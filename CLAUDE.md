@@ -186,7 +186,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - Access DataStore only through `SettingsRepository` (never directly).
 - Use Preferences DataStore (key-value) for simple settings.
 - Use Proto DataStore if structured data becomes complex (not needed initially).
-- HTTPS is optional (disabled by default); store HTTPS enabled toggle, certificate source (auto-generated vs custom), and hostname for auto-generated certificates.
+- **HTTPS is optional and disabled by default; HTTP is the primary transport.** The device's IP changes frequently and public CAs cannot issue valid certificates for bare/dynamic IPs, so any HTTPS certificate will be self-signed and clients must allow insecure certificates. Store HTTPS enabled toggle, certificate source (auto-generated vs custom), and hostname for auto-generated certificates. Future plans include ngrok/Tailscale integration for proper HTTPS.
 
 ### Workflow for settings changes:
 1) Update `ServerConfig` data class if new settings are added.
