@@ -63,9 +63,9 @@ feat/<description-with-dashes>
 <type>: <short description>
 
 <optional body explaining the "why", not the "what">
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
+
+**Note**: Do NOT include a `Co-Authored-By` trailer for commits authored by Claude. Claude is the author, not a co-author.
 
 **Types**:
 - `feat`: New feature or functionality
@@ -83,8 +83,6 @@ feat: add Gradle project configuration with all dependencies
 Set up root and app build.gradle.kts with Kotlin DSL, configure
 libs.versions.toml version catalog with all project dependencies,
 and define gradle.properties with version and build settings.
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
 ```
@@ -93,8 +91,6 @@ chore: add Makefile with development workflow targets
 Implement all Makefile targets defined in PROJECT.md including
 build, test, lint, device management, emulator, and versioning
 targets.
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
 ### Staging Specific Chunks
@@ -196,8 +192,6 @@ git commit -m "$(cat <<'EOF'
 <type>: <description>
 
 <body>
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 

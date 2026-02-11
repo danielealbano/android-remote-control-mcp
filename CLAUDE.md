@@ -18,6 +18,7 @@ You MUST follow it and you MUST keep it up to date.
 **Development Workflow Tools**
 See [TOOLS.md](docs/TOOLS.md) for git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions.
 You MUST follow the branching, commit, and PR conventions defined there.
+**Git commits authored by Claude (you) MUST NOT include the `Co-Authored-By` trailer.** You are the author, not a co-author.
 
 **Additional Documentation** (created during implementation):
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Application architecture documentation (created in Plan 6)
