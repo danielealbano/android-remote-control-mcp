@@ -1,0 +1,56 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+.navigation/
+captures/
+
+# Local configuration
+local.properties
+keystore.properties
+
+# Keystores (sensitive)
+*.jks
+*.keystore
+
+# Environment / Secrets
+.env
+.env.*
+.secrets
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kotlin
+*.class
+
+# APK files (build outputs)
+*.apk
+*.ap_
+*.aab
+
+# Generated files
+gen/
+out/
+
+# Android profiling
+*.hprof
+
+# Crash logs
+crash-reports/
+
+# Coverage reports
+jacoco/
+
+# Lint reports
+lint-results*
+
+# Test results (keep in CI artifacts, not in repo)
+test-results/
