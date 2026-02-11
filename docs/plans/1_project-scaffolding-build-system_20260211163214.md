@@ -1674,7 +1674,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +| Touch Actions | `tap`, `long_press`, `double_tap`, `swipe`, `scroll` | Coordinate-based interactions |
 +| Element Actions | `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element` | Accessibility node interactions |
 +| Text Input | `input_text`, `clear_text`, `press_key` | Keyboard input |
-+| System Actions | `press_back`, `press_home`, `press_recents`, `open_notifications`, `open_quick_settings` | Global device actions |
++| System Actions | `press_back`, `press_home`, `press_recents`, `open_notifications`, `open_quick_settings`, `get_device_logs` | Global device actions |
 +| Gestures | `pinch`, `custom_gesture` | Advanced multi-touch gestures |
 +| Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle` | Helper tools |
 +
