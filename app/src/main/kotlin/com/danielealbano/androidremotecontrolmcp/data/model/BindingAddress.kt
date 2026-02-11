@@ -15,7 +15,6 @@ enum class BindingAddress(val address: String) {
 
     companion object {
         /** Returns the [BindingAddress] matching the given [address] string, or [LOCALHOST] if not found. */
-        fun fromAddress(address: String): BindingAddress =
-            entries.firstOrNull { it.address == address } ?: LOCALHOST
+        fun fromAddress(address: String): BindingAddress = entries.firstOrNull { it.address == address } ?: LOCALHOST
     }
 }

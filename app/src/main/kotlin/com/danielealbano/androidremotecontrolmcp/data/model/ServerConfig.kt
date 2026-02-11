@@ -27,10 +27,13 @@ data class ServerConfig(
     companion object {
         /** Default server port. */
         const val DEFAULT_PORT = 8080
+
         /** Minimum valid port number. */
         const val MIN_PORT = 1
+
         /** Maximum valid port number. */
         const val MAX_PORT = 65535
+
         /** Default hostname for auto-generated certificates. */
         const val DEFAULT_CERTIFICATE_HOSTNAME = "android-mcp.local"
     }

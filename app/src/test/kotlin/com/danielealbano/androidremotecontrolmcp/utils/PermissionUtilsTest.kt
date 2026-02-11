@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("PermissionUtils")
 class PermissionUtilsTest {
-
     private val mockContext: Context = mockk(relaxed = true)
     private val mockContentResolver: ContentResolver = mockk(relaxed = true)
 
@@ -37,11 +36,11 @@ class PermissionUtilsTest {
     @Nested
     @DisplayName("isAccessibilityServiceEnabled")
     inner class IsAccessibilityServiceEnabled {
-
         @Test
         fun `returns true when service is in enabled list`() {
-            val serviceName = "com.danielealbano.androidremotecontrolmcp/" +
-                "com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService"
+            val serviceName =
+                "com.danielealbano.androidremotecontrolmcp/" +
+                    "com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService"
             every {
                 Settings.Secure.getString(mockContentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             } returns serviceName
@@ -82,7 +81,6 @@ class PermissionUtilsTest {
     @Nested
     @DisplayName("openAccessibilitySettings")
     inner class OpenAccessibilitySettings {
-
         @Test
         fun `starts activity with accessibility settings intent`() {
             PermissionUtils.openAccessibilitySettings(mockContext)
@@ -94,7 +92,6 @@ class PermissionUtilsTest {
     @Nested
     @DisplayName("isNotificationPermissionGranted")
     inner class IsNotificationPermissionGranted {
-
         @Test
         fun `returns true on API below 33`() {
             // On API < 33, notification permission is always granted.

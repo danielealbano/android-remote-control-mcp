@@ -7,11 +7,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("Logger")
 class LoggerTest {
-
     @Nested
     @DisplayName("sanitize")
     inner class Sanitize {
-
         @Test
         fun `replaces UUID with REDACTED`() {
             val message = "Token: 550e8400-e29b-41d4-a716-446655440000"
@@ -23,8 +21,9 @@ class LoggerTest {
 
         @Test
         fun `replaces multiple UUIDs`() {
-            val message = "Old: 550e8400-e29b-41d4-a716-446655440000, " +
-                "New: 6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            val message =
+                "Old: 550e8400-e29b-41d4-a716-446655440000, " +
+                    "New: 6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
             val result = Logger.sanitize(message)
 

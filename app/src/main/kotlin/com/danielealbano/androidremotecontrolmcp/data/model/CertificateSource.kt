@@ -16,7 +16,6 @@ enum class CertificateSource {
 
     companion object {
         /** Returns the [CertificateSource] matching the given [name], or [AUTO_GENERATED] if not found. */
-        fun fromName(name: String): CertificateSource =
-            entries.firstOrNull { it.name == name } ?: AUTO_GENERATED
+        fun fromName(name: String): CertificateSource = entries.firstOrNull { it.name == name } ?: AUTO_GENERATED
     }
 }
