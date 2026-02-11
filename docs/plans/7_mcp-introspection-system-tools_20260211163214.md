@@ -101,6 +101,10 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 
 **Context**: This class acts as the single entry point for registering all MCP tools. It is Hilt-injected with the `McpProtocolHandler` and all tool handler instances. The `registerAllTools()` method iterates through all tools and registers each with the protocol handler. Plans 8 and 9 will add additional tool handler parameters to the constructor and additional registration calls in `registerAllTools()`.
 
+> **IMPORTANT — Supersedes Plan 6 definitions**: Plan 6 defined `ToolDefinition` and `ToolHandler` inside `McpProtocolHandler.kt`. This plan **moves** both to `ToolRegistry.kt` as standalone types. At implementation time, **remove** the `ToolDefinition` and `ToolHandler` definitions from `McpProtocolHandler.kt` and replace references with imports from this file. `McpProtocolHandler` should delegate tool execution to `ToolRegistry.execute()` instead of managing its own tool map.
+
+> **Registration pattern evolution**: This plan registers tools via `McpServerService.registerAllTools()` calling into `ToolRegistry`. Plans 8-9 evolve this by adding private helper methods (`registerTouchActionTools()`, `registerGestureTools()`, etc.) inside `ToolRegistry.registerAll()` and expanding the constructor with tool dependencies. The final pattern is: `ToolRegistry.registerAll()` calls private categorized registration methods internally.
+
 The tool handler classes themselves are simple `@Inject constructor()` classes (no special Hilt configuration needed beyond `@Inject`), so Hilt can provide them automatically. The `ToolRegistry` is `@Singleton` to match the protocol handler's scope.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ToolRegistry.kt`
@@ -358,7 +362,7 @@ This means we also need to update `McpProtocolHandler.handleToolCall()` to handl
 +        }
 +
 +        val rootNode = service.getRootNode()
-+            ?: throw McpToolException.ExecutionFailed(
++            ?: throw McpToolException.ActionFailed(
 +                "Failed to obtain root accessibility node.",
 +            )
 +
@@ -433,7 +437,7 @@ This means we also need to update `McpProtocolHandler.handleToolCall()` to handl
 +
 +        val result = screenCaptureService.captureScreenshot(quality)
 +        val screenshotData = result.getOrElse { exception ->
-+            throw McpToolException.ExecutionFailed(
++            throw McpToolException.ActionFailed(
 +                "Screenshot capture failed: ${exception.message ?: "Unknown error"}",
 +            )
 +        }
@@ -616,17 +620,20 @@ This means we also need to update `McpProtocolHandler.handleToolCall()` to handl
 +    /** Invalid parameters (error code -32602). */
 +    class InvalidParams(message: String) : McpToolException(message, -32602)
 +
++    /** Internal server error (error code -32603). */
++    class InternalError(message: String) : McpToolException(message, -32603)
++
 +    /** Permission not granted (error code -32001). */
 +    class PermissionDenied(message: String) : McpToolException(message, -32001)
-+
-+    /** Action execution failed (error code -32603). */
-+    class ExecutionFailed(message: String) : McpToolException(message, -32603)
 +
 +    /** Element not found by ID or criteria (error code -32002). */
 +    class ElementNotFound(message: String) : McpToolException(message, -32002)
 +
-+    /** Operation timed out (error code -32003). */
-+    class Timeout(message: String) : McpToolException(message, -32003)
++    /** Accessibility action execution failed (error code -32003). */
++    class ActionFailed(message: String) : McpToolException(message, -32003)
++
++    /** Operation timed out (error code -32004). */
++    class Timeout(message: String) : McpToolException(message, -32004)
 +}
 ```
 
@@ -741,7 +748,7 @@ This means we also need to update `McpProtocolHandler.handleToolCall()` to handl
              internalError(request.id, "Tool execution failed: ${e.message ?: "Unknown error"}")
 ```
 
-> **Important**: The `McpToolException` catch block MUST appear before the general `Exception` catch block since `McpToolException` extends `Exception`. Kotlin evaluates catch blocks in order and uses the first matching one. The sealed class hierarchy means all subtypes (`InvalidParams`, `PermissionDenied`, `ExecutionFailed`, `ElementNotFound`, `Timeout`) are caught by this single block, and each carries its own `code` property.
+> **Important**: The `McpToolException` catch block MUST appear before the general `Exception` catch block since `McpToolException` extends `Exception`. Kotlin evaluates catch blocks in order and uses the first matching one. The sealed class hierarchy means all subtypes (`InvalidParams`, `InternalError`, `PermissionDenied`, `ElementNotFound`, `ActionFailed`, `Timeout`) are caught by this single block, and each carries its own `code` property.
 
 ---
 
@@ -811,7 +818,7 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +
 +    val result = action()
 +    result.onFailure { exception ->
-+        throw McpToolException.ExecutionFailed(
++        throw McpToolException.ActionFailed(
 +            "$actionName failed: ${exception.message ?: "Unknown error"}",
 +        )
 +    }
@@ -1080,7 +1087,7 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +
 +            if (exitCode != 0 && output.isEmpty()) {
 +                val errorOutput = process.errorStream.bufferedReader().readText()
-+                throw McpToolException.ExecutionFailed(
++                throw McpToolException.ActionFailed(
 +                    "logcat command failed (exit $exitCode): $errorOutput",
 +                )
 +            }
@@ -1098,7 +1105,7 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +        } catch (e: McpToolException) {
 +            throw e
 +        } catch (e: Exception) {
-+            throw McpToolException.ExecutionFailed(
++            throw McpToolException.ActionFailed(
 +                "Failed to retrieve device logs: ${e.message ?: "Unknown error"}",
 +            )
 +        }

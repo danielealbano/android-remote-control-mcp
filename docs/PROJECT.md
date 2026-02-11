@@ -136,11 +136,11 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
-  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`
+  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureService.kt`, `MediaProjectionManager.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
-  - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`
-  - `mcp/tools/` — `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
+  - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`
+  - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -148,7 +148,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`
-  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `ScreenInfo.kt`
+  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
@@ -209,7 +209,7 @@ Custom error codes:
 
 ## MCP Tools Specification
 
-The MCP server exposes 28 tools across 7 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 ### 1. Screen Introspection Tools (4 tools)
 
@@ -612,7 +612,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 28 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 29 tools
 
 ---
 

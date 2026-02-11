@@ -106,7 +106,7 @@ This plan implements 7 MCP tools for coordinate-based touch interactions and adv
 **Error handling convention**: Uses `McpToolException` sealed class defined in Plan 7 (`mcp/McpToolException.kt`). Tool handlers throw the appropriate subtype:
 - `McpToolException.InvalidParams(message)` - maps to error code `-32602`
 - `McpToolException.PermissionDenied(message)` - maps to error code `-32001`
-- `McpToolException.ExecutionFailed(message)` - maps to error code `-32603`
+- `McpToolException.ActionFailed(message)` - maps to error code `-32003`
 
 The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Action 7.2.4) to catch `McpToolException` and use `e.code` to produce the correct JSON-RPC error response.
 
@@ -135,7 +135,7 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +// NOTE: Uses McpToolException sealed class defined in Plan 7 (mcp/McpToolException.kt).
 +// Import: com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 +// Subtypes used: McpToolException.InvalidParams, McpToolException.PermissionDenied,
-+//                McpToolException.ExecutionFailed
++//                McpToolException.ActionFailed, McpToolException.InternalError
 +
 +/**
 + * Shared utilities for MCP tool parameter extraction and response building.
@@ -245,6 +245,11 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +     * Builds a standard MCP text content response.
 +     *
 +     * Returns: `{ "content": [{ "type": "text", "text": "<message>" }] }`
++     *
++     * **Implementation Note**: This method overlaps with [McpContentBuilder.textContent()]
++     * from Plan 7. At implementation time, consolidate these into a single utility to avoid
++     * duplication. Prefer delegating to [McpContentBuilder.textContent()] and remove this method,
++     * or move all response-building into [McpToolUtils] and remove [McpContentBuilder].
 +     */
 +    fun textContentResponse(message: String): JsonElement {
 +        return buildJsonObject {
@@ -262,7 +267,7 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +     * [McpToolException].
 +     *
 +     * - [IllegalStateException] with "not available" -> [McpToolException.PermissionDenied]
-+     * - All other exceptions -> [McpToolException.ExecutionFailed]
++     * - All other exceptions -> [McpToolException.ActionFailed]
 +     */
 +    fun handleActionResult(result: Result<Unit>, successMessage: String): JsonElement {
 +        if (result.isSuccess) {
@@ -278,7 +283,7 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +            )
 +        }
 +
-+        throw McpToolException.ExecutionFailed(message)
++        throw McpToolException.ActionFailed(message)
 +    }
 +
 +    /** Maximum duration in milliseconds for any gesture/action. */
@@ -457,7 +462,7 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 > - `McpToolUtils.requireFloat()` uses `toFloatOrNull()` on the `JsonPrimitive.content` string, which handles both integer (`"500"`) and floating-point (`"500.5"`) JSON numbers transparently.
 > - `McpToolUtils.optionalLong()` first parses as `Double` then converts to `Long` with `toLong()`. This handles JSON numbers like `300` (which kotlinx.serialization may represent as `300.0` internally) as well as explicit integers.
 > - `McpToolUtils.handleActionResult()` inspects the `Result.failure` exception type: `IllegalStateException` with "not available" in the message indicates the accessibility service is not enabled (maps to `-32001`), while all other failures map to `-32003`.
-> - `McpToolException` is the sealed class hierarchy defined in Plan 7 (`mcp/McpToolException.kt`). This file imports it via `import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException`. Subtypes used: `InvalidParams`, `PermissionDenied`, `ExecutionFailed`.
+> - `McpToolException` is the sealed class hierarchy defined in Plan 7 (`mcp/McpToolException.kt`). This file imports it via `import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException`. Subtypes used: `InvalidParams`, `PermissionDenied`, `ActionFailed`.
 > - `ScrollTool` uses `lowercase()` for case-insensitive matching of direction and amount strings.
 > - All coordinate values displayed in response messages use `toInt()` for clean integer display.
 
@@ -467,7 +472,7 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 
 **What**: Verify that `handleToolCall()` in `McpProtocolHandler` handles `McpToolException` correctly.
 
-**Context**: Plan 7 already updated `handleToolCall()` to catch `McpToolException` (the sealed base class) and use `e.code` to produce the correct JSON-RPC error response. Since the sealed class hierarchy includes `InvalidParams`, `PermissionDenied`, `ExecutionFailed`, `ElementNotFound`, and `Timeout` -- all carrying their own `code` -- a single catch block handles all subtypes. This action is a **no-op** if Plan 7 was implemented first. The implementer MUST verify the catch block exists before proceeding.
+**Context**: Plan 7 already updated `handleToolCall()` to catch `McpToolException` (the sealed base class) and use `e.code` to produce the correct JSON-RPC error response. Since the sealed class hierarchy includes `InvalidParams`, `InternalError`, `PermissionDenied`, `ElementNotFound`, `ActionFailed`, and `Timeout` -- all carrying their own `code` -- a single catch block handles all subtypes. This action is a **no-op** if Plan 7 was implemented first. The implementer MUST verify the catch block exists before proceeding.
 
 > **Implementation Note**: Plan 7 already handles `McpToolException` with a single catch block using `e.code`. No changes needed here. If Plan 8 is implemented before Plan 7, the implementer must add the catch block from Plan 7 Action 7.2.4.
 
@@ -482,6 +487,8 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **What**: Add registration of `TapTool`, `LongPressTool`, `DoubleTapTool`, `SwipeTool`, and `ScrollTool` in `ToolRegistry`.
 
 **Context**: The `ToolRegistry` (from Plan 7) is responsible for registering all MCP tools with `McpProtocolHandler` at startup. Each tool registration requires a name, description, JSON input schema, and handler instance. The tool handler instances are created with the injected `ActionExecutor`. Input schemas match the specifications in PROJECT.md exactly.
+
+> **IMPORTANT — Constructor evolution**: Plan 7 defined `ToolRegistry @Inject constructor()` with an empty constructor. This plan **replaces** that constructor to add `protocolHandler: McpProtocolHandler` and `actionExecutor: ActionExecutor` as constructor parameters for Hilt injection. Plan 9 will further expand this constructor with additional tool dependencies. Each plan's constructor definition supersedes the previous one.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ToolRegistry.kt (from Plan 7)`
 
@@ -510,7 +517,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
      }
 
 +    private fun registerTouchActionTools() {
-+        toolRegistry.register(
++        register(
 +            name = "tap",
 +            description = "Performs a single tap at the specified coordinates.",
 +            inputSchema = buildJsonObject {
@@ -533,7 +540,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +            handler = TapTool(actionExecutor),
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "long_press",
 +            description = "Performs a long press at the specified coordinates.",
 +            inputSchema = buildJsonObject {
@@ -561,7 +568,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +            handler = LongPressTool(actionExecutor),
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "double_tap",
 +            description = "Performs a double tap at the specified coordinates.",
 +            inputSchema = buildJsonObject {
@@ -584,7 +591,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +            handler = DoubleTapTool(actionExecutor),
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "swipe",
 +            description = "Performs a swipe gesture from one point to another.",
 +            inputSchema = buildJsonObject {
@@ -622,7 +629,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +            handler = SwipeTool(actionExecutor),
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "scroll",
 +            description = "Scrolls in the specified direction.",
 +            inputSchema = buildJsonObject {
@@ -905,7 +912,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
      }
 
 +    private fun registerGestureTools() {
-+        toolRegistry.register(
++        register(
 +            name = "pinch",
 +            description = "Performs a pinch-to-zoom gesture.",
 +            inputSchema = buildJsonObject {
@@ -938,7 +945,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +            handler = PinchTool(actionExecutor),
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "custom_gesture",
 +            description = "Executes a custom multi-touch gesture defined by path points.",
 +            inputSchema = buildJsonObject {
@@ -1181,7 +1188,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +                put("y", 1000)
 +            }
 +
-+            val exception = assertThrows(McpToolException.ExecutionFailed::class.java) {
++            val exception = assertThrows(McpToolException.ActionFailed::class.java) {
 +                kotlinx.coroutines.test.runTest { tool.execute(params) }
 +            }
 +            assertTrue(exception.message!!.contains("Gesture cancelled"))
@@ -1321,7 +1328,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +                put("y", 1000)
 +            }
 +
-+            assertThrows(McpToolException.ExecutionFailed::class.java) {
++            assertThrows(McpToolException.ActionFailed::class.java) {
 +                kotlinx.coroutines.test.runTest { tool.execute(params) }
 +            }
 +        }
@@ -1534,7 +1541,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +                put("direction", "down")
 +            }
 +
-+            assertThrows(McpToolException.ExecutionFailed::class.java) {
++            assertThrows(McpToolException.ActionFailed::class.java) {
 +                kotlinx.coroutines.test.runTest { tool.execute(params) }
 +            }
 +        }
@@ -1767,7 +1774,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +                put("scale", 1.5)
 +            }
 +
-+            assertThrows(McpToolException.ExecutionFailed::class.java) {
++            assertThrows(McpToolException.ActionFailed::class.java) {
 +                kotlinx.coroutines.test.runTest { tool.execute(params) }
 +            }
 +        }
@@ -2013,7 +2020,7 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 +                })
 +            }
 +
-+            assertThrows(McpToolException.ExecutionFailed::class.java) {
++            assertThrows(McpToolException.ActionFailed::class.java) {
 +                kotlinx.coroutines.test.runTest { tool.execute(params) }
 +            }
 +        }
