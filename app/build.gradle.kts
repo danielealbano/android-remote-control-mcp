@@ -26,7 +26,7 @@ android {
         versionCode = versionCodeProp
         versionName = versionNameProp
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.danielealbano.androidremotecontrolmcp.HiltTestRunner"
     }
 
     // Release signing configuration (optional, uses keystore.properties if present)
@@ -136,6 +136,7 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
     // Accompanist
@@ -155,6 +156,8 @@ dependencies {
     androidTestImplementation(libs.test.rules)
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.mockk.android)
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.compiler)
     debugImplementation(libs.compose.ui.test.manifest)
 }
 
