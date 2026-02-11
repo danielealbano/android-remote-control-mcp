@@ -48,7 +48,7 @@ class NetworkUtilsTest {
         }
 
         @Test
-        fun `loopback interface has 127.0.0.1 address`() {
+        fun `loopback interface has 127_0_0_1 address`() {
             val interfaces = NetworkUtils.getNetworkInterfaces()
             val loopback = interfaces.first { it.isLoopback }
 
