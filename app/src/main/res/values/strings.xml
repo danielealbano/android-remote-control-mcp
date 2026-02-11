@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Android Remote Control MCP</string>
+
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Provides remote control capabilities via MCP protocol. Allows introspecting UI elements and performing actions on the device.</string>
+
+    <!-- Notification Channel -->
+    <string name="notification_channel_mcp_server_id">mcp_server_channel</string>
+    <string name="notification_channel_mcp_server_name">MCP Server</string>
+    <string name="notification_channel_screen_capture_id">screen_capture_channel</string>
+    <string name="notification_channel_screen_capture_name">Screen Capture</string>
+
+    <!-- Notification Content -->
+    <string name="notification_mcp_server_title">MCP Server Running</string>
+    <string name="notification_screen_capture_title">Screen Capture Active</string>
+</resources>
