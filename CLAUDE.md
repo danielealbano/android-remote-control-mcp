@@ -181,11 +181,11 @@ You MUST:
 This project uses **DataStore** (not Room database) for persisting settings. There is no complex relational data.
 
 ### DataStore usage
-- All settings (port, binding address, bearer token, auto-start, HTTPS certificate config) MUST be stored in DataStore.
+- All settings (port, binding address, bearer token, auto-start, HTTPS enabled toggle, HTTPS certificate config) MUST be stored in DataStore.
 - Access DataStore only through `SettingsRepository` (never directly).
 - Use Preferences DataStore (key-value) for simple settings.
 - Use Proto DataStore if structured data becomes complex (not needed initially).
-- HTTPS is always enabled (mandatory); store certificate source (auto-generated vs custom) and hostname for auto-generated certificates.
+- HTTPS is optional (disabled by default); store HTTPS enabled toggle, certificate source (auto-generated vs custom), and hostname for auto-generated certificates.
 
 ### Workflow for settings changes:
 1) Update `ServerConfig` data class if new settings are added.
@@ -245,7 +245,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - **Bearer token authentication**: Enforce on every MCP request.
 - Implemented as Ktor middleware (`BearerTokenAuth`).
 - Return `401 Unauthorized` for missing/invalid token.
-- Never bypass authentication (even for health check endpoint, health check is unauthenticated but MCP endpoints are protected).
+- Never bypass authentication for MCP endpoints. The health check endpoint (`/health`) is the only unauthenticated endpoint.
 
 ### Permission handling
 - **Accessibility permission**: Check `isAccessibilityServiceEnabled()` before accessibility operations.
@@ -412,7 +412,7 @@ class MainActivityTest {
 - Error handling (permission denied, element not found),
 - Multiple tool calls in sequence.
 
-**Test scenario: Calculator** (see PROJECT.md for detailed steps).
+**Test scenario: Calculator** (7 + 3 = 10, see Plan 10 for detailed E2E test steps).
 
 **Running E2E tests**:
 - `make test-e2e` (starts Docker Android container, installs APK, runs tests, tears down).

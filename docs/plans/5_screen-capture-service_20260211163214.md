@@ -93,6 +93,8 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotData.kt`
 
+> **IMPORTANT — Path discrepancy**: PROJECT.md lists `ScreenshotData.kt` under `data/model/`. This plan places it in `services/screencapture/` for proximity to the screen capture code. At implementation time, use the `data/model/` location per PROJECT.md and update the import paths accordingly.
+
 ```diff
 --- /dev/null
 +++ b/app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotData.kt
@@ -649,6 +651,8 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +        val displayMetrics = resources.displayMetrics
 +        screenDensity = displayMetrics.densityDpi
 +    }
+
+> **CRITICAL — API level check missing**: `windowManager.currentWindowMetrics` requires API 30+. Since `minSdk = 26`, this will crash on API 26-29. Add a `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` check with a `DisplayMetrics` fallback, matching the pattern already used in `McpAccessibilityService.getScreenInfo()` (Action 5.5.1).
 +
 +    private fun setupImageReader() {
 +        imageReader?.close()
@@ -800,6 +804,8 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 - [ ] File passes ktlint and detekt
 
 **Tests**: Tested as part of accessibility service tests (Plan 4 tests or extended in Task 5.8). The method is straightforward and primarily delegates to Android framework APIs.
+
+> **Implementation Note — Missing test**: `McpAccessibilityService.getScreenInfo()` is added in Task 5.5 but has no dedicated test. Add a test at implementation time.
 
 #### Action 5.5.1: Add `getScreenInfo()` method to `McpAccessibilityService.kt`
 
@@ -1353,6 +1359,8 @@ The following additions should be made to the existing file:
 +@DisplayName("ScreenCaptureService")
 +class ScreenCaptureServiceTest {
 +
++// > **IMPORTANT — JVM test limitation**: `ScreenCaptureService` extends `android.app.Service` and uses `@AndroidEntryPoint`. Direct instantiation via `ScreenCaptureService()` in JVM unit tests will fail. At implementation time, use Robolectric or restructure to test the logic through extracted helper classes.
++
 +    private lateinit var service: ScreenCaptureService
 +    private lateinit var mockProjection: MediaProjection
 +
@@ -1425,6 +1433,8 @@ The following additions should be made to the existing file:
 +            // Assert
 +            assertFalse(result)
 +        }
+
+> **Implementation Note — Test logic**: The first `every` mock is immediately overwritten by the second, so this test does not actually verify a state transition. At implementation time, rewrite to test actual state change (e.g., call setup, then simulate projection stop via callback).
 +    }
 +
 +    @Nested

@@ -1574,6 +1574,8 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 
 #### Action 9.4.1: Create `ElementActionToolsTest.kt`
 
+> **CRITICAL — Wrong response structure in tests**: Multiple tests access `result["message"]` or `result["elements"]` at the top level of the JSON response. However, `McpContentBuilder.textContent()` wraps the response in a `content` array: `{ "content": [{ "type": "text", "text": "..." }] }`. At implementation time, update test assertions to navigate the content structure: `result["content"]!!.jsonArray[0].jsonObject["text"]`.
+
 **What**: Create unit tests for the five element action tools.
 
 **Context**: Tests mock `AccessibilityTreeParser`, `ElementFinder`, `ActionExecutor`, and `McpAccessibilityService.instance`. The `getFreshTree()` utility function accesses `McpAccessibilityService.instance` directly (companion object singleton), so tests must set this singleton via `mockkObject(McpAccessibilityService.Companion)` or by directly setting the field. Since the companion object field is `@Volatile var`, MockK's `every { McpAccessibilityService.instance }` approach is used.

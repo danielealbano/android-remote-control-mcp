@@ -244,7 +244,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +test-core = "1.6.1"                     # verify latest at implementation time
 +test-runner = "1.6.2"                   # verify latest at implementation time
 +test-rules = "1.6.1"                    # verify latest at implementation time
-+compose-ui-test = "1.7.6"              # verify latest at implementation time
++compose-ui-test = "1.7.6"              # verify latest at implementation time; may conflict with Compose BOM — consider removing version.ref from test libraries and relying on BOM
 +
 +# Linting
 +ktlint-gradle = "12.1.2"               # verify latest at implementation time
@@ -1695,15 +1695,15 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +
 +| Setting | Default | Description |
 +|---------|---------|-------------|
-+| Port | 8080 | HTTPS server port |
++| Port | 8080 | HTTP/HTTPS server port |
 +| Binding Address | 127.0.0.1 | Localhost only (use 0.0.0.0 for network access) |
 +| Bearer Token | Auto-generated | Authentication token for MCP clients |
-+| HTTPS | Always on | Self-signed certificate (auto-generated) or custom |
++| HTTPS | Disabled by default | Optional; self-signed certificate (auto-generated) or custom when enabled |
 +| Auto-start | Disabled | Start MCP server on device boot |
 +
 +## Security
 +
-+- **HTTPS only**: All connections use TLS encryption
++- **HTTPS (optional)**: When enabled, all connections use TLS encryption (disabled by default)
 +- **Bearer token authentication**: Every MCP request requires a valid token
 +- **Localhost by default**: Server binds to 127.0.0.1 (requires ADB port forwarding)
 +- **No root required**: Application uses standard Android APIs only
