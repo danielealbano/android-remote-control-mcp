@@ -15,6 +15,14 @@ See [PROJECT.md](docs/PROJECT.md) for comprehensive architecture, technical stac
 PROJECT.md is the source of truth for all technical decisions.
 You MUST follow it and you MUST keep it up to date.
 
+**Development Workflow Tools**
+See [TOOLS.md](docs/TOOLS.md) for git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions.
+You MUST follow the branching, commit, and PR conventions defined there.
+
+**Additional Documentation** (created during implementation):
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Application architecture documentation (created in Plan 6)
+- [MCP_TOOLS.md](docs/MCP_TOOLS.md) — MCP tools specification and usage documentation (created in Plans 7-9)
+
 ---
 
 ## 1) Role and Behavior - ABSOLUTE RULES
