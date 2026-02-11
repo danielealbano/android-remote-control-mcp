@@ -63,11 +63,11 @@ When asked to make a plan:
 -- ID is a counter determined via the following `cd docs/plans && ls -1 [0-9]*_*.md 2>/dev/null | awk -F_ '($1+0)>m{m=$1} END{print m+1}'` (the docs/plans already exists)
 -- YYYYMMDDhhmmss is determined via the date command
 - The plan MUST USE user stories -> tasks -> actions where:
--- the user story is a kanban style and has multiple tasks and has an acceptance criteria/definition of done (high level) plus executing liting and related tests
+-- the user story is a kanban style and has multiple tasks and has an acceptance criteria/definition of done (high level) plus executing linting and related tests
 -- the tasks are "functional aspects" of the user stories and have a number of actions, it has also the acceptance criteria/definition of done and the execution of each test related to the task
 -- the action is code change in patch / diff style, an explanation of what needs to be changed and some context
 -- The tasks and actions MUST be in a sequential execution order, tasks or actions MUST NOT DEPEND on items AFTER them in the execution plan
-- You MUST ALWAYS create plans that follow a ordered sequnece where previous items MUST NOT DEPEND on items afterwards!
+- You MUST ALWAYS create plans that follow an ordered sequence where previous items MUST NOT DEPEND on items afterwards!
 - Once you finish to write the plan you MUST ALWAYS re-read it and double check it from a Performance, Security and QA point of view and discuss with the user any relevant finding
 - Only run the full tests at the end of the user story, for the tasks if possible run targeted tests
 - When implementing the plan you MUST follow it to the letter unless something is unclear or incorrect, in which case you MUST ask to the user how to proceed!
@@ -79,7 +79,7 @@ When asked to make a plan:
 
 ### Terminal safety - ABSOLUTE RULES
 - YOU MUST NOT try to use `sudo`, no `su`, no root commands.
-- YOU MUST NOT use `rm -rf` and no recursive deletions without explicit permission and consent form the user, you MUST ALWAYS ASK FOR PERMISSION OR CONSENT!!! THIS IS MANDATORY!!!
+- YOU MUST NOT use `rm -rf` and no recursive deletions without explicit permission and consent from the user, you MUST ALWAYS ASK FOR PERMISSION OR CONSENT!!! THIS IS MANDATORY!!!
 - You MUST NOT use system-wide installers without specific user consent (examples: `apt`, `npm install -g`, `brew install`), you MUST ask!
 
 ### Android safety - ABSOLUTE RULES
@@ -196,7 +196,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 5) Add tests for settings persistence.
 
 ### Data types
-- Use appropriate types: `Int` for port, `String` for binding address, `String` for bearer token, `Boolean` for toggles.
+- Use appropriate types: `Int` for port, `BindingAddress` (enum) for binding address, `String` for bearer token, `Boolean` for toggles.
 - Never use `Float` or `Double` for values that require precision (not applicable for this project, but keep in mind).
 - Use `enum` or sealed classes for settings with fixed options (e.g., binding address could be enum: LOCALHOST, NETWORK).
 

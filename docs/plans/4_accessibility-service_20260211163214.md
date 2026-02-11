@@ -1168,6 +1168,8 @@ All gesture methods (`tap`, `swipe`, `pinch`, etc.) use Android's `dispatchGestu
 +        val startDistance = if (isZoomIn) pinchDistance else pinchDistance * scale
 +        val endDistance = if (isZoomIn) pinchDistance * scale else pinchDistance
 +
++> **CRITICAL — Pinch zoom-out direction inverted**: For `scale < 1` (zoom-out), `startDistance = pinchDistance * scale` (small) and `endDistance = pinchDistance` (large) means fingers START close and MOVE APART — that's zoom-IN, not zoom-OUT. At implementation time, swap the zoom-out logic: `startDistance = pinchDistance` (fingers start far apart) and `endDistance = pinchDistance * scale` (fingers end close together). The corrected code should be: `val startDistance = if (isZoomIn) pinchDistance else pinchDistance` and `val endDistance = if (isZoomIn) pinchDistance * scale else pinchDistance * scale`, which simplifies to `val startDistance = pinchDistance` and `val endDistance = pinchDistance * scale` for both cases.
++
 +        val finger1Path = Path().apply {
 +            moveTo(centerX - startDistance, centerY)
 +            lineTo(centerX - endDistance, centerY)

@@ -137,7 +137,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ScreenInfo.kt`
-  - `services/screencapture/` — `ScreenCaptureService.kt`, `MediaProjectionManager.kt`
+  - `services/screencapture/` — `ScreenCaptureService.kt`, `MediaProjectionHelper.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
   - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`

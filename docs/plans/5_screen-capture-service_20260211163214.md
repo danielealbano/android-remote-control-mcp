@@ -45,7 +45,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 - [ ] `ScreenCaptureService` calls `startForeground()` within 5 seconds of `onStartCommand()` with a valid notification
 - [ ] `ScreenCaptureService` notification uses channel `screen_capture_channel` (already defined in `strings.xml` from Plan 1, channel created in `McpApplication.onCreate()` from Plan 6)
 - [ ] `ScreenCaptureService` MUST be started via `startForegroundService()` BEFORE `bindService()` is called (from McpServerService in Plan 6), because `bindService()` alone does NOT trigger `onStartCommand()`, and `startForeground()` must be called within 5 seconds of `startForegroundService()`. The correct sequence in McpServerService is: (1) `startForegroundService(intent)` (2) `bindService(intent, connection, flags)`.
-- [ ] `ScreenCaptureService.setupMediaProjection(resultCode, data)` delegates to `MediaProjectionManager.setupProjection()` using the activity result
+- [ ] `ScreenCaptureService.setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection()` using the activity result
 - [ ] `ScreenCaptureService.isMediaProjectionActive()` returns correct boolean state
 - [ ] `ScreenCaptureService.captureScreenshot(quality)` captures a screenshot with Mutex-based thread safety
 - [ ] `ScreenCaptureService` handles `onDestroy()` correctly: stops MediaProjection, releases ImageReader/VirtualDisplay, cancels coroutines, logs shutdown
@@ -67,7 +67,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 | # | Message | Files |
 |---|---------|-------|
 | 1 | `feat: add ScreenshotData model and ScreenshotEncoder utility` | `ScreenshotData.kt`, `ScreenshotEncoder.kt` |
-| 2 | `feat: add MediaProjectionManager and ScreenCaptureService with screenshot capture` | `MediaProjectionManager.kt`, `ScreenCaptureService.kt` (replaces stub) |
+| 2 | `feat: add MediaProjectionHelper and ScreenCaptureService with screenshot capture` | `MediaProjectionHelper.kt`, `ScreenCaptureService.kt` (replaces stub) |
 | 3 | `feat: add screen info to AccessibilityService and MediaProjection handling to UI` | Updated `McpAccessibilityService.kt`, `ScreenInfo.kt`, updated `MainActivity.kt`, updated `MainViewModel.kt`, updated `strings.xml` |
 | 4 | `test: add unit tests for screenshot encoder and capture service` | `ScreenshotEncoderTest.kt`, `ScreenCaptureServiceTest.kt` |
 
@@ -82,6 +82,8 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 - [ ] Fields: `format: String` (defaults to `"jpeg"`), `data: String` (base64-encoded JPEG), `width: Int`, `height: Int`
 - [ ] File compiles without errors
 - [ ] File passes ktlint and detekt
+
+> **Implementation Note — Package location**: The acceptance criteria places `ScreenshotData` in `services.screencapture`, but PROJECT.md line 151 lists it under `data/model/`. Use the PROJECT.md location (`data/model/`) at implementation time, as noted in the existing discrepancy note at Action 5.1.1.
 
 **Tests**: Serialization is implicitly tested by `ScreenshotEncoderTest` in Task 5.7. No separate test file for this data class.
 
@@ -261,35 +263,35 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 
 ---
 
-### Task 5.2b: Create MediaProjectionManager
+### Task 5.2b: Create MediaProjectionHelper
 
-**Description**: Create a `MediaProjectionManager.kt` class that encapsulates all MediaProjection lifecycle management: permission result handling, projection setup/teardown, and callback registration. This follows SOLID's Single Responsibility Principle -- `ScreenCaptureService` should focus on service lifecycle and screenshot coordination, while `MediaProjectionManager` handles projection-specific logic. The class is injected into `ScreenCaptureService`.
+**Description**: Create a `MediaProjectionHelper.kt` class that encapsulates all MediaProjection lifecycle management: permission result handling, projection setup/teardown, and callback registration. This follows SOLID's Single Responsibility Principle -- `ScreenCaptureService` should focus on service lifecycle and screenshot coordination, while `MediaProjectionHelper` handles projection-specific logic. The class is injected into `ScreenCaptureService`.
 
 **Acceptance Criteria**:
-- [ ] `MediaProjectionManager` is a class (not a service) in `services/screencapture/` package
-- [ ] `MediaProjectionManager` has `setupProjection(context: Context, resultCode: Int, data: Intent)` method
-- [ ] `MediaProjectionManager` has `stopProjection()` method for cleanup
-- [ ] `MediaProjectionManager` has `isProjectionActive(): Boolean` method
-- [ ] `MediaProjectionManager` has `getProjection(): MediaProjection?` accessor
-- [ ] `MediaProjectionManager` registers `MediaProjection.Callback` to handle system-initiated stops
-- [ ] `MediaProjectionManager` provides an `onProjectionStopped: (() -> Unit)?` callback for the service to react to projection loss
-- [ ] `MediaProjectionManager` is `@Inject`-able via Hilt (empty constructor or Hilt module binding)
+- [ ] `MediaProjectionHelper` is a class (not a service) in `services/screencapture/` package
+- [ ] `MediaProjectionHelper` has `setupProjection(context: Context, resultCode: Int, data: Intent)` method
+- [ ] `MediaProjectionHelper` has `stopProjection()` method for cleanup
+- [ ] `MediaProjectionHelper` has `isProjectionActive(): Boolean` method
+- [ ] `MediaProjectionHelper` has `getProjection(): MediaProjection?` accessor
+- [ ] `MediaProjectionHelper` registers `MediaProjection.Callback` to handle system-initiated stops
+- [ ] `MediaProjectionHelper` provides an `onProjectionStopped: (() -> Unit)?` callback for the service to react to projection loss
+- [ ] `MediaProjectionHelper` is `@Inject`-able via Hilt (empty constructor or Hilt module binding)
 - [ ] File compiles without errors
 - [ ] File passes ktlint and detekt
 
-**Tests**: Tested indirectly via `ScreenCaptureServiceTest`. Since `MediaProjectionManager` wraps Android framework APIs (`MediaProjectionManager` system service), direct unit testing requires mocking. Tests added in Task 5.8.
+**Tests**: Tested indirectly via `ScreenCaptureServiceTest`. Since `MediaProjectionHelper` wraps Android framework APIs (`android.media.projection.MediaProjectionManager` system service), direct unit testing requires mocking. Tests added in Task 5.8.
 
-#### Action 5.2b.1: Create `MediaProjectionManager.kt`
+#### Action 5.2b.1: Create `MediaProjectionHelper.kt`
 
-**What**: Create the MediaProjection lifecycle manager class.
+**What**: Create the MediaProjection lifecycle helper class.
 
 **Context**: This class follows the Single Responsibility Principle by separating MediaProjection management from the service lifecycle. `ScreenCaptureService` delegates all projection setup/teardown to this class. The class obtains `android.media.projection.MediaProjectionManager` from the passed `Context`, calls `getMediaProjection()` with the activity result, registers a callback, and exposes projection state. The `onProjectionStopped` callback allows `ScreenCaptureService` to react when the system or user stops the projection (e.g., release ImageReader/VirtualDisplay resources).
 
-**File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionManager.kt`
+**File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionHelper.kt`
 
 ```diff
 --- /dev/null
-+++ b/app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionManager.kt
++++ b/app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionHelper.kt
 @@ -0,0 +1,99 @@
 +package com.danielealbano.androidremotecontrolmcp.services.screencapture
 +
@@ -304,6 +306,9 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +/**
 + * Manages the MediaProjection lifecycle for screen capture.
 + *
++ * Named `MediaProjectionHelper` to avoid shadowing the Android framework class
++ * [android.media.projection.MediaProjectionManager].
++ *
 + * Responsibilities:
 + * - Initializes MediaProjection from activity result (resultCode + data Intent).
 + * - Registers a [MediaProjection.Callback] to handle system-initiated projection stops.
@@ -314,7 +319,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 + * MediaProjection lifecycle, while [ScreenCaptureService] handles service
 + * lifecycle and screenshot coordination.
 + */
-+class MediaProjectionManager @Inject constructor() {
++class MediaProjectionHelper @Inject constructor() {
 +
 +    private val handler = Handler(Looper.getMainLooper())
 +    private var mediaProjection: MediaProjection? = null
@@ -339,7 +344,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +     *
 +     * Must be called after the user grants screen capture permission.
 +     *
-+     * @param context The application or service context to obtain the system MediaProjectionManager.
++     * @param context The application or service context to obtain the system [android.media.projection.MediaProjectionManager].
 +     * @param resultCode The result code from the activity result (must be [android.app.Activity.RESULT_OK]).
 +     * @param data The intent data from the activity result containing the MediaProjection token.
 +     */
@@ -380,7 +385,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +    fun getProjection(): MediaProjection? = mediaProjection
 +
 +    companion object {
-+        private const val TAG = "MCP:MediaProjectionMgr"
++        private const val TAG = "MCP:MediaProjectionHlp"
 +    }
 +}
 ```
@@ -397,18 +402,18 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 - [ ] `onBind()` returns `LocalBinder` instance
 - [ ] `onStartCommand()` calls `startForeground()` with a notification on channel `screen_capture_channel`
 - [ ] Notification channel is NOT created by the service itself -- it relies on centralized channel creation in `McpApplication.onCreate()` (see Plan 6, Task 6.6.3). The channel MUST already exist before `startForeground()` is called.
-- [ ] `onDestroy()` delegates to `MediaProjectionManager.stopProjection()`, releases ImageReader/VirtualDisplay, cancels coroutine scope, clears singleton, logs shutdown
+- [ ] `onDestroy()` delegates to `MediaProjectionHelper.stopProjection()`, releases ImageReader/VirtualDisplay, cancels coroutine scope, clears singleton, logs shutdown
 - [ ] `onLowMemory()` and `onTrimMemory()` log the event (no bitmap caches to release at this layer since bitmaps are created and recycled within a single capture call)
-- [ ] `setupMediaProjection(resultCode, data)` delegates to `MediaProjectionManager.setupProjection(context, resultCode, data)`
-- [ ] `isMediaProjectionActive()` delegates to `MediaProjectionManager.isProjectionActive()`
+- [ ] `setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection(context, resultCode, data)`
+- [ ] `isMediaProjectionActive()` delegates to `MediaProjectionHelper.isProjectionActive()`
 - [ ] `captureScreenshot(quality)` acquires mutex, checks projection active, creates ImageReader/VirtualDisplay, waits for image via `suspendCancellableCoroutine`, converts image, returns `Result<ScreenshotData>`
 - [ ] `captureScreenshot()` returns `Result.failure()` with descriptive message when projection is not active
 - [ ] ImageReader uses `PixelFormat.RGBA_8888` with buffer size 2 (double-buffered)
 - [ ] VirtualDisplay uses `DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR`
-- [ ] `MediaProjectionManager.onProjectionStopped` callback set to release resources and log
+- [ ] `MediaProjectionHelper.onProjectionStopped` callback set to release resources and log
 - [ ] Companion object stores singleton instance for inter-service access (following accessibility service pattern from Plan 4)
 - [ ] Screenshot capture uses `Dispatchers.Default` for CPU-intensive encoding work
-- [ ] `ScreenshotEncoder` and `MediaProjectionManager` are `@Inject`ed via Hilt
+- [ ] `ScreenshotEncoder` and `MediaProjectionHelper` are `@Inject`ed via Hilt
 - [ ] File compiles without errors
 - [ ] File passes ktlint and detekt
 
@@ -418,9 +423,9 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 
 **What**: Replace the minimal stub created in Plan 1 with the complete ScreenCaptureService implementation.
 
-**Context**: The stub from Plan 1 (`services/screencapture/ScreenCaptureService.kt`) is a bare `Service()` with `onBind()` returning null and a companion object with TAG. This action replaces it entirely. The service uses the bound service pattern (LocalBinder) so that McpServerService (Plan 6) can bind to it and call `captureScreenshot()`. It runs as a foreground service (Android requirement for MediaProjection) with a persistent notification. MediaProjection lifecycle is delegated to the injected `MediaProjectionManager` (Task 5.2b), following the Single Responsibility Principle. The `Mutex` ensures that only one screenshot capture happens at a time -- multiple MCP requests could trigger concurrent captures, and ImageReader/VirtualDisplay resources are not thread-safe. The `suspendCancellableCoroutine` approach converts the callback-based `ImageReader.OnImageAvailableListener` into a suspend function for clean coroutine integration. Screen metrics (width, height, density) are obtained from `WindowManager` at capture time to handle rotation changes. The singleton pattern in companion object mirrors the pattern used by `McpAccessibilityService` (Plan 4) for cross-service access.
+**Context**: The stub from Plan 1 (`services/screencapture/ScreenCaptureService.kt`) is a bare `Service()` with `onBind()` returning null and a companion object with TAG. This action replaces it entirely. The service uses the bound service pattern (LocalBinder) so that McpServerService (Plan 6) can bind to it and call `captureScreenshot()`. It runs as a foreground service (Android requirement for MediaProjection) with a persistent notification. MediaProjection lifecycle is delegated to the injected `MediaProjectionHelper` (Task 5.2b), following the Single Responsibility Principle. The `Mutex` ensures that only one screenshot capture happens at a time -- multiple MCP requests could trigger concurrent captures, and ImageReader/VirtualDisplay resources are not thread-safe. The `suspendCancellableCoroutine` approach converts the callback-based `ImageReader.OnImageAvailableListener` into a suspend function for clean coroutine integration. Screen metrics (width, height, density) are obtained from `WindowManager` at capture time to handle rotation changes. The singleton pattern in companion object mirrors the pattern used by `McpAccessibilityService` (Plan 4) for cross-service access.
 
-**IMPORTANT**: The service is annotated with `@AndroidEntryPoint` to enable Hilt injection of `ScreenshotEncoder` and `MediaProjectionManager`. The notification channel is NOT created by this service -- it must be created centrally in `McpApplication.onCreate()` (Plan 6, Task 6.6.3) before this service starts.
+**IMPORTANT**: The service is annotated with `@AndroidEntryPoint` to enable Hilt injection of `ScreenshotEncoder` and `MediaProjectionHelper`. The notification channel is NOT created by this service -- it must be created centrally in `McpApplication.onCreate()` (Plan 6, Task 6.6.3) before this service starts.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureService.kt`
 
@@ -467,7 +472,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 + * - Runs as a foreground service (Android requirement for MediaProjection).
 + * - Uses the bound service pattern (LocalBinder) for inter-service communication.
 + * - Provides thread-safe screenshot capture via [captureScreenshot] using a [Mutex].
-+ * - Delegates MediaProjection lifecycle to [MediaProjectionManager] (SRP).
++ * - Delegates MediaProjection lifecycle to [MediaProjectionHelper] (SRP).
 + * - Stores a singleton instance for cross-service access.
 + *
 + * Lifecycle:
@@ -487,6 +492,9 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 -    override fun onBind(intent: Intent?): IBinder? = null
 +    private val binder = LocalBinder()
 +    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+> **Implementation Note — Dispatcher choice**: This service uses `Dispatchers.Default` for its coroutine scope. While appropriate for CPU-intensive screenshot encoding, `McpServerService` (Plan 6) uses `Dispatchers.IO`. Consider using `Dispatchers.IO` here too for consistency, since the service also performs I/O operations (binding, notification).
+
 +    private val captureMutex = Mutex()
 +    private val handler = Handler(Looper.getMainLooper())
 +
@@ -500,7 +508,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +    lateinit var screenshotEncoder: ScreenshotEncoder
 +
 +    @Inject
-+    lateinit var mediaProjectionManager: MediaProjectionManager
++    lateinit var mediaProjectionHelper: MediaProjectionHelper
 +
 +    /**
 +     * Binder class that provides access to this service instance.
@@ -512,7 +520,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +    override fun onCreate() {
 +        super.onCreate()
 +        // Wire the projection-stopped callback to release capture resources
-+        mediaProjectionManager.onProjectionStopped = {
++        mediaProjectionHelper.onProjectionStopped = {
 +            Log.i(TAG, "MediaProjection stopped, releasing capture resources")
 +            releaseProjectionResources()
 +        }
@@ -531,7 +539,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +    override fun onDestroy() {
 +        Log.i(TAG, "ScreenCaptureService destroying")
 +        releaseProjectionResources()
-+        mediaProjectionManager.stopProjection()
++        mediaProjectionHelper.stopProjection()
 +        coroutineScope.cancel()
 +        instance = null
 +        super.onDestroy()
@@ -552,14 +560,14 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +     * Initializes MediaProjection from the activity result obtained via
 +     * [android.media.projection.MediaProjectionManager.createScreenCaptureIntent].
 +     *
-+     * Delegates to [MediaProjectionManager.setupProjection].
++     * Delegates to [MediaProjectionHelper.setupProjection].
 +     * Must be called after the user grants screen capture permission.
 +     *
 +     * @param resultCode The result code from the activity result (must be [android.app.Activity.RESULT_OK]).
 +     * @param data The intent data from the activity result containing the MediaProjection token.
 +     */
 +    fun setupMediaProjection(resultCode: Int, data: Intent) {
-+        mediaProjectionManager.setupProjection(this, resultCode, data)
++        mediaProjectionHelper.setupProjection(this, resultCode, data)
 +    }
 +
 +    /**
@@ -568,7 +576,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +     * @return `true` if [setupMediaProjection] has been called successfully and the projection
 +     *         has not been stopped.
 +     */
-+    fun isMediaProjectionActive(): Boolean = mediaProjectionManager.isProjectionActive()
++    fun isMediaProjectionActive(): Boolean = mediaProjectionHelper.isProjectionActive()
 +
 +    /**
 +     * Captures a screenshot of the current screen.
@@ -586,7 +594,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +        }
 +
 +    private suspend fun captureScreenshotInternal(quality: Int): Result<ScreenshotData> {
-+        if (!mediaProjectionManager.isProjectionActive()) {
++        if (!mediaProjectionHelper.isProjectionActive()) {
 +            return Result.failure(
 +                IllegalStateException("MediaProjection is not active. Grant screen capture permission first."),
 +            )
@@ -666,7 +674,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +
 +    private fun setupVirtualDisplay() {
 +        virtualDisplay?.release()
-+        virtualDisplay = mediaProjectionManager.getProjection()?.createVirtualDisplay(
++        virtualDisplay = mediaProjectionHelper.getProjection()?.createVirtualDisplay(
 +            VIRTUAL_DISPLAY_NAME,
 +            screenWidth,
 +            screenHeight,
@@ -695,6 +703,8 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 +            .build()
 +    }
 
+> **Implementation Note — Channel ID source of truth**: This notification uses `getString(R.string.notification_channel_screen_capture_id)` for the channel ID, but `McpApplication` (Plan 6) defines `SCREEN_CAPTURE_CHANNEL_ID = "screen_capture_channel"` as a constant. At implementation time, use `McpApplication.SCREEN_CAPTURE_CHANNEL_ID` as the single source of truth to avoid divergence between the string resource and the constant.
+
      companion object {
          private const val TAG = "MCP:ScreenCaptureService"
 +        const val NOTIFICATION_ID = 2002
@@ -713,7 +723,7 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 
 > **Implementation Note on R class import**: The `R.string.*` and `R.drawable.*` references resolve to `com.danielealbano.androidremotecontrolmcp.R` automatically because the file is in the same package namespace. If the build fails with unresolved `R` references, add an explicit import: `import com.danielealbano.androidremotecontrolmcp.R`.
 
-> **Implementation Note on `@AndroidEntryPoint` and Hilt injection**: The `ScreenCaptureService` is annotated with `@AndroidEntryPoint`, which enables Hilt field injection for `ScreenshotEncoder` and `MediaProjectionManager`. Hilt's `@AndroidEntryPoint` supports `Service` subclasses since Hilt 2.28+. Both injected classes have `@Inject constructor()` making them directly injectable. If `@AndroidEntryPoint` does not work on this Service subclass (unlikely), fall back to `EntryPointAccessors.fromApplication()` to manually obtain dependencies.
+> **Implementation Note on `@AndroidEntryPoint` and Hilt injection**: The `ScreenCaptureService` is annotated with `@AndroidEntryPoint`, which enables Hilt field injection for `ScreenshotEncoder` and `MediaProjectionHelper`. Hilt's `@AndroidEntryPoint` supports `Service` subclasses since Hilt 2.28+. Both injected classes have `@Inject constructor()` making them directly injectable. If `@AndroidEntryPoint` does not work on this Service subclass (unlikely), fall back to `EntryPointAccessors.fromApplication()` to manually obtain dependencies.
 
 > **Implementation Note on `currentWindowMetrics`**: `WindowManager.currentWindowMetrics` is available from API 30 (Android 11). Since `minSdk = 26`, a fallback using `DisplayMetrics` is needed for API 26-29. At implementation time, add a version check:
 > ```kotlin
@@ -1301,7 +1311,7 @@ The following additions should be made to the existing file:
 
 **Acceptance Criteria**:
 - [ ] Tests use JUnit 5 (`@Test` annotations from `org.junit.jupiter.api`)
-- [ ] Tests use MockK for mocking Android framework classes (`MediaProjection`, `MediaProjectionManager`, `Context`)
+- [ ] Tests use MockK for mocking Android framework classes (`MediaProjection`, `Context`) and project class (`MediaProjectionHelper`)
 - [ ] Tests follow Arrange-Act-Assert pattern
 - [ ] Test: `isMediaProjectionActive` returns `false` when not set up
 - [ ] Test: `isMediaProjectionActive` returns `true` after `setupMediaProjection` is called
@@ -1368,8 +1378,8 @@ The following additions should be made to the existing file:
 +    fun setUp() {
 +        service = ScreenCaptureService()
 +        mockProjection = mockk<MediaProjection>(relaxed = true)
-+        mockMediaProjectionManager = mockk<MediaProjectionManager>(relaxed = true)
-+        injectMediaProjectionManager(mockMediaProjectionManager)
++        mockMediaProjectionHelper = mockk<MediaProjectionHelper>(relaxed = true)
++        injectMediaProjectionHelper(mockMediaProjectionHelper)
 +    }
 +
 +    @AfterEach
@@ -1377,14 +1387,14 @@ The following additions should be made to the existing file:
 +        unmockkAll()
 +    }
 +
-+    private lateinit var mockMediaProjectionManager: MediaProjectionManager
++    private lateinit var mockMediaProjectionHelper: MediaProjectionHelper
 +
 +    /**
 +     * Helper to set the injected mediaProjectionManager field via reflection.
 +     * Since the service is not started via Hilt in unit tests, we inject manually.
 +     */
-+    private fun injectMediaProjectionManager(manager: MediaProjectionManager) {
-+        val field = ScreenCaptureService::class.java.getDeclaredField("mediaProjectionManager")
++    private fun injectMediaProjectionHelper(manager: MediaProjectionHelper) {
++        val field = ScreenCaptureService::class.java.getDeclaredField("mediaProjectionHelper")
 +        field.isAccessible = true
 +        field.set(service, manager)
 +    }
@@ -1397,7 +1407,7 @@ The following additions should be made to the existing file:
 +        @DisplayName("returns false when MediaProjection is not set up")
 +        fun `returns false when not set up`() {
 +            // Arrange
-+            every { mockMediaProjectionManager.isProjectionActive() } returns false
++            every { mockMediaProjectionHelper.isProjectionActive() } returns false
 +
 +            // Act
 +            val result = service.isMediaProjectionActive()
@@ -1410,7 +1420,7 @@ The following additions should be made to the existing file:
 +        @DisplayName("returns true when MediaProjection is set up")
 +        fun `returns true when set up`() {
 +            // Arrange
-+            every { mockMediaProjectionManager.isProjectionActive() } returns true
++            every { mockMediaProjectionHelper.isProjectionActive() } returns true
 +
 +            // Act
 +            val result = service.isMediaProjectionActive()
@@ -1423,9 +1433,9 @@ The following additions should be made to the existing file:
 +        @DisplayName("returns false after MediaProjection is cleared")
 +        fun `returns false after cleared`() {
 +            // Arrange
-+            every { mockMediaProjectionManager.isProjectionActive() } returns true
++            every { mockMediaProjectionHelper.isProjectionActive() } returns true
 +            // Simulate projection being stopped
-+            every { mockMediaProjectionManager.isProjectionActive() } returns false
++            every { mockMediaProjectionHelper.isProjectionActive() } returns false
 +
 +            // Act
 +            val result = service.isMediaProjectionActive()
@@ -1445,7 +1455,7 @@ The following additions should be made to the existing file:
 +        @DisplayName("returns failure when MediaProjection is not active")
 +        fun `returns failure when projection not active`() = runTest {
 +            // Arrange
-+            every { mockMediaProjectionManager.isProjectionActive() } returns false
++            every { mockMediaProjectionHelper.isProjectionActive() } returns false
 +
 +            // Act
 +            val result = service.captureScreenshot()
@@ -1465,7 +1475,7 @@ The following additions should be made to the existing file:
 +        @DisplayName("failure message includes guidance to grant permission")
 +        fun `failure message includes guidance`() = runTest {
 +            // Arrange
-+            every { mockMediaProjectionManager.isProjectionActive() } returns false
++            every { mockMediaProjectionHelper.isProjectionActive() } returns false
 +
 +            // Act
 +            val result = service.captureScreenshot()
@@ -1577,15 +1587,15 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 
-# Commit 2: MediaProjectionManager and ScreenCaptureService
-git add app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionManager.kt \
+# Commit 2: MediaProjectionHelper and ScreenCaptureService
+git add app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/MediaProjectionHelper.kt \
        app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureService.kt
 git commit -m "$(cat <<'EOF'
-feat: add MediaProjectionManager and ScreenCaptureService with screenshot capture
+feat: add MediaProjectionHelper and ScreenCaptureService with screenshot capture
 
-Add MediaProjectionManager class for MediaProjection lifecycle
+Add MediaProjectionHelper class for MediaProjection lifecycle
 management (SRP). Replace the Plan 1 stub with a full bound foreground
-service implementation that delegates projection to MediaProjectionManager,
+service implementation that delegates projection to MediaProjectionHelper,
 provides thread-safe screenshot capture via Mutex, and uses @AndroidEntryPoint
 for Hilt injection. Notification channel created centrally in McpApplication.
 
@@ -1698,7 +1708,7 @@ EOF
 
 - **API Level Compatibility**: The `WindowManager.currentWindowMetrics` API is available from API 30 (Android 11). Since `minSdk = 26`, the implementation notes include a version check with fallback to the deprecated `defaultDisplay.getRealMetrics()` for API 26-29. At implementation time, this MUST be verified and the fallback implemented.
 
-- **Hilt Injection in Service**: `ScreenCaptureService` is annotated with `@AndroidEntryPoint`, enabling field injection of `ScreenshotEncoder` and `MediaProjectionManager`. Hilt supports `@AndroidEntryPoint` on Service subclasses since Hilt 2.28+. Both injected classes have `@Inject constructor()`, making them directly injectable. If Hilt injection fails at runtime (unlikely with Hilt 2.28+), fall back to `EntryPointAccessors.fromApplication()` pattern.
+- **Hilt Injection in Service**: `ScreenCaptureService` is annotated with `@AndroidEntryPoint`, enabling field injection of `ScreenshotEncoder` and `MediaProjectionHelper`. Hilt supports `@AndroidEntryPoint` on Service subclasses since Hilt 2.28+. Both injected classes have `@Inject constructor()`, making them directly injectable. If Hilt injection fails at runtime (unlikely with Hilt 2.28+), fall back to `EntryPointAccessors.fromApplication()` pattern.
 
 - **Row Padding in ImageReader**: The `imageToBitmap()` method handles the case where `rowStride > width * pixelStride`. This is a known issue with some devices where the buffer has padding bytes at the end of each row. The test covers both padded and non-padded cases. However, the implementation assumes `pixelStride == 4` (RGBA_8888). If a device reports a different pixel stride, the calculation `rowPadding / pixelStride` could produce incorrect results. At implementation time, verify this assumption or add a guard check.
 
@@ -1720,7 +1730,7 @@ All files created or modified in this plan:
 |---|-----------|--------|------|
 | 1 | `app/src/main/kotlin/.../services/screencapture/ScreenshotData.kt` | CREATE | 5.1 |
 | 2 | `app/src/main/kotlin/.../services/screencapture/ScreenshotEncoder.kt` | CREATE | 5.2 |
-| 3 | `app/src/main/kotlin/.../services/screencapture/MediaProjectionManager.kt` | CREATE | 5.2b |
+| 3 | `app/src/main/kotlin/.../services/screencapture/MediaProjectionHelper.kt` | CREATE | 5.2b |
 | 4 | `app/src/main/kotlin/.../services/screencapture/ScreenCaptureService.kt` | REPLACE (was stub from Plan 1) | 5.3 |
 | 5 | `app/src/main/kotlin/.../services/accessibility/ScreenInfo.kt` | CREATE | 5.4 |
 | 6 | `app/src/main/kotlin/.../services/accessibility/McpAccessibilityService.kt` | MODIFY (add getScreenInfo method) | 5.5 |
