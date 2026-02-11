@@ -117,12 +117,13 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentat
 | Port | 8080 | HTTP/HTTPS server port |
 | Binding Address | 127.0.0.1 | Localhost only (use 0.0.0.0 for network access) |
 | Bearer Token | Auto-generated | Authentication token for MCP clients |
-| HTTPS | Disabled by default | Optional; self-signed certificate (auto-generated) or custom when enabled |
+| HTTPS | Disabled (HTTP is default) | Optional opt-in; uses self-signed certificate — clients must allow insecure certs |
 | Auto-start | Disabled | Start MCP server on device boot |
 
 ## Security
 
-- **HTTPS (optional)**: When enabled, all connections use TLS encryption (disabled by default)
+- **HTTP by default**: The server runs on plain HTTP. This is intentional — the device's IP changes frequently and public CAs cannot issue valid certificates for bare/dynamic IPs, making HTTPS impractical as a default. The primary use case (localhost via ADB port forwarding) keeps traffic on the USB cable.
+- **HTTPS (optional opt-in)**: Can be enabled in settings for encrypted transport over local networks. Uses self-signed certificates — MCP clients must be configured to allow insecure/untrusted certificates. Future releases may integrate tunneling services (ngrok, Tailscale) for proper HTTPS with valid certificates.
 - **Bearer token authentication**: Every MCP request requires a valid token
 - **Localhost by default**: Server binds to 127.0.0.1 (requires ADB port forwarding)
 - **No root required**: Application uses standard Android APIs only

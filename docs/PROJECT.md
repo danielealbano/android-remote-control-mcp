@@ -480,11 +480,15 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 - Every MCP request must include `Authorization: Bearer <token>` header
 - Constant-time comparison to prevent timing attacks; return `401 Unauthorized` if invalid/missing
 
-### HTTPS (Optional)
+### HTTPS (Optional — Disabled by Default)
 
-- **Optional**: HTTPS is disabled by default; the server runs on plain HTTP. Standard/public CAs cannot issue valid TLS certificates for IP addresses, making HTTPS impractical for most MCP server use cases. Users can enable HTTPS via a toggle in the UI if needed.
-- **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable
-- **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage
+- **HTTP is the default and primary transport.** The server starts on plain HTTP. This is intentional and the recommended mode for most users.
+- **Why HTTP is the priority**: The MCP server runs on an Android device whose IP address changes frequently (WiFi reconnects, mobile data, different networks). Standard/public Certificate Authorities (CAs) cannot issue valid TLS certificates for bare IP addresses or dynamic IPs. Any HTTPS certificate the device can generate will be self-signed, meaning every MCP client would need to explicitly trust it or disable certificate verification. This makes HTTPS impractical as a default — it adds configuration friction with no real security benefit for the primary use case (localhost via ADB port forwarding, where traffic never leaves the USB cable).
+- **HTTPS is a nice-to-have, not a priority.** It exists for users who need encrypted transport over a local network (binding to `0.0.0.0`), but even then the certificate will be self-signed and clients must allow insecure/untrusted certificates. Users who enable HTTPS must understand this trade-off.
+- **Future direction**: Proper HTTPS exposure may be achieved via integration with tunneling services like ngrok or Tailscale, which provide valid certificates for dynamically-assigned endpoints. This is planned for a future release, not the current scope.
+- **When HTTPS is enabled** (user opt-in via UI toggle):
+  - **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable. Clients must allow insecure/self-signed certificates.
+  - **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage.
 
 ### Network Security
 
@@ -519,7 +523,7 @@ Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMP
 - **Port**: `8080`
 - **Binding Address**: `127.0.0.1` (localhost)
 - **Bearer Token**: Auto-generated UUID on first launch
-- **HTTPS**: Disabled by default; when enabled, auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity
+- **HTTPS**: Disabled by default (HTTP is the primary transport). When enabled by the user, uses auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity. Clients must allow insecure/self-signed certificates.
 - **Auto-start on Boot**: Disabled
 
 ### MCP Defaults
