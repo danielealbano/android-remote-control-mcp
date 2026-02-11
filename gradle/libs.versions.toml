@@ -27,6 +27,7 @@ kotlinx-coroutines = "1.9.0"           # verify latest at implementation time
 
 # Dependency Injection
 hilt = "2.58"                           # verify latest at implementation time
+hilt-navigation-compose = "1.3.0"      # latest stable
 
 # Material Components (XML themes)
 material = "1.13.0"                     # verify latest at implementation time
@@ -91,6 +92,8 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hilt-navigation-compose" }
+hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
 
 # Material Components (XML themes)
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
