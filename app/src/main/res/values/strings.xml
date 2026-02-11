@@ -13,4 +13,61 @@
     <!-- Notification Content -->
     <string name="notification_mcp_server_title">MCP Server Running</string>
     <string name="notification_screen_capture_title">Screen Capture Active</string>
+
+    <!-- App Bar -->
+    <string name="app_bar_title">MCP Remote Control</string>
+
+    <!-- Server Status -->
+    <string name="server_status_title">Server Status</string>
+    <string name="server_status_running">Running</string>
+    <string name="server_status_stopped">Stopped</string>
+    <string name="server_status_starting">Starting…</string>
+    <string name="server_status_stopping">Stopping…</string>
+    <string name="server_status_error">Error: %1$s</string>
+    <string name="server_action_start">Start</string>
+    <string name="server_action_stop">Stop</string>
+
+    <!-- Configuration -->
+    <string name="configuration_title">Configuration</string>
+    <string name="config_binding_address_label">Binding Address</string>
+    <string name="config_binding_localhost">Localhost (127.0.0.1)</string>
+    <string name="config_binding_network">Network (0.0.0.0)</string>
+    <string name="config_port_label">Port</string>
+    <string name="config_bearer_token_label">Bearer Token</string>
+    <string name="config_token_show">Show token</string>
+    <string name="config_token_hide">Hide token</string>
+    <string name="config_token_copy">Copy token</string>
+    <string name="config_token_regenerate">Regenerate token</string>
+    <string name="config_auto_start_label">Auto-start on boot</string>
+    <string name="config_https_enabled_label">Enable HTTPS</string>
+    <string name="config_certificate_title">HTTPS Certificate</string>
+    <string name="config_cert_auto_generated">Auto-generated self-signed</string>
+    <string name="config_cert_custom">Custom certificate (.p12/.pfx)</string>
+    <string name="config_hostname_label">Certificate hostname</string>
+
+    <!-- Network Security Warning -->
+    <string name="network_warning_title">Network Exposure Warning</string>
+    <string name="network_warning_message">Binding to 0.0.0.0 makes the MCP server accessible to:\n\n\u2022 All devices on your current WiFi network\n\u2022 Devices connected to your hotspot\n\u2022 Potentially other devices depending on network configuration\n\nThis is a SECURITY RISK on public/untrusted networks.\n\nOnly use this option on trusted private networks.</string>
+    <string name="network_warning_confirm">I Understand, Continue</string>
+    <string name="network_warning_cancel">Cancel</string>
+
+    <!-- Permissions -->
+    <string name="permissions_title">Permissions</string>
+    <string name="permission_accessibility">Accessibility Service</string>
+    <string name="permission_notifications">Notifications</string>
+    <string name="permission_enable">Enable</string>
+    <string name="permission_enabled">Enabled</string>
+    <string name="permission_grant">Grant</string>
+
+    <!-- Server Logs -->
+    <string name="server_logs_title">Server Logs</string>
+    <string name="server_logs_empty">No log entries yet</string>
+
+    <!-- Connection Info -->
+    <string name="connection_info_title">Connection Info</string>
+    <string name="connection_info_ip">IP Address</string>
+    <string name="connection_info_port">Port</string>
+    <string name="connection_info_url">URL</string>
+    <string name="connection_info_token">Token</string>
+    <string name="connection_info_copy_all">Copy All</string>
 </resources>
