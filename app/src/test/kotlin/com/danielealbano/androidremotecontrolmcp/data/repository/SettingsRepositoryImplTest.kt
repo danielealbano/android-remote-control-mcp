@@ -1,0 +1,375 @@
+package com.danielealbano.androidremotecontrolmcp.data.repository
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import app.cash.turbine.test
+import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import java.io.File
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@DisplayName("SettingsRepositoryImpl")
+class SettingsRepositoryImplTest {
+
+    @TempDir
+    lateinit var tempDir: File
+
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testScope = TestScope(testDispatcher)
+
+    private lateinit var dataStore: DataStore<Preferences>
+    private lateinit var repository: SettingsRepositoryImpl
+
+    @BeforeEach
+    fun setUp() {
+        dataStore = PreferenceDataStoreFactory.create(
+            scope = testScope,
+            produceFile = { File(tempDir, "test_settings.preferences_pb") },
+        )
+        repository = SettingsRepositoryImpl(dataStore)
+    }
+
+    @Nested
+    @DisplayName("getServerConfig")
+    inner class GetServerConfig {
+
+        @Test
+        fun `returns default values when no settings stored`() = testScope.runTest {
+            val config = repository.getServerConfig()
+
+            assertEquals(ServerConfig.DEFAULT_PORT, config.port)
+            assertEquals(BindingAddress.LOCALHOST, config.bindingAddress)
+            assertFalse(config.autoStartOnBoot)
+            assertFalse(config.httpsEnabled)
+            assertEquals(CertificateSource.AUTO_GENERATED, config.certificateSource)
+            assertEquals(ServerConfig.DEFAULT_CERTIFICATE_HOSTNAME, config.certificateHostname)
+        }
+
+        @Test
+        fun `auto-generates bearer token when empty`() = testScope.runTest {
+            val config = repository.getServerConfig()
+
+            assertTrue(config.bearerToken.isNotEmpty())
+        }
+
+        @Test
+        fun `auto-generated bearer token is UUID format`() = testScope.runTest {
+            val config = repository.getServerConfig()
+
+            val uuidPattern = Regex(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            )
+            assertTrue(uuidPattern.matches(config.bearerToken))
+        }
+
+        @Test
+        fun `auto-generated bearer token is persisted`() = testScope.runTest {
+            val firstRead = repository.getServerConfig()
+            val secondRead = repository.getServerConfig()
+
+            assertEquals(firstRead.bearerToken, secondRead.bearerToken)
+        }
+    }
+
+    @Nested
+    @DisplayName("updatePort")
+    inner class UpdatePort {
+
+        @Test
+        fun `updates port value`() = testScope.runTest {
+            repository.updatePort(9090)
+            val config = repository.getServerConfig()
+
+            assertEquals(9090, config.port)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateBindingAddress")
+    inner class UpdateBindingAddress {
+
+        @Test
+        fun `updates binding address to NETWORK`() = testScope.runTest {
+            repository.updateBindingAddress(BindingAddress.NETWORK)
+            val config = repository.getServerConfig()
+
+            assertEquals(BindingAddress.NETWORK, config.bindingAddress)
+        }
+
+        @Test
+        fun `updates binding address back to LOCALHOST`() = testScope.runTest {
+            repository.updateBindingAddress(BindingAddress.NETWORK)
+            repository.updateBindingAddress(BindingAddress.LOCALHOST)
+            val config = repository.getServerConfig()
+
+            assertEquals(BindingAddress.LOCALHOST, config.bindingAddress)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateBearerToken")
+    inner class UpdateBearerToken {
+
+        @Test
+        fun `updates bearer token`() = testScope.runTest {
+            repository.updateBearerToken("custom-token-123")
+            val config = repository.getServerConfig()
+
+            assertEquals("custom-token-123", config.bearerToken)
+        }
+    }
+
+    @Nested
+    @DisplayName("generateNewBearerToken")
+    inner class GenerateNewBearerToken {
+
+        @Test
+        fun `generates new UUID token`() = testScope.runTest {
+            val token = repository.generateNewBearerToken()
+
+            val uuidPattern = Regex(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            )
+            assertTrue(uuidPattern.matches(token))
+        }
+
+        @Test
+        fun `persists the generated token`() = testScope.runTest {
+            val token = repository.generateNewBearerToken()
+            val config = repository.getServerConfig()
+
+            assertEquals(token, config.bearerToken)
+        }
+
+        @Test
+        fun `generates different token each time`() = testScope.runTest {
+            val token1 = repository.generateNewBearerToken()
+            val token2 = repository.generateNewBearerToken()
+
+            assertNotEquals(token1, token2)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateAutoStartOnBoot")
+    inner class UpdateAutoStartOnBoot {
+
+        @Test
+        fun `enables auto start on boot`() = testScope.runTest {
+            repository.updateAutoStartOnBoot(true)
+            val config = repository.getServerConfig()
+
+            assertTrue(config.autoStartOnBoot)
+        }
+
+        @Test
+        fun `disables auto start on boot`() = testScope.runTest {
+            repository.updateAutoStartOnBoot(true)
+            repository.updateAutoStartOnBoot(false)
+            val config = repository.getServerConfig()
+
+            assertFalse(config.autoStartOnBoot)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateHttpsEnabled")
+    inner class UpdateHttpsEnabled {
+
+        @Test
+        fun `enables HTTPS`() = testScope.runTest {
+            repository.updateHttpsEnabled(true)
+            val config = repository.getServerConfig()
+
+            assertTrue(config.httpsEnabled)
+        }
+
+        @Test
+        fun `disables HTTPS`() = testScope.runTest {
+            repository.updateHttpsEnabled(true)
+            repository.updateHttpsEnabled(false)
+            val config = repository.getServerConfig()
+
+            assertFalse(config.httpsEnabled)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateCertificateSource")
+    inner class UpdateCertificateSource {
+
+        @Test
+        fun `updates certificate source to CUSTOM`() = testScope.runTest {
+            repository.updateCertificateSource(CertificateSource.CUSTOM)
+            val config = repository.getServerConfig()
+
+            assertEquals(CertificateSource.CUSTOM, config.certificateSource)
+        }
+    }
+
+    @Nested
+    @DisplayName("updateCertificateHostname")
+    inner class UpdateCertificateHostname {
+
+        @Test
+        fun `updates certificate hostname`() = testScope.runTest {
+            repository.updateCertificateHostname("my-device.local")
+            val config = repository.getServerConfig()
+
+            assertEquals("my-device.local", config.certificateHostname)
+        }
+    }
+
+    @Nested
+    @DisplayName("validatePort")
+    inner class ValidatePort {
+
+        @Test
+        fun `valid port returns success`() {
+            assertTrue(repository.validatePort(8080).isSuccess)
+        }
+
+        @Test
+        fun `port 1 is valid`() {
+            assertTrue(repository.validatePort(1).isSuccess)
+        }
+
+        @Test
+        fun `port 65535 is valid`() {
+            assertTrue(repository.validatePort(65535).isSuccess)
+        }
+
+        @Test
+        fun `port 0 is invalid`() {
+            assertTrue(repository.validatePort(0).isFailure)
+        }
+
+        @Test
+        fun `port 65536 is invalid`() {
+            assertTrue(repository.validatePort(65536).isFailure)
+        }
+
+        @Test
+        fun `negative port is invalid`() {
+            assertTrue(repository.validatePort(-1).isFailure)
+        }
+    }
+
+    @Nested
+    @DisplayName("validateCertificateHostname")
+    inner class ValidateCertificateHostname {
+
+        @Test
+        fun `valid hostname returns success`() {
+            assertTrue(repository.validateCertificateHostname("android-mcp.local").isSuccess)
+        }
+
+        @Test
+        fun `single label hostname is valid`() {
+            assertTrue(repository.validateCertificateHostname("localhost").isSuccess)
+        }
+
+        @Test
+        fun `empty hostname is invalid`() {
+            assertTrue(repository.validateCertificateHostname("").isFailure)
+        }
+
+        @Test
+        fun `blank hostname is invalid`() {
+            assertTrue(repository.validateCertificateHostname("   ").isFailure)
+        }
+
+        @Test
+        fun `hostname with spaces is invalid`() {
+            assertTrue(repository.validateCertificateHostname("my host").isFailure)
+        }
+
+        @Test
+        fun `hostname with underscore is invalid`() {
+            assertTrue(repository.validateCertificateHostname("my_host.local").isFailure)
+        }
+    }
+
+    @Nested
+    @DisplayName("serverConfig Flow")
+    inner class ServerConfigFlow {
+
+        @Test
+        fun `emits default config initially`() = testScope.runTest {
+            repository.serverConfig.test {
+                val config = awaitItem()
+                assertEquals(ServerConfig.DEFAULT_PORT, config.port)
+                assertEquals(BindingAddress.LOCALHOST, config.bindingAddress)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `emits updated config after port change`() = testScope.runTest {
+            repository.serverConfig.test {
+                awaitItem() // initial emission
+
+                repository.updatePort(9090)
+                val updated = awaitItem()
+                assertEquals(9090, updated.port)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `emits updated config after binding address change`() = testScope.runTest {
+            repository.serverConfig.test {
+                awaitItem() // initial emission
+
+                repository.updateBindingAddress(BindingAddress.NETWORK)
+                val updated = awaitItem()
+                assertEquals(BindingAddress.NETWORK, updated.bindingAddress)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `Flow does not auto-generate bearer token when empty`() = testScope.runTest {
+            // The Flow should NOT have side effects — it simply maps preferences.
+            // Auto-generation only happens via getServerConfig().
+            repository.serverConfig.test {
+                val config = awaitItem()
+                assertTrue(config.bearerToken.isEmpty())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `Flow reflects token after getServerConfig auto-generates it`() = testScope.runTest {
+            // getServerConfig() triggers auto-generation and persists it
+            val generated = repository.getServerConfig()
+            assertTrue(generated.bearerToken.isNotEmpty())
+
+            // Flow should now emit the persisted token
+            repository.serverConfig.test {
+                val config = awaitItem()
+                assertEquals(generated.bearerToken, config.bearerToken)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+    }
+}
