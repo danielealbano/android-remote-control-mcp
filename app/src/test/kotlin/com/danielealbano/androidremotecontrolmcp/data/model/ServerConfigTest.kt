@@ -105,12 +105,12 @@ class ServerConfigTest {
     @DisplayName("BindingAddress enum")
     inner class BindingAddressTest {
         @Test
-        fun `LOCALHOST address is 127 0 0 1`() {
+        fun `LOCALHOST address is 127.0.0.1`() {
             assertEquals("127.0.0.1", BindingAddress.LOCALHOST.address)
         }
 
         @Test
-        fun `NETWORK address is 0 0 0 0`() {
+        fun `NETWORK address is 0.0.0.0`() {
             assertEquals("0.0.0.0", BindingAddress.NETWORK.address)
         }
 
