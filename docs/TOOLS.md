@@ -65,7 +65,7 @@ feat/<description-with-dashes>
 <optional body explaining the "why", not the "what">
 ```
 
-**Note**: Do NOT include a `Co-Authored-By` trailer for commits authored by Claude. Claude is the author, not a co-author.
+**Note**: Commits and PRs MUST NOT contain any references to Claude Code, Claude, Anthropic, or any AI tooling. This includes `Co-Authored-By` trailers, `Generated with Claude Code` footers, or any similar attribution. You are the sole author.
 
 **Types**:
 - `feat`: New feature or functionality
@@ -144,8 +144,6 @@ Implementation of Plan N: <plan name> from `docs/plans/<plan-file>.md`.
 - [ ] Lint passes (`make lint`)
 - [ ] Build succeeds (`make build`)
 - [ ] CI validated locally (`gh act --validate`)
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```

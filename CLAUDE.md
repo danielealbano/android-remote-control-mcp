@@ -18,7 +18,7 @@ You MUST follow it and you MUST keep it up to date.
 **Development Workflow Tools**
 See [TOOLS.md](docs/TOOLS.md) for git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions.
 You MUST follow the branching, commit, and PR conventions defined there.
-**Git commits authored by Claude (you) MUST NOT include the `Co-Authored-By` trailer.** You are the author, not a co-author.
+**Git commits and PRs MUST NOT contain any references to Claude Code, Claude, Anthropic, or any AI tooling.** This includes `Co-Authored-By` trailers, `Generated with Claude Code` footers, or any similar attribution. You are the sole author.
 
 **Additional Documentation** (created during implementation):
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Application architecture documentation (created in Plan 6)
