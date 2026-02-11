@@ -49,7 +49,7 @@ class ServerConfigTest {
         }
 
         @Test
-        fun `default certificate hostname is android-mcp.local`() {
+        fun `default certificate hostname is android-mcp local`() {
             val config = ServerConfig()
             assertEquals("android-mcp.local", config.certificateHostname)
         }
@@ -105,12 +105,12 @@ class ServerConfigTest {
     @DisplayName("BindingAddress enum")
     inner class BindingAddressTest {
         @Test
-        fun `LOCALHOST address is 127.0.0.1`() {
+        fun `LOCALHOST address is 127_0_0_1`() {
             assertEquals("127.0.0.1", BindingAddress.LOCALHOST.address)
         }
 
         @Test
-        fun `NETWORK address is 0.0.0.0`() {
+        fun `NETWORK address is 0_0_0_0`() {
             assertEquals("0.0.0.0", BindingAddress.NETWORK.address)
         }
 
