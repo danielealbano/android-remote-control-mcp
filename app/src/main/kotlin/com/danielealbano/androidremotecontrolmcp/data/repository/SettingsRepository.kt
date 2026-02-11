@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.Flow
  * All DataStore access MUST go through this interface. UI, ViewModels,
  * and Services must not access DataStore directly.
  */
+@Suppress("TooManyFunctions")
 interface SettingsRepository {
-
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.

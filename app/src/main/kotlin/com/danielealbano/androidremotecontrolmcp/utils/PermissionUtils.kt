@@ -6,15 +6,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
-import android.text.TextUtils
 import androidx.core.content.ContextCompat
 
 /**
  * Utility functions for checking and requesting Android permissions.
  */
 object PermissionUtils {
-
-    private const val TAG = "MCP:PermissionUtils"
     private const val ENABLED_SERVICES_SEPARATOR = ':'
 
     /**
@@ -27,26 +24,22 @@ object PermissionUtils {
      * @param serviceClass The accessibility service class to check (e.g., `McpAccessibilityService::class.java`).
      * @return `true` if the service is enabled, `false` otherwise.
      */
-    fun isAccessibilityServiceEnabled(context: Context, serviceClass: Class<*>): Boolean {
+    fun isAccessibilityServiceEnabled(
+        context: Context,
+        serviceClass: Class<*>,
+    ): Boolean {
         val expectedComponentName =
             "${context.packageName}/${serviceClass.canonicalName}"
 
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
+        val enabledServices =
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            ) ?: return false
 
-        val colonSplitter = TextUtils.SimpleStringSplitter(ENABLED_SERVICES_SEPARATOR)
-        colonSplitter.setString(enabledServices)
-
-        while (colonSplitter.hasNext()) {
-            val componentName = colonSplitter.next()
-            if (componentName.equals(expectedComponentName, ignoreCase = true)) {
-                return true
-            }
-        }
-
-        return false
+        return enabledServices
+            .split(ENABLED_SERVICES_SEPARATOR)
+            .any { it.equals(expectedComponentName, ignoreCase = true) }
     }
 
     /**
@@ -56,9 +49,10 @@ object PermissionUtils {
      *   so this can be called from non-Activity contexts.
      */
     fun openAccessibilitySettings(context: Context) {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        val intent =
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
         context.startActivity(intent)
     }
 

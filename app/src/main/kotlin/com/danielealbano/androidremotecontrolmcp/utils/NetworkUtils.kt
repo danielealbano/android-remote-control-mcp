@@ -11,9 +11,6 @@ import java.net.ServerSocket
  * Utility functions for network operations.
  */
 object NetworkUtils {
-
-    private const val TAG = "MCP:NetworkUtils"
-
     /**
      * Returns the device's primary IPv4 address, or `null` if unavailable.
      *
@@ -22,6 +19,7 @@ object NetworkUtils {
      * @param context Application context for accessing system services.
      * @return The device's IPv4 address as a string, or `null`.
      */
+    @Suppress("ReturnCount")
     fun getDeviceIpAddress(context: Context): String? {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -50,7 +48,9 @@ object NetworkUtils {
     fun isPortAvailable(port: Int): Boolean =
         try {
             ServerSocket(port).use { true }
-        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception,
+        ) {
             false
         }
 
