@@ -29,7 +29,7 @@ This document is the source of truth for the Android Remote Control MCP project.
 
 ### Overview
 
-The application is a **service-based Android app** that exposes an MCP server over HTTPS. It consists of four main components:
+The application is a **service-based Android app** that exposes an MCP server over HTTP (with optional HTTPS). It consists of four main components:
 
 1. **AccessibilityService** — Provides UI introspection and action execution
 2. **ScreenCaptureService** — Manages MediaProjection for screenshot capture
@@ -59,14 +59,14 @@ The application is a **service-based Android app** that exposes an MCP server ov
 - **Type**: Android Foreground Service
 - **Purpose**: Run HTTP server implementing MCP protocol
 - **Lifecycle**: User-controlled via MainActivity (start/stop)
-- **Capabilities**: HTTPS server using Ktor, MCP JSON-RPC 2.0 protocol, bearer token authentication, configurable binding address (127.0.0.1 or 0.0.0.0), orchestrates calls to AccessibilityService and ScreenCaptureService
+- **Capabilities**: HTTP/HTTPS server using Ktor, MCP JSON-RPC 2.0 protocol, bearer token authentication, configurable binding address (127.0.0.1 or 0.0.0.0), orchestrates calls to AccessibilityService and ScreenCaptureService
 - **Implementation**: Foreground service with persistent notification, Kotlin coroutines for async request handling, reads configuration from DataStore, exposes MCP endpoints (`/mcp/v1/tools`, `/mcp/v1/call`), graceful shutdown on service stop
 
 #### 4. MainActivity
 
 - **Type**: Android Activity (Jetpack Compose UI)
 - **Purpose**: Configuration and control interface
-- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS certificate management), quick links (enable accessibility service, grant MediaProjection), connection info display, server logs viewer (recent MCP requests)
+- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS toggle and certificate management), quick links (enable accessibility service, grant MediaProjection), connection info display, server logs viewer (recent MCP requests)
 - **Implementation**: Material Design 3 with dark mode support, Jetpack Compose, ViewModel for state management, observes service status via Flow/StateFlow
 
 ### Inter-Service Communication
@@ -78,7 +78,7 @@ The application is a **service-based Android app** that exposes an MCP server ov
 
 ### Service Lifecycle
 
-The typical startup flow: User opens app → enables Accessibility Service in Android Settings → grants MediaProjection permission → starts MCP server via button → McpServerService starts as foreground service → binds to ScreenCaptureService → starts Ktor HTTPS server → MCP server ready on configured address:port → user minimizes app (services continue in background) → MCP clients can connect and control device.
+The typical startup flow: User opens app → enables Accessibility Service in Android Settings → grants MediaProjection permission → starts MCP server via button → McpServerService starts as foreground service → binds to ScreenCaptureService → starts Ktor HTTP/HTTPS server → MCP server ready on configured address:port → user minimizes app (services continue in background) → MCP clients can connect and control device.
 
 **Auto-start on Boot** (if enabled): Device boots → `BootCompletedReceiver` triggers → if auto-start enabled in settings → McpServerService starts automatically.
 
@@ -139,7 +139,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureService.kt`, `MediaProjectionManager.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
-  - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`
+  - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
@@ -147,7 +147,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/screens/` — `HomeScreen.kt`
   - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
-  - `data/repository/` — `SettingsRepository.kt`
+  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`
@@ -417,7 +417,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Framework**: Testcontainers Kotlin (`budtmo/docker-android-x86:emulator_14.0`), JUnit 5, OkHttp
 - **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, element not found)
-- **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility handles HTTPS/self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
+- **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility handles HTTP and HTTPS/self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
 
@@ -480,10 +480,10 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 - Every MCP request must include `Authorization: Bearer <token>` header
 - Constant-time comparison to prevent timing attacks; return `401 Unauthorized` if invalid/missing
 
-### HTTPS
+### HTTPS (Optional)
 
-- **Mandatory**: MCP server always uses HTTPS (not HTTP), not optional
-- **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first launch using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable
+- **Optional**: HTTPS is disabled by default; the server runs on plain HTTP. Standard/public CAs cannot issue valid TLS certificates for IP addresses, making HTTPS impractical for most MCP server use cases. Users can enable HTTPS via a toggle in the UI if needed.
+- **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable
 - **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage
 
 ### Network Security
@@ -519,13 +519,13 @@ Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMP
 - **Port**: `8080`
 - **Binding Address**: `127.0.0.1` (localhost)
 - **Bearer Token**: Auto-generated UUID on first launch
-- **HTTPS**: Always enabled; auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity
+- **HTTPS**: Disabled by default; when enabled, auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity
 - **Auto-start on Boot**: Disabled
 
 ### MCP Defaults
 
 - **Screenshot Quality**: 80 (JPEG, 1-100)
-- **Timeout**: 5000ms (wait_for_element, wait_for_idle)
+- **Timeout**: 5000ms (wait_for_element), 3000ms (wait_for_idle)
 - **Long Press Duration**: 1000ms
 - **Swipe Duration**: 300ms
 - **Gesture Duration**: 300ms

@@ -61,6 +61,8 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 - [ ] `McpServerService.startServer()` calls `ToolRegistry.registerAllTools()` before `McpServer.start()`
 - [ ] `McpServerService` exposes `screenCaptureService` reference for tool access
 - [ ] All tool results use the MCP content format (`content` array with typed entries)
+
+> **Implementation Note — Naming evolution**: The acceptance criteria references `registerAllTools()`, but the actual Plan 7 code uses top-level registration functions called from `McpServerService`. Plans 8-9 introduce `registerAll()` inside `ToolRegistry`. The final method name is `registerAll()`.
 - [ ] Unit tests exist and pass for all 10 tools (success paths, error paths, parameter validation)
 - [ ] `docs/MCP_TOOLS.md` documents all 10 tools with schemas, examples, and error codes
 - [ ] `make lint` passes with no warnings or errors
@@ -102,6 +104,8 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 **Context**: This class acts as the single entry point for registering all MCP tools. It is Hilt-injected with the `McpProtocolHandler` and all tool handler instances. The `registerAllTools()` method iterates through all tools and registers each with the protocol handler. Plans 8 and 9 will add additional tool handler parameters to the constructor and additional registration calls in `registerAllTools()`.
 
 > **IMPORTANT — Supersedes Plan 6 definitions**: Plan 6 defined `ToolDefinition` and `ToolHandler` inside `McpProtocolHandler.kt`. This plan **moves** both to `ToolRegistry.kt` as standalone types. At implementation time, **remove** the `ToolDefinition` and `ToolHandler` definitions from `McpProtocolHandler.kt` and replace references with imports from this file. `McpProtocolHandler` should delegate tool execution to `ToolRegistry.execute()` instead of managing its own tool map.
+
+> **Implementation Note — ToolHandler location**: The code imports `ToolHandler` from `com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler` (the `mcp` package), but this plan moves `ToolDefinition` to `ToolRegistry.kt` in `mcp/tools/`. At implementation time, either keep `ToolHandler` in `McpProtocolHandler.kt` (Plan 6) or create a standalone `mcp/ToolHandler.kt` file. The imports already reference the correct package path.
 
 > **Registration pattern evolution**: This plan registers tools via `McpServerService.registerAllTools()` calling into `ToolRegistry`. Plans 8-9 evolve this by adding private helper methods (`registerTouchActionTools()`, `registerGestureTools()`, etc.) inside `ToolRegistry.registerAll()` and expanding the constructor with tool dependencies. The final pattern is: `ToolRegistry.registerAll()` calls private categorized registration methods internally.
 
@@ -291,6 +295,8 @@ The tool handler classes themselves are simple `@Inject constructor()` classes (
 **Tests**: Unit tests in Task 7.4 (`ScreenIntrospectionToolsTest.kt`).
 
 #### Action 7.2.1: Create `ScreenIntrospectionTools.kt`
+
+> **CRITICAL — Action ordering**: Actions 7.2.2 (McpToolException.kt) and 7.2.3 (McpContentBuilder.kt) MUST be implemented BEFORE Action 7.2.1 (ScreenIntrospectionTools.kt), because ScreenIntrospectionTools imports both. At implementation time, execute in order: 7.2.2 → 7.2.3 → 7.2.1.
 
 **What**: Create the 4 screen introspection tool handler classes and a shared exception class.
 
@@ -796,7 +802,9 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +import kotlinx.serialization.json.putJsonArray
 +import kotlinx.serialization.json.putJsonObject
 +import javax.inject.Inject
-+
+
+> **CRITICAL — Missing imports**: The following imports are used in the code but not listed: `import kotlinx.serialization.json.buildJsonArray`, `import kotlinx.serialization.json.JsonPrimitive`, `import kotlinx.serialization.json.contentOrNull`, `import kotlinx.serialization.json.int`, `import kotlinx.serialization.json.Json`. Add these at implementation time.
+
 +/**
 + * Executes a system action via [ActionExecutor], with standard error handling.
 + *
@@ -1056,6 +1064,9 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 + * **Errors**:
 + *   - -32602 if parameters are invalid
 + *   - -32603 if logcat execution fails
+
+> **Implementation Note — Wrong error code in KDoc**: The KDoc and acceptance criteria say `-32603` for logcat execution failure, but the catch block throws `McpToolException.ActionFailed` which is `-32003`. Update KDoc to say `-32003` at implementation time.
+
 + */
 +class GetDeviceLogsHandler @Inject constructor() : ToolHandler {
 +
@@ -1072,6 +1083,8 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +        val tag = params?.get("tag")?.jsonPrimitive?.contentOrNull
 +        val levelStr = params?.get("level")?.jsonPrimitive?.contentOrNull ?: DEFAULT_LEVEL
 +        val packageName = params?.get("package_name")?.jsonPrimitive?.contentOrNull
+
+> **IMPORTANT — Unimplemented parameters**: The `until` and `package_name` parameters are accepted in the schema and extracted from the request, but are NOT used in `buildLogcatCommand()`. At implementation time, either implement these parameters or remove them from the schema.
 +
 +        if (levelStr !in VALID_LEVELS) {
 +            throw McpToolException.InvalidParams(
@@ -1386,6 +1399,9 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 +            }
 +            assertEquals(McpProtocolHandler.ERROR_INTERNAL, exception.code)
 +        }
+
+> **CRITICAL — Wrong error code in test**: These tests assert error code `-32603` (InternalError), but the actual code throws `McpToolException.ActionFailed` which is `-32003`. Fix at implementation time: change assertions from `-32603` to `-32003`.
+
 +    }
 +
 +    // ─────────────────────────────────────────────────────────────────────

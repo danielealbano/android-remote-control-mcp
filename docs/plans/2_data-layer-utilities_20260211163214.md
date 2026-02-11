@@ -106,7 +106,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 
 **What**: Create the `CertificateSource` enum class.
 
-**Context**: This enum represents the HTTPS certificate source. `AUTO_GENERATED` means the app creates a self-signed certificate on first launch. `CUSTOM` means the user uploads their own `.p12`/`.pfx` certificate. HTTPS is always enabled (mandatory per PROJECT.md).
+**Context**: This enum represents the HTTPS certificate source. `AUTO_GENERATED` means the app creates a self-signed certificate on first launch. `CUSTOM` means the user uploads their own `.p12`/`.pfx` certificate. HTTPS is optional (disabled by default). When enabled, the user chooses between an auto-generated self-signed certificate or a custom uploaded certificate.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/data/model/CertificateSource.kt`
 
@@ -119,8 +119,8 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +/**
 + * Represents the source of the HTTPS certificate used by the MCP server.
 + *
-+ * HTTPS is always enabled. The user chooses between an auto-generated
-+ * self-signed certificate or a custom uploaded certificate.
++ * HTTPS is optional (disabled by default). When enabled, the user
++ * chooses between an auto-generated self-signed certificate or a custom uploaded certificate.
 + */
 +enum class CertificateSource {
 +    /** Auto-generated self-signed certificate with configurable hostname. */
@@ -221,7 +221,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 
 **What**: Create the `ServerStatus` sealed class.
 
-**Context**: This sealed class represents the MCP server's lifecycle states. It is exposed via `StateFlow` from the `MainViewModel` and observed by the UI to display the current server status. The `Running` state carries connection details. The `Error` state carries an error message. `httpsEnabled` is always `true` per PROJECT.md (HTTPS is mandatory), but the field is included for future flexibility and UI display.
+**Context**: This sealed class represents the MCP server's lifecycle states. It is exposed via `StateFlow` from the `MainViewModel` and observed by the UI to display the current server status. The `Running` state carries connection details. The `Error` state carries an error message. `httpsEnabled` reflects whether the user has enabled HTTPS in settings (disabled by default). The field is used for UI display and connection info.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/data/model/ServerStatus.kt`
 
@@ -250,7 +250,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +     *
 +     * @property port The port the server is listening on.
 +     * @property bindingAddress The IP address the server is bound to.
-+     * @property httpsEnabled Whether HTTPS is enabled (always true per specification).
++     * @property httpsEnabled Whether HTTPS is enabled (optional, disabled by default).
 +     */
 +    data class Running(
 +        val port: Int,
@@ -803,7 +803,6 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +object PermissionUtils {
 +
 +    private const val TAG = "MCP:PermissionUtils"
-+    private const val ACCESSIBILITY_SERVICE_SEPARATOR = ':'
 +    private const val ENABLED_SERVICES_SEPARATOR = ':'
 +
 +    /**
