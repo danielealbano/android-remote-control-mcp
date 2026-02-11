@@ -49,7 +49,7 @@ class ServerConfigTest {
         }
 
         @Test
-        fun `default certificate hostname is android-mcp local`() {
+        fun `default certificate hostname is android-mcp.local`() {
             val config = ServerConfig()
             assertEquals("android-mcp.local", config.certificateHostname)
         }
