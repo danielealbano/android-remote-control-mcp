@@ -399,7 +399,7 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +
 +        // Find nearest scrollable ancestor
 +        val scrollableAncestorId = findScrollableAncestor(tree, elementId)
-+            ?: throw McpToolException.ExecutionFailed(
++            ?: throw McpToolException.ActionFailed(
 +                "No scrollable container found for element '$elementId'",
 +            )
 +
@@ -407,7 +407,7 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +        for (attempt in 1..MAX_SCROLL_ATTEMPTS) {
 +            val scrollResult = actionExecutor.scrollNode(scrollableAncestorId, ScrollDirection.DOWN, tree)
 +            if (scrollResult.isFailure) {
-+                throw McpToolException.ExecutionFailed(
++                throw McpToolException.ActionFailed(
 +                    "Scroll failed on ancestor '$scrollableAncestorId': ${scrollResult.exceptionOrNull()?.message}",
 +                )
 +            }
@@ -425,7 +425,7 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +            }
 +        }
 +
-+        throw McpToolException.ExecutionFailed(
++        throw McpToolException.ActionFailed(
 +            "Element '$elementId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
 +        )
 +    }
@@ -482,7 +482,7 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +// NOTE: Uses McpToolException sealed class defined in Plan 7 (mcp/McpToolException.kt).
 +// Import: com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 +// Subtypes used: McpToolException.InvalidParams, McpToolException.PermissionDenied,
-+//                McpToolException.ExecutionFailed, McpToolException.ElementNotFound,
++//                McpToolException.ActionFailed, McpToolException.ElementNotFound,
 +//                McpToolException.Timeout
 +
 +/**
@@ -542,11 +542,11 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +                    exception.message ?: "Accessibility service not available",
 +                )
 +            }
-+            throw McpToolException.ExecutionFailed(
++            throw McpToolException.ActionFailed(
 +                exception.message ?: "Action failed on element '$elementId'",
 +            )
 +        }
-+        else -> throw McpToolException.ExecutionFailed(
++        else -> throw McpToolException.ActionFailed(
 +            "Action failed on element '$elementId': ${exception.message}",
 +        )
 +    }
@@ -565,7 +565,7 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 
 **What**: Verify that `handleToolCall()` already catches `McpToolException` (from Plan 7 Action 7.2.4).
 
-**Context**: Plan 7 already updated `handleToolCall()` to catch `McpToolException` (sealed base class) and use `e.code` to produce the correct JSON-RPC error response. Since the sealed class hierarchy covers `InvalidParams`, `PermissionDenied`, `ExecutionFailed`, `ElementNotFound`, and `Timeout`, a single catch block handles all subtypes. This action is a **no-op** -- the implementer just needs to verify the catch block exists.
+**Context**: Plan 7 already updated `handleToolCall()` to catch `McpToolException` (sealed base class) and use `e.code` to produce the correct JSON-RPC error response. Since the sealed class hierarchy covers `InvalidParams`, `InternalError`, `PermissionDenied`, `ElementNotFound`, `ActionFailed`, and `Timeout`, a single catch block handles all subtypes. This action is a **no-op** -- the implementer just needs to verify the catch block exists.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/McpProtocolHandler.kt`
 
@@ -673,7 +673,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +                }
 +                val success = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 +                if (!success) {
-+                    throw McpToolException.ExecutionFailed(
++                    throw McpToolException.ActionFailed(
 +                        "Failed to set text on focused element",
 +                    )
 +                }
@@ -728,7 +728,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +                }
 +                val success = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 +                if (!success) {
-+                    throw McpToolException.ExecutionFailed(
++                    throw McpToolException.ActionFailed(
 +                        "Failed to clear text on focused element",
 +                    )
 +                }
@@ -777,13 +777,13 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            "BACK" -> {
 +                val result = actionExecutor.pressBack()
 +                result.onFailure { e ->
-+                    throw McpToolException.ExecutionFailed( "BACK key failed: ${e.message}")
++                    throw McpToolException.ActionFailed( "BACK key failed: ${e.message}")
 +                }
 +            }
 +            "HOME" -> {
 +                val result = actionExecutor.pressHome()
 +                result.onFailure { e ->
-+                    throw McpToolException.ExecutionFailed( "HOME key failed: ${e.message}")
++                    throw McpToolException.ActionFailed( "HOME key failed: ${e.message}")
 +                }
 +            }
 +            "ENTER" -> pressEnter()
@@ -817,7 +817,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +                focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 +            }
 +            if (!success) {
-+                throw McpToolException.ExecutionFailed( "ENTER key action failed")
++                throw McpToolException.ActionFailed( "ENTER key action failed")
 +            }
 +        } finally {
 +            @Suppress("DEPRECATION")
@@ -843,7 +843,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +                }
 +                val success = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 +                if (!success) {
-+                    throw McpToolException.ExecutionFailed( "DEL key action failed")
++                    throw McpToolException.ActionFailed( "DEL key action failed")
 +                }
 +            }
 +            // If text is already empty, DEL is a no-op (not an error)
@@ -869,7 +869,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            }
 +            val success = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 +            if (!success) {
-+                throw McpToolException.ExecutionFailed( "Key input action failed")
++                throw McpToolException.ActionFailed( "Key input action failed")
 +            }
 +        } finally {
 +            @Suppress("DEPRECATION")
@@ -1007,7 +1007,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +
 +        return try {
 +            val clipboardManager = service.getSystemService(ClipboardManager::class.java)
-+                ?: throw McpToolException.ExecutionFailed(
++                ?: throw McpToolException.ActionFailed(
 +                    "ClipboardManager not available",
 +                )
 +
@@ -1028,7 +1028,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            throw e
 +        } catch (e: Exception) {
 +            Log.e(TAG, "Clipboard access failed", e)
-+            throw McpToolException.ExecutionFailed(
++            throw McpToolException.ActionFailed(
 +                "Clipboard access failed: ${e.message}",
 +            )
 +        }
@@ -1057,7 +1057,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +
 +        return try {
 +            val clipboardManager = service.getSystemService(ClipboardManager::class.java)
-+                ?: throw McpToolException.ExecutionFailed(
++                ?: throw McpToolException.ActionFailed(
 +                    "ClipboardManager not available",
 +                )
 +
@@ -1071,7 +1071,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            throw e
 +        } catch (e: Exception) {
 +            Log.e(TAG, "Clipboard set failed", e)
-+            throw McpToolException.ExecutionFailed(
++            throw McpToolException.ActionFailed(
 +                "Clipboard set failed: ${e.message}",
 +            )
 +        }
@@ -1280,6 +1280,8 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 
 **Context**: The `ToolRegistry` (created in Plans 7-8) calls `McpProtocolHandler.registerTool()` for each tool with the tool name, description, JSON input schema, and handler instance. The registrar is called during `McpServerService` startup. The new tools need Hilt injection for their dependencies (`AccessibilityTreeParser`, `ElementFinder`, `ActionExecutor`), so the tool instances are injected into `ToolRegistry` via constructor injection.
 
+> **IMPORTANT — Constructor evolution**: Plan 7 defined an empty constructor. Plan 8 replaced it with `(protocolHandler, actionExecutor)`. This plan further expands the constructor to add 12 new tool parameters. Each plan's constructor definition **supersedes** the previous one. At implementation time, the final constructor includes all dependencies accumulated across Plans 7-9.
+
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ToolRegistry.kt`
 
 ```diff
@@ -1306,7 +1308,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 @@ in registerAll() method - add after existing registrations:
 
 +        // Element Action Tools
-+        toolRegistry.register(
++        register(
 +            name = "find_elements",
 +            description = "Find UI elements matching the specified criteria (text, content_desc, resource_id, class_name)",
 +            inputSchema = buildJsonObject {
@@ -1340,7 +1342,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = findElementsTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "click_element",
 +            description = "Click the specified accessibility node by element ID",
 +            inputSchema = buildJsonObject {
@@ -1356,7 +1358,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = clickElementTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "long_click_element",
 +            description = "Long-click the specified accessibility node by element ID",
 +            inputSchema = buildJsonObject {
@@ -1372,7 +1374,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = longClickElementTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "set_text",
 +            description = "Set text on an editable accessibility node (empty string to clear)",
 +            inputSchema = buildJsonObject {
@@ -1395,7 +1397,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = setTextTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "scroll_to_element",
 +            description = "Scroll to make the specified element visible",
 +            inputSchema = buildJsonObject {
@@ -1412,7 +1414,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +        )
 +
 +        // Text Input Tools
-+        toolRegistry.register(
++        register(
 +            name = "input_text",
 +            description = "Type text into the focused input field or a specified element",
 +            inputSchema = buildJsonObject {
@@ -1432,7 +1434,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = inputTextTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "clear_text",
 +            description = "Clear text from the focused input field or a specified element",
 +            inputSchema = buildJsonObject {
@@ -1448,7 +1450,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = clearTextTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "press_key",
 +            description = "Press a specific key (ENTER, BACK, DEL, HOME, TAB, SPACE)",
 +            inputSchema = buildJsonObject {
@@ -1473,7 +1475,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +        )
 +
 +        // Utility Tools
-+        toolRegistry.register(
++        register(
 +            name = "get_clipboard",
 +            description = "Get the current clipboard text content",
 +            inputSchema = buildJsonObject {
@@ -1484,7 +1486,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = getClipboardTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "set_clipboard",
 +            description = "Set the clipboard content to the specified text",
 +            inputSchema = buildJsonObject {
@@ -1500,7 +1502,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = setClipboardTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "wait_for_element",
 +            description = "Wait until an element matching criteria appears (with timeout)",
 +            inputSchema = buildJsonObject {
@@ -1534,7 +1536,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 +            handler = waitForElementTool,
 +        )
 +
-+        toolRegistry.register(
++        register(
 +            name = "wait_for_idle",
 +            description = "Wait for the UI to become idle (no changes detected)",
 +            inputSchema = buildJsonObject {
@@ -2341,7 +2343,7 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 **Description**: Update (or create) `docs/MCP_TOOLS.md` with comprehensive documentation for all 29 MCP tools across 7 categories. This document covers all tools from Plans 7-9: 4 screen introspection + 6 system + 5 touch + 2 gesture + 5 element action + 3 text input + 4 utility.
 
 **Acceptance Criteria**:
-- [ ] Document includes all 28 tools organized by category
+- [ ] Document includes all 29 tools organized by category
 - [ ] Each tool has: name, description, input schema, output format, error cases, usage examples
 - [ ] Document includes error code reference table
 - [ ] Document includes authentication notes
