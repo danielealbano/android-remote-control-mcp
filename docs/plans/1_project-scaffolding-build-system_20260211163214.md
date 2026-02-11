@@ -619,7 +619,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +            android:foregroundServiceType="specialUse">
 +            <property
 +                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-+                android:value="MCP server providing remote device control over HTTPS" />
++                android:value="MCP server providing remote device control" />
 +        </service>
 +
 +        <!-- Screen Capture Foreground Service -->
@@ -1585,7 +1585,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +
 +## Features
 +
-+- MCP server running directly on Android device over HTTPS
++- MCP server running directly on Android device over HTTP (with optional HTTPS)
 +- Full UI introspection via Android Accessibility Services
 +- Screenshot capture via MediaProjection
 +- Coordinate-based and element-based touch interactions
@@ -1636,7 +1636,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +   ```bash
 +   # If using localhost binding (default), set up port forwarding:
 +   make forward-port
-+   # Then connect to https://localhost:8080
++   # Then connect to http://localhost:8080
 +   ```
 +
 +## Building
@@ -1684,7 +1684,7 @@ gradle/wrapper/gradle-wrapper.properties (config)
 +
 +The application is service-based with four main components:
 +
-+- **McpServerService** - Foreground service running Ktor HTTPS server
++- **McpServerService** - Foreground service running Ktor HTTP/HTTPS server
 +- **McpAccessibilityService** - Android AccessibilityService for UI introspection and actions
 +- **ScreenCaptureService** - Foreground service managing MediaProjection for screenshots
 +- **MainActivity** - Jetpack Compose UI for configuration and control

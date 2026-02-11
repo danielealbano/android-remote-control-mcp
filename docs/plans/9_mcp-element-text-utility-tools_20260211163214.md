@@ -207,6 +207,9 @@ For `scroll_to_element`, the approach is: find the element by ID in the parsed t
 +
 +    override suspend fun execute(params: JsonObject?): JsonElement {
 +        // Validate parameters
++
+> **Implementation Note — Leading spaces in error messages**: Multiple `McpToolException` constructor calls in this plan have a leading space in the message string (e.g., `" Missing required parameter 'by'"` instead of `"Missing required parameter 'by'"`). At implementation time, remove the leading spaces from ALL error message strings to avoid test assertion mismatches. This affects approximately 15 occurrences across `ElementActionTools.kt`, `TextInputTools.kt`, and `UtilityTools.kt`.
+
 +        val byStr = params?.get("by")?.jsonPrimitive?.contentOrNull
 +            ?: throw McpToolException.InvalidParams( "Missing required parameter 'by'")
 +

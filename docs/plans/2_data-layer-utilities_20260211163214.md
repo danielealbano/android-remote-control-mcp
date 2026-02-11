@@ -160,6 +160,8 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/data/model/ServerConfig.kt`
 
+> **CRITICAL -- Missing field**: `ServerConfig` is missing `httpsEnabled: Boolean = false`. This field is required by PROJECT.md (line 69: "HTTPS toggle") and referenced by Plan 3 (line 1568: `serverConfig.httpsEnabled`). At implementation time, add `val httpsEnabled: Boolean = false` to the data class, add a `PREF_HTTPS_ENABLED` DataStore key to `SettingsRepositoryImpl`, add `updateHttpsEnabled(enabled: Boolean)` to `SettingsRepository` interface and implementation, and include it in `mapPreferencesToServerConfig()`.
+
 ```diff
 --- /dev/null
 +++ b/app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/data/model/ServerConfig.kt
@@ -173,7 +175,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 + * The bearer token defaults to an empty string and is auto-generated
 + * (UUID) on first read by [com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImpl].
 + *
-+ * @property port The HTTPS server port (1-65535).
++ * @property port The server port (1-65535).
 + * @property bindingAddress The network binding address.
 + * @property bearerToken The bearer token for MCP request authentication.
 + * @property autoStartOnBoot Whether to start the MCP server on device boot.
@@ -189,7 +191,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +    val certificateHostname: String = DEFAULT_CERTIFICATE_HOSTNAME,
 +) {
 +    companion object {
-+        /** Default HTTPS server port. */
++        /** Default server port. */
 +        const val DEFAULT_PORT = 8080
 +        /** Minimum valid port number. */
 +        const val MIN_PORT = 1
@@ -210,7 +212,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Acceptance Criteria**:
 - [ ] `ServerStatus` sealed class has `Stopped`, `Starting`, `Running`, `Stopping`, `Error` subtypes
 - [ ] `Stopped` and `Starting` and `Stopping` are `data object` (singleton, no fields)
-- [ ] `Running` is a `data class` with `port: Int`, `bindingAddress: String`, `httpsEnabled: Boolean = true`
+- [ ] `Running` is a `data class` with `port: Int`, `bindingAddress: String`, `httpsEnabled: Boolean = false`
 - [ ] `Error` is a `data class` with `message: String`
 - [ ] File compiles without errors
 - [ ] File passes ktlint and detekt
@@ -255,7 +257,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +    data class Running(
 +        val port: Int,
 +        val bindingAddress: String,
-+        val httpsEnabled: Boolean = true,
++        val httpsEnabled: Boolean = false,
 +    ) : ServerStatus()
 +
 +    /** The MCP server is in the process of shutting down. */
@@ -330,7 +332,7 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +    suspend fun getServerConfig(): ServerConfig
 +
 +    /**
-+     * Updates the HTTPS server port.
++     * Updates the server port.
 +     *
 +     * @param port The new port value. Must pass [validatePort] first.
 +     */
@@ -1239,9 +1241,9 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 +        }
 +
 +        @Test
-+        fun `Running defaults httpsEnabled to true`() {
++        fun `Running defaults httpsEnabled to false`() {
 +            val status = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
-+            assertTrue(status.httpsEnabled)
++            assertFalse(status.httpsEnabled)
 +        }
 +
 +        @Test

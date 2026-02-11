@@ -32,6 +32,8 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 1. **Each tool is a separate class implementing `ToolHandler`**: This keeps each tool focused (single responsibility) and independently unit-testable.
 2. **`ToolRegistry` is a central registration point**: A single Hilt-injected class that receives all tool instances and registers them with `McpProtocolHandler`. Plans 8 and 9 will update this class to register additional tools.
 3. **Tool classes are grouped by file**: `ScreenIntrospectionTools.kt` contains the 4 screen introspection tool classes, `SystemActionTools.kt` contains the 6 system action tool classes. Each file also contains a registrar function.
+
+> **Implementation Note — Registration mechanism**: The description mentions "a registrar function" but the actual plan code uses `ToolHandler` classes with a `register()` instance method pattern. The acceptance criteria (line 61) and Plan 8-9 use `ToolRegistry.registerAll()`. At implementation time, follow the `ToolRegistry.registerAll()` pattern from Plans 8-9.
 4. **MCP content format**: Tool results are wrapped in the MCP content format `{ "content": [{ "type": "text", "text": "..." }] }` for text results, or `{ "content": [{ "type": "image", "data": "...", "mimeType": "image/jpeg" }] }` for screenshot images.
 5. **AccessibilityService access via singleton**: Tool classes access `McpAccessibilityService.instance` directly (same pattern as `ActionExecutor` in Plan 4) since the accessibility service is system-managed and cannot be Hilt-injected.
 6. **ScreenCaptureService access via `McpServerService`**: The `capture_screenshot` tool needs access to `ScreenCaptureService`. Since `ScreenCaptureService` is a bound service managed by `McpServerService`, the tool accesses it via `McpServerService.instance?.screenCaptureService`. This requires making `screenCaptureService` accessible (internal or via getter) on `McpServerService`.
@@ -245,6 +247,9 @@ The tool handler classes themselves are simple `@Inject constructor()` classes (
              val keyStorePassword = certificateManager.getKeyStorePassword()
 +
 +            // Register all MCP tools before starting the server (Plan 7 tools)
++
++> **CRITICAL — Tool registration placement**: The `registerScreenIntrospectionTools()` and `registerSystemActionTools()` calls appear after the certificate/HTTPS setup code. At implementation time, ensure these registration calls are placed UNCONDITIONALLY before any HTTPS-conditional block. Tools must be registered regardless of whether HTTPS is enabled or disabled.
++
 +            registerScreenIntrospectionTools(toolRegistry)
 +            registerSystemActionTools(toolRegistry)
 +            // Plans 8 and 9 add: registerTouchActionTools(toolRegistry),

@@ -137,6 +137,9 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +// Subtypes used: McpToolException.InvalidParams, McpToolException.PermissionDenied,
 +//                McpToolException.ActionFailed, McpToolException.InternalError
 +
++
++> **CRITICAL — Wrong file location**: `McpToolUtils` is defined as `internal object` inside `TouchActionTools.kt`, but PROJECT.md line 143 lists `McpToolUtils.kt` as a separate file in `mcp/tools/`. At implementation time, create `McpToolUtils.kt` as a standalone file in `mcp/tools/` instead of embedding it inside `TouchActionTools.kt`.
++
 +/**
 + * Shared utilities for MCP tool parameter extraction and response building.
 + *
@@ -251,6 +254,9 @@ The `McpProtocolHandler.handleToolCall()` catch block was updated in Plan 7 (Act
 +     * duplication. Prefer delegating to [McpContentBuilder.textContent()] and remove this method,
 +     * or move all response-building into [McpToolUtils] and remove [McpContentBuilder].
 +     */
+
+> **CRITICAL — Duplicate utility**: `McpToolUtils.textContentResponse()` duplicates `McpContentBuilder.textContent()` from Plan 7. At implementation time, remove `McpToolUtils.textContentResponse()` and use `McpContentBuilder.textContent()` instead. Update all tool handlers that call `McpToolUtils.textContentResponse()` or `McpToolUtils.handleActionResult()` to use `McpContentBuilder` directly.
+
 +    fun textContentResponse(message: String): JsonElement {
 +        return buildJsonObject {
 +            put("content", buildJsonArray {
@@ -489,6 +495,8 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **Context**: The `ToolRegistry` (from Plan 7) is responsible for registering all MCP tools with `McpProtocolHandler` at startup. Each tool registration requires a name, description, JSON input schema, and handler instance. The tool handler instances are created with the injected `ActionExecutor`. Input schemas match the specifications in PROJECT.md exactly.
 
 > **IMPORTANT — Constructor evolution**: Plan 7 defined `ToolRegistry @Inject constructor()` with an empty constructor. This plan **replaces** that constructor to add `protocolHandler: McpProtocolHandler` and `actionExecutor: ActionExecutor` as constructor parameters for Hilt injection. Plan 9 will further expand this constructor with additional tool dependencies. Each plan's constructor definition supersedes the previous one.
+
+> **CRITICAL — ToolRegistry constructor evolution**: Plan 7 defines `ToolRegistry @Inject constructor()` (empty). This plan adds `protocolHandler: McpProtocolHandler, actionExecutor: ActionExecutor`. Plan 9 further adds 12 tool instance parameters. These are incompatible changes. Additionally, tool classes have `@Inject constructor(...)` annotations but `registerTouchActionTools()` manually instantiates them via `TapTool(actionExecutor)`, making the `@Inject` annotations dead code. At implementation time, choose ONE consistent pattern: either (a) inject all tool instances into `ToolRegistry` constructor (Plan 9 pattern) and remove manual instantiation, or (b) use manual instantiation and remove `@Inject` from tool classes. The Plan 9 pattern (constructor injection) is recommended since it leverages Hilt for all dependency resolution.
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ToolRegistry.kt (from Plan 7)`
 
