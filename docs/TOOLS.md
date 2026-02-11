@@ -1,0 +1,384 @@
+# Development Workflow Tools
+
+This document defines the git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions used in this project. All contributors and LLM agents MUST follow these conventions.
+
+---
+
+## Table of Contents
+
+1. [Branching Convention](#branching-convention)
+2. [Commit Convention](#commit-convention)
+3. [Pull Request Convention](#pull-request-convention)
+4. [Git Commands Reference](#git-commands-reference)
+5. [GitHub CLI Commands Reference](#github-cli-commands-reference)
+6. [Local CI with act](#local-ci-with-act)
+
+---
+
+## Branching Convention
+
+### Branch Naming
+
+All feature branches MUST follow this format:
+
+```
+feat/<description-with-dashes>
+```
+
+**Examples**:
+- `feat/project-scaffolding`
+- `feat/data-layer-utilities`
+- `feat/ui-layer-compose`
+- `feat/accessibility-service`
+- `feat/screen-capture-service`
+- `feat/mcp-server-ktor`
+- `feat/mcp-introspection-system-tools`
+- `feat/mcp-touch-gesture-tools`
+- `feat/mcp-element-text-utility-tools`
+- `feat/e2e-tests-ci-docs`
+
+### Branch Lifecycle
+
+1. Always branch from `main` (latest)
+2. Implement the plan on the feature branch
+3. Push to remote with `-u` flag
+4. Create PR via `gh pr create`
+5. User reviews and merges the PR
+6. Agent pulls updated `main` before starting the next plan
+
+---
+
+## Commit Convention
+
+### Commit Granularity
+
+- Create **multiple logical commits** per PR, NOT one giant squash commit.
+- Each commit MUST be a **coherent, self-contained unit of work**.
+- Use `git add -p` when needed to stage specific hunks from a file that contains changes belonging to different logical commits.
+- Each commit tells a story: what was done and why.
+
+### Commit Message Format
+
+```
+<type>: <short description>
+
+<optional body explaining the "why", not the "what">
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+**Types**:
+- `feat`: New feature or functionality
+- `fix`: Bug fix
+- `refactor`: Code restructuring without behavior change
+- `test`: Adding or updating tests
+- `docs`: Documentation changes
+- `chore`: Build, CI, tooling, dependencies
+- `style`: Code style/formatting (no logic change)
+
+**Examples**:
+```
+feat: add Gradle project configuration with all dependencies
+
+Set up root and app build.gradle.kts with Kotlin DSL, configure
+libs.versions.toml version catalog with all project dependencies,
+and define gradle.properties with version and build settings.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+```
+chore: add Makefile with development workflow targets
+
+Implement all Makefile targets defined in PROJECT.md including
+build, test, lint, device management, emulator, and versioning
+targets.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+### Staging Specific Chunks
+
+When a single file contains changes that belong to different logical commits, use interactive staging:
+
+```bash
+# Stage specific hunks interactively
+git add -p <file>
+
+# Review what is staged vs unstaged
+git diff --cached   # staged changes
+git diff            # unstaged changes
+```
+
+**Rules**:
+- Never use `git add -A` or `git add .` blindly — always review what is being staged.
+- Prefer `git add <specific-file>` for files that belong entirely to one commit.
+- Use `git add -p <file>` only when a file has changes spanning multiple logical commits.
+
+---
+
+## Pull Request Convention
+
+### PR Creation
+
+Create PRs using the GitHub CLI with a HEREDOC for the body:
+
+```bash
+gh pr create --base main --title "<Plan N>: <short title>" --body "$(cat <<'EOF'
+## Summary
+
+Brief summary of the plan: what it implements, why, and what the expected outcome is.
+
+## Plan Reference
+
+Implementation of Plan N: <plan name> from `docs/plans/<plan-file>.md`.
+
+## Changes
+
+- <bullet points of key changes>
+
+## Testing
+
+- <what tests were added/run>
+- <verification steps performed>
+
+## Checklist
+
+- [ ] All tests pass (`make test-unit`)
+- [ ] Lint passes (`make lint`)
+- [ ] Build succeeds (`make build`)
+- [ ] CI validated locally (`gh act --validate`)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+### PR Title Format
+
+```
+Plan <N>: <Short descriptive title>
+```
+
+**Examples**:
+- `Plan 1: Project scaffolding and build system`
+- `Plan 2: Data layer, settings repository, and utilities`
+- `Plan 7: Screen introspection and system action MCP tools`
+
+---
+
+## Git Commands Reference
+
+### Daily Workflow
+
+```bash
+# Ensure main is up to date before starting a new plan
+git checkout main
+git pull origin main
+
+# Create feature branch
+git checkout -b feat/<description>
+
+# Stage specific files
+git add <file1> <file2>
+
+# Stage specific hunks from a file
+git add -p <file>
+
+# Review staged changes
+git diff --cached
+
+# Review unstaged changes
+git diff
+
+# Commit with HEREDOC for multi-line message
+git commit -m "$(cat <<'EOF'
+<type>: <description>
+
+<body>
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+
+# Push branch to remote (first push)
+git push -u origin feat/<description>
+
+# Push subsequent commits
+git push
+```
+
+### Inspection Commands
+
+```bash
+# Show working tree status
+git status
+
+# Show recent commit history
+git log --oneline -20
+
+# Show diff between branch and main
+git diff main...HEAD
+
+# Show all changes (staged + unstaged)
+git diff HEAD
+
+# Show specific file history
+git log --oneline -- <file>
+```
+
+### Safety Rules
+
+- **NEVER** use `git push --force` without explicit user permission.
+- **NEVER** use `git reset --hard` without explicit user permission.
+- **NEVER** amend published commits without explicit user permission.
+- **NEVER** skip hooks (`--no-verify`) without explicit user permission.
+- **ALWAYS** create NEW commits rather than amending after hook failures.
+
+---
+
+## GitHub CLI Commands Reference
+
+### PR Management
+
+```bash
+# Create PR
+gh pr create --base main --title "<title>" --body "<body>"
+
+# List open PRs
+gh pr list
+
+# View PR details
+gh pr view <number>
+
+# View PR checks/status
+gh pr checks <number>
+
+# View PR diff
+gh pr diff <number>
+```
+
+### Repository Information
+
+```bash
+# View repo info
+gh repo view
+
+# View remote URL
+git remote -v
+```
+
+### Issue Management (if needed)
+
+```bash
+# List issues
+gh issue list
+
+# Create issue
+gh issue create --title "<title>" --body "<body>"
+
+# View issue
+gh issue view <number>
+```
+
+---
+
+## Local CI with act
+
+### Overview
+
+`act` (installed as `gh act` via the nektos/act GitHub CLI extension) runs GitHub Actions workflows locally using Docker containers. This allows testing CI pipelines before pushing to GitHub.
+
+### Validation Commands
+
+```bash
+# Validate workflow YAML syntax (no Docker needed)
+gh act --validate
+
+# Dry run — validates correctness without creating containers
+gh act -n
+
+# Dry run for a specific event
+gh act -n push
+gh act -n pull_request
+```
+
+### Running Workflows Locally
+
+```bash
+# Run all jobs triggered by push event (default)
+gh act push
+
+# Run all jobs triggered by pull_request event
+gh act pull_request
+
+# Run a specific job by ID
+gh act -j lint
+gh act -j test-unit
+gh act -j build
+
+# List all available workflows and jobs
+gh act -l
+```
+
+### Platform Image Configuration
+
+GitHub Actions runners may need custom Docker images for Android development:
+
+```bash
+# Use a custom image for a platform
+gh act -P ubuntu-latest=<custom-image>
+
+# Example: use a specific Ubuntu image
+gh act -P ubuntu-latest=catthehacker/ubuntu:act-latest
+```
+
+### Environment and Secrets
+
+```bash
+# Pass environment variables
+gh act --env ANDROID_HOME=/opt/android-sdk --env JAVA_HOME=/usr/lib/jvm/java-17
+
+# Pass secrets
+gh act -s GITHUB_TOKEN=<token>
+
+# Use env file
+gh act --env-file .env.ci
+
+# Use secrets file
+gh act --secret-file .secrets
+```
+
+### Known Limitations
+
+- **Android SDK**: CI containers may not have Android SDK pre-installed. Jobs requiring Android SDK (build, test) may need custom platform images (`-P`) or may only work fully on GitHub-hosted runners.
+- **Android Emulator**: Integration tests requiring an emulator are unlikely to work locally via `act` due to KVM/hardware acceleration requirements inside Docker. These jobs should be validated on GitHub.
+- **Docker-in-Docker**: E2E tests using Testcontainers (Docker Android) require Docker-in-Docker support, which may not work in all `act` configurations.
+- **Recommended local usage**: Use `gh act` primarily for validating workflow syntax, running lint jobs, and testing non-Android-specific jobs. Rely on GitHub-hosted runners for full Android CI.
+
+### Workflow During Plan Implementation
+
+1. **After creating/modifying CI workflow**: Run `gh act --validate` to check syntax.
+2. **After implementing lint/test jobs**: Run `gh act -j <job-id>` to verify locally.
+3. **Before creating PR**: Run `gh act -n` to dry-run the full pipeline.
+4. **Plan 10 (CI finalization)**: Run `gh act push` for full local pipeline validation.
+
+---
+
+## Quick Reference Card
+
+| Task | Command |
+|------|---------|
+| Create feature branch | `git checkout -b feat/<desc>` |
+| Stage files | `git add <file>` |
+| Stage hunks | `git add -p <file>` |
+| Review staged | `git diff --cached` |
+| Commit | `git commit -m "$(cat <<'EOF' ... EOF)"` |
+| Push (first time) | `git push -u origin feat/<desc>` |
+| Push (subsequent) | `git push` |
+| Create PR | `gh pr create --base main --title "..." --body "..."` |
+| Validate CI | `gh act --validate` |
+| Dry-run CI | `gh act -n` |
+| Run CI job | `gh act -j <job-id>` |
+| Run full CI | `gh act push` |
+| List CI jobs | `gh act -l` |
