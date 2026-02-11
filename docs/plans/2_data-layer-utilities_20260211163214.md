@@ -26,20 +26,20 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `BindingAddress` enum exists with `LOCALHOST("127.0.0.1")` and `NETWORK("0.0.0.0")` values
-- [ ] `CertificateSource` enum exists with `AUTO_GENERATED` and `CUSTOM` values
-- [ ] `ServerConfig` data class exists with all fields and sensible defaults matching PROJECT.md
-- [ ] `ServerStatus` sealed class exists with `Stopped`, `Starting`, `Running`, `Stopping`, `Error` subtypes
-- [ ] `SettingsRepository` interface declares all CRUD operations, validation methods, and `Flow<ServerConfig>`
-- [ ] `SettingsRepositoryImpl` implements `SettingsRepository` using Preferences DataStore with full validation
-- [ ] `AppModule` provides `DataStore<Preferences>` as singleton and binds `SettingsRepository` to `SettingsRepositoryImpl`
-- [ ] `NetworkUtils` provides device IP address lookup, port availability check, and network interface listing
-- [ ] `PermissionUtils` provides accessibility service detection, accessibility settings navigation, and notification permission check
-- [ ] `Logger` wraps Android `Log` with sanitization and build-type-aware log level filtering
-- [ ] Unit tests exist and pass for all data models, repository, and utility classes
-- [ ] `make lint` passes with no warnings or errors
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds without errors or warnings
+- [x] `BindingAddress` enum exists with `LOCALHOST("127.0.0.1")` and `NETWORK("0.0.0.0")` values
+- [x] `CertificateSource` enum exists with `AUTO_GENERATED` and `CUSTOM` values
+- [x] `ServerConfig` data class exists with all fields and sensible defaults matching PROJECT.md
+- [x] `ServerStatus` sealed class exists with `Stopped`, `Starting`, `Running`, `Stopping`, `Error` subtypes
+- [x] `SettingsRepository` interface declares all CRUD operations, validation methods, and `Flow<ServerConfig>`
+- [x] `SettingsRepositoryImpl` implements `SettingsRepository` using Preferences DataStore with full validation
+- [x] `AppModule` provides `DataStore<Preferences>` as singleton and binds `SettingsRepository` to `SettingsRepositoryImpl`
+- [x] `NetworkUtils` provides device IP address lookup, port availability check, and network interface listing
+- [x] `PermissionUtils` provides accessibility service detection, accessibility settings navigation, and notification permission check
+- [x] `Logger` wraps Android `Log` with sanitization and build-type-aware log level filtering
+- [x] Unit tests exist and pass for all data models, repository, and utility classes
+- [x] `make lint` passes with no warnings or errors
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds without errors or warnings
 
 ### Commit Strategy
 
@@ -58,10 +58,10 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create the `BindingAddress` and `CertificateSource` enum classes that are used as field types in `ServerConfig`. These must exist before `ServerConfig` can be created.
 
 **Acceptance Criteria**:
-- [ ] `BindingAddress` enum has `LOCALHOST` and `NETWORK` entries with correct `address` property values
-- [ ] `CertificateSource` enum has `AUTO_GENERATED` and `CUSTOM` entries
-- [ ] Both files compile without errors
-- [ ] Both files pass ktlint and detekt
+- [x] `BindingAddress` enum has `LOCALHOST` and `NETWORK` entries with correct `address` property values
+- [x] `CertificateSource` enum has `AUTO_GENERATED` and `CUSTOM` entries
+- [x] Both files compile without errors
+- [x] Both files pass ktlint and detekt
 
 **Tests**: Unit tests for these enums are included in `ServerConfigTest.kt` (Task 2.6). No separate test file needed for enums alone.
 
@@ -145,10 +145,10 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create the `ServerConfig` data class that holds all server configuration fields with default values matching PROJECT.md.
 
 **Acceptance Criteria**:
-- [ ] `ServerConfig` has all six fields: `port`, `bindingAddress`, `bearerToken`, `autoStartOnBoot`, `certificateSource`, `certificateHostname`
-- [ ] Default values match PROJECT.md: port=8080, bindingAddress=LOCALHOST, bearerToken="", autoStartOnBoot=false, certificateSource=AUTO_GENERATED, certificateHostname="android-mcp.local"
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ServerConfig` has all seven fields: `port`, `bindingAddress`, `bearerToken`, `autoStartOnBoot`, `httpsEnabled`, `certificateSource`, `certificateHostname`
+- [x] Default values match PROJECT.md: port=8080, bindingAddress=LOCALHOST, bearerToken="", autoStartOnBoot=false, httpsEnabled=false, certificateSource=AUTO_GENERATED, certificateHostname="android-mcp.local"
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests for `ServerConfig` are in Task 2.6 (`ServerConfigTest.kt`).
 
@@ -210,12 +210,12 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create the `ServerStatus` sealed class representing the MCP server lifecycle states.
 
 **Acceptance Criteria**:
-- [ ] `ServerStatus` sealed class has `Stopped`, `Starting`, `Running`, `Stopping`, `Error` subtypes
-- [ ] `Stopped` and `Starting` and `Stopping` are `data object` (singleton, no fields)
-- [ ] `Running` is a `data class` with `port: Int`, `bindingAddress: String`, `httpsEnabled: Boolean = false`
-- [ ] `Error` is a `data class` with `message: String`
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ServerStatus` sealed class has `Stopped`, `Starting`, `Running`, `Stopping`, `Error` subtypes
+- [x] `Stopped` and `Starting` and `Stopping` are `data object` (singleton, no fields)
+- [x] `Running` is a `data class` with `port: Int`, `bindingAddress: String`, `httpsEnabled: Boolean = false`
+- [x] `Error` is a `data class` with `message: String`
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests for `ServerStatus` are in Task 2.6 (`ServerStatusTest.kt`).
 
@@ -279,15 +279,15 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create the `SettingsRepository` interface and `SettingsRepositoryImpl` implementation backed by Preferences DataStore. This is the single access point for all settings in the application per CLAUDE.md rules ("All DataStore access MUST go through SettingsRepository").
 
 **Acceptance Criteria**:
-- [ ] `SettingsRepository` interface declares `serverConfig: Flow<ServerConfig>`, `getServerConfig()`, and all update/validate methods
-- [ ] `SettingsRepositoryImpl` uses `DataStore<Preferences>` injected via constructor
-- [ ] Port validation rejects values outside 1-65535
-- [ ] Certificate hostname validation rejects empty or invalid hostnames
-- [ ] Bearer token is auto-generated (UUID) on first read if empty
-- [ ] `generateNewBearerToken()` creates a new UUID and persists it
-- [ ] All DataStore reads provide default fallbacks
-- [ ] Files compile without errors
-- [ ] Files pass ktlint and detekt
+- [x] `SettingsRepository` interface declares `serverConfig: Flow<ServerConfig>`, `getServerConfig()`, and all update/validate methods
+- [x] `SettingsRepositoryImpl` uses `DataStore<Preferences>` injected via constructor
+- [x] Port validation rejects values outside 1-65535
+- [x] Certificate hostname validation rejects empty or invalid hostnames
+- [x] Bearer token is auto-generated (UUID) on first read if empty
+- [x] `generateNewBearerToken()` creates a new UUID and persists it
+- [x] All DataStore reads provide default fallbacks
+- [x] Files compile without errors
+- [x] Files pass ktlint and detekt
 
 **Tests**: Unit tests for `SettingsRepositoryImpl` are in Task 2.6 (`SettingsRepositoryImplTest.kt`).
 
@@ -580,11 +580,11 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Update the existing `AppModule.kt` to provide `DataStore<Preferences>` as a singleton and bind `SettingsRepository` to `SettingsRepositoryImpl`.
 
 **Acceptance Criteria**:
-- [ ] `AppModule` provides `DataStore<Preferences>` via `@Provides @Singleton`
-- [ ] A separate `RepositoryModule` (abstract class) binds `SettingsRepository` to `SettingsRepositoryImpl` via `@Binds @Singleton`
-- [ ] Both modules are `@InstallIn(SingletonComponent::class)`
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `AppModule` provides `DataStore<Preferences>` via `@Provides @Singleton`
+- [x] A separate `RepositoryModule` (abstract class) binds `SettingsRepository` to `SettingsRepositoryImpl` via `@Binds @Singleton`
+- [x] Both modules are `@InstallIn(SingletonComponent::class)`
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: The Hilt module is verified implicitly by `SettingsRepositoryImplTest` (Task 2.6) which uses the DataStore directly, and by `make build` succeeding.
 
@@ -656,11 +656,11 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create the `NetworkUtils`, `PermissionUtils`, and `Logger` utility classes.
 
 **Acceptance Criteria**:
-- [ ] `NetworkUtils` provides `getDeviceIpAddress()`, `isPortAvailable()`, `getNetworkInterfaces()` with `NetworkInterfaceInfo` data class
-- [ ] `PermissionUtils` provides `isAccessibilityServiceEnabled()`, `openAccessibilitySettings()`, `isNotificationPermissionGranted()`
-- [ ] `Logger` provides `d()`, `i()`, `w()`, `e()` methods with bearer token sanitization and build-type log level filtering
-- [ ] All files compile without errors
-- [ ] All files pass ktlint and detekt
+- [x] `NetworkUtils` provides `getDeviceIpAddress()`, `isPortAvailable()`, `getNetworkInterfaces()` with `NetworkInterfaceInfo` data class
+- [x] `PermissionUtils` provides `isAccessibilityServiceEnabled()`, `openAccessibilitySettings()`, `isNotificationPermissionGranted()`
+- [x] `Logger` provides `d()`, `i()`, `w()`, `e()` methods with bearer token sanitization and build-type log level filtering
+- [x] All files compile without errors
+- [x] All files pass ktlint and detekt
 
 **Tests**: Unit tests for all utilities are in Task 2.7.
 
@@ -995,14 +995,14 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Create comprehensive unit tests for all data models, the settings repository, and all utility classes.
 
 **Acceptance Criteria**:
-- [ ] `ServerConfigTest` tests default values, copy behavior, companion constants
-- [ ] `ServerStatusTest` tests all sealed class subtypes, equality, and toString
-- [ ] `SettingsRepositoryImplTest` tests all CRUD operations, validation (port range, hostname pattern), bearer token auto-generation, Flow emission via Turbine
-- [ ] `NetworkUtilsTest` tests port availability check, network interface listing
-- [ ] `PermissionUtilsTest` tests accessibility service detection with mocked Context/ContentResolver
-- [ ] `LoggerTest` tests UUID sanitization, log level filtering based on build type
-- [ ] All tests pass with `./gradlew test` (or targeted `./gradlew test --tests "..."`)
-- [ ] No warnings or errors from test execution
+- [x] `ServerConfigTest` tests default values, copy behavior, companion constants
+- [x] `ServerStatusTest` tests all sealed class subtypes, equality, and toString
+- [x] `SettingsRepositoryImplTest` tests all CRUD operations, validation (port range, hostname pattern), bearer token auto-generation, Flow emission via Turbine
+- [x] `NetworkUtilsTest` tests port availability check, network interface listing
+- [x] `PermissionUtilsTest` tests accessibility service detection with mocked Context/ContentResolver
+- [x] `LoggerTest` tests UUID sanitization, log level filtering based on build type
+- [x] All tests pass with `./gradlew test` (or targeted `./gradlew test --tests "..."`)
+- [x] No warnings or errors from test execution
 
 **Tests**: These ARE the tests.
 
@@ -1971,10 +1971,10 @@ This plan creates the data models, settings repository (DataStore), Hilt DI bind
 **Description**: Run all verification commands to ensure the data layer and utilities are correct, then create the commits.
 
 **Acceptance Criteria**:
-- [ ] `make lint` succeeds (no ktlint or detekt violations)
-- [ ] `make test-unit` succeeds (all unit tests pass)
-- [ ] `make build` succeeds (debug APK generated without errors or warnings)
-- [ ] All 4-5 commits are created on the `feat/data-layer-utilities` branch
+- [x] `make lint` succeeds (no ktlint or detekt violations)
+- [x] `make test-unit` succeeds (all unit tests pass)
+- [x] `make build` succeeds (debug APK generated without errors or warnings)
+- [x] All 5 commits are created on the `feat/data-layer-utilities` branch
 
 **Tests**: These are the verification steps.
 
