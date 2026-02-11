@@ -217,10 +217,11 @@ version-bump-patch: ## Bump patch version (1.0.0 -> 1.0.1)
 	PATCH=$$(echo $$CURRENT | cut -d. -f3); \
 	NEW_PATCH=$$((PATCH + 1)); \
 	NEW_VERSION="$$MAJOR.$$MINOR.$$NEW_PATCH"; \
-	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	sed -i.bak "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
 	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
 	NEW_CODE=$$((CODE + 1)); \
-	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	sed -i.bak "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	rm -f gradle.properties.bak; \
 	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
 
 version-bump-minor: ## Bump minor version (1.0.0 -> 1.1.0)
@@ -229,10 +230,11 @@ version-bump-minor: ## Bump minor version (1.0.0 -> 1.1.0)
 	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
 	NEW_MINOR=$$((MINOR + 1)); \
 	NEW_VERSION="$$MAJOR.$$NEW_MINOR.0"; \
-	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	sed -i.bak "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
 	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
 	NEW_CODE=$$((CODE + 1)); \
-	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	sed -i.bak "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	rm -f gradle.properties.bak; \
 	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
 
 version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
@@ -240,10 +242,11 @@ version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
 	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
 	NEW_MAJOR=$$((MAJOR + 1)); \
 	NEW_VERSION="$$NEW_MAJOR.0.0"; \
-	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	sed -i.bak "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
 	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
 	NEW_CODE=$$((CODE + 1)); \
-	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	sed -i.bak "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	rm -f gradle.properties.bak; \
 	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
 
 # ─────────────────────────────────────────────────────────────────────────────
