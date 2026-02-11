@@ -1,0 +1,255 @@
+.PHONY: help check-deps build build-release clean \
+        test-unit test-integration test-e2e test coverage \
+        lint lint-fix \
+        install install-release uninstall grant-permissions start-server forward-port \
+        setup-emulator start-emulator stop-emulator \
+        logs logs-clear \
+        version-bump-patch version-bump-minor version-bump-major \
+        all ci
+
+# Variables
+GRADLE := ./gradlew
+ADB := adb
+APP_ID := com.danielealbano.androidremotecontrolmcp
+APP_ID_DEBUG := $(APP_ID).debug
+EMULATOR_NAME := mcp_test_emulator
+EMULATOR_DEVICE := pixel_6
+EMULATOR_API := 34
+EMULATOR_IMAGE := system-images;android-$(EMULATOR_API);google_apis;x86_64
+DEFAULT_PORT := 8080
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Help
+# ─────────────────────────────────────────────────────────────────────────────
+
+help: ## Show this help message
+	@echo "Android Remote Control MCP - Development Targets"
+	@echo ""
+	@echo "Usage: make <target>"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment & Dependencies
+# ─────────────────────────────────────────────────────────────────────────────
+
+check-deps: ## Check for required development tools
+	@echo "Checking required tools..."
+	@echo ""
+	@MISSING=0; \
+	if [ -z "$$ANDROID_HOME" ]; then \
+		echo "  [MISSING] ANDROID_HOME is not set"; \
+		echo "           Install Android SDK and set: export ANDROID_HOME=~/Android/Sdk"; \
+		MISSING=1; \
+	else \
+		echo "  [OK] ANDROID_HOME = $$ANDROID_HOME"; \
+	fi; \
+	if command -v java >/dev/null 2>&1; then \
+		JAVA_VER=$$(java -version 2>&1 | head -1 | awk -F'"' '{print $$2}'); \
+		echo "  [OK] Java $$JAVA_VER"; \
+	else \
+		echo "  [MISSING] Java (JDK 17 required)"; \
+		echo "           Install: https://adoptium.net/"; \
+		MISSING=1; \
+	fi; \
+	if [ -f "$(GRADLE)" ]; then \
+		echo "  [OK] Gradle wrapper found"; \
+	else \
+		echo "  [MISSING] Gradle wrapper (gradlew)"; \
+		echo "           Run: gradle wrapper --gradle-version 8.14.4"; \
+		MISSING=1; \
+	fi; \
+	if command -v $(ADB) >/dev/null 2>&1; then \
+		ADB_VER=$$($(ADB) version | head -1); \
+		echo "  [OK] $$ADB_VER"; \
+	else \
+		echo "  [MISSING] adb (Android Debug Bridge)"; \
+		echo "           Install Android SDK platform-tools"; \
+		MISSING=1; \
+	fi; \
+	if command -v docker >/dev/null 2>&1; then \
+		DOCKER_VER=$$(docker --version); \
+		echo "  [OK] $$DOCKER_VER"; \
+	else \
+		echo "  [MISSING] Docker (required for E2E tests)"; \
+		echo "           Install: https://docs.docker.com/get-docker/"; \
+		MISSING=1; \
+	fi; \
+	echo ""; \
+	if [ $$MISSING -eq 1 ]; then \
+		echo "Some dependencies are missing. Please install them."; \
+		exit 1; \
+	else \
+		echo "All dependencies are present."; \
+	fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build
+# ─────────────────────────────────────────────────────────────────────────────
+
+build: ## Build debug APK
+	$(GRADLE) assembleDebug
+
+build-release: ## Build release APK
+	$(GRADLE) assembleRelease
+
+clean: ## Clean build artifacts
+	$(GRADLE) clean
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────────────────────
+
+test-unit: ## Run unit tests
+	$(GRADLE) test
+
+test-integration: ## Run integration tests (requires device/emulator)
+	$(GRADLE) connectedAndroidTest
+
+test-e2e: ## Run E2E tests (requires Docker)
+	$(GRADLE) :e2e-tests:test
+
+test: test-unit test-integration test-e2e ## Run all tests
+
+coverage: ## Generate code coverage report (Jacoco)
+	$(GRADLE) jacocoTestReport
+	@echo "Coverage report: app/build/reports/jacoco/index.html"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Linting
+# ─────────────────────────────────────────────────────────────────────────────
+
+lint: ## Run all linters (ktlint + detekt)
+	$(GRADLE) ktlintCheck detekt
+
+lint-fix: ## Auto-fix linting issues
+	$(GRADLE) ktlintFormat
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Device Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+install: ## Install debug APK on connected device/emulator
+	$(GRADLE) installDebug
+
+install-release: ## Install release APK on connected device/emulator
+	$(GRADLE) installRelease
+
+uninstall: ## Uninstall app from connected device/emulator
+	$(ADB) uninstall $(APP_ID) 2>/dev/null || true
+	$(ADB) uninstall $(APP_ID_DEBUG) 2>/dev/null || true
+
+grant-permissions: ## Display instructions for granting permissions
+	@echo "=== Permission Setup Instructions ==="
+	@echo ""
+	@echo "1. Accessibility Service (must be enabled manually):"
+	@echo "   Settings > Accessibility > Android Remote Control MCP > Enable"
+	@echo ""
+	@echo "   Or open Settings directly:"
+	@echo "   $(ADB) shell am start -a android.settings.ACCESSIBILITY_SETTINGS"
+	@echo ""
+	@echo "2. MediaProjection (granted when prompted in app):"
+	@echo "   Start the MCP server in the app and grant the screen capture permission"
+	@echo "   when the system dialog appears."
+	@echo ""
+	@echo "3. Notifications (Android 13+):"
+	@echo "   The app will request notification permission on first launch."
+	@echo ""
+
+# Note: start-server defaults to the debug application ID (APP_ID_DEBUG).
+# To launch the release build, use: make start-server APP_ID_TARGET=$(APP_ID)
+APP_ID_TARGET ?= $(APP_ID_DEBUG)
+
+start-server: ## Launch MainActivity on device (debug build by default)
+	$(ADB) shell am start -n $(APP_ID_TARGET)/.ui.MainActivity
+
+forward-port: ## Set up adb port forwarding (device -> host)
+	$(ADB) forward tcp:$(DEFAULT_PORT) tcp:$(DEFAULT_PORT)
+	@echo "Port forwarding: localhost:$(DEFAULT_PORT) -> device:$(DEFAULT_PORT)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Emulator Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+setup-emulator: ## Create AVD for testing
+	@echo "Creating AVD '$(EMULATOR_NAME)'..."
+	@echo "Ensure system image is installed: sdkmanager '$(EMULATOR_IMAGE)'"
+	avdmanager create avd \
+		-n $(EMULATOR_NAME) \
+		-k "$(EMULATOR_IMAGE)" \
+		--device "$(EMULATOR_DEVICE)" \
+		--force
+	@echo "AVD '$(EMULATOR_NAME)' created."
+
+start-emulator: ## Start emulator in background (headless)
+	@echo "Starting emulator '$(EMULATOR_NAME)'..."
+	emulator -avd $(EMULATOR_NAME) -no-snapshot -no-window -no-audio &
+	@echo "Waiting for emulator to boot..."
+	$(ADB) wait-for-device
+	$(ADB) shell getprop sys.boot_completed | grep -q 1 || \
+		(echo "Waiting for boot..."; while [ "$$($(ADB) shell getprop sys.boot_completed 2>/dev/null)" != "1" ]; do sleep 2; done)
+	@echo "Emulator is ready."
+
+stop-emulator: ## Stop running emulator
+	$(ADB) -s emulator-5554 emu kill 2>/dev/null || true
+	@echo "Emulator stopped."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Logging & Debugging
+# ─────────────────────────────────────────────────────────────────────────────
+
+logs: ## Show app logs (filtered by MCP tags)
+	$(ADB) logcat -s "MCP:*" "AndroidRemoteControl:*"
+
+logs-clear: ## Clear logcat buffer
+	$(ADB) logcat -c
+	@echo "Logcat buffer cleared."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Versioning
+# ─────────────────────────────────────────────────────────────────────────────
+
+version-bump-patch: ## Bump patch version (1.0.0 -> 1.0.1)
+	@CURRENT=$$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2); \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
+	PATCH=$$(echo $$CURRENT | cut -d. -f3); \
+	NEW_PATCH=$$((PATCH + 1)); \
+	NEW_VERSION="$$MAJOR.$$MINOR.$$NEW_PATCH"; \
+	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
+	NEW_CODE=$$((CODE + 1)); \
+	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
+
+version-bump-minor: ## Bump minor version (1.0.0 -> 1.1.0)
+	@CURRENT=$$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2); \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
+	NEW_MINOR=$$((MINOR + 1)); \
+	NEW_VERSION="$$MAJOR.$$NEW_MINOR.0"; \
+	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
+	NEW_CODE=$$((CODE + 1)); \
+	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
+
+version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
+	@CURRENT=$$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2); \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	NEW_MAJOR=$$((MAJOR + 1)); \
+	NEW_VERSION="$$NEW_MAJOR.0.0"; \
+	sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$$NEW_VERSION/" gradle.properties; \
+	CODE=$$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2); \
+	NEW_CODE=$$((CODE + 1)); \
+	sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$$NEW_CODE/" gradle.properties; \
+	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# All-in-One
+# ─────────────────────────────────────────────────────────────────────────────
+
+all: clean build lint test-unit ## Run full workflow (clean, build, lint, test-unit)
+
+ci: check-deps lint test-unit build-release ## Run CI workflow
