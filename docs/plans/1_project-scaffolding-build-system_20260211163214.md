@@ -22,26 +22,26 @@ This is a greenfield plan -- every file listed below is new. There is no existin
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] Gradle wrapper is generated and committed (version 8.14.4)
-- [ ] `settings.gradle.kts` configures plugin management and dependency resolution
-- [ ] `gradle.properties` defines JVM args, AndroidX, Kotlin style, VERSION_NAME, VERSION_CODE
-- [ ] `gradle/libs.versions.toml` declares ALL project dependencies with version catalog
-- [ ] Root `build.gradle.kts` applies all plugins with `apply false`
-- [ ] `app/build.gradle.kts` fully configures the app module (plugins, android block, dependencies, JUnit 5)
-- [ ] `app/proguard-rules.pro` exists (empty, with comment)
-- [ ] `AndroidManifest.xml` declares all permissions, services, receiver, and activity
-- [ ] String resources, theme, accessibility config, and notification icon are present
-- [ ] Launcher icons (mipmap) are present (default placeholder)
-- [ ] `McpApplication.kt` is a valid `@HiltAndroidApp` Application class
-- [ ] `AppModule.kt` is a valid Hilt module
-- [ ] `Makefile` contains ALL targets defined in PROJECT.md
-- [ ] `.gitignore` covers all standard Android exclusions
-- [ ] `.github/workflows/ci.yml` defines a working CI pipeline (lint, test-unit, build)
-- [ ] `README.md` skeleton exists with all required sections
-- [ ] `make build` succeeds without errors or warnings
-- [ ] `make lint` succeeds without errors or warnings
-- [ ] `gh act --validate` succeeds (CI workflow syntax is valid)
-- [ ] `make test-unit` succeeds (no tests yet, but the task completes without failure)
+- [x] Gradle wrapper is generated and committed (version 8.14.4)
+- [x] `settings.gradle.kts` configures plugin management and dependency resolution
+- [x] `gradle.properties` defines JVM args, AndroidX, Kotlin style, VERSION_NAME, VERSION_CODE
+- [x] `gradle/libs.versions.toml` declares ALL project dependencies with version catalog
+- [x] Root `build.gradle.kts` applies all plugins with `apply false`
+- [x] `app/build.gradle.kts` fully configures the app module (plugins, android block, dependencies, JUnit 5)
+- [x] `app/proguard-rules.pro` exists (empty, with comment)
+- [x] `AndroidManifest.xml` declares all permissions, services, receiver, and activity
+- [x] String resources, theme, accessibility config, and notification icon are present
+- [x] Launcher icons (mipmap) are present (default placeholder)
+- [x] `McpApplication.kt` is a valid `@HiltAndroidApp` Application class
+- [x] `AppModule.kt` is a valid Hilt module
+- [x] `Makefile` contains ALL targets defined in PROJECT.md
+- [x] `.gitignore` covers all standard Android exclusions
+- [x] `.github/workflows/ci.yml` defines a working CI pipeline (lint, test-unit, build)
+- [x] `README.md` skeleton exists with all required sections
+- [x] `make build` succeeds without errors or warnings
+- [x] `make lint` succeeds without errors or warnings
+- [x] `gh act --validate` succeeds (CI workflow syntax is valid)
+- [x] `make test-unit` succeeds (no tests yet, but the task completes without failure)
 
 ### Commit Strategy
 
@@ -61,9 +61,9 @@ This is a greenfield plan -- every file listed below is new. There is no existin
 **Description**: Generate the Gradle wrapper so that all developers use the same Gradle version without requiring a global install.
 
 **Acceptance Criteria**:
-- [ ] `gradlew` and `gradlew.bat` scripts exist and are executable
-- [ ] `gradle/wrapper/gradle-wrapper.jar` exists
-- [ ] `gradle/wrapper/gradle-wrapper.properties` references Gradle 8.14.4
+- [x] `gradlew` and `gradlew.bat` scripts exist and are executable
+- [x] `gradle/wrapper/gradle-wrapper.jar` exists
+- [x] `gradle/wrapper/gradle-wrapper.properties` references Gradle 8.14.4
 
 **Tests**: No automated tests for this task. Verification is that subsequent Gradle commands work.
 
@@ -109,13 +109,13 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Set up all Gradle configuration files: settings, properties, version catalog, root build script, and app build script.
 
 **Acceptance Criteria**:
-- [ ] `settings.gradle.kts` configures pluginManagement and dependencyResolutionManagement
-- [ ] `gradle.properties` has correct JVM args and project version
-- [ ] `gradle/libs.versions.toml` has all required dependencies with version references
-- [ ] Root `build.gradle.kts` applies all plugins with `apply false`
-- [ ] `app/build.gradle.kts` is fully configured with all plugins, android block, and dependencies
-- [ ] `app/proguard-rules.pro` exists
-- [ ] `./gradlew tasks` runs successfully after all files are in place (after Task 1.3 provides AndroidManifest.xml and resources)
+- [x] `settings.gradle.kts` configures pluginManagement and dependencyResolutionManagement
+- [x] `gradle.properties` has correct JVM args and project version
+- [x] `gradle/libs.versions.toml` has all required dependencies with version references
+- [x] Root `build.gradle.kts` applies all plugins with `apply false`
+- [x] `app/build.gradle.kts` is fully configured with all plugins, android block, and dependencies
+- [x] `app/proguard-rules.pro` exists
+- [x] `./gradlew tasks` runs successfully after all files are in place (after Task 1.3 provides AndroidManifest.xml and resources)
 
 **Tests**: No automated tests for this task. Build verification happens at the end of the user story.
 
@@ -551,13 +551,13 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Create the Android manifest with all permissions, components, and the application resources (strings, theme, accessibility config, notification icon, launcher icons).
 
 **Acceptance Criteria**:
-- [ ] `AndroidManifest.xml` declares INTERNET, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PROJECTION, FOREGROUND_SERVICE_SPECIAL_USE, RECEIVE_BOOT_COMPLETED, POST_NOTIFICATIONS permissions
-- [ ] `AndroidManifest.xml` declares MainActivity, McpServerService, ScreenCaptureService, McpAccessibilityService, BootCompletedReceiver
-- [ ] `strings.xml` has app name, accessibility service description, notification strings
-- [ ] `themes.xml` has basic Material 3 DayNight theme
-- [ ] `accessibility_service_config.xml` has correct event types, feedback type, flags
-- [ ] `ic_notification.xml` is a valid vector drawable
-- [ ] Launcher icons exist in all required mipmap densities
+- [x] `AndroidManifest.xml` declares INTERNET, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PROJECTION, FOREGROUND_SERVICE_SPECIAL_USE, RECEIVE_BOOT_COMPLETED, POST_NOTIFICATIONS permissions
+- [x] `AndroidManifest.xml` declares MainActivity, McpServerService, ScreenCaptureService, McpAccessibilityService, BootCompletedReceiver
+- [x] `strings.xml` has app name, accessibility service description, notification strings
+- [x] `themes.xml` has basic Material 3 DayNight theme
+- [x] `accessibility_service_config.xml` has correct event types, feedback type, flags
+- [x] `ic_notification.xml` is a valid vector drawable
+- [x] Launcher icons exist in all required mipmap densities
 
 **Tests**: No automated tests for this task. Validation is that the manifest parses correctly during build.
 
@@ -854,10 +854,10 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Create the `McpApplication` class annotated with `@HiltAndroidApp` and the base Hilt `AppModule`.
 
 **Acceptance Criteria**:
-- [ ] `McpApplication.kt` compiles and extends `Application`
-- [ ] `McpApplication.kt` has `@HiltAndroidApp` annotation
-- [ ] `AppModule.kt` compiles as a valid Hilt module
-- [ ] `AppModule.kt` provides `@ApplicationContext` binding
+- [x] `McpApplication.kt` compiles and extends `Application`
+- [x] `McpApplication.kt` has `@HiltAndroidApp` annotation
+- [x] `AppModule.kt` compiles as a valid Hilt module
+- [x] `AppModule.kt` provides `@ApplicationContext` binding
 
 **Tests**: No automated tests for this task (Hilt setup is verified by the build compiling successfully). Unit tests for Hilt modules will be added in Plan 2.
 
@@ -1056,24 +1056,24 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Create the Makefile with ALL development workflow targets defined in PROJECT.md.
 
 **Acceptance Criteria**:
-- [ ] `make help` displays all available targets with descriptions
-- [ ] `make check-deps` checks for Android SDK, Java, Gradle, adb, Docker
-- [ ] `make build` runs `./gradlew assembleDebug`
-- [ ] `make build-release` runs `./gradlew assembleRelease`
-- [ ] `make clean` runs `./gradlew clean`
-- [ ] `make test-unit` runs `./gradlew test`
-- [ ] `make test-integration` runs `./gradlew connectedAndroidTest`
-- [ ] `make test-e2e` runs `./gradlew :e2e-tests:test`
-- [ ] `make test` runs all test targets
-- [ ] `make coverage` runs `./gradlew jacocoTestReport`
-- [ ] `make lint` runs `./gradlew ktlintCheck detekt`
-- [ ] `make lint-fix` runs `./gradlew ktlintFormat`
-- [ ] `make install`, `make install-release`, `make uninstall` work correctly
-- [ ] `make grant-permissions`, `make start-server`, `make forward-port` work correctly
-- [ ] `make setup-emulator`, `make start-emulator`, `make stop-emulator` work correctly
-- [ ] `make logs`, `make logs-clear` work correctly
-- [ ] `make version-bump-patch`, `make version-bump-minor`, `make version-bump-major` correctly modify `gradle.properties`
-- [ ] `make all`, `make ci` chain targets correctly
+- [x] `make help` displays all available targets with descriptions
+- [x] `make check-deps` checks for Android SDK, Java, Gradle, adb, Docker
+- [x] `make build` runs `./gradlew assembleDebug`
+- [x] `make build-release` runs `./gradlew assembleRelease`
+- [x] `make clean` runs `./gradlew clean`
+- [x] `make test-unit` runs `./gradlew test`
+- [x] `make test-integration` runs `./gradlew connectedAndroidTest`
+- [x] `make test-e2e` runs `./gradlew :e2e-tests:test`
+- [x] `make test` runs all test targets
+- [x] `make coverage` runs `./gradlew jacocoTestReport`
+- [x] `make lint` runs `./gradlew ktlintCheck detekt`
+- [x] `make lint-fix` runs `./gradlew ktlintFormat`
+- [x] `make install`, `make install-release`, `make uninstall` work correctly
+- [x] `make grant-permissions`, `make start-server`, `make forward-port` work correctly
+- [x] `make setup-emulator`, `make start-emulator`, `make stop-emulator` work correctly
+- [x] `make logs`, `make logs-clear` work correctly
+- [x] `make version-bump-patch`, `make version-bump-minor`, `make version-bump-major` correctly modify `gradle.properties`
+- [x] `make all`, `make ci` chain targets correctly
 
 **Tests**: Verify `make help` runs without error. Full target verification happens with `make build` and `make lint` at the end of the user story.
 
@@ -1353,11 +1353,11 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Create the GitHub Actions CI workflow and the project .gitignore file.
 
 **Acceptance Criteria**:
-- [ ] `.github/workflows/ci.yml` is valid YAML (passes `gh act --validate`)
-- [ ] CI pipeline triggers on push to main and pull requests
-- [ ] CI pipeline has lint, test-unit, and build jobs
-- [ ] Build job uploads APK artifacts
-- [ ] `.gitignore` excludes build/, .gradle/, .idea/, local.properties, keystore files, etc.
+- [x] `.github/workflows/ci.yml` is valid YAML (passes `gh act --validate`)
+- [x] CI pipeline triggers on push to main and pull requests
+- [x] CI pipeline has lint, test-unit, and build jobs
+- [x] Build job uploads APK artifacts
+- [x] `.gitignore` excludes build/, .gradle/, .idea/, local.properties, keystore files, etc.
 
 **Tests**: Run `gh act --validate` to verify workflow syntax.
 
@@ -1562,8 +1562,8 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Create the README.md skeleton with all required sections.
 
 **Acceptance Criteria**:
-- [ ] README.md exists with Project title, description, Features, Requirements, Quick Start, Building, Testing, MCP Tools, Architecture, Configuration, Security, Contributing, License sections
-- [ ] License section references MIT
+- [x] README.md exists with Project title, description, Features, Requirements, Quick Start, Building, Testing, MCP Tools, Architecture, Configuration, Security, Contributing, License sections
+- [x] License section references MIT
 
 **Tests**: No automated tests for documentation.
 
@@ -1735,11 +1735,11 @@ gradle/wrapper/gradle-wrapper.properties (config)
 **Description**: Run all verification commands to ensure the scaffolding is correct, then create the commits.
 
 **Acceptance Criteria**:
-- [ ] `make build` succeeds (debug APK is generated)
-- [ ] `make lint` succeeds (no linting errors or warnings)
-- [ ] `make test-unit` succeeds (no test failures -- there are no tests yet, but the task should complete)
-- [ ] `gh act --validate` succeeds (CI workflow YAML is valid)
-- [ ] All 6 commits are created on the `feat/project-scaffolding` branch
+- [x] `make build` succeeds (debug APK is generated)
+- [x] `make lint` succeeds (no linting errors or warnings)
+- [x] `make test-unit` succeeds (no test failures -- there are no tests yet, but the task should complete)
+- [x] `gh act --validate` succeeds (CI workflow YAML is valid)
+- [x] All 6 commits are created on the `feat/project-scaffolding` branch
 
 **Tests**: These are the verification steps, not unit tests.
 
