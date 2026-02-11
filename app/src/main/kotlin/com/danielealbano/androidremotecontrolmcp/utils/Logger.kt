@@ -23,14 +23,14 @@ import com.danielealbano.androidremotecontrolmcp.BuildConfig
  * - **Release builds**: Only info, warn, and error are emitted.
  */
 object Logger {
-
     /**
      * Regex matching UUID strings (standard 8-4-4-4-12 hex format).
      * Used to detect and sanitize bearer tokens in log messages.
      */
-    private val UUID_PATTERN = Regex(
-        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
-    )
+    private val UUID_PATTERN =
+        Regex(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        )
 
     private const val REDACTED_TOKEN = "[REDACTED]"
 
@@ -40,7 +40,10 @@ object Logger {
      * @param tag Log tag identifying the source component.
      * @param message The message to log. Bearer tokens are auto-sanitized.
      */
-    fun d(tag: String, message: String) {
+    fun d(
+        tag: String,
+        message: String,
+    ) {
         if (BuildConfig.DEBUG) {
             Log.d(tag, sanitize(message))
         }
@@ -52,7 +55,10 @@ object Logger {
      * @param tag Log tag identifying the source component.
      * @param message The message to log. Bearer tokens are auto-sanitized.
      */
-    fun i(tag: String, message: String) {
+    fun i(
+        tag: String,
+        message: String,
+    ) {
         Log.i(tag, sanitize(message))
     }
 
@@ -63,7 +69,11 @@ object Logger {
      * @param message The message to log. Bearer tokens are auto-sanitized.
      * @param throwable Optional throwable to include in the log.
      */
-    fun w(tag: String, message: String, throwable: Throwable? = null) {
+    fun w(
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (throwable != null) {
             Log.w(tag, sanitize(message), throwable)
         } else {
@@ -78,7 +88,11 @@ object Logger {
      * @param message The message to log. Bearer tokens are auto-sanitized.
      * @param throwable Optional throwable to include in the log.
      */
-    fun e(tag: String, message: String, throwable: Throwable? = null) {
+    fun e(
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (throwable != null) {
             Log.e(tag, sanitize(message), throwable)
         } else {
@@ -94,6 +108,5 @@ object Logger {
      * @param message The raw log message.
      * @return The sanitized message with UUIDs replaced.
      */
-    internal fun sanitize(message: String): String =
-        UUID_PATTERN.replace(message, REDACTED_TOKEN)
+    internal fun sanitize(message: String): String = UUID_PATTERN.replace(message, REDACTED_TOKEN)
 }

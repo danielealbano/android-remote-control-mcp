@@ -11,11 +11,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ServerStatus")
 class ServerStatusTest {
-
     @Nested
     @DisplayName("Stopped")
     inner class StoppedTest {
-
         @Test
         fun `Stopped is a singleton`() {
             assertSame(ServerStatus.Stopped, ServerStatus.Stopped)
@@ -30,7 +28,6 @@ class ServerStatusTest {
     @Nested
     @DisplayName("Starting")
     inner class StartingTest {
-
         @Test
         fun `Starting is a singleton`() {
             assertSame(ServerStatus.Starting, ServerStatus.Starting)
@@ -45,7 +42,6 @@ class ServerStatusTest {
     @Nested
     @DisplayName("Running")
     inner class RunningTest {
-
         @Test
         fun `Running carries port and binding address`() {
             val status = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
@@ -77,7 +73,6 @@ class ServerStatusTest {
     @Nested
     @DisplayName("Stopping")
     inner class StoppingTest {
-
         @Test
         fun `Stopping is a singleton`() {
             assertSame(ServerStatus.Stopping, ServerStatus.Stopping)
@@ -87,7 +82,6 @@ class ServerStatusTest {
     @Nested
     @DisplayName("Error")
     inner class ErrorTest {
-
         @Test
         fun `Error carries message`() {
             val status = ServerStatus.Error(message = "Port in use")

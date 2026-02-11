@@ -1,20 +1,18 @@
 package com.danielealbano.androidremotecontrolmcp.utils
 
-import java.net.ServerSocket
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.net.ServerSocket
 
 @DisplayName("NetworkUtils")
 class NetworkUtilsTest {
-
     @Nested
     @DisplayName("isPortAvailable")
     inner class IsPortAvailable {
-
         @Test
         fun `returns true for available port`() {
             // Arrange: find a free port by letting the system assign one
@@ -42,7 +40,6 @@ class NetworkUtilsTest {
     @Nested
     @DisplayName("getNetworkInterfaces")
     inner class GetNetworkInterfaces {
-
         @Test
         fun `returns at least loopback interface`() {
             val interfaces = NetworkUtils.getNetworkInterfaces()
@@ -62,7 +59,6 @@ class NetworkUtilsTest {
     @Nested
     @DisplayName("NetworkInterfaceInfo")
     inner class NetworkInterfaceInfoTest {
-
         @Test
         fun `data class equality works`() {
             val a = NetworkInterfaceInfo(name = "lo", address = "127.0.0.1", isLoopback = true)

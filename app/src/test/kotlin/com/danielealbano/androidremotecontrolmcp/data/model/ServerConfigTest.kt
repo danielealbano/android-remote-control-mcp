@@ -9,11 +9,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ServerConfig")
 class ServerConfigTest {
-
     @Nested
     @DisplayName("default values")
     inner class DefaultValues {
-
         @Test
         fun `default port is 8080`() {
             val config = ServerConfig()
@@ -60,7 +58,6 @@ class ServerConfigTest {
     @Nested
     @DisplayName("copy behavior")
     inner class CopyBehavior {
-
         @Test
         fun `copy with changed port preserves other fields`() {
             val original = ServerConfig(port = 8080, bearerToken = "test-token")
@@ -83,7 +80,6 @@ class ServerConfigTest {
     @Nested
     @DisplayName("companion constants")
     inner class CompanionConstants {
-
         @Test
         fun `DEFAULT_PORT is 8080`() {
             assertEquals(8080, ServerConfig.DEFAULT_PORT)
@@ -108,7 +104,6 @@ class ServerConfigTest {
     @Nested
     @DisplayName("BindingAddress enum")
     inner class BindingAddressTest {
-
         @Test
         fun `LOCALHOST address is 127 0 0 1`() {
             assertEquals("127.0.0.1", BindingAddress.LOCALHOST.address)
@@ -138,7 +133,6 @@ class ServerConfigTest {
     @Nested
     @DisplayName("CertificateSource enum")
     inner class CertificateSourceTest {
-
         @Test
         fun `fromName returns AUTO_GENERATED for known name`() {
             assertEquals(CertificateSource.AUTO_GENERATED, CertificateSource.fromName("AUTO_GENERATED"))

@@ -7,7 +7,6 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * and observed by the UI to display server status.
  */
 sealed class ServerStatus {
-
     /** The MCP server is stopped and not listening for connections. */
     data object Stopped : ServerStatus()
 
