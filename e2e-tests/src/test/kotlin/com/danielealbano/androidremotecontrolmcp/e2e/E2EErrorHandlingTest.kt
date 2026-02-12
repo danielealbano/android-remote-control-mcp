@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
@@ -61,9 +62,7 @@ class E2EErrorHandlingTest {
     @Test
     fun `correct bearer token returns successful response`() {
         // The shared mcpClient already has the correct token; verify a simple tool call succeeds
-        val result = mcpClient.callTool("press_home")
-        // If we get here without exception, the auth succeeded
-        assertTrue(true, "Correct bearer token should allow tool call to succeed")
+        assertDoesNotThrow { mcpClient.callTool("press_home") }
     }
 
     @Test

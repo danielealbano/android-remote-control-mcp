@@ -114,7 +114,7 @@ test: test-unit test-integration test-e2e ## Run all tests
 
 coverage: ## Generate code coverage report (Jacoco)
 	$(GRADLE) jacocoTestReport
-	@echo "Coverage report: app/build/reports/jacoco/index.html"
+	@echo "Coverage report: app/build/reports/jacoco/jacocoTestReport/html/index.html"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Linting

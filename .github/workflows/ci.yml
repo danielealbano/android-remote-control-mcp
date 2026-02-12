@@ -53,7 +53,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run unit tests with coverage
-        run: ./gradlew :app:test jacocoTestReport
+        run: ./gradlew :app:test jacocoTestReport jacocoTestCoverageVerification
 
       - name: Upload unit test results
         if: always()

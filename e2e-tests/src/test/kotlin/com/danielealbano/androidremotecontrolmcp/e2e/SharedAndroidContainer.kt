@@ -23,10 +23,10 @@ object SharedAndroidContainer {
     private const val APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
 
     /**
-     * The shared Docker Android container instance.
-     * Lazily initialized on first access.
+     * Lazy delegate for the container so we can check initialization state
+     * in the shutdown hook without triggering container creation.
      */
-    val container: GenericContainer<*> by lazy {
+    private val containerDelegate = lazy {
         val c = AndroidContainerSetup.createContainer()
         c.start()
 
@@ -58,6 +58,12 @@ object SharedAndroidContainer {
     }
 
     /**
+     * The shared Docker Android container instance.
+     * Lazily initialized on first access.
+     */
+    val container: GenericContainer<*> by containerDelegate
+
+    /**
      * The base URL of the MCP server, derived from the shared container.
      */
     val mcpServerUrl: String by lazy {
@@ -74,13 +80,17 @@ object SharedAndroidContainer {
     }
 
     init {
-        // Register JVM shutdown hook to stop the container when all tests complete
+        // Register JVM shutdown hook to stop the container when all tests complete.
+        // Only stop if the lazy delegate was actually initialized to avoid triggering
+        // container creation during JVM shutdown.
         Runtime.getRuntime().addShutdownHook(Thread {
-            println("[SharedAndroidContainer] Stopping shared container...")
-            if (container.isRunning) {
-                container.stop()
+            if (containerDelegate.isInitialized()) {
+                println("[SharedAndroidContainer] Stopping shared container...")
+                if (container.isRunning) {
+                    container.stop()
+                }
+                println("[SharedAndroidContainer] Shared container stopped")
             }
-            println("[SharedAndroidContainer] Shared container stopped")
         })
     }
 }
