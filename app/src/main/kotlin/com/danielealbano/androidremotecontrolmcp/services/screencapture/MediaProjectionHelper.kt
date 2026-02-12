@@ -62,6 +62,7 @@ class MediaProjectionHelper
             data: Intent,
         ) {
             Log.i(TAG, "Setting up MediaProjection")
+            stopProjection()
             val projectionManager =
                 context.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
                     as MediaProjectionManager

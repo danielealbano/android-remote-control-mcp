@@ -175,24 +175,7 @@ class ScreenCaptureService : Service() {
             setupImageReader()
             setupVirtualDisplay()
 
-            val image =
-                withTimeoutOrNull(CAPTURE_TIMEOUT_MS) {
-                    suspendCancellableCoroutine { continuation ->
-                        imageReader?.setOnImageAvailableListener(
-                            { reader ->
-                                val img = reader.acquireLatestImage()
-                                if (img != null && continuation.isActive) {
-                                    continuation.resume(img)
-                                }
-                            },
-                            handler,
-                        )
-
-                        continuation.invokeOnCancellation {
-                            imageReader?.setOnImageAvailableListener(null, null)
-                        }
-                    }
-                }
+            val image = awaitImage()
 
             if (image == null) {
                 releaseProjectionResources()
@@ -205,12 +188,15 @@ class ScreenCaptureService : Service() {
 
             val screenshotData =
                 withContext(Dispatchers.Default) {
-                    val bitmap = screenshotEncoder.imageToBitmap(image)
-                    image.close()
                     try {
-                        screenshotEncoder.bitmapToScreenshotData(bitmap, quality)
+                        val bitmap = screenshotEncoder.imageToBitmap(image)
+                        try {
+                            screenshotEncoder.bitmapToScreenshotData(bitmap, quality)
+                        } finally {
+                            bitmap.recycle()
+                        }
                     } finally {
-                        bitmap.recycle()
+                        image.close()
                     }
                 }
 
@@ -222,6 +208,30 @@ class ScreenCaptureService : Service() {
             Result.failure(e)
         }
     }
+
+    private suspend fun awaitImage(): android.media.Image? =
+        withTimeoutOrNull(CAPTURE_TIMEOUT_MS) {
+            suspendCancellableCoroutine { continuation ->
+                imageReader?.setOnImageAvailableListener(
+                    { reader ->
+                        val img = reader.acquireLatestImage()
+                        if (img != null) {
+                            if (continuation.isActive) {
+                                imageReader?.setOnImageAvailableListener(null, null)
+                                continuation.resume(img)
+                            } else {
+                                img.close()
+                            }
+                        }
+                    },
+                    handler,
+                )
+
+                continuation.invokeOnCancellation {
+                    imageReader?.setOnImageAvailableListener(null, null)
+                }
+            }
+        }
 
     @Suppress("DEPRECATION")
     private fun updateScreenMetrics() {

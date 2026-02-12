@@ -12,6 +12,7 @@ import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -76,6 +77,41 @@ class ScreenshotEncoderTest {
             // Assert
             assertEquals(bitmap, result)
             verify { bitmap.copyPixelsFromBuffer(buffer) }
+        }
+
+        @Test
+        @DisplayName("rewinds buffer before copying pixels to handle non-zero buffer position")
+        fun `rewinds buffer before copying`() {
+            // Arrange
+            val width = 10
+            val height = 5
+            val pixelStride = 4
+            val rowStride = width * pixelStride
+
+            val buffer = ByteBuffer.allocate(rowStride * height)
+            buffer.position(100) // Simulate non-zero position from upstream usage
+            val plane =
+                mockk<Image.Plane> {
+                    every { getBuffer() } returns buffer
+                    every { getPixelStride() } returns pixelStride
+                    every { getRowStride() } returns rowStride
+                }
+            val image =
+                mockk<Image> {
+                    every { planes } returns arrayOf(plane)
+                    every { getWidth() } returns width
+                    every { getHeight() } returns height
+                }
+
+            val bitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) } returns bitmap
+
+            // Act
+            encoder.imageToBitmap(image)
+
+            // Assert - buffer position should be 0 after rewind (mocked copyPixelsFromBuffer
+            // does not advance it)
+            assertEquals(0, buffer.position(), "Buffer should be rewound to position 0")
         }
 
         @Test
@@ -173,6 +209,23 @@ class ScreenshotEncoderTest {
 
             // Assert
             assertEquals(100, qualitySlot.captured)
+        }
+
+        @Test
+        @DisplayName("throws IllegalStateException when bitmap compression fails")
+        fun `throws on compression failure`() {
+            // Arrange
+            val bitmap = mockk<Bitmap>(relaxed = true)
+            every {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, any(), any<OutputStream>())
+            } returns false
+
+            // Act & Assert
+            val exception =
+                assertThrows(IllegalStateException::class.java) {
+                    encoder.encodeBitmapToJpeg(bitmap, 80)
+                }
+            assertEquals("Failed to compress bitmap to JPEG", exception.message)
         }
 
         @Test
