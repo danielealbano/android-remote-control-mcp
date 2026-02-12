@@ -40,7 +40,10 @@ import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: MainViewModel = hiltViewModel()) {
+fun HomeScreen(
+    onRequestMediaProjectionPermission: () -> Unit = {},
+    viewModel: MainViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -51,6 +54,7 @@ fun HomeScreen(viewModel: MainViewModel = hiltViewModel()) {
     val hostnameInput by viewModel.hostnameInput.collectAsStateWithLifecycle()
     val hostnameError by viewModel.hostnameError.collectAsStateWithLifecycle()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
+    val isMediaProjectionGranted by viewModel.isMediaProjectionGranted.collectAsStateWithLifecycle()
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
 
     val isServerRunning =
@@ -122,11 +126,13 @@ fun HomeScreen(viewModel: MainViewModel = hiltViewModel()) {
 
             PermissionsSection(
                 isAccessibilityEnabled = isAccessibilityEnabled,
+                isMediaProjectionGranted = isMediaProjectionGranted,
                 onOpenAccessibilitySettings = {
                     context.startActivity(
                         Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
                     )
                 },
+                onRequestMediaProjectionPermission = onRequestMediaProjectionPermission,
                 onRequestNotificationPermission = {
                     // Notification permission handling will be refined in Plan 6
                 },

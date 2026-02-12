@@ -3,7 +3,11 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentCallbacks2
+import android.content.Context
+import android.content.res.Configuration
+import android.os.Build
 import android.util.Log
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.CoroutineScope
@@ -128,6 +132,47 @@ class McpAccessibilityService : AccessibilityService() {
      */
     fun getServiceScope(): CoroutineScope? {
         return serviceScope
+    }
+
+    /**
+     * Returns the current screen dimensions, density, and orientation.
+     *
+     * @return [ScreenInfo] with width, height, densityDpi, and orientation.
+     */
+    @Suppress("DEPRECATION")
+    fun getScreenInfo(): ScreenInfo {
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val width: Int
+        val height: Int
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = windowManager.currentWindowMetrics
+            val bounds = metrics.bounds
+            width = bounds.width()
+            height = bounds.height()
+        } else {
+            val display = windowManager.defaultDisplay
+            val displayMetrics = android.util.DisplayMetrics()
+            display.getRealMetrics(displayMetrics)
+            width = displayMetrics.widthPixels
+            height = displayMetrics.heightPixels
+        }
+
+        val displayMetrics = resources.displayMetrics
+        val densityDpi = displayMetrics.densityDpi
+
+        val orientation =
+            when (resources.configuration.orientation) {
+                Configuration.ORIENTATION_LANDSCAPE -> ScreenInfo.ORIENTATION_LANDSCAPE
+                else -> ScreenInfo.ORIENTATION_PORTRAIT
+            }
+
+        return ScreenInfo(
+            width = width,
+            height = height,
+            densityDpi = densityDpi,
+            orientation = orientation,
+        )
     }
 
     private fun configureServiceInfo() {

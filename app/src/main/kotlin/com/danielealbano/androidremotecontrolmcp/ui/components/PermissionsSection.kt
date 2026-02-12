@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "MagicNumber", "UnusedPrivateMember")
+@file:Suppress("FunctionNaming", "LongParameterList", "MagicNumber", "UnusedPrivateMember")
 
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
@@ -34,7 +34,9 @@ private val DisabledColor = Color(0xFFF44336)
 @Composable
 fun PermissionsSection(
     isAccessibilityEnabled: Boolean,
+    isMediaProjectionGranted: Boolean,
     onOpenAccessibilitySettings: () -> Unit,
+    onRequestMediaProjectionPermission: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -62,6 +64,21 @@ fun PermissionsSection(
                     },
                 onAction = onOpenAccessibilitySettings,
                 actionEnabled = !isAccessibilityEnabled,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PermissionRow(
+                label = stringResource(R.string.permission_screen_capture),
+                isEnabled = isMediaProjectionGranted,
+                buttonText =
+                    if (isMediaProjectionGranted) {
+                        stringResource(R.string.permission_granted)
+                    } else {
+                        stringResource(R.string.permission_grant)
+                    },
+                onAction = onRequestMediaProjectionPermission,
+                actionEnabled = !isMediaProjectionGranted,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -124,7 +141,9 @@ private fun PermissionsSectionPreview() {
     AndroidRemoteControlMcpTheme {
         PermissionsSection(
             isAccessibilityEnabled = false,
+            isMediaProjectionGranted = false,
             onOpenAccessibilitySettings = {},
+            onRequestMediaProjectionPermission = {},
             onRequestNotificationPermission = {},
         )
     }

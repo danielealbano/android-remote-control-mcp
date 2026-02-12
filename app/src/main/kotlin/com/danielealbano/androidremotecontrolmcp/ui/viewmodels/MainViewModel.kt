@@ -2,9 +2,11 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,6 +57,15 @@ class MainViewModel
 
         private val _serverLogs = MutableStateFlow<List<ServerLogEntry>>(emptyList())
         val serverLogs: StateFlow<List<ServerLogEntry>> = _serverLogs.asStateFlow()
+
+        private val _isMediaProjectionGranted = MutableStateFlow(false)
+        val isMediaProjectionGranted: StateFlow<Boolean> = _isMediaProjectionGranted.asStateFlow()
+
+        private var _mediaProjectionResultCode: Int = Activity.RESULT_CANCELED
+        val mediaProjectionResultCode: Int get() = _mediaProjectionResultCode
+
+        private var _mediaProjectionData: Intent? = null
+        val mediaProjectionData: Intent? get() = _mediaProjectionData
 
         init {
             viewModelScope.launch(ioDispatcher) {
@@ -164,6 +175,22 @@ class MainViewModel
                     context,
                     McpAccessibilityService::class.java,
                 )
+        }
+
+        /**
+         * Stores the MediaProjection activity result for later use when starting the
+         * ScreenCaptureService.
+         *
+         * @param resultCode The result code from the activity result.
+         * @param data The intent data containing the MediaProjection token.
+         */
+        fun setMediaProjectionResult(
+            resultCode: Int,
+            data: Intent,
+        ) {
+            _mediaProjectionResultCode = resultCode
+            _mediaProjectionData = data
+            _isMediaProjectionGranted.value = (resultCode == Activity.RESULT_OK)
         }
 
         fun addServerLogEntry(entry: ServerLogEntry) {
