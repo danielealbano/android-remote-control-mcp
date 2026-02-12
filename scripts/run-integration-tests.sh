@@ -4,7 +4,11 @@
 # Android emulator container. Same image as E2E tests for consistency.
 #
 # Requirements: Docker, adb (Android SDK platform-tools), Java 17
-# KVM recommended for acceptable emulator performance.
+# KVM required for emulator hardware acceleration.
+#
+# In CI (detected via CI=true env var) the container runs in headless
+# mode without VNC/display stack to minimise resource usage.
+# Locally, VNC is enabled on port 6080 for visual debugging.
 #
 # Usage:
 #   bash scripts/run-integration-tests.sh
@@ -28,18 +32,40 @@ trap cleanup EXIT
 # Remove any leftover container from a previous run
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
+# Build docker run arguments depending on environment
+DOCKER_ARGS=(
+    -d --name "$CONTAINER_NAME"
+    --privileged
+    -p "$ADB_HOST_PORT":5555
+    -e EMULATOR_DEVICE="Nexus 5"
+    -e DATAPARTITION_SIZE=4096
+    -e USER_BEHAVIOR_ANALYTICS=false
+)
+
+# Emulator performance flags (always applied)
+EMULATOR_EXTRA_ARGS="-no-boot-anim -no-audio -no-snapshot"
+
+if [ "${CI:-false}" = "true" ]; then
+    echo "[integration] CI detected — headless mode, no VNC"
+    DOCKER_ARGS+=(
+        -e EMULATOR_HEADLESS=true
+        -e WEB_VNC=false
+        -e "EMULATOR_ADDITIONAL_ARGS=${EMULATOR_EXTRA_ARGS} -no-window"
+        --memory=4g
+    )
+else
+    echo "[integration] Local mode — VNC enabled on http://localhost:$NOVNC_HOST_PORT"
+    DOCKER_ARGS+=(
+        -p "$NOVNC_HOST_PORT":6080
+        -e WEB_VNC=true
+        -e "EMULATOR_ADDITIONAL_ARGS=${EMULATOR_EXTRA_ARGS}"
+        --memory=6g
+    )
+fi
+
 echo "[integration] Starting Docker Android container ($DOCKER_IMAGE)..."
 echo "[integration]   adb port: localhost:$ADB_HOST_PORT"
-echo "[integration]   noVNC:    http://localhost:$NOVNC_HOST_PORT"
-docker run -d --name "$CONTAINER_NAME" \
-    --privileged \
-    -p "$ADB_HOST_PORT":5555 \
-    -p "$NOVNC_HOST_PORT":6080 \
-    -e EMULATOR_DEVICE="Nexus 5" \
-    -e WEB_VNC=true \
-    -e DATAPARTITION_SIZE=4096 \
-    --memory=6g \
-    "$DOCKER_IMAGE"
+docker run "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE"
 
 echo "[integration] Waiting for emulator boot (timeout ${BOOT_TIMEOUT}s)..."
 SECONDS=0
