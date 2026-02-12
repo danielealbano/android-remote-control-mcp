@@ -98,15 +98,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run integration tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics
-          disable-animations: true
-          script: ./gradlew :app:connectedAndroidTest
+        run: bash scripts/run-integration-tests.sh
 
       - name: Upload integration test results
         if: always()

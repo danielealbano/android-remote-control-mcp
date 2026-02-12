@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -72,6 +73,7 @@ class MainActivityTest {
     fun permissionsSectionIsDisplayed() {
         composeTestRule
             .onNodeWithText("Permissions")
+            .performScrollTo()
             .assertIsDisplayed()
     }
 
@@ -79,6 +81,7 @@ class MainActivityTest {
     fun connectionInfoSectionIsDisplayed() {
         composeTestRule
             .onNodeWithText("Connection Info")
+            .performScrollTo()
             .assertIsDisplayed()
     }
 
@@ -108,6 +111,7 @@ class MainActivityTest {
     fun serverLogsSectionIsDisplayed() {
         composeTestRule
             .onNodeWithText("Server Logs")
+            .performScrollTo()
             .assertIsDisplayed()
     }
 }

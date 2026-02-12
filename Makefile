@@ -104,8 +104,8 @@ clean: ## Clean build artifacts
 test-unit: ## Run unit tests
 	$(GRADLE) :app:test
 
-test-integration: ## Run integration tests (requires device/emulator)
-	$(GRADLE) connectedAndroidTest
+test-integration: ## Run integration tests (requires Docker)
+	bash scripts/run-integration-tests.sh
 
 test-e2e: ## Run E2E tests (requires Docker)
 	$(GRADLE) :e2e-tests:test

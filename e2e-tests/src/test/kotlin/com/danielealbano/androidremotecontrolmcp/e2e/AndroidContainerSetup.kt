@@ -17,7 +17,7 @@ import java.time.Duration
  */
 object AndroidContainerSetup {
 
-    private const val DOCKER_IMAGE = "budtmo/docker-android-x86:emulator_14.0"
+    private const val DOCKER_IMAGE = "budtmo/docker-android:emulator_14.0"
     private const val ADB_PORT = 5555
     private const val NOVNC_PORT = 6080
     private const val MCP_DEFAULT_PORT = 8080
@@ -59,7 +59,7 @@ object AndroidContainerSetup {
 
         return GenericContainer(DockerImageName.parse(DOCKER_IMAGE))
             .withExposedPorts(ADB_PORT, NOVNC_PORT, MCP_DEFAULT_PORT)
-            .withEnv("EMULATOR_DEVICE", "Samsung Galaxy S10")
+            .withEnv("EMULATOR_DEVICE", "Nexus 5")
             .withEnv("WEB_VNC", "true")
             .withEnv("DATAPARTITION_SIZE", "4096")
             .withPrivilegedMode(true)
@@ -69,8 +69,8 @@ object AndroidContainerSetup {
                     .withStartupTimeout(Duration.ofSeconds(300))
             )
             .withCreateContainerCmdModifier { cmd ->
-                cmd.hostConfig?.withMemory(4L * 1024 * 1024 * 1024) // 4 GB
-                cmd.hostConfig?.withMemorySwap(4L * 1024 * 1024 * 1024)
+                cmd.hostConfig?.withMemory(6L * 1024 * 1024 * 1024) // 6 GB
+                cmd.hostConfig?.withMemorySwap(6L * 1024 * 1024 * 1024)
             }
     }
 
