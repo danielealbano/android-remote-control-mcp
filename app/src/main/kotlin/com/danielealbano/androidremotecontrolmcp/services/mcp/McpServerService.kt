@@ -22,6 +22,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementAction
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
@@ -149,6 +150,7 @@ class McpServerService : Service() {
             registerTouchActionTools(toolRegistry)
             registerGestureTools(toolRegistry)
             registerElementActionTools(toolRegistry)
+            registerTextInputTools(toolRegistry)
 
             // Create and start the Ktor server
             mcpServer =
