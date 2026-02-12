@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolRegistry
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test
 
 class McpProtocolHandlerTest {
     private lateinit var handler: McpProtocolHandler
+    private lateinit var toolRegistry: ToolRegistry
 
     @BeforeEach
     fun setUp() {
@@ -29,7 +31,8 @@ class McpProtocolHandlerTest {
         every { android.util.Log.e(any(), any(), any()) } returns 0
         every { android.util.Log.e(any(), any()) } returns 0
 
-        handler = McpProtocolHandler()
+        toolRegistry = ToolRegistry()
+        handler = McpProtocolHandler(toolRegistry)
     }
 
     @AfterEach
@@ -88,7 +91,7 @@ class McpProtocolHandlerTest {
                 buildJsonObject {
                     put("type", JsonPrimitive("object"))
                 }
-            handler.registerTool(
+            toolRegistry.register(
                 "test_tool",
                 "A test tool",
                 schema,
@@ -119,7 +122,7 @@ class McpProtocolHandlerTest {
     fun `handleRequest with tools call dispatches to registered handler`() =
         runTest {
             val schema = buildJsonObject { put("type", JsonPrimitive("object")) }
-            handler.registerTool(
+            toolRegistry.register(
                 "echo_tool",
                 "Echoes params",
                 schema,
