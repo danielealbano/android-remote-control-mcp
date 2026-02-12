@@ -84,6 +84,9 @@ ktor-server-auth = { group = "io.ktor", name = "ktor-server-auth", version.ref =
 ktor-network-tls-certificates = { group = "io.ktor", name = "ktor-network-tls-certificates", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
+# Ktor additional plugins
+ktor-server-status-pages = { group = "io.ktor", name = "ktor-server-status-pages", version.ref = "ktor" }
+
 # Certificate generation (Bouncy Castle for self-signed cert with SAN support)
 bouncy-castle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncy-castle" }
 bouncy-castle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncy-castle" }
