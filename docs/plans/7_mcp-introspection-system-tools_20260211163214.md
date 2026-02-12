@@ -48,28 +48,28 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `GetAccessibilityTreeHandler` implements `ToolHandler` and returns the full UI hierarchy as JSON
-- [ ] `CaptureScreenshotHandler` implements `ToolHandler` and returns a base64-encoded JPEG screenshot
-- [ ] `CaptureScreenshotHandler` validates `quality` parameter (range 1-100, default 80)
-- [ ] `CaptureScreenshotHandler` returns image content type per MCP spec (including `width` and `height` fields)
-- [ ] `GetCurrentAppHandler` implements `ToolHandler` and returns the foreground app's package/activity name
-- [ ] `GetScreenInfoHandler` implements `ToolHandler` and returns screen dimensions, DPI, and orientation
-- [ ] `PressBackHandler`, `PressHomeHandler`, `PressRecentsHandler`, `OpenNotificationsHandler`, `OpenQuickSettingsHandler` each implement `ToolHandler`
-- [ ] `GetDeviceLogsHandler` implements `ToolHandler` and returns filtered logcat output
-- [ ] All tools return proper MCP error code `-32001` when accessibility service is not enabled
-- [ ] `CaptureScreenshotHandler` returns error `-32001` when MediaProjection is not granted
-- [ ] System action tools return error `-32003` when action execution fails
-- [ ] `ToolRegistry` registers all 10 tools on server startup (4 introspection + 6 system action)
-- [ ] `McpServerService.startServer()` calls `ToolRegistry.registerAllTools()` before `McpServer.start()`
-- [ ] `McpServerService` exposes `screenCaptureService` reference for tool access
-- [ ] All tool results use the MCP content format (`content` array with typed entries)
+- [x] `GetAccessibilityTreeHandler` implements `ToolHandler` and returns the full UI hierarchy as JSON
+- [x] `CaptureScreenshotHandler` implements `ToolHandler` and returns a base64-encoded JPEG screenshot
+- [x] `CaptureScreenshotHandler` validates `quality` parameter (range 1-100, default 80)
+- [x] `CaptureScreenshotHandler` returns image content type per MCP spec (including `width` and `height` fields)
+- [x] `GetCurrentAppHandler` implements `ToolHandler` and returns the foreground app's package/activity name
+- [x] `GetScreenInfoHandler` implements `ToolHandler` and returns screen dimensions, DPI, and orientation
+- [x] `PressBackHandler`, `PressHomeHandler`, `PressRecentsHandler`, `OpenNotificationsHandler`, `OpenQuickSettingsHandler` each implement `ToolHandler`
+- [x] `GetDeviceLogsHandler` implements `ToolHandler` and returns filtered logcat output
+- [x] All tools return proper MCP error code `-32001` when accessibility service is not enabled
+- [x] `CaptureScreenshotHandler` returns error `-32001` when MediaProjection is not granted
+- [x] System action tools return error `-32003` when action execution fails
+- [x] `ToolRegistry` registers all 10 tools on server startup (4 introspection + 6 system action)
+- [x] `McpServerService.startServer()` calls `ToolRegistry.registerAllTools()` before `McpServer.start()`
+- [x] `McpServerService` exposes `screenCaptureService` reference for tool access
+- [x] All tool results use the MCP content format (`content` array with typed entries)
 
 > **Implementation Note — Naming evolution**: The acceptance criteria references `registerAllTools()`, but the actual Plan 7 code uses top-level registration functions called from `McpServerService`. Plans 8-9 introduce `registerAll()` inside `ToolRegistry`. The final method name is `registerAll()`.
-- [ ] Unit tests exist and pass for all 10 tools (success paths, error paths, parameter validation)
-- [ ] `docs/MCP_TOOLS.md` documents all 10 tools with schemas, examples, and error codes
-- [ ] `make lint` passes with no warnings or errors
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds without errors or warnings
+- [x] Unit tests exist and pass for all 10 tools (success paths, error paths, parameter validation)
+- [x] `docs/MCP_TOOLS.md` documents all 10 tools with schemas, examples, and error codes
+- [x] `make lint` passes with no warnings or errors
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds without errors or warnings
 
 ### Commit Strategy
 
@@ -88,14 +88,14 @@ This plan implements the first batch of 10 MCP tools (4 screen introspection + 6
 **Description**: Create the `ToolRegistry` class that centralizes registration of all MCP tools with the `McpProtocolHandler`. Update `McpServerService` to call `ToolRegistry.registerAllTools()` during server startup and to expose `screenCaptureService` for tool access.
 
 **Acceptance Criteria**:
-- [ ] `ToolRegistry` has `@Inject constructor(protocolHandler: McpProtocolHandler, ...tool classes)` for Hilt injection
-- [ ] `registerAllTools()` registers all 10 tools (4 introspection + 6 system action)
-- [ ] `McpServerService.startServer()` calls `toolRegistry.registerAllTools()` before `mcpServer?.start()`
-- [ ] `McpServerService` exposes `screenCaptureService` via a getter method or internal property
-- [ ] `ToolRegistry` is annotated `@Singleton` to match `McpProtocolHandler` scope
-- [ ] `AppModule` provides Hilt bindings for the tool classes (or they use `@Inject constructor()`)
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ToolRegistry` has `@Inject constructor(protocolHandler: McpProtocolHandler, ...tool classes)` for Hilt injection
+- [x] `registerAllTools()` registers all 10 tools (4 introspection + 6 system action)
+- [x] `McpServerService.startServer()` calls `toolRegistry.registerAllTools()` before `mcpServer?.start()`
+- [x] `McpServerService` exposes `screenCaptureService` via a getter method or internal property
+- [x] `ToolRegistry` is annotated `@Singleton` to match `McpProtocolHandler` scope
+- [x] `AppModule` provides Hilt bindings for the tool classes (or they use `@Inject constructor()`)
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: `ToolRegistry` is tested indirectly through the individual tool tests. Direct unit testing would require verifying that `McpProtocolHandler.registerTool()` was called for each tool, which is covered by the protocol handler's `handleToolsList()` returning the registered tools.
 
@@ -282,20 +282,20 @@ The tool handler classes themselves are simple `@Inject constructor()` classes (
 **Description**: Create the 4 screen introspection MCP tool handlers: `GetAccessibilityTreeHandler`, `CaptureScreenshotHandler`, `GetCurrentAppHandler`, and `GetScreenInfoHandler`. Each class implements `ToolHandler` and includes a `register()` method for self-registration with the protocol handler.
 
 **Acceptance Criteria**:
-- [ ] `GetAccessibilityTreeHandler` checks `McpAccessibilityService.isReady()` before accessing root node
-- [ ] `GetAccessibilityTreeHandler` calls `AccessibilityTreeParser.parseTree()` and serializes the result to JSON
-- [ ] `GetAccessibilityTreeHandler` wraps output in MCP content format with type "text"
-- [ ] `CaptureScreenshotHandler` validates `quality` parameter: defaults to 80, rejects values outside 1-100
-- [ ] `CaptureScreenshotHandler` accesses `ScreenCaptureService` via `McpServerService.instance?.getScreenCaptureService()`
-- [ ] `CaptureScreenshotHandler` checks `isMediaProjectionActive()` before capture
-- [ ] `CaptureScreenshotHandler` returns MCP content with type "image", including base64 data, mimeType, width, and height
-- [ ] `GetCurrentAppHandler` returns package name and activity name from `McpAccessibilityService`
-- [ ] `GetCurrentAppHandler` handles null package/activity gracefully (returns "unknown")
-- [ ] `GetScreenInfoHandler` calls `McpAccessibilityService.instance?.getScreenInfo()`
-- [ ] All 4 tools throw `McpToolException` with appropriate error codes for error conditions
-- [ ] All 4 tools define correct `name`, `description`, and `inputSchema` per PROJECT.md spec
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `GetAccessibilityTreeHandler` checks `McpAccessibilityService.isReady()` before accessing root node
+- [x] `GetAccessibilityTreeHandler` calls `AccessibilityTreeParser.parseTree()` and serializes the result to JSON
+- [x] `GetAccessibilityTreeHandler` wraps output in MCP content format with type "text"
+- [x] `CaptureScreenshotHandler` validates `quality` parameter: defaults to 80, rejects values outside 1-100
+- [x] `CaptureScreenshotHandler` accesses `ScreenCaptureService` via `McpServerService.instance?.getScreenCaptureService()`
+- [x] `CaptureScreenshotHandler` checks `isMediaProjectionActive()` before capture
+- [x] `CaptureScreenshotHandler` returns MCP content with type "image", including base64 data, mimeType, width, and height
+- [x] `GetCurrentAppHandler` returns package name and activity name from `McpAccessibilityService`
+- [x] `GetCurrentAppHandler` handles null package/activity gracefully (returns "unknown")
+- [x] `GetScreenInfoHandler` calls `McpAccessibilityService.instance?.getScreenInfo()`
+- [x] All 4 tools throw `McpToolException` with appropriate error codes for error conditions
+- [x] All 4 tools define correct `name`, `description`, and `inputSchema` per PROJECT.md spec
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests in Task 7.4 (`ScreenIntrospectionToolsTest.kt`).
 
@@ -768,15 +768,15 @@ This means we also need to update `McpProtocolHandler.handleToolCall()` to handl
 **Description**: Create the 6 system action MCP tool handlers: `PressBackHandler`, `PressHomeHandler`, `PressRecentsHandler`, `OpenNotificationsHandler`, `OpenQuickSettingsHandler`, and `GetDeviceLogsHandler`. The first 5 delegate to `ActionExecutor` from Plan 4. `GetDeviceLogsHandler` retrieves filtered logcat output.
 
 **Acceptance Criteria**:
-- [ ] Each handler checks `McpAccessibilityService.instance` availability and throws `-32001` if not ready
-- [ ] Each handler calls the corresponding `ActionExecutor` method (`pressBack()`, `pressHome()`, etc.)
-- [ ] Each handler checks the `Result<Unit>` return and throws `-32003` on failure
-- [ ] Each handler returns a text content confirmation message on success
-- [ ] All 6 tools define correct `name`, `description`, and `inputSchema` per PROJECT.md spec
-- [ ] `GetDeviceLogsHandler` validates `last_lines` (1-1000), `level` (V/D/I/W/E/F), and other optional params
-- [ ] `GetDeviceLogsHandler` returns `-32602` for invalid params and `-32603` for execution failure
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] Each handler checks `McpAccessibilityService.instance` availability and throws `-32001` if not ready
+- [x] Each handler calls the corresponding `ActionExecutor` method (`pressBack()`, `pressHome()`, etc.)
+- [x] Each handler checks the `Result<Unit>` return and throws `-32003` on failure
+- [x] Each handler returns a text content confirmation message on success
+- [x] All 6 tools define correct `name`, `description`, and `inputSchema` per PROJECT.md spec
+- [x] `GetDeviceLogsHandler` validates `last_lines` (1-1000), `level` (V/D/I/W/E/F), and other optional params
+- [x] `GetDeviceLogsHandler` returns `-32602` for invalid params and `-32603` for execution failure
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests in Task 7.4 (`SystemActionToolsTest.kt`).
 
@@ -1215,14 +1215,14 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 **Description**: Create comprehensive unit tests for all screen introspection and system action tool handlers.
 
 **Acceptance Criteria**:
-- [ ] `ScreenIntrospectionToolsTest.kt` tests all 4 introspection tools
-- [ ] `SystemActionToolsTest.kt` tests all 6 system action tools (including `GetDeviceLogsHandler`)
-- [ ] Tests verify success paths (correct output format, correct content type)
-- [ ] Tests verify error paths (service not available, permission denied, action failure)
-- [ ] Tests verify parameter validation (capture_screenshot quality range)
-- [ ] Tests use MockK to mock `McpAccessibilityService`, `ScreenCaptureService`, `AccessibilityTreeParser`, `ActionExecutor`
-- [ ] Tests follow Arrange-Act-Assert pattern
-- [ ] All tests pass via `make test-unit`
+- [x] `ScreenIntrospectionToolsTest.kt` tests all 4 introspection tools
+- [x] `SystemActionToolsTest.kt` tests all 6 system action tools (including `GetDeviceLogsHandler`)
+- [x] Tests verify success paths (correct output format, correct content type)
+- [x] Tests verify error paths (service not available, permission denied, action failure)
+- [x] Tests verify parameter validation (capture_screenshot quality range)
+- [x] Tests use MockK to mock `McpAccessibilityService`, `ScreenCaptureService`, `AccessibilityTreeParser`, `ActionExecutor`
+- [x] Tests follow Arrange-Act-Assert pattern
+- [x] All tests pass via `make test-unit`
 
 **Tests**: These ARE the tests.
 
@@ -2126,12 +2126,12 @@ Note: `ActionExecutor` methods return `Result<Unit>`. On failure, the `Result` c
 **Description**: Create the `docs/MCP_TOOLS.md` documentation file covering the 10 tools implemented in this plan, with full schemas, request/response examples, and error codes.
 
 **Acceptance Criteria**:
-- [ ] Document includes overview of MCP tools system
-- [ ] Document includes Screen Introspection Tools section with 4 tools fully documented
-- [ ] Document includes System Action Tools section with 6 tools fully documented
-- [ ] Each tool has: name, description, input schema, output example, error codes, full request/response JSON examples
-- [ ] Document includes placeholder sections for remaining tool categories (to be filled in Plans 8 and 9)
-- [ ] Document follows Markdown conventions and is readable
+- [x] Document includes overview of MCP tools system
+- [x] Document includes Screen Introspection Tools section with 4 tools fully documented
+- [x] Document includes System Action Tools section with 6 tools fully documented
+- [x] Each tool has: name, description, input schema, output example, error codes, full request/response JSON examples
+- [x] Document includes placeholder sections for remaining tool categories (to be filled in Plans 8 and 9)
+- [x] Document follows Markdown conventions and is readable
 
 **Tests**: Documentation only, no automated tests.
 
