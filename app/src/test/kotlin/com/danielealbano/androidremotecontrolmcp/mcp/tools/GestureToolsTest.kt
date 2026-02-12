@@ -116,6 +116,45 @@ class GestureToolsTest {
             }
 
         @Test
+        @DisplayName("pinch with zero duration returns invalid params")
+        fun pinchWithZeroDurationReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("center_x", 540)
+                        put("center_y", 1200)
+                        put("scale", 1.5)
+                        put("duration", 0)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("duration"))
+            }
+
+        @Test
+        @DisplayName("pinch with duration exceeding max returns invalid params")
+        fun pinchWithDurationExceedingMaxReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("center_x", 540)
+                        put("center_y", 1200)
+                        put("scale", 1.5)
+                        put("duration", 60001)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("duration"))
+                assertTrue(exception.message!!.contains("60000"))
+            }
+
+        @Test
         @DisplayName("pinch with missing center_x returns invalid params")
         fun pinchWithMissingCenterXReturnsInvalidParams() =
             runTest {

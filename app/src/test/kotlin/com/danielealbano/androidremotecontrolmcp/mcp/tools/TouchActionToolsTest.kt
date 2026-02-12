@@ -444,6 +444,47 @@ class TouchActionToolsTest {
             }
 
         @Test
+        @DisplayName("swipe with zero duration returns invalid params")
+        fun swipeWithZeroDurationReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("x1", 100)
+                        put("y1", 200)
+                        put("x2", 300)
+                        put("y2", 400)
+                        put("duration", 0)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("duration"))
+            }
+
+        @Test
+        @DisplayName("swipe with duration exceeding max returns invalid params")
+        fun swipeWithDurationExceedingMaxReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("x1", 100)
+                        put("y1", 200)
+                        put("x2", 300)
+                        put("y2", 400)
+                        put("duration", 60001)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("duration"))
+                assertTrue(exception.message!!.contains("60000"))
+            }
+
+        @Test
         @DisplayName("swipe with missing x2 returns invalid params")
         fun swipeWithMissingX2ReturnsInvalidParams() =
             runTest {
