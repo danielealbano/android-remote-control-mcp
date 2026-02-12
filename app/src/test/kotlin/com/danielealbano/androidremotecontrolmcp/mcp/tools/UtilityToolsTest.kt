@@ -1,0 +1,272 @@
+@file:Suppress("DEPRECATION")
+
+package com.danielealbano.androidremotecontrolmcp.mcp.tools
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.view.accessibility.AccessibilityNodeInfo
+import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
+import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import io.mockk.verify
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+
+@DisplayName("UtilityTools")
+class UtilityToolsTest {
+    private val mockTreeParser = mockk<AccessibilityTreeParser>()
+    private val mockElementFinder = mockk<ElementFinder>()
+    private val mockService = mockk<McpAccessibilityService>()
+    private val mockRootNode = mockk<AccessibilityNodeInfo>()
+    private val mockClipboardManager = mockk<ClipboardManager>()
+
+    private val sampleTree =
+        AccessibilityNodeData(
+            id = "node_root",
+            className = "android.widget.FrameLayout",
+            bounds = BoundsData(0, 0, 1080, 2400),
+            visible = true,
+        )
+
+    private val sampleBounds = BoundsData(50, 800, 250, 1000)
+
+    private val sampleElementInfo =
+        ElementInfo(
+            id = "node_abc",
+            text = "Result",
+            className = "android.widget.TextView",
+            bounds = sampleBounds,
+            clickable = false,
+            enabled = true,
+        )
+
+    /**
+     * Extracts the text content from a standard MCP response.
+     * Expected format: { "content": [{ "type": "text", "text": "..." }] }
+     */
+    private fun extractTextContent(result: JsonElement): String {
+        val content = result.jsonObject["content"]!!.jsonArray
+        assertEquals(1, content.size)
+        val item = content[0].jsonObject
+        assertEquals("text", item["type"]!!.jsonPrimitive.content)
+        return item["text"]!!.jsonPrimitive.content
+    }
+
+    @BeforeEach
+    fun setUp() {
+        mockkObject(McpAccessibilityService.Companion)
+        every { McpAccessibilityService.instance } returns mockService
+        every { mockService.getRootNode() } returns mockRootNode
+        every { mockService.getSystemService(ClipboardManager::class.java) } returns mockClipboardManager
+        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockRootNode.recycle() } returns Unit
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkObject(McpAccessibilityService.Companion)
+    }
+
+    @Nested
+    @DisplayName("GetClipboardTool")
+    inner class GetClipboardToolTests {
+        private val tool = GetClipboardTool()
+
+        @Test
+        fun `returns clipboard text`() =
+            runTest {
+                val mockClip = mockk<ClipData>()
+                val mockItem = mockk<ClipData.Item>()
+                every { mockClipboardManager.primaryClip } returns mockClip
+                every { mockClip.itemCount } returns 1
+                every { mockClip.getItemAt(0) } returns mockItem
+                every { mockItem.text } returns "copied text"
+
+                val result = tool.execute(null)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertEquals("copied text", parsed["text"]?.jsonPrimitive?.content)
+            }
+
+        @Test
+        fun `returns null when clipboard empty`() =
+            runTest {
+                every { mockClipboardManager.primaryClip } returns null
+
+                val result = tool.execute(null)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertTrue(
+                    parsed["text"]?.jsonPrimitive?.content == null ||
+                        parsed["text"]?.jsonPrimitive?.content == "null",
+                )
+            }
+    }
+
+    @Nested
+    @DisplayName("SetClipboardTool")
+    inner class SetClipboardToolTests {
+        private val tool = SetClipboardTool()
+
+        @Test
+        fun `sets clipboard text`() =
+            runTest {
+                every { mockClipboardManager.setPrimaryClip(any()) } returns Unit
+                val params = buildJsonObject { put("text", "new content") }
+
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                assertTrue(text.contains("Clipboard set"))
+                verify { mockClipboardManager.setPrimaryClip(any()) }
+            }
+
+        @Test
+        fun `throws error when text missing`() =
+            runTest {
+                val params = buildJsonObject {}
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+    }
+
+    @Nested
+    @DisplayName("WaitForElementTool")
+    inner class WaitForElementToolTests {
+        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder)
+
+        @Test
+        fun `finds element on first attempt`() =
+            runTest {
+                every {
+                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Result", false)
+                } returns listOf(sampleElementInfo)
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "Result")
+                        put("timeout", 5000)
+                    }
+
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
+            }
+
+        @Test
+        fun `throws error for invalid by parameter`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "invalid")
+                        put("value", "test")
+                    }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+
+        @Test
+        fun `throws error for empty value`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "")
+                    }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+
+        @Test
+        fun `throws error for timeout exceeding max`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "test")
+                        put("timeout", 50000)
+                    }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertTrue(exception.message!!.contains("Timeout must be between"))
+            }
+
+        @Test
+        fun `throws error for negative timeout`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "test")
+                        put("timeout", -1)
+                    }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+    }
+
+    @Nested
+    @DisplayName("WaitForIdleTool")
+    inner class WaitForIdleToolTests {
+        private val tool = WaitForIdleTool(mockTreeParser)
+
+        @Test
+        fun `detects idle when tree does not change`() =
+            runTest {
+                // Same tree returned each time -> idle detected
+                val params = buildJsonObject { put("timeout", 5000) }
+
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
+            }
+
+        @Test
+        fun `throws error for timeout exceeding max`() =
+            runTest {
+                val params = buildJsonObject { put("timeout", 50000) }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+
+        @Test
+        fun `throws error for zero timeout`() =
+            runTest {
+                val params = buildJsonObject { put("timeout", 0) }
+
+                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+    }
+}
