@@ -62,7 +62,7 @@ object AndroidContainerSetup {
             append("-no-boot-anim -no-audio -no-snapshot")
             if (isCI) append(" -no-window")
         }
-        val memoryBytes = if (isCI) 4L * 1024 * 1024 * 1024 else 6L * 1024 * 1024 * 1024
+        val memoryBytes = if (isCI) 5L * 1024 * 1024 * 1024 else 6L * 1024 * 1024 * 1024
 
         return GenericContainer(DockerImageName.parse(DOCKER_IMAGE))
             .withExposedPorts(ADB_PORT, NOVNC_PORT, MCP_DEFAULT_PORT)
