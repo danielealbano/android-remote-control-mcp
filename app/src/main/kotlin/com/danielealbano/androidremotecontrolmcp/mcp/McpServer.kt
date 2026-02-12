@@ -185,7 +185,7 @@ class McpServer(
 
                 route("/v1") {
                     post("/initialize") {
-                        val request = call.receive<JsonRpcRequest>()
+                        val request = receiveJsonRpcRequest(call, "/initialize") ?: return@post
                         val response = protocolHandler.handleRequest(request)
                         call.respond(response)
                     }
@@ -193,7 +193,9 @@ class McpServer(
                     get("/tools/list") {
                         val idParam = call.request.queryParameters["id"]
                         val requestId: kotlinx.serialization.json.JsonElement? =
-                            idParam?.let { JsonPrimitive(it) }
+                            idParam?.let { id ->
+                                id.toLongOrNull()?.let { JsonPrimitive(it) } ?: JsonPrimitive(id)
+                            }
                         val request =
                             JsonRpcRequest(
                                 method = McpProtocolHandler.METHOD_TOOLS_LIST,
@@ -204,12 +206,26 @@ class McpServer(
                     }
 
                     post("/tools/call") {
-                        val request = call.receive<JsonRpcRequest>()
+                        val request = receiveJsonRpcRequest(call, "/tools/call") ?: return@post
                         val response = protocolHandler.handleRequest(request)
                         call.respond(response)
                     }
                 }
             }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun receiveJsonRpcRequest(
+        call: io.ktor.server.application.ApplicationCall,
+        endpointName: String,
+    ): JsonRpcRequest? {
+        return try {
+            call.receive<JsonRpcRequest>()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse JSON-RPC request on $endpointName: ${e.message}")
+            call.respond(protocolHandler.parseError(null))
+            null
         }
     }
 
