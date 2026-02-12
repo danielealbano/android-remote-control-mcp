@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.BuildConfig
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolRegistry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -12,7 +13,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +20,7 @@ import javax.inject.Singleton
  * Handler interface for individual MCP tools.
  *
  * Each tool category (touch actions, element actions, etc.) implements this
- * interface. Implementations are registered via [McpProtocolHandler.registerTool].
+ * interface. Implementations are registered via [ToolRegistry.register].
  */
 interface ToolHandler {
     /**
@@ -31,21 +31,6 @@ interface ToolHandler {
      */
     suspend fun execute(params: JsonObject?): JsonElement
 }
-
-/**
- * Metadata for a registered MCP tool, used in the tools/list response.
- *
- * @property name The unique tool name (e.g., "tap", "get_accessibility_tree").
- * @property description Human-readable description of what the tool does.
- * @property inputSchema JSON Schema describing the tool's input parameters.
- * @property handler The handler that executes this tool.
- */
-data class ToolDefinition(
-    val name: String,
-    val description: String,
-    val inputSchema: JsonObject,
-    val handler: ToolHandler,
-)
 
 /**
  * JSON-RPC 2.0 request.
@@ -84,8 +69,8 @@ private const val JSON_RPC_VERSION = "2.0"
 /**
  * Handles MCP JSON-RPC 2.0 requests by routing methods to appropriate handlers.
  *
- * Supports tool registration via [registerTool] and dispatches tool calls to
- * the registered [ToolHandler] instances. Thread-safe via [ConcurrentHashMap].
+ * Dispatches tool calls to
+ * the registered [ToolHandler] instances. Delegates tool management to [ToolRegistry].
  *
  * If the official MCP Kotlin SDK supports server-side HTTP transport and is
  * Android-compatible, this class should be replaced with the SDK's built-in
@@ -94,27 +79,9 @@ private const val JSON_RPC_VERSION = "2.0"
 @Singleton
 class McpProtocolHandler
     @Inject
-    constructor() {
-        private val tools = ConcurrentHashMap<String, ToolDefinition>()
-
-        /**
-         * Registers a tool with the protocol handler.
-         *
-         * @param name Unique tool name.
-         * @param description Human-readable description.
-         * @param inputSchema JSON Schema for the tool's input parameters.
-         * @param handler The handler that executes this tool.
-         */
-        fun registerTool(
-            name: String,
-            description: String,
-            inputSchema: JsonObject,
-            handler: ToolHandler,
-        ) {
-            tools[name] = ToolDefinition(name, description, inputSchema, handler)
-            Log.d(TAG, "Registered tool: $name")
-        }
-
+    constructor(
+        private val toolRegistry: ToolRegistry,
+    ) {
         /**
          * Routes a JSON-RPC request to the appropriate handler method.
          *
@@ -155,7 +122,7 @@ class McpProtocolHandler
             val result =
                 buildJsonObject {
                     putJsonArray("tools") {
-                        tools.values.forEach { tool ->
+                        toolRegistry.listTools().forEach { tool ->
                             add(
                                 buildJsonObject {
                                     put("name", tool.name)
@@ -169,7 +136,7 @@ class McpProtocolHandler
             return JsonRpcResponse(id = request.id, result = result)
         }
 
-        @Suppress("TooGenericExceptionCaught", "ReturnCount")
+        @Suppress("TooGenericExceptionCaught", "ReturnCount", "SwallowedException")
         private suspend fun handleToolCall(request: JsonRpcRequest): JsonRpcResponse {
             val params =
                 request.params
@@ -179,15 +146,23 @@ class McpProtocolHandler
                 (params["name"] as? JsonPrimitive)?.content
                     ?: return invalidParams(request.id, "Missing 'name' in params")
 
-            val toolDef =
-                tools[toolName]
-                    ?: return methodNotFound(request.id, toolName)
-
             val toolArgs = params["arguments"] as? JsonObject
 
             return try {
-                val result = toolDef.handler.execute(toolArgs)
+                val result = toolRegistry.execute(toolName, toolArgs)
                 JsonRpcResponse(id = request.id, result = result)
+            } catch (e: McpToolException) {
+                Log.w(TAG, "Tool returned error: $toolName, code=${e.code}, message=${e.message}")
+                JsonRpcResponse(
+                    id = request.id,
+                    error =
+                        JsonRpcError(
+                            code = e.code,
+                            message = e.message ?: "Unknown tool error",
+                        ),
+                )
+            } catch (e: NoSuchElementException) {
+                methodNotFound(request.id, toolName)
             } catch (e: Exception) {
                 Log.e(TAG, "Tool execution failed: $toolName", e)
                 internalError(request.id, "Tool execution failed: ${e.message ?: "Unknown error"}")
