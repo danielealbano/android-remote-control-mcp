@@ -17,13 +17,12 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels()
     private lateinit var mediaProjectionLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        val viewModel: MainViewModel by viewModels()
 
         mediaProjectionLauncher =
             registerForActivityResult(
@@ -40,6 +39,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshPermissionStatus(this)
+    }
+    // NOTE: No onPause() needed for broadcast receiver since we use StateFlow
+    // for server status, which is collected in MainViewModel via viewModelScope.
 
     /**
      * Launches the system MediaProjection permission dialog.

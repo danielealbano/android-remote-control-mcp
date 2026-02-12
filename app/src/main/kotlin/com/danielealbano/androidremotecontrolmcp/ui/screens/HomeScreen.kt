@@ -99,8 +99,8 @@ fun HomeScreen(
         ) {
             ServerStatusCard(
                 status = serverStatus,
-                onStartClick = viewModel::startServer,
-                onStopClick = viewModel::stopServer,
+                onStartClick = { viewModel.startServer(context) },
+                onStopClick = { viewModel.stopServer(context) },
             )
 
             ConfigurationSection(
