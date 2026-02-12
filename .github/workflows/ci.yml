@@ -14,6 +14,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +38,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: lint
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,10 +52,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run unit tests
-        run: ./gradlew test
+      - name: Run unit tests with coverage
+        run: ./gradlew :app:test jacocoTestReport
 
-      - name: Upload test results
+      - name: Upload unit test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -61,10 +63,90 @@ jobs:
           path: app/build/reports/tests/
           retention-days: 14
 
-  build:
-    name: Build
+      - name: Upload Jacoco coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            app/build/reports/jacoco/jacocoTestReport/html/
+            app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          retention-days: 14
+
+  test-integration:
+    name: Integration Tests
     runs-on: ubuntu-latest
     needs: test-unit
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run integration tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: ./gradlew :app:connectedAndroidTest
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: app/build/reports/androidTests/connected/
+          retention-days: 14
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: test-integration
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK (required by E2E tests)
+        run: ./gradlew assembleDebug
+
+      - name: Run E2E tests
+        run: ./gradlew :e2e-tests:test
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: e2e-tests/build/reports/tests/
+          retention-days: 14
+
+  build-release:
+    name: Build Release
+    runs-on: ubuntu-latest
+    needs: test-e2e
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,18 +171,11 @@ jobs:
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 14
+          retention-days: 30
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/app-release-unsigned.apk
-          retention-days: 14
-
-  # Stub: initial scaffolding — full CI chain (lint -> test-unit -> test-integration -> test-e2e -> build-release)
-  # will be completed in Plan 10 (approved by user). Currently only: lint -> test-unit -> build.
-  # test-integration:
-  #   ...
-  # test-e2e:
-  #   ...
+          retention-days: 30
