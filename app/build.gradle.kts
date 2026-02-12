@@ -126,6 +126,10 @@ dependencies {
     implementation(libs.ktor.network.tls.certificates)
     implementation(libs.ktor.serialization.kotlinx.json)
 
+    // Certificate generation (Bouncy Castle for self-signed cert with SAN support)
+    implementation(libs.bouncy.castle.pkix)
+    implementation(libs.bouncy.castle.prov)
+
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk)
 
@@ -149,6 +153,8 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.bouncy.castle.pkix)
+    testImplementation(libs.bouncy.castle.prov)
 
     // Android Instrumented Testing
     androidTestImplementation(libs.test.core)
