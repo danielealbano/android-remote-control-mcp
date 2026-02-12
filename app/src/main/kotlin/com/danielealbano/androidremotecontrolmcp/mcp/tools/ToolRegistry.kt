@@ -1,10 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
-import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,7 +37,7 @@ data class ToolDefinition(
 class ToolRegistry
     @Inject
     constructor() {
-        private val tools = mutableMapOf<String, ToolDefinition>()
+        private val tools = ConcurrentHashMap<String, ToolDefinition>()
 
         /**
          * Registers a tool with the registry.
@@ -63,7 +63,6 @@ class ToolRegistry
          * @param name The tool name to execute.
          * @param params Optional JSON parameters for the tool.
          * @return The tool's result as a [JsonElement].
-         * @throws McpToolException if the tool throws a tool-level error.
          * @throws NoSuchElementException if the tool name is not registered.
          */
         suspend fun execute(

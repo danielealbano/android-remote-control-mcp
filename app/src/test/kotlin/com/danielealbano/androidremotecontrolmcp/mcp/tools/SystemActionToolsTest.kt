@@ -411,6 +411,22 @@ class SystemActionToolsTest {
             }
 
         @Test
+        @DisplayName("throws error -32602 when last_lines is non-integer")
+        fun throwsErrorWhenLastLinesNonInteger() =
+            runTest {
+                // Arrange
+                val params = buildJsonObject { put("last_lines", JsonPrimitive("abc")) }
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException> {
+                        handler.execute(params)
+                    }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertTrue(exception.message!!.contains("integer"))
+            }
+
+        @Test
         @DisplayName("throws error -32602 for invalid log level")
         fun throwsErrorForInvalidLogLevel() =
             runTest {
@@ -474,6 +490,93 @@ class SystemActionToolsTest {
                 // Assert
                 val content = result.jsonObject["content"]?.jsonArray
                 assertNotNull(content)
+            }
+
+        @Test
+        @DisplayName("filters logs by until timestamp")
+        fun filtersLogsByUntilTimestamp() =
+            runTest {
+                // Arrange - two log lines, one before and one after the until time
+                val logOutput =
+                    "01-15 10:00:00.000 D/Tag: Before line\n" +
+                        "01-15 11:00:00.000 D/Tag: After line\n"
+                every { mockProcess.inputStream } returns
+                    ByteArrayInputStream(logOutput.toByteArray())
+                val params =
+                    buildJsonObject {
+                        put("since", JsonPrimitive("2024-01-15T09:00:00"))
+                        put("until", JsonPrimitive("2024-01-15T10:30:00"))
+                    }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                val content = result.jsonObject["content"]?.jsonArray
+                assertNotNull(content)
+                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
+                assertNotNull(textContent)
+                assertTrue(textContent!!.contains("Before line"))
+                assertTrue(!textContent.contains("After line"))
+            }
+
+        @Test
+        @DisplayName("resolves package_name to PID for logcat filtering")
+        fun resolvesPackageNameToPid() =
+            runTest {
+                // Arrange - first exec call resolves PID, second call is logcat
+                val pidProcess = mockk<Process>()
+                every { pidProcess.inputStream } returns
+                    ByteArrayInputStream("12345\n".toByteArray())
+                every { pidProcess.waitFor() } returns 0
+
+                val logProcess = mockk<Process>()
+                every { logProcess.inputStream } returns
+                    ByteArrayInputStream("01-15 10:00:00.000 D/Tag: App log\n".toByteArray())
+                every { logProcess.errorStream } returns ByteArrayInputStream(ByteArray(0))
+                every { logProcess.waitFor() } returns 0
+
+                // First exec call = pidof, second = logcat
+                every { mockRuntime.exec(any<Array<String>>()) } returnsMany
+                    listOf(pidProcess, logProcess)
+
+                val params =
+                    buildJsonObject {
+                        put("package_name", JsonPrimitive("com.example.app"))
+                    }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                val content = result.jsonObject["content"]?.jsonArray
+                assertNotNull(content)
+                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
+                assertNotNull(textContent)
+                assertTrue(textContent!!.contains("App log"))
+            }
+
+        @Test
+        @DisplayName("detects truncation correctly with extra line")
+        fun detectsTruncationCorrectly() =
+            runTest {
+                // Arrange - provide exactly 2 lines for last_lines=1 (1+1 requested)
+                val logOutput =
+                    "01-15 10:00:00.000 D/Tag: Line 1\n" +
+                        "01-15 10:01:00.000 D/Tag: Line 2\n"
+                every { mockProcess.inputStream } returns
+                    ByteArrayInputStream(logOutput.toByteArray())
+                val params = buildJsonObject { put("last_lines", JsonPrimitive(1)) }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                val content = result.jsonObject["content"]?.jsonArray
+                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
+                assertNotNull(textContent)
+                assertTrue(textContent!!.contains("\"truncated\":true"))
+                assertTrue(textContent.contains("\"line_count\":1"))
             }
     }
 }
