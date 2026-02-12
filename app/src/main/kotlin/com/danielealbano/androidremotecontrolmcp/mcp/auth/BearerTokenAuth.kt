@@ -108,6 +108,11 @@ private object AuthenticationHook : Hook<suspend (io.ktor.server.application.App
     ) {
         pipeline.intercept(ApplicationCallPipeline.Plugins) {
             handler(call)
+            // If the auth handler sent a response (e.g., 401), stop the pipeline
+            // to prevent route handlers from executing after authentication failure
+            if (call.response.status() != null) {
+                finish()
+            }
         }
     }
 }

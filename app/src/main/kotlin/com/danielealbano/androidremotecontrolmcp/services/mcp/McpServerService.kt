@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -52,6 +53,7 @@ class McpServerService : Service() {
     @Inject lateinit var certificateManager: CertificateManager
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val serverStarting = AtomicBoolean(false)
     private var mcpServer: McpServer? = null
     private var screenCaptureService: ScreenCaptureService? = null
     private var isBoundToScreenCapture = false
@@ -92,8 +94,12 @@ class McpServerService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START, null -> {
-                coroutineScope.launch {
-                    startServer()
+                if (!serverStarting.compareAndSet(false, true)) {
+                    Log.w(TAG, "Server already starting or running, ignoring duplicate start request")
+                } else {
+                    coroutineScope.launch {
+                        startServer()
+                    }
                 }
             }
         }
@@ -118,7 +124,7 @@ class McpServerService : Service() {
             // Only get/create SSL keystore when HTTPS is enabled
             val keyStore =
                 if (config.httpsEnabled) {
-                    certificateManager.getOrCreateKeyStore()
+                    certificateManager.getOrCreateKeyStore(config)
                 } else {
                     null
                 }
@@ -150,6 +156,7 @@ class McpServerService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start MCP server", e)
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
+            serverStarting.set(false)
         }
     }
 
@@ -168,6 +175,7 @@ class McpServerService : Service() {
             Log.e(TAG, "Error during server shutdown", e)
         }
         mcpServer = null
+        serverStarting.set(false)
 
         // Unbind from ScreenCaptureService
         if (isBoundToScreenCapture) {

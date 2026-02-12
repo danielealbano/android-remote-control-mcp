@@ -1,10 +1,43 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.auth
 
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class BearerTokenAuthTest {
+    @BeforeEach
+    fun setUp() {
+        mockkStatic(android.util.Log::class)
+        every { android.util.Log.d(any(), any()) } returns 0
+        every { android.util.Log.i(any(), any()) } returns 0
+        every { android.util.Log.w(any(), any<String>()) } returns 0
+        every { android.util.Log.e(any(), any()) } returns 0
+        every { android.util.Log.e(any(), any(), any()) } returns 0
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(android.util.Log::class)
+    }
+
     // --- constantTimeEquals tests ---
 
     @Test
@@ -66,5 +99,89 @@ class BearerTokenAuthTest {
         assertFalse(constantTimeEquals(base, "abcdefghijklmnoX"))
         // Mismatch at middle character
         assertFalse(constantTimeEquals(base, "abcdefgXijklmnop"))
+    }
+
+    // --- Ktor plugin integration tests ---
+
+    @Test
+    fun `plugin returns 401 when Authorization header is missing`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/protected") {
+                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
+                        get("/resource") { call.respondText("OK") }
+                    }
+                }
+            }
+
+            val response = client.get("/protected/resource")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `plugin returns 401 when Authorization header is malformed`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/protected") {
+                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
+                        get("/resource") { call.respondText("OK") }
+                    }
+                }
+            }
+
+            val response =
+                client.get("/protected/resource") {
+                    header("Authorization", "Basic abc123")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `plugin returns 401 when token is invalid`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/protected") {
+                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
+                        get("/resource") { call.respondText("OK") }
+                    }
+                }
+            }
+
+            val response =
+                client.get("/protected/resource") {
+                    header("Authorization", "Bearer wrong-token")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `plugin allows request with valid token`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/protected") {
+                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
+                        get("/resource") { call.respondText("OK") }
+                    }
+                }
+            }
+
+            val response =
+                client.get("/protected/resource") {
+                    header("Authorization", "Bearer $TEST_TOKEN")
+                }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("OK", response.bodyAsText())
+        }
+
+    companion object {
+        private const val TEST_TOKEN = "test-secret-token"
     }
 }
