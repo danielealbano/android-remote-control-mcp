@@ -35,28 +35,28 @@ This plan implements the Android AccessibilityService, accessibility tree parser
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `McpAccessibilityService` extends `AccessibilityService` with singleton lifecycle (companion object `instance`)
-- [ ] `McpAccessibilityService` tracks current package name and activity name from accessibility events
-- [ ] `McpAccessibilityService` provides `getRootNode()`, `getCurrentPackageName()`, `getCurrentActivityName()`, `isReady()`
-- [ ] `McpAccessibilityService` handles `onServiceConnected()`, `onAccessibilityEvent()`, `onInterrupt()`, `onDestroy()`, `onLowMemory()`, `onTrimMemory()`
-- [ ] `McpAccessibilityService` uses `CoroutineScope(SupervisorJob() + Dispatchers.Main)` for the service scope
-- [ ] `AccessibilityNodeData` and `BoundsData` are `@Serializable` data classes representing the parsed accessibility tree
-- [ ] `AccessibilityTreeParser` recursively parses `AccessibilityNodeInfo` into `AccessibilityNodeData` with stable node IDs
-- [ ] `AccessibilityTreeParser` properly recycles `AccessibilityNodeInfo` nodes after parsing
-- [ ] `ElementFinder` finds elements by `TEXT`, `CONTENT_DESC`, `RESOURCE_ID`, `CLASS_NAME` with exact and contains matching
-- [ ] `ElementFinder` operates on parsed `AccessibilityNodeData` (not raw `AccessibilityNodeInfo`), making it testable without Android framework
-- [ ] `ElementInfo` data class represents found elements with key properties and bounds
-- [ ] `ActionExecutor` performs node actions: click, long click, set text, scroll
-- [ ] `ActionExecutor` performs coordinate-based actions: tap, long press, double tap, swipe, scroll
-- [ ] `ActionExecutor` performs global actions: back, home, recents, notifications, quick settings
-- [ ] `ActionExecutor` performs advanced gestures: pinch, custom multi-path gesture
-- [ ] `ActionExecutor` uses `suspendCancellableCoroutine` to wrap `GestureResultCallback`
-- [ ] `ActionExecutor` validates coordinates are within screen bounds
-- [ ] `ActionExecutor` checks `McpAccessibilityService.instance` before all operations
-- [ ] Unit tests exist and pass for `AccessibilityTreeParser`, `ElementFinder`, and `ActionExecutor`
-- [ ] `make lint` passes with no warnings or errors
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds without errors or warnings
+- [x] `McpAccessibilityService` extends `AccessibilityService` with singleton lifecycle (companion object `instance`)
+- [x] `McpAccessibilityService` tracks current package name and activity name from accessibility events
+- [x] `McpAccessibilityService` provides `getRootNode()`, `getCurrentPackageName()`, `getCurrentActivityName()`, `isReady()`
+- [x] `McpAccessibilityService` handles `onServiceConnected()`, `onAccessibilityEvent()`, `onInterrupt()`, `onDestroy()`, `onLowMemory()`, `onTrimMemory()`
+- [x] `McpAccessibilityService` uses `CoroutineScope(SupervisorJob() + Dispatchers.Main)` for the service scope
+- [x] `AccessibilityNodeData` and `BoundsData` are `@Serializable` data classes representing the parsed accessibility tree
+- [x] `AccessibilityTreeParser` recursively parses `AccessibilityNodeInfo` into `AccessibilityNodeData` with stable node IDs
+- [x] `AccessibilityTreeParser` properly recycles `AccessibilityNodeInfo` nodes after parsing
+- [x] `ElementFinder` finds elements by `TEXT`, `CONTENT_DESC`, `RESOURCE_ID`, `CLASS_NAME` with exact and contains matching
+- [x] `ElementFinder` operates on parsed `AccessibilityNodeData` (not raw `AccessibilityNodeInfo`), making it testable without Android framework
+- [x] `ElementInfo` data class represents found elements with key properties and bounds
+- [x] `ActionExecutor` performs node actions: click, long click, set text, scroll
+- [x] `ActionExecutor` performs coordinate-based actions: tap, long press, double tap, swipe, scroll
+- [x] `ActionExecutor` performs global actions: back, home, recents, notifications, quick settings
+- [x] `ActionExecutor` performs advanced gestures: pinch, custom multi-path gesture
+- [x] `ActionExecutor` uses `suspendCancellableCoroutine` to wrap `GestureResultCallback`
+- [x] `ActionExecutor` validates coordinates are within screen bounds
+- [x] `ActionExecutor` checks `McpAccessibilityService.instance` before all operations
+- [x] Unit tests exist and pass for `AccessibilityTreeParser`, `ElementFinder`, and `ActionExecutor`
+- [x] `make lint` passes with no warnings or errors
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds without errors or warnings
 
 ### Commit Strategy
 
@@ -76,18 +76,18 @@ This plan implements the Android AccessibilityService, accessibility tree parser
 **Description**: Replace the stub `McpAccessibilityService.kt` with the full implementation. This service is the Android-managed accessibility service that provides UI introspection capabilities. It stores a singleton instance in a companion object for inter-service access, tracks the currently focused app/activity, and manages a coroutine scope for async operations.
 
 **Acceptance Criteria**:
-- [ ] `McpAccessibilityService` extends `android.accessibilityservice.AccessibilityService`
-- [ ] Companion object stores `var instance: McpAccessibilityService? = null`
-- [ ] `onServiceConnected()` stores singleton, configures service info, initializes coroutine scope, logs start
-- [ ] `onAccessibilityEvent()` filters by `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED`, tracks package/activity name
-- [ ] `onInterrupt()` logs interruption
-- [ ] `onDestroy()` clears singleton, cancels coroutine scope, logs shutdown
-- [ ] `onLowMemory()` and `onTrimMemory()` log events
-- [ ] `getRootNode()` returns root node of active window (or null)
-- [ ] `getCurrentPackageName()` returns tracked package name
-- [ ] `getCurrentActivityName()` returns tracked activity name
-- [ ] `isReady()` returns true when service is connected and root node is available
-- [ ] File compiles without errors and passes lint
+- [x] `McpAccessibilityService` extends `android.accessibilityservice.AccessibilityService`
+- [x] Companion object stores `var instance: McpAccessibilityService? = null`
+- [x] `onServiceConnected()` stores singleton, configures service info, initializes coroutine scope, logs start
+- [x] `onAccessibilityEvent()` filters by `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED`, tracks package/activity name
+- [x] `onInterrupt()` logs interruption
+- [x] `onDestroy()` clears singleton, cancels coroutine scope, logs shutdown
+- [x] `onLowMemory()` and `onTrimMemory()` log events
+- [x] `getRootNode()` returns root node of active window (or null)
+- [x] `getCurrentPackageName()` returns tracked package name
+- [x] `getCurrentActivityName()` returns tracked activity name
+- [x] `isReady()` returns true when service is connected and root node is available
+- [x] File compiles without errors and passes lint
 
 **Tests**: `McpAccessibilityService` is an Android system-managed component and cannot be unit tested directly. Its behavior is verified indirectly through `AccessibilityTreeParser` tests (which mock `AccessibilityNodeInfo`) and through integration/E2E tests in later plans.
 
@@ -276,15 +276,15 @@ This plan implements the Android AccessibilityService, accessibility tree parser
 **Description**: Create the `AccessibilityTreeParser` that converts the Android `AccessibilityNodeInfo` tree into a serializable `AccessibilityNodeData` hierarchy. This parser is the bridge between the Android framework's accessibility API and our JSON-based MCP protocol.
 
 **Acceptance Criteria**:
-- [ ] `BoundsData` is a `@Serializable` data class with `left`, `top`, `right`, `bottom` Int fields
-- [ ] `AccessibilityNodeData` is a `@Serializable` data class with all specified fields including `children: List<AccessibilityNodeData>`
-- [ ] `AccessibilityTreeParser` has `@Inject constructor()` for Hilt injection
-- [ ] `parseTree(rootNode)` recursively parses the entire accessibility tree
-- [ ] `parseNode(node, depth, index, parentId)` parses a single node and its children
-- [ ] `isNodeVisible(node)` checks node visibility using `isVisibleToUser`
-- [ ] Node ID generation is stable: uses combination of resource ID, class name, bounds, depth, and index
-- [ ] Nodes are properly recycled after data extraction (children obtained via `getChild(i)` are recycled)
-- [ ] File compiles without errors and passes lint
+- [x] `BoundsData` is a `@Serializable` data class with `left`, `top`, `right`, `bottom` Int fields
+- [x] `AccessibilityNodeData` is a `@Serializable` data class with all specified fields including `children: List<AccessibilityNodeData>`
+- [x] `AccessibilityTreeParser` has `@Inject constructor()` for Hilt injection
+- [x] `parseTree(rootNode)` recursively parses the entire accessibility tree
+- [x] `parseNode(node, depth, index, parentId)` parses a single node and its children
+- [x] `isNodeVisible(node)` checks node visibility using `isVisibleToUser`
+- [x] Node ID generation is stable: uses combination of resource ID, class name, bounds, depth, and index
+- [x] Nodes are properly recycled after data extraction (children obtained via `getChild(i)` are recycled)
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 4.5 (`AccessibilityTreeParserTest.kt`).
 
@@ -519,14 +519,14 @@ Node ID generation must be deterministic so that IDs returned by `find_elements`
 **Description**: Create the `ElementFinder` that searches through parsed `AccessibilityNodeData` trees to find elements matching specific criteria. This operates entirely on parsed data (not raw `AccessibilityNodeInfo`), making it fully testable without Android framework mocks.
 
 **Acceptance Criteria**:
-- [ ] `FindBy` enum has `TEXT`, `CONTENT_DESC`, `RESOURCE_ID`, `CLASS_NAME` entries
-- [ ] `ElementInfo` data class holds key properties of found elements (id, text, contentDescription, resourceId, className, bounds, clickable, longClickable, scrollable, editable, enabled)
-- [ ] `findElements(tree, by, value, exactMatch)` recursively searches the tree and returns matching `ElementInfo` list
-- [ ] `findNodeById(tree, nodeId)` finds a specific `AccessibilityNodeData` by its ID
-- [ ] Exact match compares strings case-sensitively using equality
-- [ ] Contains match is case-insensitive
-- [ ] Returns empty list when no matches found (not an error)
-- [ ] File compiles without errors and passes lint
+- [x] `FindBy` enum has `TEXT`, `CONTENT_DESC`, `RESOURCE_ID`, `CLASS_NAME` entries
+- [x] `ElementInfo` data class holds key properties of found elements (id, text, contentDescription, resourceId, className, bounds, clickable, longClickable, scrollable, editable, enabled)
+- [x] `findElements(tree, by, value, exactMatch)` recursively searches the tree and returns matching `ElementInfo` list
+- [x] `findNodeById(tree, nodeId)` finds a specific `AccessibilityNodeData` by its ID
+- [x] Exact match compares strings case-sensitively using equality
+- [x] Contains match is case-insensitive
+- [x] Returns empty list when no matches found (not an error)
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 4.6 (`ElementFinderTest.kt`).
 
@@ -720,19 +720,19 @@ Node ID generation must be deterministic so that IDs returned by `find_elements`
 **Description**: Create the `ActionExecutor` that performs actions on accessibility nodes and the screen. This includes node-based actions (click, long click, set text, scroll), coordinate-based gestures (tap, long press, double tap, swipe), global actions (back, home, recents), and advanced gestures (pinch, custom multi-path).
 
 **Acceptance Criteria**:
-- [ ] `GesturePoint` data class has `x: Float`, `y: Float`, `time: Long` fields
-- [ ] `ScrollDirection` enum has `UP`, `DOWN`, `LEFT`, `RIGHT` entries
-- [ ] `ScrollAmount` enum has `SMALL`, `MEDIUM`, `LARGE` entries mapping to 25%, 50%, 75% screen percentage
-- [ ] All node actions check service availability and return `Result.failure` if not available
-- [ ] All node actions find the real `AccessibilityNodeInfo` corresponding to a parsed node ID
-- [ ] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` use `performAction()` on the real node
-- [ ] `tap`, `longPress`, `doubleTap`, `swipe`, `scroll` use `dispatchGesture()` with `GestureDescription`
-- [ ] `pressBack`, `pressHome`, `pressRecents`, `openNotifications`, `openQuickSettings` use `performGlobalAction()`
-- [ ] `pinch` and `customGesture` use `dispatchGesture()` with multi-stroke `GestureDescription`
-- [ ] All gesture methods use `suspendCancellableCoroutine` to wrap `GestureResultCallback`
-- [ ] All coordinate-based methods validate coordinates are non-negative
-- [ ] `findAccessibilityNodeByNodeId` walks the real node tree matching the parsed tree structure
-- [ ] File compiles without errors and passes lint
+- [x] `GesturePoint` data class has `x: Float`, `y: Float`, `time: Long` fields
+- [x] `ScrollDirection` enum has `UP`, `DOWN`, `LEFT`, `RIGHT` entries
+- [x] `ScrollAmount` enum has `SMALL`, `MEDIUM`, `LARGE` entries mapping to 25%, 50%, 75% screen percentage
+- [x] All node actions check service availability and return `Result.failure` if not available
+- [x] All node actions find the real `AccessibilityNodeInfo` corresponding to a parsed node ID
+- [x] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` use `performAction()` on the real node
+- [x] `tap`, `longPress`, `doubleTap`, `swipe`, `scroll` use `dispatchGesture()` with `GestureDescription`
+- [x] `pressBack`, `pressHome`, `pressRecents`, `openNotifications`, `openQuickSettings` use `performGlobalAction()`
+- [x] `pinch` and `customGesture` use `dispatchGesture()` with multi-stroke `GestureDescription`
+- [x] All gesture methods use `suspendCancellableCoroutine` to wrap `GestureResultCallback`
+- [x] All coordinate-based methods validate coordinates are non-negative
+- [x] `findAccessibilityNodeByNodeId` walks the real node tree matching the parsed tree structure
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 4.6 (`ActionExecutorTest.kt`).
 
@@ -1472,16 +1472,16 @@ All gesture methods (`tap`, `swipe`, `pinch`, etc.) use Android's `dispatchGestu
 **Description**: Create comprehensive unit tests for the `AccessibilityTreeParser` using JUnit 5 and MockK to mock `AccessibilityNodeInfo`.
 
 **Acceptance Criteria**:
-- [ ] Tests mock `AccessibilityNodeInfo` using MockK
-- [ ] Test single node parsing extracts all properties correctly
-- [ ] Test nested tree parsing (parent with children) produces correct hierarchy
-- [ ] Test node visibility detection
-- [ ] Test node ID generation stability (same input produces same ID)
-- [ ] Test bounds extraction via `getBoundsInScreen`
-- [ ] Test null/empty text handling (text is null, contentDescription is null)
-- [ ] Test deep tree (3+ levels)
-- [ ] Test node with no children
-- [ ] All tests pass via `./gradlew test --tests '*AccessibilityTreeParserTest*'`
+- [x] Tests mock `AccessibilityNodeInfo` using MockK
+- [x] Test single node parsing extracts all properties correctly
+- [x] Test nested tree parsing (parent with children) produces correct hierarchy
+- [x] Test node visibility detection
+- [x] Test node ID generation stability (same input produces same ID)
+- [x] Test bounds extraction via `getBoundsInScreen`
+- [x] Test null/empty text handling (text is null, contentDescription is null)
+- [x] Test deep tree (3+ levels)
+- [x] Test node with no children
+- [x] All tests pass via `./gradlew test --tests '*AccessibilityTreeParserTest*'`
 
 **Tests**: This IS the test task.
 
@@ -1838,17 +1838,17 @@ All gesture methods (`tap`, `swipe`, `pinch`, etc.) use Android's `dispatchGestu
 **Description**: Create comprehensive unit tests for `ElementFinder` (which operates on plain data classes) and `ActionExecutor` (which requires mocking the accessibility service).
 
 **Acceptance Criteria**:
-- [ ] `ElementFinderTest` tests all four `FindBy` criteria with exact and contains matching
-- [ ] `ElementFinderTest` tests `findNodeById` (found and not found)
-- [ ] `ElementFinderTest` tests empty result for no matches
-- [ ] `ElementFinderTest` tests multiple matches
-- [ ] `ActionExecutorTest` mocks `McpAccessibilityService` singleton
-- [ ] `ActionExecutorTest` tests gesture description creation (tap, long press, swipe)
-- [ ] `ActionExecutorTest` tests global action delegation
-- [ ] `ActionExecutorTest` tests service not available returns failure
-- [ ] `ActionExecutorTest` tests node not found returns failure
-- [ ] `ActionExecutorTest` tests coordinate validation (negative values rejected)
-- [ ] All tests pass via `./gradlew test --tests '*ElementFinderTest*'` and `./gradlew test --tests '*ActionExecutorTest*'`
+- [x] `ElementFinderTest` tests all four `FindBy` criteria with exact and contains matching
+- [x] `ElementFinderTest` tests `findNodeById` (found and not found)
+- [x] `ElementFinderTest` tests empty result for no matches
+- [x] `ElementFinderTest` tests multiple matches
+- [x] `ActionExecutorTest` mocks `McpAccessibilityService` singleton
+- [x] `ActionExecutorTest` tests gesture description creation (tap, long press, swipe)
+- [x] `ActionExecutorTest` tests global action delegation
+- [x] `ActionExecutorTest` tests service not available returns failure
+- [x] `ActionExecutorTest` tests node not found returns failure
+- [x] `ActionExecutorTest` tests coordinate validation (negative values rejected)
+- [x] All tests pass via `./gradlew test --tests '*ElementFinderTest*'` and `./gradlew test --tests '*ActionExecutorTest*'`
 
 **Tests**: This IS the test task.
 
@@ -2550,13 +2550,13 @@ For coordinate validation and service unavailability, we can test directly witho
 **Description**: Run all verification commands and create commits.
 
 **Acceptance Criteria**:
-- [ ] `./gradlew test --tests '*AccessibilityTreeParserTest*'` passes
-- [ ] `./gradlew test --tests '*ElementFinderTest*'` passes
-- [ ] `./gradlew test --tests '*ActionExecutorTest*'` passes
-- [ ] `make lint` passes with no errors or warnings
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds without errors or warnings
-- [ ] All 6 commits are created on the `feat/accessibility-service` branch
+- [x] `./gradlew test --tests '*AccessibilityTreeParserTest*'` passes
+- [x] `./gradlew test --tests '*ElementFinderTest*'` passes
+- [x] `./gradlew test --tests '*ActionExecutorTest*'` passes
+- [x] `make lint` passes with no errors or warnings
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds without errors or warnings
+- [x] All 6 commits are created on the `feat/accessibility-service` branch
 
 **Tests**: These are the verification steps.
 
@@ -2754,12 +2754,12 @@ Implementation of Plan 4: AccessibilityService & Core Accessibility Logic from `
 
 ## Test plan
 
-- [ ] `./gradlew test --tests '*AccessibilityTreeParserTest*'` passes
-- [ ] `./gradlew test --tests '*ElementFinderTest*'` passes
-- [ ] `./gradlew test --tests '*ActionExecutorTest*'` passes
-- [ ] `make test-unit` passes (all tests including Plans 2-3)
-- [ ] `make lint` passes
-- [ ] `make build` succeeds
+- [x] `./gradlew test --tests '*AccessibilityTreeParserTest*'` passes
+- [x] `./gradlew test --tests '*ElementFinderTest*'` passes
+- [x] `./gradlew test --tests '*ActionExecutorTest*'` passes
+- [x] `make test-unit` passes (all tests including Plans 2-3)
+- [x] `make lint` passes
+- [x] `make build` succeeds
 
 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
