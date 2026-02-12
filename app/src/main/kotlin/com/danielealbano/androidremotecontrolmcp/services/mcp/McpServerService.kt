@@ -17,6 +17,9 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolRegistry
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,6 +54,8 @@ class McpServerService : Service() {
     @Inject lateinit var protocolHandler: McpProtocolHandler
 
     @Inject lateinit var certificateManager: CertificateManager
+
+    @Inject lateinit var toolRegistry: ToolRegistry
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -135,6 +140,10 @@ class McpServerService : Service() {
                     null
                 }
 
+            // Register all MCP tools before starting the server (Plan 7 tools)
+            registerScreenIntrospectionTools(toolRegistry)
+            registerSystemActionTools(toolRegistry)
+
             // Create and start the Ktor server
             mcpServer =
                 McpServer(
@@ -202,6 +211,14 @@ class McpServerService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /**
+     * Returns the bound [ScreenCaptureService] instance, or null if not yet bound.
+     *
+     * Used by MCP tools (e.g., [CaptureScreenshotHandler]) to access screenshot
+     * capture functionality.
+     */
+    fun getScreenCaptureService(): ScreenCaptureService? = screenCaptureService
 
     private fun bindToScreenCaptureService() {
         val intent = Intent(this, ScreenCaptureService::class.java)
