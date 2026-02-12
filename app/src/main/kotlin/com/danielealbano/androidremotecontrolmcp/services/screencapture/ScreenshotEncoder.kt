@@ -41,6 +41,7 @@ class ScreenshotEncoder
 
             val bitmapWidth = image.width + rowPadding / pixelStride
             val bitmap = Bitmap.createBitmap(bitmapWidth, image.height, Bitmap.Config.ARGB_8888)
+            buffer.rewind()
             bitmap.copyPixelsFromBuffer(buffer)
 
             return if (rowPadding > 0) {
@@ -65,7 +66,8 @@ class ScreenshotEncoder
         ): ByteArray {
             val clampedQuality = quality.coerceIn(MIN_QUALITY, MAX_QUALITY)
             val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, clampedQuality, outputStream)
+            val success = bitmap.compress(Bitmap.CompressFormat.JPEG, clampedQuality, outputStream)
+            check(success) { "Failed to compress bitmap to JPEG" }
             return outputStream.toByteArray()
         }
 
