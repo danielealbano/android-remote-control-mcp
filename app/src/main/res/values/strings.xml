@@ -54,9 +54,11 @@
     <!-- Permissions -->
     <string name="permissions_title">Permissions</string>
     <string name="permission_accessibility">Accessibility Service</string>
+    <string name="permission_screen_capture">Screen Capture</string>
     <string name="permission_notifications">Notifications</string>
     <string name="permission_enable">Enable</string>
     <string name="permission_enabled">Enabled</string>
+    <string name="permission_granted">Granted</string>
     <string name="permission_grant">Grant</string>
 
     <!-- Server Logs -->
