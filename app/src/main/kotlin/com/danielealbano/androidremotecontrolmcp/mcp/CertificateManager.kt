@@ -40,7 +40,7 @@ import javax.security.auth.x500.X500Principal
 class CertificateManager
     @Inject
     constructor(
-        @ApplicationContext private val context: Context,
+        @param:ApplicationContext private val context: Context,
     ) {
         /**
          * Returns the KeyStore for the server's HTTPS mode, loading an existing one
