@@ -57,10 +57,20 @@ object AndroidContainerSetup {
     fun createContainer(): GenericContainer<*> {
         println("[E2E Setup] Creating Docker Android container ($DOCKER_IMAGE)")
 
+        val isCI = System.getenv("CI") == "true"
+        val emulatorArgs = buildString {
+            append("-no-boot-anim -no-audio -no-snapshot")
+            if (isCI) append(" -no-window")
+        }
+        val memoryBytes = if (isCI) 4L * 1024 * 1024 * 1024 else 6L * 1024 * 1024 * 1024
+
         return GenericContainer(DockerImageName.parse(DOCKER_IMAGE))
             .withExposedPorts(ADB_PORT, NOVNC_PORT, MCP_DEFAULT_PORT)
             .withEnv("EMULATOR_DEVICE", "Nexus 5")
-            .withEnv("WEB_VNC", "true")
+            .withEnv("WEB_VNC", if (isCI) "false" else "true")
+            .withEnv("EMULATOR_HEADLESS", if (isCI) "true" else "false")
+            .withEnv("EMULATOR_ADDITIONAL_ARGS", emulatorArgs)
+            .withEnv("USER_BEHAVIOR_ANALYTICS", "false")
             .withEnv("DATAPARTITION_SIZE", "4096")
             .withPrivilegedMode(true)
             .withStartupTimeout(Duration.ofSeconds(300))
@@ -69,8 +79,8 @@ object AndroidContainerSetup {
                     .withStartupTimeout(Duration.ofSeconds(300))
             )
             .withCreateContainerCmdModifier { cmd ->
-                cmd.hostConfig?.withMemory(6L * 1024 * 1024 * 1024) // 6 GB
-                cmd.hostConfig?.withMemorySwap(6L * 1024 * 1024 * 1024)
+                cmd.hostConfig?.withMemory(memoryBytes)
+                cmd.hostConfig?.withMemorySwap(memoryBytes)
             }
     }
 
