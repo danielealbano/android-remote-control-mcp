@@ -102,7 +102,7 @@ clean: ## Clean build artifacts
 # ─────────────────────────────────────────────────────────────────────────────
 
 test-unit: ## Run unit tests
-	$(GRADLE) test
+	$(GRADLE) :app:test
 
 test-integration: ## Run integration tests (requires device/emulator)
 	$(GRADLE) connectedAndroidTest

@@ -7,11 +7,11 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Debug-only [BroadcastReceiver] that accepts test configuration overrides
@@ -33,13 +33,15 @@ import kotlinx.coroutines.launch
  */
 @AndroidEntryPoint
 class E2EConfigReceiver : BroadcastReceiver() {
-
     @Inject
     lateinit var settingsRepository: SettingsRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != ACTION_E2E_CONFIGURE) {
             Log.w(TAG, "Ignoring unexpected action: ${intent.action}")
             return
@@ -57,11 +59,12 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 Log.i(TAG, "Bearer token updated (length=${bearerToken.length})")
             }
             if (!bindingAddress.isNullOrEmpty()) {
-                val address = if (bindingAddress == "0.0.0.0") {
-                    BindingAddress.NETWORK
-                } else {
-                    BindingAddress.LOCALHOST
-                }
+                val address =
+                    if (bindingAddress == "0.0.0.0") {
+                        BindingAddress.NETWORK
+                    } else {
+                        BindingAddress.LOCALHOST
+                    }
                 settingsRepository.updateBindingAddress(address)
                 Log.i(TAG, "Binding address updated to $address")
             }
