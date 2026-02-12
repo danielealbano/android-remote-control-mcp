@@ -22,6 +22,56 @@ ADB_HOST_PORT=5555
 NOVNC_HOST_PORT=6080
 BOOT_TIMEOUT=300
 
+# ── Diagnostics (dumped on failure) ──────────────────────────────────────────
+
+dump_diagnostics() {
+    echo ""
+    echo "========================================"
+    echo "[integration] DIAGNOSTICS — emulator failed to boot"
+    echo "========================================"
+
+    echo ""
+    echo "── Container state ──"
+    docker inspect "$CONTAINER_NAME" --format \
+        'Status={{.State.Status}}  OOMKilled={{.State.OOMKilled}}  ExitCode={{.State.ExitCode}}' 2>&1 || true
+
+    echo ""
+    echo "── Host KVM ──"
+    ls -la /dev/kvm 2>&1 || echo "/dev/kvm not found on host"
+
+    echo ""
+    echo "── Container /dev/kvm ──"
+    docker exec "$CONTAINER_NAME" ls -la /dev/kvm 2>&1 || echo "Cannot exec into container"
+
+    echo ""
+    echo "── Container processes ──"
+    docker exec "$CONTAINER_NAME" ps aux 2>&1 || true
+
+    echo ""
+    echo "── Container memory usage ──"
+    docker stats "$CONTAINER_NAME" --no-stream --format \
+        'MemUsage={{.MemUsage}}  MemPerc={{.MemPerc}}  PIDs={{.PIDs}}' 2>&1 || true
+
+    echo ""
+    echo "── Docker logs (last 60 lines) ──"
+    docker logs --tail 60 "$CONTAINER_NAME" 2>&1 || true
+
+    echo ""
+    echo "── Emulator device log (last 80 lines) ──"
+    docker exec "$CONTAINER_NAME" tail -80 /home/androidusr/logs/device.stdout.log 2>&1 || true
+
+    echo ""
+    echo "── adb devices (inside container) ──"
+    docker exec "$CONTAINER_NAME" adb devices 2>&1 || true
+
+    echo ""
+    echo "========================================"
+    echo "[integration] END DIAGNOSTICS"
+    echo "========================================"
+}
+
+# ── Cleanup ──────────────────────────────────────────────────────────────────
+
 cleanup() {
     echo "[integration] Cleaning up Docker container..."
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
@@ -32,7 +82,8 @@ trap cleanup EXIT
 # Remove any leftover container from a previous run
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-# Build docker run arguments depending on environment
+# ── Build docker run arguments ───────────────────────────────────────────────
+
 DOCKER_ARGS=(
     -d --name "$CONTAINER_NAME"
     --privileged
@@ -64,13 +115,15 @@ else
     )
 fi
 
+# ── Start container and wait for boot ────────────────────────────────────────
+
 echo "[integration] Starting Docker Android container ($DOCKER_IMAGE)..."
 echo "[integration]   adb port: localhost:$ADB_HOST_PORT"
 docker run "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE"
 
 echo "[integration] Waiting for emulator boot (timeout ${BOOT_TIMEOUT}s)..."
 SECONDS=0
-timeout "$BOOT_TIMEOUT" bash -c "
+if ! timeout "$BOOT_TIMEOUT" bash -c "
     while true; do
         adb connect localhost:$ADB_HOST_PORT >/dev/null 2>&1 || true
         BOOT=\$(adb -s localhost:$ADB_HOST_PORT shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
@@ -79,8 +132,14 @@ timeout "$BOOT_TIMEOUT" bash -c "
         fi
         sleep 2
     done
-"
+"; then
+    echo "[integration] ERROR: Emulator did not boot within ${BOOT_TIMEOUT}s"
+    dump_diagnostics
+    exit 1
+fi
 echo "[integration] Emulator booted in ${SECONDS}s."
+
+# ── Run tests ────────────────────────────────────────────────────────────────
 
 echo "[integration] Disabling animations..."
 adb -s "localhost:$ADB_HOST_PORT" shell settings put global window_animation_scale 0
