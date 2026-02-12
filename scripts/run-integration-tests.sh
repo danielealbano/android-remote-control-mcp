@@ -89,6 +89,7 @@ DOCKER_ARGS=(
     --privileged
     -p "$ADB_HOST_PORT":5555
     -e EMULATOR_DEVICE="Nexus 5"
+    -e DATAPARTITION_SIZE=2048
     -e USER_BEHAVIOR_ANALYTICS=false
 )
 
