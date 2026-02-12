@@ -51,7 +51,7 @@ if [ "${CI:-false}" = "true" ]; then
         -e EMULATOR_HEADLESS=true
         -e WEB_VNC=false
         -e "EMULATOR_ADDITIONAL_ARGS=${EMULATOR_EXTRA_ARGS} -no-window"
-        --memory=4g
+        --memory=5g
     )
 else
     echo "[integration] Local mode — VNC enabled on http://localhost:$NOVNC_HOST_PORT"
