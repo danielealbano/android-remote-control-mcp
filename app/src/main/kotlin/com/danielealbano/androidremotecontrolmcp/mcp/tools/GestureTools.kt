@@ -256,11 +256,25 @@ class CustomGestureTool
                     ?: throw McpToolException.InvalidParams(
                         "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number",
                     )
-            return primitive.content.toFloatOrNull()
-                ?: throw McpToolException.InvalidParams(
+            if (primitive.isString) {
+                throw McpToolException.InvalidParams(
                     "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number, " +
+                        "got string: '${primitive.content}'",
+                )
+            }
+            val value =
+                primitive.content.toFloatOrNull()
+                    ?: throw McpToolException.InvalidParams(
+                        "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number, " +
+                            "got: '${primitive.content}'",
+                    )
+            if (!value.isFinite()) {
+                throw McpToolException.InvalidParams(
+                    "Field '$field' in point at path[$pathIndex][$pointIndex] must be a finite number, " +
                         "got: '${primitive.content}'",
                 )
+            }
+            return value
         }
 
         @Suppress("ThrowsCount")
@@ -280,11 +294,26 @@ class CustomGestureTool
                     ?: throw McpToolException.InvalidParams(
                         "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number",
                     )
-            return primitive.content.toDoubleOrNull()?.toLong()
-                ?: throw McpToolException.InvalidParams(
+            if (primitive.isString) {
+                throw McpToolException.InvalidParams(
                     "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number, " +
+                        "got string: '${primitive.content}'",
+                )
+            }
+            val doubleVal =
+                primitive.content.toDoubleOrNull()
+                    ?: throw McpToolException.InvalidParams(
+                        "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number, " +
+                            "got: '${primitive.content}'",
+                    )
+            val longVal = doubleVal.toLong()
+            if (doubleVal != longVal.toDouble()) {
+                throw McpToolException.InvalidParams(
+                    "Field '$field' in point at path[$pathIndex][$pointIndex] must be an integer, " +
                         "got: '${primitive.content}'",
                 )
+            }
+            return longVal
         }
 
         fun register(toolRegistry: ToolRegistry) {
@@ -313,6 +342,14 @@ class CustomGestureTool
                                                 put("description", "Time offset in ms")
                                             }
                                         }
+                                        put(
+                                            "required",
+                                            buildJsonArray {
+                                                add(JsonPrimitive("x"))
+                                                add(JsonPrimitive("y"))
+                                                add(JsonPrimitive("time"))
+                                            },
+                                        )
                                     }
                                 }
                             }
