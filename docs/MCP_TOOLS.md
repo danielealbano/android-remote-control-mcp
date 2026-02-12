@@ -15,8 +15,8 @@ This document provides a comprehensive reference for all MCP tools available in 
 3. [Error Codes](#error-codes)
 4. [Screen Introspection Tools](#1-screen-introspection-tools)
 5. [System Action Tools](#2-system-action-tools)
-6. [Touch Action Tools](#3-touch-action-tools) *(Plan 8)*
-7. [Gesture Tools](#4-gesture-tools) *(Plan 8)*
+6. [Touch Action Tools](#3-touch-action-tools)
+7. [Gesture Tools](#4-gesture-tools)
 8. [Element Action Tools](#5-element-action-tools) *(Plan 9)*
 9. [Text Input Tools](#6-text-input-tools) *(Plan 9)*
 10. [Utility Tools](#7-utility-tools) *(Plan 9)*
@@ -707,17 +707,406 @@ Retrieves device logcat logs filtered by time range, tag, level, or package name
 
 ## 3. Touch Action Tools
 
-*To be documented in Plan 8.*
+Coordinate-based touch interactions. All coordinates are in screen pixels (absolute).
+Coordinate values must be >= 0. Duration values must be between 1 and 60000 milliseconds.
 
-Tools: `tap`, `long_press`, `double_tap`, `swipe`, `scroll`
+### `tap`
+
+Performs a single tap at the specified coordinates.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `x` | number | Yes | - | X coordinate (>= 0) |
+| `y` | number | Yes | - | Y coordinate (>= 0) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "tap",
+    "arguments": {
+      "x": 500,
+      "y": 1000
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Tap executed at (500, 1000)"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Missing or invalid parameters (x, y not numbers or negative)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Tap gesture execution failed
+
+---
+
+### `long_press`
+
+Performs a long press at the specified coordinates.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `x` | number | Yes | - | X coordinate (>= 0) |
+| `y` | number | Yes | - | Y coordinate (>= 0) |
+| `duration` | number | No | 1000 | Press duration in ms (1-60000) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "long_press",
+    "arguments": {
+      "x": 500,
+      "y": 1000,
+      "duration": 2000
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Long press executed at (500, 1000) for 2000ms"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Missing or invalid parameters (x, y not numbers or negative; duration <= 0 or > 60000)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Long press gesture execution failed
+
+---
+
+### `double_tap`
+
+Performs a double tap at the specified coordinates.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `x` | number | Yes | - | X coordinate (>= 0) |
+| `y` | number | Yes | - | Y coordinate (>= 0) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "double_tap",
+    "arguments": {
+      "x": 500,
+      "y": 1000
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Double tap executed at (500, 1000)"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Missing or invalid parameters
+- `-32001`: Accessibility service not enabled
+- `-32003`: Double tap gesture execution failed
+
+---
+
+### `swipe`
+
+Performs a swipe gesture from one point to another.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `x1` | number | Yes | - | Start X coordinate (>= 0) |
+| `y1` | number | Yes | - | Start Y coordinate (>= 0) |
+| `x2` | number | Yes | - | End X coordinate (>= 0) |
+| `y2` | number | Yes | - | End Y coordinate (>= 0) |
+| `duration` | number | No | 300 | Swipe duration in ms (1-60000) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "swipe",
+    "arguments": {
+      "x1": 500,
+      "y1": 1500,
+      "x2": 500,
+      "y2": 500,
+      "duration": 300
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Swipe executed from (500, 1500) to (500, 500) over 300ms"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Missing or invalid parameters (coords not numbers or negative; duration <= 0 or > 60000)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Swipe gesture execution failed
+
+---
+
+### `scroll`
+
+Scrolls the screen in the specified direction. Calculates scroll distance as a percentage of screen dimension based on the amount parameter.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `direction` | string | Yes | - | Direction: "up", "down", "left", "right" |
+| `amount` | string | No | "medium" | Amount: "small" (25%), "medium" (50%), "large" (75%) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "scroll",
+    "arguments": {
+      "direction": "down",
+      "amount": "large"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Scroll down (large) executed"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Invalid direction (not one of up/down/left/right) or invalid amount (not one of small/medium/large)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Scroll gesture execution failed (e.g., no root node available for screen dimensions)
 
 ---
 
 ## 4. Gesture Tools
 
-*To be documented in Plan 8.*
+Advanced multi-touch gesture tools for zoom and custom gesture sequences.
 
-Tools: `pinch`, `custom_gesture`
+### `pinch`
+
+Performs a pinch-to-zoom gesture centered at the specified coordinates.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `center_x` | number | Yes | - | Center X coordinate (>= 0) |
+| `center_y` | number | Yes | - | Center Y coordinate (>= 0) |
+| `scale` | number | Yes | - | Scale factor (> 0; > 1 = zoom in, < 1 = zoom out) |
+| `duration` | number | No | 300 | Gesture duration in ms (1-60000) |
+
+**Example Request** (zoom in):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "pinch",
+    "arguments": {
+      "center_x": 540,
+      "center_y": 1200,
+      "scale": 2.0
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Pinch (zoom in) executed at (540, 1200) with scale 2.0 over 300ms"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Missing or invalid parameters (coords negative; scale <= 0; duration <= 0 or > 60000)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Pinch gesture execution failed
+
+---
+
+### `custom_gesture`
+
+Executes a custom multi-touch gesture defined by path points. Each path represents one finger's movement. Multiple paths enable multi-finger gestures.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `paths` | array | Yes | - | Array of paths (see below) |
+
+Each path is an array of point objects:
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | number | X coordinate (>= 0) |
+| `y` | number | Y coordinate (>= 0) |
+| `time` | number | Time offset in ms from gesture start (>= 0, monotonically increasing) |
+
+**Validation Rules**:
+- `paths` must be a non-empty array
+- Each path must contain at least 2 points
+- All coordinates must be >= 0
+- All time values must be >= 0
+- Time values must be strictly monotonically increasing within each path
+
+**Example Request** (single-finger drag):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "custom_gesture",
+    "arguments": {
+      "paths": [
+        [
+          {"x": 100, "y": 100, "time": 0},
+          {"x": 200, "y": 200, "time": 150},
+          {"x": 300, "y": 300, "time": 300}
+        ]
+      ]
+    }
+  }
+}
+```
+
+**Example Request** (two-finger pinch):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "custom_gesture",
+    "arguments": {
+      "paths": [
+        [
+          {"x": 400, "y": 600, "time": 0},
+          {"x": 300, "y": 600, "time": 300}
+        ],
+        [
+          {"x": 600, "y": 600, "time": 0},
+          {"x": 700, "y": 600, "time": 300}
+        ]
+      ]
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Custom gesture executed with 2 path(s), total 4 point(s)"
+      }
+    ]
+  }
+}
+```
+
+**Error Codes**:
+- `-32602`: Invalid parameters (empty paths, path with < 2 points, negative coords/times, non-monotonic times, missing fields)
+- `-32001`: Accessibility service not enabled
+- `-32003`: Custom gesture execution failed
 
 ---
 
