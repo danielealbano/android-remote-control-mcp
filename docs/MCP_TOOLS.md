@@ -17,9 +17,9 @@ This document provides a comprehensive reference for all MCP tools available in 
 5. [System Action Tools](#2-system-action-tools)
 6. [Touch Action Tools](#3-touch-action-tools)
 7. [Gesture Tools](#4-gesture-tools)
-8. [Element Action Tools](#5-element-action-tools) *(Plan 9)*
-9. [Text Input Tools](#6-text-input-tools) *(Plan 9)*
-10. [Utility Tools](#7-utility-tools) *(Plan 9)*
+8. [Element Action Tools](#5-element-action-tools)
+9. [Text Input Tools](#6-text-input-tools)
+10. [Utility Tools](#7-utility-tools)
 
 ---
 
@@ -1112,22 +1112,511 @@ Each path is an array of point objects:
 
 ## 5. Element Action Tools
 
-*To be documented in Plan 9.*
+### `find_elements`
 
-Tools: `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element`
+Find UI elements matching the specified criteria in the accessibility tree.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "by": {
+      "type": "string",
+      "enum": ["text", "content_desc", "resource_id", "class_name"],
+      "description": "Search criteria type"
+    },
+    "value": {
+      "type": "string",
+      "description": "Search value"
+    },
+    "exact_match": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, match exactly. If false, match contains (case-insensitive)"
+    }
+  },
+  "required": ["by", "value"]
+}
+```
+
+**Output**: JSON string containing an `elements` array (may be empty):
+```json
+{
+  "elements": [
+    {
+      "id": "node_abc123",
+      "text": "Submit",
+      "contentDescription": null,
+      "resourceId": "com.example:id/submit_btn",
+      "className": "android.widget.Button",
+      "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
+      "clickable": true,
+      "longClickable": false,
+      "scrollable": false,
+      "editable": false,
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "find_elements", "arguments": { "by": "text", "value": "Submit" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Invalid `by` value, empty `value`, or missing required parameters
+- `-32001`: Accessibility service not enabled
+
+---
+
+### `click_element`
+
+Click the specified accessibility node by element ID.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+  },
+  "required": ["element_id"]
+}
+```
+
+**Output**: `"Click performed on element '<element_id>'"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "click_element", "arguments": { "element_id": "node_abc123" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing or empty `element_id`
+- `-32001`: Accessibility service not enabled
+- `-32002`: Element not found in accessibility tree
+- `-32003`: Element is not clickable or click action failed
+
+---
+
+### `long_click_element`
+
+Long-click the specified accessibility node by element ID.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+  },
+  "required": ["element_id"]
+}
+```
+
+**Output**: `"Long-click performed on element '<element_id>'"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "long_click_element", "arguments": { "element_id": "node_abc123" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing or empty `element_id`
+- `-32001`: Accessibility service not enabled
+- `-32002`: Element not found
+- `-32003`: Element is not long-clickable or action failed
+
+---
+
+### `set_text`
+
+Set text on an editable accessibility node. Empty string clears the field.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Node ID from find_elements" },
+    "text": { "type": "string", "description": "Text to set (empty string to clear)" }
+  },
+  "required": ["element_id", "text"]
+}
+```
+
+**Output**: `"Text set on element '<element_id>'"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "set_text", "arguments": { "element_id": "node_abc123", "text": "Hello World" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing `element_id` or `text` parameter
+- `-32001`: Accessibility service not enabled
+- `-32002`: Element not found
+- `-32003`: Element is not editable or set text action failed
+
+---
+
+### `scroll_to_element`
+
+Scroll to make the specified element visible by scrolling its nearest scrollable ancestor.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+  },
+  "required": ["element_id"]
+}
+```
+
+**Output**: `"Scrolled to element '<element_id>' (N scroll(s))"` or `"Element '<element_id>' is already visible"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "scroll_to_element", "arguments": { "element_id": "node_abc123" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing or empty `element_id`
+- `-32001`: Accessibility service not enabled
+- `-32002`: Element not found
+- `-32003`: No scrollable container found, scroll failed, or element not visible after max attempts (5)
 
 ---
 
 ## 6. Text Input Tools
 
-*To be documented in Plan 9.*
+### `input_text`
 
-Tools: `input_text`, `clear_text`, `press_key`
+Type text into the focused input field or a specified element. When `element_id` is provided, the tool clicks the element to focus it before setting text.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "text": { "type": "string", "description": "Text to type" },
+    "element_id": { "type": "string", "description": "Optional: target element ID to focus and type into" }
+  },
+  "required": ["text"]
+}
+```
+
+**Output**: `"Text input completed (N characters)"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "input_text", "arguments": { "text": "Hello World" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing `text` parameter
+- `-32001`: Accessibility service not enabled
+- `-32002`: No focused editable element found (when `element_id` not provided) or element not found
+- `-32003`: Text input action failed
+
+---
+
+### `clear_text`
+
+Clear text from the focused input field or a specified element.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Optional: target element ID to clear" }
+  },
+  "required": []
+}
+```
+
+**Output**: `"Text cleared successfully"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "clear_text", "arguments": {} }
+  }'
+```
+
+**Error Codes**:
+- `-32001`: Accessibility service not enabled
+- `-32002`: No focused editable element found (when `element_id` not provided)
+- `-32003`: Clear text action failed
+
+---
+
+### `press_key`
+
+Press a specific key. Supported keys: ENTER, BACK, DEL, HOME, TAB, SPACE.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "enum": ["ENTER", "BACK", "DEL", "HOME", "TAB", "SPACE"],
+      "description": "Key to press"
+    }
+  },
+  "required": ["key"]
+}
+```
+
+**Output**: `"Key '<KEY>' pressed successfully"`
+
+**Key Behavior**:
+- **BACK**, **HOME**: Delegate to global accessibility actions
+- **ENTER**: Uses `ACTION_IME_ENTER` on API 30+, fallback to newline append
+- **DEL**: Removes last character from focused field (no-op if empty)
+- **TAB**, **SPACE**: Appends the character to focused field text
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "press_key", "arguments": { "key": "ENTER" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing `key` parameter or invalid key name
+- `-32001`: Accessibility service not enabled
+- `-32002`: No focused element found (for ENTER, DEL, TAB, SPACE)
+- `-32003`: Key action failed
 
 ---
 
 ## 7. Utility Tools
 
-*To be documented in Plan 9.*
+### `get_clipboard`
 
-Tools: `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle`
+Get the current clipboard text content. Accessibility services are exempt from Android 10+ background clipboard restrictions.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {},
+  "required": []
+}
+```
+
+**Output**: JSON string:
+```json
+{ "text": "clipboard content" }
+```
+Returns `{ "text": null }` when clipboard is empty.
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "get_clipboard", "arguments": {} }
+  }'
+```
+
+**Error Codes**:
+- `-32001`: Accessibility service not enabled
+- `-32003`: Clipboard access failed
+
+---
+
+### `set_clipboard`
+
+Set the clipboard content to the specified text.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "text": { "type": "string", "description": "Text to set in clipboard" }
+  },
+  "required": ["text"]
+}
+```
+
+**Output**: `"Clipboard set successfully (N characters)"`
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "set_clipboard", "arguments": { "text": "Hello from MCP" } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Missing `text` parameter
+- `-32001`: Accessibility service not enabled
+- `-32003`: Clipboard set failed
+
+---
+
+### `wait_for_element`
+
+Wait until an element matching the specified criteria appears in the accessibility tree, polling every 500ms.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "by": {
+      "type": "string",
+      "enum": ["text", "content_desc", "resource_id", "class_name"],
+      "description": "Search criteria type"
+    },
+    "value": { "type": "string", "description": "Search value" },
+    "timeout": {
+      "type": "number",
+      "description": "Timeout in milliseconds (1-30000)",
+      "default": 5000
+    }
+  },
+  "required": ["by", "value"]
+}
+```
+
+**Output** (on success): JSON string:
+```json
+{
+  "found": true,
+  "elapsedMs": 1200,
+  "attempts": 3,
+  "element": {
+    "id": "node_abc123",
+    "text": "Result",
+    "contentDescription": null,
+    "resourceId": null,
+    "className": "android.widget.TextView",
+    "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
+    "clickable": false,
+    "enabled": true
+  }
+}
+```
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "wait_for_element", "arguments": { "by": "text", "value": "10", "timeout": 5000 } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Invalid `by` value, empty `value`, missing required parameters, or timeout out of range (1-30000)
+- `-32001`: Accessibility service not enabled
+- `-32004`: Element not found within timeout
+
+---
+
+### `wait_for_idle`
+
+Wait for the UI to become idle by detecting when the accessibility tree structure stops changing. Considers UI idle when two consecutive snapshots (500ms apart) produce the same structural hash.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "timeout": {
+      "type": "number",
+      "description": "Timeout in milliseconds (1-30000)",
+      "default": 3000
+    }
+  },
+  "required": []
+}
+```
+
+**Output** (on success): JSON string:
+```json
+{
+  "message": "UI is idle",
+  "elapsedMs": 1500
+}
+```
+
+**Example**:
+```bash
+curl -X POST https://localhost:8080/mcp/v1/tools/call \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "wait_for_idle", "arguments": { "timeout": 3000 } }
+  }'
+```
+
+**Error Codes**:
+- `-32602`: Timeout out of range (1-30000)
+- `-32001`: Accessibility service not enabled
+- `-32004`: UI did not become idle within timeout
