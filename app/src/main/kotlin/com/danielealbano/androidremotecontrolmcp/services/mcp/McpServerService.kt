@@ -1,9 +1,249 @@
 package com.danielealbano.androidremotecontrolmcp.services.mcp
 
+import android.app.Notification
+import android.app.PendingIntent
 import android.app.Service
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.os.IBinder
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.danielealbano.androidremotecontrolmcp.McpApplication
+import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
+import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
+import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
+import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+/**
+ * Foreground service that runs the MCP server (HTTP by default, optional HTTPS).
+ *
+ * Lifecycle:
+ * 1. Started via intent from MainActivity (start/stop button)
+ * 2. Calls startForeground() with persistent notification
+ * 3. Reads configuration from SettingsRepository
+ * 4. Binds to ScreenCaptureService for screenshot support
+ * 5. Creates and starts McpServer (Ktor HTTP, optionally HTTPS)
+ * 6. Updates ServerStatus via companion-level StateFlow (collected by MainViewModel)
+ * 7. On stop: gracefully shuts down server, unbinds services, clears singleton
+ */
+@AndroidEntryPoint
 class McpServerService : Service() {
+    @Inject lateinit var settingsRepository: SettingsRepository
+
+    @Inject lateinit var protocolHandler: McpProtocolHandler
+
+    @Inject lateinit var certificateManager: CertificateManager
+
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var mcpServer: McpServer? = null
+    private var screenCaptureService: ScreenCaptureService? = null
+    private var isBoundToScreenCapture = false
+
+    private val screenCaptureConnection =
+        object : ServiceConnection {
+            override fun onServiceConnected(
+                name: ComponentName?,
+                binder: IBinder?,
+            ) {
+                val localBinder = binder as? ScreenCaptureService.LocalBinder
+                screenCaptureService = localBinder?.getService()
+                Log.i(TAG, "Bound to ScreenCaptureService")
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                screenCaptureService = null
+                Log.i(TAG, "Disconnected from ScreenCaptureService")
+            }
+        }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+        Log.i(TAG, "McpServerService created")
+    }
+
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
+        startForeground(NOTIFICATION_ID, createNotification())
+
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_START, null -> {
+                coroutineScope.launch {
+                    startServer()
+                }
+            }
+        }
+
+        return START_STICKY
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun startServer() {
+        try {
+            updateStatus(ServerStatus.Starting)
+
+            val config = settingsRepository.serverConfig.first()
+            Log.i(
+                TAG,
+                "Starting MCP server with config: port=${config.port}, binding=${config.bindingAddress.address}",
+            )
+
+            // Bind to ScreenCaptureService
+            bindToScreenCaptureService()
+
+            // Only get/create SSL keystore when HTTPS is enabled
+            val keyStore =
+                if (config.httpsEnabled) {
+                    certificateManager.getOrCreateKeyStore()
+                } else {
+                    null
+                }
+            val keyStorePassword =
+                if (config.httpsEnabled) {
+                    certificateManager.getKeyStorePassword()
+                } else {
+                    null
+                }
+
+            // Create and start the Ktor server
+            mcpServer =
+                McpServer(
+                    config = config,
+                    keyStore = keyStore,
+                    keyStorePassword = keyStorePassword,
+                    protocolHandler = protocolHandler,
+                )
+            mcpServer?.start()
+
+            updateStatus(
+                ServerStatus.Running(
+                    port = config.port,
+                    bindingAddress = config.bindingAddress.address,
+                ),
+            )
+
+            Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start MCP server", e)
+            updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
+        }
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "McpServerService destroying")
+        updateStatus(ServerStatus.Stopping)
+
+        // Stop the Ktor server gracefully
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            mcpServer?.stop(
+                gracePeriodMillis = SHUTDOWN_GRACE_PERIOD_MS,
+                timeoutMillis = SHUTDOWN_TIMEOUT_MS,
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during server shutdown", e)
+        }
+        mcpServer = null
+
+        // Unbind from ScreenCaptureService
+        if (isBoundToScreenCapture) {
+            @Suppress("TooGenericExceptionCaught")
+            try {
+                unbindService(screenCaptureConnection)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unbinding from ScreenCaptureService", e)
+            }
+            isBoundToScreenCapture = false
+        }
+        screenCaptureService = null
+
+        // Cancel coroutine scope
+        coroutineScope.cancel()
+
+        // Clear singleton
+        instance = null
+
+        updateStatus(ServerStatus.Stopped)
+        Log.i(TAG, "McpServerService destroyed")
+
+        super.onDestroy()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun bindToScreenCaptureService() {
+        val intent = Intent(this, ScreenCaptureService::class.java)
+        // MUST start as foreground service first, THEN bind.
+        // bindService() alone does NOT trigger onStartCommand(), so startForeground()
+        // would never be called, violating the 5-second foreground service requirement.
+        startForegroundService(intent)
+        isBoundToScreenCapture = bindService(intent, screenCaptureConnection, Context.BIND_AUTO_CREATE)
+        Log.d(TAG, "Started and binding to ScreenCaptureService: $isBoundToScreenCapture")
+    }
+
+    private fun updateStatus(status: ServerStatus) {
+        _serverStatus.value = status
+    }
+
+    private fun createNotification(): Notification {
+        val pendingIntent =
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+
+        return NotificationCompat.Builder(this, McpApplication.MCP_SERVER_CHANNEL_ID)
+            .setContentTitle(getString(R.string.notification_mcp_server_title))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build()
+    }
+
+    companion object {
+        private const val TAG = "MCP:ServerService"
+        const val ACTION_START = "com.danielealbano.androidremotecontrolmcp.ACTION_START_MCP_SERVER"
+        const val ACTION_STOP = "com.danielealbano.androidremotecontrolmcp.ACTION_STOP_MCP_SERVER"
+        const val NOTIFICATION_ID = 1001
+        const val SHUTDOWN_GRACE_PERIOD_MS = 1000L
+        const val SHUTDOWN_TIMEOUT_MS = 5000L
+
+        /**
+         * Shared server status flow. Collected by MainViewModel to update the UI.
+         * Uses a companion-level StateFlow so it survives service rebinding and is
+         * accessible without requiring a bound service reference.
+         */
+        private val _serverStatus = MutableStateFlow<ServerStatus>(ServerStatus.Stopped)
+        val serverStatus: StateFlow<ServerStatus> = _serverStatus.asStateFlow()
+
+        @Volatile
+        var instance: McpServerService? = null
+            private set
+    }
 }
