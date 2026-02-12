@@ -73,6 +73,18 @@ When asked to make a plan:
 - When implementing the plan you MUST follow it to the letter unless something is unclear or incorrect, in which case you MUST ask to the user how to proceed!
 - You MUST NEVER digress or improvise when implementing a plan, you MUST follow it to the letter
 
+When implementing a plan (git workflow):
+- You MUST ALWAYS create a feature branch from the latest `main` before starting implementation:
+  1. `git checkout main && git pull origin main`
+  2. `git checkout -b feat/<plan-description>` (following the naming convention in TOOLS.md)
+- You MUST commit changes in an **ordered, logical, and sensible** sequence as you implement the plan. Each commit MUST be a coherent, self-contained unit of work (see TOOLS.md commit conventions).
+- You MUST push commits to the remote regularly (at minimum after each user story or major task).
+- When all plan work is complete and all quality gates pass, you MUST create a Pull Request:
+  1. Push any remaining unpushed commits
+  2. Create the PR via `gh pr create` following the PR convention in TOOLS.md
+  3. Request Copilot as a reviewer: `gh pr edit <PR#> --add-reviewer copilot`
+- You MUST report the PR URL to the user when done
+
 ---
 
 ## 2) Safety & Permissions (Terminal + Code Integrity + Android)
