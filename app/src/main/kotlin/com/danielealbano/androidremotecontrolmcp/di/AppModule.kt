@@ -12,7 +12,15 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+/** Qualifier for the IO [CoroutineDispatcher]. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class IoDispatcher
 
 /** Extension property for creating the Preferences DataStore on [Context]. */
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -30,6 +38,13 @@ object AppModule {
     fun provideDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.settingsDataStore
+
+    /**
+     * Provides [Dispatchers.IO] for background work.
+     */
+    @Provides
+    @IoDispatcher
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
 }
 
 @Module

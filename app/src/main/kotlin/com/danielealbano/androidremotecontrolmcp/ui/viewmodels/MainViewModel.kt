@@ -14,10 +14,11 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,7 @@ class MainViewModel
     @Inject
     constructor(
         private val settingsRepository: SettingsRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _serverConfig = MutableStateFlow(ServerConfig())
         val serverConfig: StateFlow<ServerConfig> = _serverConfig.asStateFlow()
@@ -55,7 +57,7 @@ class MainViewModel
         val serverLogs: StateFlow<List<ServerLogEntry>> = _serverLogs.asStateFlow()
 
         init {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.serverConfig.collect { config ->
                     _serverConfig.value = config
                     _portInput.value = config.port.toString()
@@ -85,37 +87,37 @@ class MainViewModel
             }
 
             _portError.value = null
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updatePort(port)
             }
         }
 
         fun updateBindingAddress(address: BindingAddress) {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateBindingAddress(address)
             }
         }
 
         fun generateNewBearerToken() {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.generateNewBearerToken()
             }
         }
 
         fun updateAutoStartOnBoot(enabled: Boolean) {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateAutoStartOnBoot(enabled)
             }
         }
 
         fun updateHttpsEnabled(enabled: Boolean) {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateHttpsEnabled(enabled)
             }
         }
 
         fun updateCertificateSource(source: CertificateSource) {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateCertificateSource(source)
             }
         }
@@ -134,7 +136,7 @@ class MainViewModel
             }
 
             _hostnameError.value = null
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateCertificateHostname(hostname)
             }
         }

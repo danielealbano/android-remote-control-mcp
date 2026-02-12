@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -25,7 +26,7 @@ import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher: TestDispatcher = StandardTestDispatcher()
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var configFlow: MutableStateFlow<ServerConfig>
     private lateinit var viewModel: MainViewModel
@@ -50,7 +51,7 @@ class MainViewModelTest {
         settingsRepository = mockk(relaxed = true)
         every { settingsRepository.serverConfig } returns configFlow
 
-        viewModel = MainViewModel(settingsRepository)
+        viewModel = MainViewModel(settingsRepository, testDispatcher)
     }
 
     @AfterEach
