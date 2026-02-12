@@ -255,4 +255,4 @@ version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
 
 all: clean build lint test-unit ## Run full workflow (clean, build, lint, test-unit)
 
-ci: check-deps lint test-unit build-release ## Run CI workflow
+ci: check-deps lint test-unit coverage build-release ## Run CI workflow
