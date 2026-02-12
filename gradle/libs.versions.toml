@@ -44,6 +44,9 @@ mockk = "1.13.14"                       # verify latest at implementation time
 turbine = "1.2.0"                       # verify latest at implementation time
 testcontainers = "1.20.4"              # verify latest at implementation time
 
+# HTTP client (E2E tests)
+okhttp = "5.3.2"                        # latest stable (OkHttp 5.x)
+
 # AndroidX Test
 test-core = "1.6.1"                     # verify latest at implementation time
 test-runner = "1.6.2"                   # verify latest at implementation time
@@ -122,6 +125,9 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+
+# OkHttp (E2E tests)
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 # AndroidX Test
 test-core = { group = "androidx.test", name = "core", version.ref = "test-core" }
