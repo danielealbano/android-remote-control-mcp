@@ -82,42 +82,42 @@ fun parseTree(rootNode: AccessibilityNodeInfo): AccessibilityNodeData
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `FindElementsTool` correctly finds elements by text, content_desc, resource_id, class_name with exact and contains matching
-- [ ] `FindElementsTool` returns empty array (not an error) when no matches found
-- [ ] `FindElementsTool` validates `by` parameter against allowed values and returns -32602 for invalid values
-- [ ] `FindElementsTool` validates `value` is non-empty and returns -32602 for empty value
-- [ ] `ClickElementTool` clicks a node by element_id and returns confirmation
-- [ ] `ClickElementTool` returns -32002 for stale/invalid element_id
-- [ ] `ClickElementTool` returns -32003 if element is not clickable or action fails
-- [ ] `LongClickElementTool` long-clicks a node by element_id
-- [ ] `LongClickElementTool` returns -32002 for not found, -32003 for action failure
-- [ ] `SetTextTool` sets text on an editable node by element_id
-- [ ] `SetTextTool` allows empty text (to clear field)
-- [ ] `SetTextTool` returns -32002 for not found, -32003 for non-editable
-- [ ] `ScrollToElementTool` scrolls parent scrollable container to make element visible
-- [ ] `ScrollToElementTool` returns -32002 for not found, -32003 for scroll failure
-- [ ] `InputTextTool` types text into a specified element or currently focused field
-- [ ] `InputTextTool` validates text is present and returns -32602 if missing
-- [ ] `ClearTextTool` clears text from a specified element or currently focused field
-- [ ] `PressKeyTool` dispatches key events for ENTER, BACK, DEL, HOME, TAB, SPACE
-- [ ] `PressKeyTool` validates key name against allowed values and returns -32602 for invalid key
-- [ ] `GetClipboardTool` reads clipboard text via ClipboardManager from accessibility service context
-- [ ] `SetClipboardTool` sets clipboard text via ClipboardManager
-- [ ] `SetClipboardTool` validates text parameter is present
-- [ ] `WaitForElementTool` polls the accessibility tree every 500ms until element appears or timeout
-- [ ] `WaitForElementTool` returns element details on success, -32004 on timeout
-- [ ] `WaitForElementTool` validates timeout is > 0 and <= 30000
-- [ ] `WaitForIdleTool` monitors accessibility events to detect UI idle state
-- [ ] `WaitForIdleTool` returns confirmation on idle, -32004 on timeout
-- [ ] `WaitForIdleTool` validates timeout is > 0 and <= 30000
-- [ ] All 12 tools are registered in `ToolRegistry` with correct names, descriptions, and input schemas
-- [ ] All tools parse the accessibility tree fresh on each invocation (nodes can be stale)
-- [ ] All tools handle JSON type coercion for parameters (e.g., timeout as int or long)
-- [ ] `docs/MCP_TOOLS.md` documents all 29 MCP tools (17 from Plans 7-8 + 12 from this plan)
-- [ ] Unit tests exist and pass for all 12 tools
-- [ ] `make lint` passes with no errors or warnings
-- [ ] `make test-unit` passes
-- [ ] `make build` succeeds with no errors or warnings
+- [x] `FindElementsTool` correctly finds elements by text, content_desc, resource_id, class_name with exact and contains matching
+- [x] `FindElementsTool` returns empty array (not an error) when no matches found
+- [x] `FindElementsTool` validates `by` parameter against allowed values and returns -32602 for invalid values
+- [x] `FindElementsTool` validates `value` is non-empty and returns -32602 for empty value
+- [x] `ClickElementTool` clicks a node by element_id and returns confirmation
+- [x] `ClickElementTool` returns -32002 for stale/invalid element_id
+- [x] `ClickElementTool` returns -32003 if element is not clickable or action fails
+- [x] `LongClickElementTool` long-clicks a node by element_id
+- [x] `LongClickElementTool` returns -32002 for not found, -32003 for action failure
+- [x] `SetTextTool` sets text on an editable node by element_id
+- [x] `SetTextTool` allows empty text (to clear field)
+- [x] `SetTextTool` returns -32002 for not found, -32003 for non-editable
+- [x] `ScrollToElementTool` scrolls parent scrollable container to make element visible
+- [x] `ScrollToElementTool` returns -32002 for not found, -32003 for scroll failure
+- [x] `InputTextTool` types text into a specified element or currently focused field
+- [x] `InputTextTool` validates text is present and returns -32602 if missing
+- [x] `ClearTextTool` clears text from a specified element or currently focused field
+- [x] `PressKeyTool` dispatches key events for ENTER, BACK, DEL, HOME, TAB, SPACE
+- [x] `PressKeyTool` validates key name against allowed values and returns -32602 for invalid key
+- [x] `GetClipboardTool` reads clipboard text via ClipboardManager from accessibility service context
+- [x] `SetClipboardTool` sets clipboard text via ClipboardManager
+- [x] `SetClipboardTool` validates text parameter is present
+- [x] `WaitForElementTool` polls the accessibility tree every 500ms until element appears or timeout
+- [x] `WaitForElementTool` returns element details on success, -32004 on timeout
+- [x] `WaitForElementTool` validates timeout is > 0 and <= 30000
+- [x] `WaitForIdleTool` monitors accessibility events to detect UI idle state
+- [x] `WaitForIdleTool` returns confirmation on idle, -32004 on timeout
+- [x] `WaitForIdleTool` validates timeout is > 0 and <= 30000
+- [x] All 12 tools are registered in `ToolRegistry` with correct names, descriptions, and input schemas
+- [x] All tools parse the accessibility tree fresh on each invocation (nodes can be stale)
+- [x] All tools handle JSON type coercion for parameters (e.g., timeout as int or long)
+- [x] `docs/MCP_TOOLS.md` documents all 29 MCP tools (17 from Plans 7-8 + 12 from this plan)
+- [x] Unit tests exist and pass for all 12 tools
+- [x] `make lint` passes with no errors or warnings
+- [x] `make test-unit` passes
+- [x] `make build` succeeds with no errors or warnings
 
 ### Commit Strategy
 
@@ -136,21 +136,21 @@ fun parseTree(rootNode: AccessibilityNodeInfo): AccessibilityNodeData
 **Description**: Create `ElementActionTools.kt` containing five `ToolHandler` implementations for element-based interactions: `find_elements`, `click_element`, `long_click_element`, `set_text`, and `scroll_to_element`. Each tool gets a fresh accessibility tree on every invocation to avoid stale node references.
 
 **Acceptance Criteria**:
-- [ ] `FindElementsTool` implements `ToolHandler` and is Hilt-injectable
-- [ ] `FindElementsTool` validates `by` against allowed values: text, content_desc, resource_id, class_name
-- [ ] `FindElementsTool` validates `value` is non-empty
-- [ ] `FindElementsTool` maps `by` string to `FindBy` enum correctly
-- [ ] `FindElementsTool` returns JSON array of `ElementInfo` objects (may be empty)
-- [ ] `ClickElementTool` validates `element_id` is non-empty
-- [ ] `ClickElementTool` parses tree, delegates to `ActionExecutor.clickNode()`
-- [ ] `ClickElementTool` maps `NoSuchElementException` to error -32002
-- [ ] `ClickElementTool` maps `IllegalStateException` (not clickable) to error -32003
-- [ ] `LongClickElementTool` follows same patterns as `ClickElementTool`
-- [ ] `SetTextTool` validates `element_id` is non-empty, allows empty `text`
-- [ ] `SetTextTool` delegates to `ActionExecutor.setTextOnNode()`
-- [ ] `ScrollToElementTool` finds element, identifies parent scrollable container, scrolls, retries find
-- [ ] All tools check `McpAccessibilityService.instance` and return -32001 if null
-- [ ] File compiles without errors and passes lint
+- [x] `FindElementsTool` implements `ToolHandler` and is Hilt-injectable
+- [x] `FindElementsTool` validates `by` against allowed values: text, content_desc, resource_id, class_name
+- [x] `FindElementsTool` validates `value` is non-empty
+- [x] `FindElementsTool` maps `by` string to `FindBy` enum correctly
+- [x] `FindElementsTool` returns JSON array of `ElementInfo` objects (may be empty)
+- [x] `ClickElementTool` validates `element_id` is non-empty
+- [x] `ClickElementTool` parses tree, delegates to `ActionExecutor.clickNode()`
+- [x] `ClickElementTool` maps `NoSuchElementException` to error -32002
+- [x] `ClickElementTool` maps `IllegalStateException` (not clickable) to error -32003
+- [x] `LongClickElementTool` follows same patterns as `ClickElementTool`
+- [x] `SetTextTool` validates `element_id` is non-empty, allows empty `text`
+- [x] `SetTextTool` delegates to `ActionExecutor.setTextOnNode()`
+- [x] `ScrollToElementTool` finds element, identifies parent scrollable container, scrolls, retries find
+- [x] All tools check `McpAccessibilityService.instance` and return -32001 if null
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 9.4 (`ElementActionToolsTest.kt`).
 
@@ -581,19 +581,19 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **Description**: Create `TextInputTools.kt` containing three `ToolHandler` implementations: `input_text`, `clear_text`, and `press_key`. These tools handle keyboard input and text manipulation.
 
 **Acceptance Criteria**:
-- [ ] `InputTextTool` implements `ToolHandler` and is Hilt-injectable
-- [ ] `InputTextTool` validates `text` parameter is present
-- [ ] `InputTextTool` with `element_id` targets that specific element (click to focus, then set text)
-- [ ] `InputTextTool` without `element_id` finds the currently focused editable node
-- [ ] `ClearTextTool` with `element_id` clears that element's text
-- [ ] `ClearTextTool` without `element_id` finds the currently focused editable node and clears it
-- [ ] `PressKeyTool` validates `key` against allowed values: ENTER, BACK, DEL, HOME, TAB, SPACE
-- [ ] `PressKeyTool` maps BACK and HOME to global actions via `ActionExecutor`
-- [ ] `PressKeyTool` maps ENTER to `AccessibilityNodeInfo.ACTION_IME_ENTER` (API 30+) or fallback
-- [ ] `PressKeyTool` maps DEL to text manipulation (get current text, remove last character, set text)
-- [ ] `PressKeyTool` maps TAB and SPACE to `ACTION_SET_TEXT` with appended character
-- [ ] All tools check accessibility service availability
-- [ ] File compiles without errors and passes lint
+- [x] `InputTextTool` implements `ToolHandler` and is Hilt-injectable
+- [x] `InputTextTool` validates `text` parameter is present
+- [x] `InputTextTool` with `element_id` targets that specific element (click to focus, then set text)
+- [x] `InputTextTool` without `element_id` finds the currently focused editable node
+- [x] `ClearTextTool` with `element_id` clears that element's text
+- [x] `ClearTextTool` without `element_id` finds the currently focused editable node and clears it
+- [x] `PressKeyTool` validates `key` against allowed values: ENTER, BACK, DEL, HOME, TAB, SPACE
+- [x] `PressKeyTool` maps BACK and HOME to global actions via `ActionExecutor`
+- [x] `PressKeyTool` maps ENTER to `AccessibilityNodeInfo.ACTION_IME_ENTER` (API 30+) or fallback
+- [x] `PressKeyTool` maps DEL to text manipulation (get current text, remove last character, set text)
+- [x] `PressKeyTool` maps TAB and SPACE to `ACTION_SET_TEXT` with appended character
+- [x] All tools check accessibility service availability
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 9.4 (`TextInputToolsTest.kt`).
 
@@ -935,22 +935,22 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 **Description**: Create `UtilityTools.kt` containing four `ToolHandler` implementations: `get_clipboard`, `set_clipboard`, `wait_for_element`, and `wait_for_idle`. These are helper tools for clipboard access and UI synchronization.
 
 **Acceptance Criteria**:
-- [ ] `GetClipboardTool` implements `ToolHandler` and is Hilt-injectable
-- [ ] `GetClipboardTool` reads clipboard text via `ClipboardManager` from the accessibility service context
-- [ ] `GetClipboardTool` returns `{ "text": "..." }` or `{ "text": null }` if clipboard is empty
-- [ ] `GetClipboardTool` returns -32603 if clipboard access fails
-- [ ] `SetClipboardTool` validates `text` parameter is present
-- [ ] `SetClipboardTool` sets clipboard via `ClipboardManager.setPrimaryClip()`
-- [ ] `WaitForElementTool` validates `by` and `value` parameters
-- [ ] `WaitForElementTool` validates timeout > 0 and <= 30000, defaults to 5000
-- [ ] `WaitForElementTool` polls every 500ms (parse tree, search for element)
-- [ ] `WaitForElementTool` returns element details when found
-- [ ] `WaitForElementTool` returns -32004 when timeout is reached
-- [ ] `WaitForIdleTool` validates timeout > 0 and <= 30000, defaults to 3000
-- [ ] `WaitForIdleTool` detects idle by monitoring whether the accessibility tree changes between polls
-- [ ] `WaitForIdleTool` returns confirmation when idle, -32004 on timeout
-- [ ] All tools check accessibility service availability where needed
-- [ ] File compiles without errors and passes lint
+- [x] `GetClipboardTool` implements `ToolHandler` and is Hilt-injectable
+- [x] `GetClipboardTool` reads clipboard text via `ClipboardManager` from the accessibility service context
+- [x] `GetClipboardTool` returns `{ "text": "..." }` or `{ "text": null }` if clipboard is empty
+- [x] `GetClipboardTool` returns -32603 if clipboard access fails
+- [x] `SetClipboardTool` validates `text` parameter is present
+- [x] `SetClipboardTool` sets clipboard via `ClipboardManager.setPrimaryClip()`
+- [x] `WaitForElementTool` validates `by` and `value` parameters
+- [x] `WaitForElementTool` validates timeout > 0 and <= 30000, defaults to 5000
+- [x] `WaitForElementTool` polls every 500ms (parse tree, search for element)
+- [x] `WaitForElementTool` returns element details when found
+- [x] `WaitForElementTool` returns -32004 when timeout is reached
+- [x] `WaitForIdleTool` validates timeout > 0 and <= 30000, defaults to 3000
+- [x] `WaitForIdleTool` detects idle by monitoring whether the accessibility tree changes between polls
+- [x] `WaitForIdleTool` returns confirmation when idle, -32004 on timeout
+- [x] All tools check accessibility service availability where needed
+- [x] File compiles without errors and passes lint
 
 **Tests**: Unit tests in Task 9.4 (`UtilityToolsTest.kt`).
 
@@ -1566,12 +1566,12 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 **Description**: Create unit tests for all element action, text input, and utility tools. Tests mock `AccessibilityTreeParser`, `ElementFinder`, `ActionExecutor`, `McpAccessibilityService`, and `ClipboardManager` using MockK. Tests verify correct behavior for valid inputs, invalid inputs, error conditions, and edge cases.
 
 **Acceptance Criteria**:
-- [ ] `ElementActionToolsTest` covers find_elements (valid, empty results, invalid by, empty value), click_element (valid, not found, not clickable), long_click_element, set_text (valid, non-editable), scroll_to_element
-- [ ] `TextInputToolsTest` covers input_text (with element_id, without element_id), clear_text (with/without element_id), press_key (each valid key, invalid key)
-- [ ] `UtilityToolsTest` covers get_clipboard, set_clipboard, wait_for_element (found, timeout, invalid params), wait_for_idle (idle, timeout, invalid params)
-- [ ] All tests follow Arrange-Act-Assert pattern
-- [ ] All tests use JUnit 5 and MockK
-- [ ] All tests pass via `./gradlew test --tests '*ElementActionToolsTest*'`, `*TextInputToolsTest*`, `*UtilityToolsTest*`
+- [x] `ElementActionToolsTest` covers find_elements (valid, empty results, invalid by, empty value), click_element (valid, not found, not clickable), long_click_element, set_text (valid, non-editable), scroll_to_element
+- [x] `TextInputToolsTest` covers input_text (with element_id, without element_id), clear_text (with/without element_id), press_key (each valid key, invalid key)
+- [x] `UtilityToolsTest` covers get_clipboard, set_clipboard, wait_for_element (found, timeout, invalid params), wait_for_idle (idle, timeout, invalid params)
+- [x] All tests follow Arrange-Act-Assert pattern
+- [x] All tests use JUnit 5 and MockK
+- [x] All tests pass via `./gradlew test --tests '*ElementActionToolsTest*'`, `*TextInputToolsTest*`, `*UtilityToolsTest*`
 
 **Tests**: This IS the test task.
 
@@ -2348,11 +2348,11 @@ For finding the focused node, we add a helper `findFocusedEditableNode()` that t
 **Description**: Update (or create) `docs/MCP_TOOLS.md` with comprehensive documentation for all 29 MCP tools across 7 categories. This document covers all tools from Plans 7-9: 4 screen introspection + 6 system + 5 touch + 2 gesture + 5 element action + 3 text input + 4 utility.
 
 **Acceptance Criteria**:
-- [ ] Document includes all 29 tools organized by category
-- [ ] Each tool has: name, description, input schema, output format, error cases, usage examples
-- [ ] Document includes error code reference table
-- [ ] Document includes authentication notes
-- [ ] File is well-formatted markdown
+- [x] Document includes all 29 tools organized by category
+- [x] Each tool has: name, description, input schema, output format, error cases, usage examples
+- [x] Document includes error code reference table
+- [x] Document includes authentication notes
+- [x] File is well-formatted markdown
 
 **Tests**: Documentation — no automated tests. Verify content accuracy by cross-referencing with tool implementations.
 
@@ -2394,9 +2394,9 @@ Due to the large size of this documentation file, the full content is not includ
 **Description**: Run linting, unit tests, and build to verify all changes compile and pass quality gates.
 
 **Acceptance Criteria**:
-- [ ] `make lint` passes with no errors or warnings
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds with no errors or warnings
+- [x] `make lint` passes with no errors or warnings
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds with no errors or warnings
 
 #### Action 9.6.1: Run linting
 
