@@ -227,7 +227,7 @@ object AndroidContainerSetup {
             container,
             "adb", "shell", "am", "broadcast",
             "-a", configAction,
-            "-n", "$APP_PACKAGE/.debug.E2EConfigReceiver",
+            "-n", "$APP_PACKAGE/.E2EConfigReceiver",
             "--es", "bearer_token", E2E_BEARER_TOKEN,
             "--es", "binding_address", "0.0.0.0",
             "--ei", "port", MCP_DEFAULT_PORT.toString()
@@ -324,8 +324,14 @@ object AndroidContainerSetup {
      */
     private fun execInContainer(container: GenericContainer<*>, vararg command: String): String {
         val result = container.execInContainer(*command)
-        if (result.exitCode != 0 && result.stderr.isNotEmpty()) {
-            println("[E2E Setup] Command '${command.joinToString(" ")}' stderr: ${result.stderr}")
+        if (result.exitCode != 0) {
+            if (result.stderr.isNotEmpty()) {
+                println("[E2E Setup] Command '${command.joinToString(" ")}' stderr: ${result.stderr}")
+            }
+            throw IllegalStateException(
+                "[E2E Setup] Command '${command.joinToString(" ")}' failed with exit code " +
+                    "${result.exitCode}. stdout: ${result.stdout} stderr: ${result.stderr}"
+            )
         }
         return result.stdout
     }
