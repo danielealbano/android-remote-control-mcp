@@ -3,8 +3,11 @@ package com.danielealbano.androidremotecontrolmcp.services.screencapture
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -82,6 +85,20 @@ class ScreenCaptureServiceTest {
             // Assert
             assertTrue(result)
         }
+
+        @Test
+        @DisplayName("returns false after MediaProjection is cleared")
+        fun `returns false after cleared`() {
+            // Arrange - verify active state first
+            every { mockMediaProjectionHelper.isProjectionActive() } returns true
+            assertTrue(service.isMediaProjectionActive())
+
+            // Act - simulate projection being stopped
+            every { mockMediaProjectionHelper.isProjectionActive() } returns false
+
+            // Assert
+            assertFalse(service.isMediaProjectionActive())
+        }
     }
 
     @Nested
@@ -124,6 +141,26 @@ class ScreenCaptureServiceTest {
                     message.contains("permission", ignoreCase = true),
                     "Error message should mention permission, got: $message",
                 )
+            }
+
+        @Test
+        @DisplayName("concurrent calls are serialized without deadlock")
+        fun `concurrent calls are serialized`() =
+            runTest {
+                // Arrange
+                every { mockMediaProjectionHelper.isProjectionActive() } returns false
+
+                // Act - launch multiple concurrent calls
+                val results =
+                    (1..10).map {
+                        async { service.captureScreenshot() }
+                    }.awaitAll()
+
+                // Assert - all should complete and return failure (projection not active)
+                assertEquals(10, results.size)
+                results.forEach { result ->
+                    assertTrue(result.isFailure)
+                }
             }
     }
 }

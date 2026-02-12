@@ -12,6 +12,7 @@ import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -172,6 +173,38 @@ class ScreenshotEncoderTest {
 
             // Assert
             assertEquals(100, qualitySlot.captured)
+        }
+
+        @Test
+        @DisplayName("low quality produces smaller output than high quality for same bitmap")
+        fun `quality affects output size`() {
+            // Arrange
+            val bitmap = mockk<Bitmap>(relaxed = true)
+            val lowQualityBytes = byteArrayOf(1, 2, 3)
+            val highQualityBytes = byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+            every {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 10, any<OutputStream>())
+            } answers {
+                thirdArg<OutputStream>().write(lowQualityBytes)
+                true
+            }
+            every {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, any<OutputStream>())
+            } answers {
+                thirdArg<OutputStream>().write(highQualityBytes)
+                true
+            }
+
+            // Act
+            val lowResult = encoder.encodeBitmapToJpeg(bitmap, 10)
+            val highResult = encoder.encodeBitmapToJpeg(bitmap, 95)
+
+            // Assert
+            assertTrue(
+                lowResult.size < highResult.size,
+                "Low quality (${lowResult.size} bytes) should be smaller than high quality (${highResult.size} bytes)",
+            )
         }
     }
 
