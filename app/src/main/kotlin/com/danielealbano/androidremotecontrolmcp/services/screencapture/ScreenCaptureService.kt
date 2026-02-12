@@ -288,14 +288,15 @@ class ScreenCaptureService : Service() {
         imageReader = null
     }
 
-    private fun createNotification(): Notification {
-        val channelId = getString(R.string.notification_channel_screen_capture_id)
-        return Notification.Builder(this, channelId)
+    private fun createNotification(): Notification =
+        androidx.core.app.NotificationCompat.Builder(
+            this,
+            com.danielealbano.androidremotecontrolmcp.McpApplication.SCREEN_CAPTURE_CHANNEL_ID,
+        )
             .setContentTitle(getString(R.string.notification_screen_capture_title))
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .build()
-    }
 
     companion object {
         private const val TAG = "MCP:ScreenCaptureService"

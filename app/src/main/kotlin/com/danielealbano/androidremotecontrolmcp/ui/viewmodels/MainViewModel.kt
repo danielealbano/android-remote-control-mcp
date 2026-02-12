@@ -18,6 +18,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
+import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -73,6 +74,15 @@ class MainViewModel
                     _serverConfig.value = config
                     _portInput.value = config.port.toString()
                     _hostnameInput.value = config.certificateHostname
+                }
+            }
+
+            // Collect server status from McpServerService's companion-level StateFlow.
+            // This replaces the deprecated LocalBroadcastManager approach with a
+            // Kotlin-idiomatic StateFlow collection pattern.
+            viewModelScope.launch {
+                McpServerService.serverStatus.collect { status ->
+                    _serverStatus.value = status
                 }
             }
         }
@@ -152,12 +162,24 @@ class MainViewModel
             }
         }
 
-        fun startServer() {
-            Log.i(TAG, "startServer called (stub, will be wired in Plan 6)")
+        fun startServer(context: Context) {
+            Log.i(TAG, "Starting MCP server via McpServerService")
+            _serverStatus.value = ServerStatus.Starting
+            val intent =
+                Intent(context, McpServerService::class.java).apply {
+                    action = McpServerService.ACTION_START
+                }
+            context.startForegroundService(intent)
         }
 
-        fun stopServer() {
-            Log.i(TAG, "stopServer called (stub, will be wired in Plan 6)")
+        fun stopServer(context: Context) {
+            Log.i(TAG, "Stopping MCP server via McpServerService")
+            _serverStatus.value = ServerStatus.Stopping
+            val intent =
+                Intent(context, McpServerService::class.java).apply {
+                    action = McpServerService.ACTION_STOP
+                }
+            context.startForegroundService(intent)
         }
 
         fun copyToClipboard(
