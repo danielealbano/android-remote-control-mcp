@@ -17,8 +17,10 @@ internal object McpToolUtils {
      * Extracts a required numeric value from [params] as a [Float].
      *
      * Handles both integer and floating-point JSON numbers.
+     * Rejects string-encoded numbers (e.g., `"500"`) and non-finite values (NaN, Infinity).
      *
-     * @throws McpToolException.InvalidParams if the parameter is missing or not a number.
+     * @throws McpToolException.InvalidParams if the parameter is missing, not a number,
+     *         is a string-encoded number, or is non-finite.
      */
     @Suppress("ThrowsCount")
     fun requireFloat(
@@ -31,18 +33,34 @@ internal object McpToolUtils {
         val primitive =
             element as? JsonPrimitive
                 ?: throw McpToolException.InvalidParams("Parameter '$name' must be a number")
-        return primitive.content.toFloatOrNull()
-            ?: throw McpToolException.InvalidParams(
-                "Parameter '$name' must be a number, got: '${primitive.content}'",
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
+        }
+        val value =
+            primitive.content.toFloatOrNull()
+                ?: throw McpToolException.InvalidParams(
+                    "Parameter '$name' must be a number, got: '${primitive.content}'",
+                )
+        if (!value.isFinite()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a finite number, got: '${primitive.content}'",
+            )
+        }
+        return value
     }
 
     /**
      * Extracts an optional numeric value from [params] as a [Float],
      * returning [default] if not present.
      *
-     * @throws McpToolException.InvalidParams if the parameter is present but not a valid number.
+     * Rejects string-encoded numbers and non-finite values.
+     *
+     * @throws McpToolException.InvalidParams if the parameter is present but not a valid number,
+     *         is a string-encoded number, or is non-finite.
      */
+    @Suppress("ThrowsCount")
     fun optionalFloat(
         params: JsonObject?,
         name: String,
@@ -52,18 +70,35 @@ internal object McpToolUtils {
         val primitive =
             element as? JsonPrimitive
                 ?: throw McpToolException.InvalidParams("Parameter '$name' must be a number")
-        return primitive.content.toFloatOrNull()
-            ?: throw McpToolException.InvalidParams(
-                "Parameter '$name' must be a number, got: '${primitive.content}'",
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
+        }
+        val value =
+            primitive.content.toFloatOrNull()
+                ?: throw McpToolException.InvalidParams(
+                    "Parameter '$name' must be a number, got: '${primitive.content}'",
+                )
+        if (!value.isFinite()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a finite number, got: '${primitive.content}'",
+            )
+        }
+        return value
     }
 
     /**
      * Extracts an optional numeric value from [params] as a [Long],
      * returning [default] if not present.
      *
-     * @throws McpToolException.InvalidParams if the parameter is present but not a valid number.
+     * Rejects string-encoded numbers and fractional values (e.g., `1.5` is rejected;
+     * `1.0` is accepted as `1L` since JSON does not distinguish integer from float notation).
+     *
+     * @throws McpToolException.InvalidParams if the parameter is present but not a valid integer,
+     *         is a string-encoded number, or has a fractional component.
      */
+    @Suppress("ThrowsCount")
     fun optionalLong(
         params: JsonObject?,
         name: String,
@@ -73,17 +108,34 @@ internal object McpToolUtils {
         val primitive =
             element as? JsonPrimitive
                 ?: throw McpToolException.InvalidParams("Parameter '$name' must be a number")
-        return primitive.content.toDoubleOrNull()?.toLong()
-            ?: throw McpToolException.InvalidParams(
-                "Parameter '$name' must be a number, got: '${primitive.content}'",
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
+        }
+        val doubleVal =
+            primitive.content.toDoubleOrNull()
+                ?: throw McpToolException.InvalidParams(
+                    "Parameter '$name' must be a number, got: '${primitive.content}'",
+                )
+        val longVal = doubleVal.toLong()
+        if (doubleVal != longVal.toDouble()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be an integer, got: '${primitive.content}'",
+            )
+        }
+        return longVal
     }
 
     /**
      * Extracts a required string value from [params].
      *
-     * @throws McpToolException.InvalidParams if the parameter is missing or not a string.
+     * Rejects non-string primitives (e.g., numeric `123` instead of `"123"`).
+     *
+     * @throws McpToolException.InvalidParams if the parameter is missing, not a primitive,
+     *         or is a non-string primitive (number, boolean).
      */
+    @Suppress("ThrowsCount")
     fun requireString(
         params: JsonObject?,
         name: String,
@@ -94,6 +146,11 @@ internal object McpToolUtils {
         val primitive =
             element as? JsonPrimitive
                 ?: throw McpToolException.InvalidParams("Parameter '$name' must be a string")
+        if (!primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a string, got: ${primitive.content}",
+            )
+        }
         return primitive.content
     }
 
@@ -101,7 +158,10 @@ internal object McpToolUtils {
      * Extracts an optional string value from [params],
      * returning [default] if not present.
      *
-     * @throws McpToolException.InvalidParams if the parameter is present but not a string.
+     * Rejects non-string primitives (e.g., numeric `123` instead of `"123"`).
+     *
+     * @throws McpToolException.InvalidParams if the parameter is present but not a string,
+     *         or is a non-string primitive (number, boolean).
      */
     fun optionalString(
         params: JsonObject?,
@@ -112,6 +172,11 @@ internal object McpToolUtils {
         val primitive =
             element as? JsonPrimitive
                 ?: throw McpToolException.InvalidParams("Parameter '$name' must be a string")
+        if (!primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a string, got: ${primitive.content}",
+            )
+        }
         return primitive.content
     }
 
