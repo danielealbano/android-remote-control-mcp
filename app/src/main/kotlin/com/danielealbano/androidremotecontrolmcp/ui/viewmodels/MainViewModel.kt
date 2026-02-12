@@ -181,16 +181,20 @@ class MainViewModel
          * Stores the MediaProjection activity result for later use when starting the
          * ScreenCaptureService.
          *
+         * Called for both granted (RESULT_OK with non-null data) and denied/cancelled
+         * results. On denial, clears any previously stored result so that
+         * [isMediaProjectionGranted] correctly reflects the current state.
+         *
          * @param resultCode The result code from the activity result.
-         * @param data The intent data containing the MediaProjection token.
+         * @param data The intent data containing the MediaProjection token, or null if denied/cancelled.
          */
         fun setMediaProjectionResult(
             resultCode: Int,
-            data: Intent,
+            data: Intent?,
         ) {
             _mediaProjectionResultCode = resultCode
             _mediaProjectionData = data
-            _isMediaProjectionGranted.value = (resultCode == Activity.RESULT_OK)
+            _isMediaProjectionGranted.value = (resultCode == Activity.RESULT_OK && data != null)
         }
 
         fun addServerLogEntry(entry: ServerLogEntry) {

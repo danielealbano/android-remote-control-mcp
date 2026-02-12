@@ -1,6 +1,5 @@
 package com.danielealbano.androidremotecontrolmcp.ui
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
@@ -30,9 +29,7 @@ class MainActivity : ComponentActivity() {
             registerForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { result ->
-                if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                    viewModel.setMediaProjectionResult(result.resultCode, result.data!!)
-                }
+                viewModel.setMediaProjectionResult(result.resultCode, result.data)
             }
 
         setContent {
