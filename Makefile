@@ -184,7 +184,7 @@ setup-emulator: ## Create AVD for testing
 
 start-emulator: ## Start emulator in background (headless)
 	@echo "Starting emulator '$(EMULATOR_NAME)'..."
-	emulator -avd $(EMULATOR_NAME) -no-snapshot -no-window -no-audio &
+	emulator -avd $(EMULATOR_NAME) -no-snapshot -no-window -no-audio -no-metrics &
 	@echo "Waiting for emulator to boot..."
 	$(ADB) wait-for-device
 	$(ADB) shell getprop sys.boot_completed | grep -q 1 || \
