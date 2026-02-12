@@ -48,24 +48,24 @@ This plan implements 7 MCP tools for coordinate-based touch interactions and adv
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `TapTool` validates `x` and `y` params (required, >= 0), calls `ActionExecutor.tap()`, returns MCP text content response
-- [ ] `LongPressTool` validates `x`, `y` (required, >= 0) and `duration` (optional, default 1000, > 0, <= 60000), calls `ActionExecutor.longPress()`, returns MCP text content response
-- [ ] `DoubleTapTool` validates `x` and `y` params (required, >= 0), calls `ActionExecutor.doubleTap()`, returns MCP text content response
-- [ ] `SwipeTool` validates `x1`, `y1`, `x2`, `y2` (required, >= 0) and `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.swipe()`, returns MCP text content response
-- [ ] `ScrollTool` validates `direction` (required, one of up/down/left/right) and `amount` (optional, default medium, one of small/medium/large), maps strings to enums, calls `ActionExecutor.scroll()`, returns MCP text content response
-- [ ] `PinchTool` validates `center_x`, `center_y` (required, >= 0), `scale` (required, > 0), `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.pinch()`, returns MCP text content response
-- [ ] `CustomGestureTool` validates `paths` (required, non-empty array, each path >= 2 points, all coords >= 0, all times >= 0, times monotonically increasing within each path), maps to `GesturePoint` lists, calls `ActionExecutor.customGesture()`, returns MCP text content response
-- [ ] All 7 tools return error code `-32602` (invalid params) for missing or invalid parameters
-- [ ] All 7 tools return error code `-32001` (permission denied) when accessibility service is not enabled
-- [ ] All 7 tools return error code `-32003` (action failed) when ActionExecutor returns `Result.failure`
-- [ ] All 7 tools handle both `Int` and `Double` JSON number types for numeric parameter extraction
-- [ ] All tool responses follow MCP content format: `{ "content": [{ "type": "text", "text": "..." }] }`
-- [ ] `ToolRegistry` updated to register all 7 new tools with correct names, descriptions, and input schemas
-- [ ] `docs/MCP_TOOLS.md` updated with Touch Action Tools and Gesture Tools sections
-- [ ] Unit tests exist and pass for all 7 tools covering valid params, missing params, invalid params, service not enabled, and action failure scenarios
-- [ ] `make lint` passes with no errors or warnings
-- [ ] `make test-unit` passes
-- [ ] `make build` succeeds with no errors or warnings
+- [x] `TapTool` validates `x` and `y` params (required, >= 0), calls `ActionExecutor.tap()`, returns MCP text content response
+- [x] `LongPressTool` validates `x`, `y` (required, >= 0) and `duration` (optional, default 1000, > 0, <= 60000), calls `ActionExecutor.longPress()`, returns MCP text content response
+- [x] `DoubleTapTool` validates `x` and `y` params (required, >= 0), calls `ActionExecutor.doubleTap()`, returns MCP text content response
+- [x] `SwipeTool` validates `x1`, `y1`, `x2`, `y2` (required, >= 0) and `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.swipe()`, returns MCP text content response
+- [x] `ScrollTool` validates `direction` (required, one of up/down/left/right) and `amount` (optional, default medium, one of small/medium/large), maps strings to enums, calls `ActionExecutor.scroll()`, returns MCP text content response
+- [x] `PinchTool` validates `center_x`, `center_y` (required, >= 0), `scale` (required, > 0), `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.pinch()`, returns MCP text content response
+- [x] `CustomGestureTool` validates `paths` (required, non-empty array, each path >= 2 points, all coords >= 0, all times >= 0, times monotonically increasing within each path), maps to `GesturePoint` lists, calls `ActionExecutor.customGesture()`, returns MCP text content response
+- [x] All 7 tools return error code `-32602` (invalid params) for missing or invalid parameters
+- [x] All 7 tools return error code `-32001` (permission denied) when accessibility service is not enabled
+- [x] All 7 tools return error code `-32003` (action failed) when ActionExecutor returns `Result.failure`
+- [x] All 7 tools handle both `Int` and `Double` JSON number types for numeric parameter extraction
+- [x] All tool responses follow MCP content format: `{ "content": [{ "type": "text", "text": "..." }] }`
+- [x] `ToolRegistry` updated to register all 7 new tools with correct names, descriptions, and input schemas
+- [x] `docs/MCP_TOOLS.md` updated with Touch Action Tools and Gesture Tools sections
+- [x] Unit tests exist and pass for all 7 tools covering valid params, missing params, invalid params, service not enabled, and action failure scenarios
+- [x] `make lint` passes with no errors or warnings
+- [x] `make test-unit` passes
+- [x] `make build` succeeds with no errors or warnings
 
 ### Commit Strategy
 
@@ -83,17 +83,17 @@ This plan implements 7 MCP tools for coordinate-based touch interactions and adv
 **Description**: Create `TouchActionTools.kt` containing 5 tool handler classes that implement the `ToolHandler` interface. Each tool validates its MCP parameters, delegates to the corresponding `ActionExecutor` method, and returns an MCP-formatted response. Also update `ToolRegistry` to register these 5 tools.
 
 **Acceptance Criteria**:
-- [ ] `TapTool` implements `ToolHandler`, extracts `x` and `y` from `JsonObject`, validates >= 0, calls `ActionExecutor.tap(x, y)`, returns success text content
-- [ ] `LongPressTool` implements `ToolHandler`, extracts `x`, `y`, optional `duration` (default 1000), validates coords >= 0 and duration in range (1..60000), calls `ActionExecutor.longPress(x, y, duration)`, returns success text content
-- [ ] `DoubleTapTool` implements `ToolHandler`, extracts `x` and `y`, validates >= 0, calls `ActionExecutor.doubleTap(x, y)`, returns success text content
-- [ ] `SwipeTool` implements `ToolHandler`, extracts `x1`, `y1`, `x2`, `y2`, optional `duration` (default 300), validates all coords >= 0 and duration in range (1..60000), calls `ActionExecutor.swipe(x1, y1, x2, y2, duration)`, returns success text content
-- [ ] `ScrollTool` implements `ToolHandler`, extracts `direction` (string), optional `amount` (string, default "medium"), validates direction is one of up/down/left/right, validates amount is one of small/medium/large, maps to enums, calls `ActionExecutor.scroll(direction, amount)`, returns success text content
-- [ ] All tools return `-32602` error via `McpToolErrors.invalidParams()` for missing or invalid params
-- [ ] All tools return `-32001` error via `McpToolErrors.permissionDenied()` when `ActionExecutor` returns failure with `IllegalStateException` containing "not available"
-- [ ] All tools return `-32003` error via `McpToolErrors.actionFailed()` when `ActionExecutor` returns failure with other exceptions
-- [ ] Numeric parameter extraction handles both `Int` and `Double` JSON number types using helper function
-- [ ] `ToolRegistry` updated to register `TapTool`, `LongPressTool`, `DoubleTapTool`, `SwipeTool`, `ScrollTool`
-- [ ] Files compile without errors and pass ktlint/detekt
+- [x] `TapTool` implements `ToolHandler`, extracts `x` and `y` from `JsonObject`, validates >= 0, calls `ActionExecutor.tap(x, y)`, returns success text content
+- [x] `LongPressTool` implements `ToolHandler`, extracts `x`, `y`, optional `duration` (default 1000), validates coords >= 0 and duration in range (1..60000), calls `ActionExecutor.longPress(x, y, duration)`, returns success text content
+- [x] `DoubleTapTool` implements `ToolHandler`, extracts `x` and `y`, validates >= 0, calls `ActionExecutor.doubleTap(x, y)`, returns success text content
+- [x] `SwipeTool` implements `ToolHandler`, extracts `x1`, `y1`, `x2`, `y2`, optional `duration` (default 300), validates all coords >= 0 and duration in range (1..60000), calls `ActionExecutor.swipe(x1, y1, x2, y2, duration)`, returns success text content
+- [x] `ScrollTool` implements `ToolHandler`, extracts `direction` (string), optional `amount` (string, default "medium"), validates direction is one of up/down/left/right, validates amount is one of small/medium/large, maps to enums, calls `ActionExecutor.scroll(direction, amount)`, returns success text content
+- [x] All tools return `-32602` error via `McpToolErrors.invalidParams()` for missing or invalid params
+- [x] All tools return `-32001` error via `McpToolErrors.permissionDenied()` when `ActionExecutor` returns failure with `IllegalStateException` containing "not available"
+- [x] All tools return `-32003` error via `McpToolErrors.actionFailed()` when `ActionExecutor` returns failure with other exceptions
+- [x] Numeric parameter extraction handles both `Int` and `Double` JSON number types using helper function
+- [x] `ToolRegistry` updated to register `TapTool`, `LongPressTool`, `DoubleTapTool`, `SwipeTool`, `ScrollTool`
+- [x] Files compile without errors and pass ktlint/detekt
 
 **Tests**: Unit tests in Task 8.3 (`TouchActionToolsTest.kt`).
 
@@ -678,14 +678,14 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **Description**: Create `GestureTools.kt` containing 2 tool handler classes for advanced gesture operations. Also update `ToolRegistry` to register these 2 tools.
 
 **Acceptance Criteria**:
-- [ ] `PinchTool` implements `ToolHandler`, extracts `center_x`, `center_y` (required, >= 0), `scale` (required, > 0), `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.pinch(centerX, centerY, scale, duration)`, returns success text content
-- [ ] `CustomGestureTool` implements `ToolHandler`, extracts `paths` (required, non-empty array of arrays of point objects), validates each path has >= 2 points, all coords >= 0, all times >= 0, times monotonically increasing within each path, maps to `List<List<GesturePoint>>`, calls `ActionExecutor.customGesture(paths)`, returns success text content
-- [ ] `PinchTool` returns `-32602` for missing params, invalid scale (<= 0), invalid duration
-- [ ] `CustomGestureTool` returns `-32602` for empty paths, short paths (< 2 points), negative coords, negative times, non-monotonic times
-- [ ] Both tools return `-32001` when accessibility service not enabled
-- [ ] Both tools return `-32003` when action execution fails
-- [ ] `ToolRegistry` updated to register `PinchTool` and `CustomGestureTool`
-- [ ] Files compile without errors and pass ktlint/detekt
+- [x] `PinchTool` implements `ToolHandler`, extracts `center_x`, `center_y` (required, >= 0), `scale` (required, > 0), `duration` (optional, default 300, > 0, <= 60000), calls `ActionExecutor.pinch(centerX, centerY, scale, duration)`, returns success text content
+- [x] `CustomGestureTool` implements `ToolHandler`, extracts `paths` (required, non-empty array of arrays of point objects), validates each path has >= 2 points, all coords >= 0, all times >= 0, times monotonically increasing within each path, maps to `List<List<GesturePoint>>`, calls `ActionExecutor.customGesture(paths)`, returns success text content
+- [x] `PinchTool` returns `-32602` for missing params, invalid scale (<= 0), invalid duration
+- [x] `CustomGestureTool` returns `-32602` for empty paths, short paths (< 2 points), negative coords, negative times, non-monotonic times
+- [x] Both tools return `-32001` when accessibility service not enabled
+- [x] Both tools return `-32003` when action execution fails
+- [x] `ToolRegistry` updated to register `PinchTool` and `CustomGestureTool`
+- [x] Files compile without errors and pass ktlint/detekt
 
 **Tests**: Unit tests in Task 8.3 (`GestureToolsTest.kt`).
 
@@ -997,16 +997,16 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **Description**: Create comprehensive unit tests for all 7 tools using JUnit 5 and MockK. Tests cover valid parameters, missing parameters, invalid parameters, service-not-enabled errors, and action-failure errors. `ActionExecutor` is mocked in all tests.
 
 **Acceptance Criteria**:
-- [ ] `TouchActionToolsTest.kt` tests all 5 touch action tools
-- [ ] `GestureToolsTest.kt` tests both gesture tools
-- [ ] Tests cover: valid params, missing required params, negative coordinates, invalid duration, invalid direction/amount, service not enabled, action failure
-- [ ] Tests verify correct MCP text content response format for success cases
-- [ ] Tests verify correct `McpToolException` subtype and message for error cases
-- [ ] All tests mock `ActionExecutor` using MockK
-- [ ] All tests use JUnit 5 `@Test` and `@Nested` for organization
-- [ ] All tests follow Arrange-Act-Assert pattern
-- [ ] Tests compile and pass
-- [ ] Tests pass ktlint/detekt
+- [x] `TouchActionToolsTest.kt` tests all 5 touch action tools
+- [x] `GestureToolsTest.kt` tests both gesture tools
+- [x] Tests cover: valid params, missing required params, negative coordinates, invalid duration, invalid direction/amount, service not enabled, action failure
+- [x] Tests verify correct MCP text content response format for success cases
+- [x] Tests verify correct `McpToolException` subtype and message for error cases
+- [x] All tests mock `ActionExecutor` using MockK
+- [x] All tests use JUnit 5 `@Test` and `@Nested` for organization
+- [x] All tests follow Arrange-Act-Assert pattern
+- [x] Tests compile and pass
+- [x] Tests pass ktlint/detekt
 
 **Tests**: These ARE the tests. Run via `./gradlew test --tests "*TouchActionToolsTest"` and `./gradlew test --tests "*GestureToolsTest"`.
 
@@ -2043,13 +2043,13 @@ No diff required -- already handled by Plan 7 Action 7.2.4.
 **Description**: Add Touch Action Tools and Gesture Tools sections to `docs/MCP_TOOLS.md` with full schemas, examples, error codes, and implementation notes.
 
 **Acceptance Criteria**:
-- [ ] Touch Action Tools section documents all 5 tools (tap, long_press, double_tap, swipe, scroll)
-- [ ] Gesture Tools section documents both gesture tools (pinch, custom_gesture)
-- [ ] Each tool has: description, input schema, example request/response, error codes
-- [ ] Error codes documented: -32602 (invalid params), -32001 (permission denied), -32003 (action failed)
-- [ ] Duration limits documented (max 60000ms)
-- [ ] Coordinate validation documented (>= 0)
-- [ ] File passes any applicable markdown linting
+- [x] Touch Action Tools section documents all 5 tools (tap, long_press, double_tap, swipe, scroll)
+- [x] Gesture Tools section documents both gesture tools (pinch, custom_gesture)
+- [x] Each tool has: description, input schema, example request/response, error codes
+- [x] Error codes documented: -32602 (invalid params), -32001 (permission denied), -32003 (action failed)
+- [x] Duration limits documented (max 60000ms)
+- [x] Coordinate validation documented (>= 0)
+- [x] File passes any applicable markdown linting
 
 **Tests**: Documentation-only task, no automated tests.
 
