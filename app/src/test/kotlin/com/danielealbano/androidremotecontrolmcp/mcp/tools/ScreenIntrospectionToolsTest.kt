@@ -281,6 +281,21 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
+        @DisplayName("rejects non-integer quality (string)")
+        fun rejectsNonIntegerQuality() =
+            runTest {
+                // Arrange
+                val params = buildJsonObject { put("quality", JsonPrimitive("high")) }
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException> {
+                        handler.execute(params)
+                    }
+                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+
+        @Test
         @DisplayName("throws error -32001 when MediaProjection not granted")
         fun throwsErrorWhenMediaProjectionNotGranted() =
             runTest {

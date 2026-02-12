@@ -148,8 +148,17 @@ class CaptureScreenshotHandler
             )
         }
 
+        @Suppress("SwallowedException", "TooGenericExceptionCaught")
         private fun parseQuality(params: JsonObject?): Int {
-            val quality = params?.get("quality")?.jsonPrimitive?.int ?: DEFAULT_QUALITY
+            val qualityElement = params?.get("quality") ?: return DEFAULT_QUALITY
+            val quality =
+                try {
+                    qualityElement.jsonPrimitive.int
+                } catch (e: Exception) {
+                    throw McpToolException.InvalidParams(
+                        "Quality must be an integer between $MIN_QUALITY and $MAX_QUALITY, got $qualityElement",
+                    )
+                }
             if (quality < MIN_QUALITY || quality > MAX_QUALITY) {
                 throw McpToolException.InvalidParams(
                     "Quality must be between $MIN_QUALITY and $MAX_QUALITY, got $quality",

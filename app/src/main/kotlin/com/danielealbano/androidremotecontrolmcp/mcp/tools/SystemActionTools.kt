@@ -298,13 +298,7 @@ class GetDeviceLogsHandler
     constructor() : ToolHandler {
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         override suspend fun execute(params: JsonObject?): JsonElement {
-            val lastLines = params?.get("last_lines")?.jsonPrimitive?.int ?: DEFAULT_LAST_LINES
-            if (lastLines < 1 || lastLines > MAX_LAST_LINES) {
-                throw McpToolException.InvalidParams(
-                    "last_lines must be between 1 and $MAX_LAST_LINES, got $lastLines",
-                )
-            }
-
+            val lastLines = parseLastLines(params)
             val since = params?.get("since")?.jsonPrimitive?.contentOrNull
             val until = params?.get("until")?.jsonPrimitive?.contentOrNull
             val tag = params?.get("tag")?.jsonPrimitive?.contentOrNull
@@ -318,7 +312,10 @@ class GetDeviceLogsHandler
             }
 
             return try {
-                val command = buildLogcatCommand(lastLines, since, until, tag, levelStr, packageName)
+                val pid = if (packageName != null) resolvePid(packageName) else null
+                // Request one extra line to reliably detect truncation
+                val requestLines = lastLines + 1
+                val command = buildLogcatCommand(requestLines, since, tag, levelStr, pid)
                 val process = Runtime.getRuntime().exec(command.toTypedArray())
                 val output = process.inputStream.bufferedReader().readText()
                 val exitCode = process.waitFor()
@@ -330,8 +327,12 @@ class GetDeviceLogsHandler
                     )
                 }
 
-                val lines = output.lines().filter { it.isNotBlank() }
-                val truncated = lines.size >= lastLines
+                var allLines = output.lines().filter { it.isNotBlank() }
+                if (until != null) {
+                    allLines = filterByUntil(allLines, until)
+                }
+                val truncated = allLines.size > lastLines
+                val lines = if (truncated) allLines.take(lastLines) else allLines
 
                 val resultJson =
                     buildJsonObject {
@@ -350,14 +351,31 @@ class GetDeviceLogsHandler
             }
         }
 
-        @Suppress("UnusedParameter", "LongParameterList")
+        @Suppress("SwallowedException", "TooGenericExceptionCaught")
+        private fun parseLastLines(params: JsonObject?): Int {
+            val element = params?.get("last_lines") ?: return DEFAULT_LAST_LINES
+            val lastLines =
+                try {
+                    element.jsonPrimitive.int
+                } catch (e: Exception) {
+                    throw McpToolException.InvalidParams(
+                        "last_lines must be an integer, got $element",
+                    )
+                }
+            if (lastLines < 1 || lastLines > MAX_LAST_LINES) {
+                throw McpToolException.InvalidParams(
+                    "last_lines must be between 1 and $MAX_LAST_LINES, got $lastLines",
+                )
+            }
+            return lastLines
+        }
+
         private fun buildLogcatCommand(
             lastLines: Int,
             since: String?,
-            until: String?,
             tag: String?,
             level: String,
-            packageName: String?,
+            pid: Int?,
         ): List<String> {
             val cmd = mutableListOf("logcat", "-d")
 
@@ -367,6 +385,10 @@ class GetDeviceLogsHandler
                 cmd.addAll(listOf("-t", lastLines.toString()))
             }
 
+            if (pid != null) {
+                cmd.addAll(listOf("--pid", pid.toString()))
+            }
+
             if (tag != null) {
                 cmd.addAll(listOf("-s", "$tag:$level"))
             } else {
@@ -374,6 +396,69 @@ class GetDeviceLogsHandler
             }
 
             return cmd
+        }
+
+        /**
+         * Resolves the PID of a running package via `pidof`.
+         *
+         * @return The PID, or null if the package is not running or pidof fails.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private fun resolvePid(packageName: String): Int? {
+            return try {
+                val process = Runtime.getRuntime().exec(arrayOf("pidof", "-s", packageName))
+                val output = process.inputStream.bufferedReader().readText().trim()
+                process.waitFor()
+                output.toIntOrNull()
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /**
+         * Filters logcat lines to only include those with timestamps at or before [until].
+         *
+         * Expects [until] in ISO 8601 format (e.g., `2024-01-15T10:30:00`).
+         * Logcat timestamps are in `MM-DD HH:MM:SS.mmm` format. The comparison
+         * is best-effort: the year component from ISO 8601 is dropped, and
+         * the month-day + time portion is compared lexicographically.
+         */
+        private fun filterByUntil(
+            lines: List<String>,
+            until: String,
+        ): List<String> {
+            val untilComparable = isoToLogcatTimestamp(until) ?: return lines
+            return lines.filter { line ->
+                val lineTimestamp = line.take(LOGCAT_TIMESTAMP_LENGTH).trim()
+                if (lineTimestamp.length < LOGCAT_TIMESTAMP_LENGTH) {
+                    return@filter true
+                }
+                lineTimestamp <= untilComparable
+            }
+        }
+
+        /**
+         * Converts an ISO 8601 timestamp to logcat's `MM-DD HH:MM:SS.mmm` format
+         * for lexicographic comparison.
+         *
+         * @return The converted timestamp, or null if parsing fails.
+         */
+        @Suppress("SwallowedException", "TooGenericExceptionCaught", "ReturnCount")
+        private fun isoToLogcatTimestamp(iso: String): String? {
+            return try {
+                val parts = iso.split("T")
+                if (parts.size != ISO_PARTS_COUNT) return null
+
+                val dateParts = parts[0].split("-")
+                if (dateParts.size != DATE_PARTS_COUNT) return null
+
+                val monthDay = "${dateParts[1]}-${dateParts[2]}"
+                val timePart =
+                    if (parts[1].contains(".")) parts[1] else "${parts[1]}.000"
+                "$monthDay $timePart"
+            } catch (e: Exception) {
+                null
+            }
         }
 
         fun register(toolRegistry: ToolRegistry) {
@@ -428,6 +513,9 @@ class GetDeviceLogsHandler
             private const val DEFAULT_LAST_LINES = 100
             private const val MAX_LAST_LINES = 1000
             private const val DEFAULT_LEVEL = "D"
+            private const val LOGCAT_TIMESTAMP_LENGTH = 18
+            private const val ISO_PARTS_COUNT = 2
+            private const val DATE_PARTS_COUNT = 3
             private val VALID_LEVELS = setOf("V", "D", "I", "W", "E", "F")
         }
     }
