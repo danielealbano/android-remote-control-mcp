@@ -71,7 +71,6 @@ object AndroidContainerSetup {
             .withEnv("EMULATOR_HEADLESS", if (isCI) "true" else "false")
             .withEnv("EMULATOR_ADDITIONAL_ARGS", emulatorArgs)
             .withEnv("USER_BEHAVIOR_ANALYTICS", "false")
-            .withEnv("DATAPARTITION_SIZE", "4096")
             .withPrivilegedMode(true)
             .withStartupTimeout(Duration.ofSeconds(300))
             .waitingFor(
