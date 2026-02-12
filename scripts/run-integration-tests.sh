@@ -47,11 +47,12 @@ EMULATOR_EXTRA_ARGS="-no-boot-anim -no-audio -no-snapshot"
 
 if [ "${CI:-false}" = "true" ]; then
     echo "[integration] CI detected — headless mode, no VNC"
+    export GRADLE_OPTS="${GRADLE_OPTS:-} -Xmx1536m"
     DOCKER_ARGS+=(
         -e EMULATOR_HEADLESS=true
         -e WEB_VNC=false
         -e "EMULATOR_ADDITIONAL_ARGS=${EMULATOR_EXTRA_ARGS} -no-window"
-        --memory=5g
+        --memory=5632m
     )
 else
     echo "[integration] Local mode — VNC enabled on http://localhost:$NOVNC_HOST_PORT"
