@@ -25,7 +25,7 @@ import javax.inject.Inject
  * ```
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_CONFIGURE \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.debug.E2EConfigReceiver \
+ *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver \
  *   --es bearer_token "test-token-uuid" \
  *   --es binding_address "0.0.0.0" \
  *   --ei port 8080
