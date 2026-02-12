@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Debug-only manifest overlay.
+      Registers E2EConfigReceiver for test configuration injection.
+      This receiver is NOT included in release builds.
+    -->
+    <application>
+        <receiver
+            android:name=".debug.E2EConfigReceiver"
+            android:exported="false">
+        </receiver>
+    </application>
+
+</manifest>
