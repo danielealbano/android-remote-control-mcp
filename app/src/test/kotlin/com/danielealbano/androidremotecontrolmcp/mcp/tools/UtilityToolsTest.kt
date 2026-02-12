@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -17,7 +18,9 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAcces
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mockk.unmockkObject
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -231,6 +234,58 @@ class UtilityToolsTest {
 
                 val exception = assertThrows<McpToolException> { tool.execute(params) }
                 assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+            }
+
+        @Test
+        fun `finds element after multiple poll attempts`() =
+            runTest {
+                var callCount = 0
+                every {
+                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Delayed", false)
+                } answers {
+                    callCount++
+                    if (callCount >= 3) listOf(sampleElementInfo) else emptyList()
+                }
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "Delayed")
+                        put("timeout", 10000)
+                    }
+
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
+                assertTrue(parsed["attempts"]?.jsonPrimitive?.content?.toInt()!! >= 3)
+            }
+
+        @Test
+        fun `throws timeout when element never found`() =
+            runTest {
+                mockkStatic(SystemClock::class)
+                try {
+                    var clockMs = 0L
+                    every { SystemClock.elapsedRealtime() } answers { clockMs }
+                    every {
+                        mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Missing", false)
+                    } answers {
+                        clockMs += 600L
+                        emptyList()
+                    }
+                    val params =
+                        buildJsonObject {
+                            put("by", "text")
+                            put("value", "Missing")
+                            put("timeout", 2000)
+                        }
+
+                    val exception = assertThrows<McpToolException> { tool.execute(params) }
+                    assertEquals(McpProtocolHandler.ERROR_TIMEOUT, exception.code)
+                    assertTrue(exception.message!!.contains("Element not found within"))
+                } finally {
+                    unmockkStatic(SystemClock::class)
+                }
             }
     }
 

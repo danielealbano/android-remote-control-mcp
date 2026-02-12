@@ -200,7 +200,7 @@ class ClearTextTool
  *
  * Key mapping strategy:
  * - BACK, HOME: Delegate to ActionExecutor global actions (already implemented).
- * - ENTER: Use ACTION_IME_ENTER on API 30+, fallback to ACTION_CLICK on the focused node.
+ * - ENTER: Use ACTION_IME_ENTER on API 30+, fallback to appending newline via ACTION_SET_TEXT.
  * - DEL: Get current text from focused node, remove last character, set text.
  * - TAB, SPACE: Get current text from focused node, append character, set text.
  */

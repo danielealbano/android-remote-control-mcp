@@ -1532,7 +1532,7 @@ Wait until an element matching the specified criteria appears in the accessibili
     },
     "value": { "type": "string", "description": "Search value" },
     "timeout": {
-      "type": "number",
+      "type": "integer",
       "description": "Timeout in milliseconds (1-30000)",
       "default": 5000
     }
@@ -1588,7 +1588,7 @@ Wait for the UI to become idle by detecting when the accessibility tree structur
   "type": "object",
   "properties": {
     "timeout": {
-      "type": "number",
+      "type": "integer",
       "description": "Timeout in milliseconds (1-30000)",
       "default": 3000
     }
