@@ -1,14 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
 import android.content.Context
-import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
-import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
-import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -28,7 +24,6 @@ class CertificateManagerTest {
     lateinit var tempDir: File
 
     private lateinit var context: Context
-    private lateinit var settingsRepository: SettingsRepository
     private lateinit var certificateManager: CertificateManager
 
     @BeforeEach
@@ -45,15 +40,8 @@ class CertificateManagerTest {
             mockk(relaxed = true) {
                 every { filesDir } returns tempDir
             }
-        settingsRepository =
-            mockk {
-                every { serverConfig } returns
-                    flowOf(
-                        ServerConfig(certificateSource = CertificateSource.AUTO_GENERATED),
-                    )
-            }
 
-        certificateManager = CertificateManager(context, settingsRepository)
+        certificateManager = CertificateManager(context)
     }
 
     @AfterEach

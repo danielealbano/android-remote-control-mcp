@@ -156,6 +156,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
+    testImplementation(libs.ktor.server.test.host)
 
     // Android Instrumented Testing
     androidTestImplementation(libs.test.core)
