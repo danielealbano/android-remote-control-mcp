@@ -287,7 +287,10 @@ class SetTextTool
             val textElement =
                 params["text"]
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
-            val text = (textElement as? JsonPrimitive)?.contentOrNull ?: ""
+            val textPrimitive =
+                textElement as? JsonPrimitive
+                    ?: throw McpToolException.InvalidParams("Parameter 'text' must be a string")
+            val text = textPrimitive.contentOrNull ?: ""
 
             val tree = getFreshTree(treeParser)
 

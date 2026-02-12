@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.SystemClock
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -206,10 +207,10 @@ class WaitForElementTool
             }
 
             // Poll loop
-            val startTime = System.currentTimeMillis()
+            val startTime = SystemClock.elapsedRealtime()
             var attemptCount = 0
 
-            while (System.currentTimeMillis() - startTime < timeout) {
+            while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 attemptCount++
 
                 try {
@@ -218,7 +219,7 @@ class WaitForElementTool
 
                     if (elements.isNotEmpty()) {
                         val element = elements.first()
-                        val elapsed = System.currentTimeMillis() - startTime
+                        val elapsed = SystemClock.elapsedRealtime() - startTime
                         Log.d(TAG, "wait_for_element: found after ${elapsed}ms ($attemptCount attempts)")
 
                         val resultJson =
@@ -285,7 +286,7 @@ class WaitForElementTool
                                 put("description", "Search value")
                             }
                             putJsonObject("timeout") {
-                                put("type", "number")
+                                put("type", "integer")
                                 put("description", "Timeout in milliseconds (1-30000)")
                                 put("default", DEFAULT_TIMEOUT_MS.toInt())
                             }
@@ -332,11 +333,11 @@ class WaitForIdleTool
                 )
             }
 
-            val startTime = System.currentTimeMillis()
+            val startTime = SystemClock.elapsedRealtime()
             var previousHash: Int? = null
             var consecutiveIdleChecks = 0
 
-            while (System.currentTimeMillis() - startTime < timeout) {
+            while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
                     val tree = getFreshTree(treeParser)
                     val currentHash = computeTreeHash(tree)
@@ -344,7 +345,7 @@ class WaitForIdleTool
                     if (previousHash != null && currentHash == previousHash) {
                         consecutiveIdleChecks++
                         if (consecutiveIdleChecks >= REQUIRED_IDLE_CHECKS) {
-                            val elapsed = System.currentTimeMillis() - startTime
+                            val elapsed = SystemClock.elapsedRealtime() - startTime
                             Log.d(TAG, "wait_for_idle: UI idle after ${elapsed}ms")
                             val resultJson =
                                 buildJsonObject {
@@ -400,7 +401,7 @@ class WaitForIdleTool
                         put("type", "object")
                         putJsonObject("properties") {
                             putJsonObject("timeout") {
-                                put("type", "number")
+                                put("type", "integer")
                                 put("description", "Timeout in milliseconds (1-30000)")
                                 put("default", DEFAULT_TIMEOUT_MS.toInt())
                             }
