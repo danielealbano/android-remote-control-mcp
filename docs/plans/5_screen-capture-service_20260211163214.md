@@ -37,30 +37,30 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 
 ### Acceptance Criteria / Definition of Done (High Level)
 
-- [ ] `ScreenshotData` data class exists with `format`, `data` (base64), `width`, `height` fields and is `@Serializable`
-- [ ] `ScreenshotEncoder` utility class converts `Image` to `Bitmap`, encodes `Bitmap` to JPEG, and base64-encodes the result
-- [ ] `ScreenshotEncoder` handles row padding correctly when `rowStride != width * pixelStride`
-- [ ] `ScreenshotEncoder` recycles bitmaps after encoding to prevent memory leaks
-- [ ] `ScreenCaptureService` extends `Service()` and implements the bound service pattern with `LocalBinder`
-- [ ] `ScreenCaptureService` calls `startForeground()` within 5 seconds of `onStartCommand()` with a valid notification
-- [ ] `ScreenCaptureService` notification uses channel `screen_capture_channel` (already defined in `strings.xml` from Plan 1, channel created in `McpApplication.onCreate()` from Plan 6)
-- [ ] `ScreenCaptureService` MUST be started via `startForegroundService()` BEFORE `bindService()` is called (from McpServerService in Plan 6), because `bindService()` alone does NOT trigger `onStartCommand()`, and `startForeground()` must be called within 5 seconds of `startForegroundService()`. The correct sequence in McpServerService is: (1) `startForegroundService(intent)` (2) `bindService(intent, connection, flags)`.
-- [ ] `ScreenCaptureService.setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection()` using the activity result
-- [ ] `ScreenCaptureService.isMediaProjectionActive()` returns correct boolean state
-- [ ] `ScreenCaptureService.captureScreenshot(quality)` captures a screenshot with Mutex-based thread safety
-- [ ] `ScreenCaptureService` handles `onDestroy()` correctly: stops MediaProjection, releases ImageReader/VirtualDisplay, cancels coroutines, logs shutdown
-- [ ] `ScreenCaptureService` handles `onLowMemory()` and `onTrimMemory()` by releasing bitmap caches
-- [ ] `ScreenCaptureService` registers `MediaProjection.Callback` to handle projection stop events gracefully
-- [ ] `ScreenInfo` data class exists with `width`, `height`, `densityDpi`, `orientation` fields and is `@Serializable`
-- [ ] `McpAccessibilityService.getScreenInfo()` returns correct screen metrics and orientation
-- [ ] `MainActivity` registers `ActivityResultLauncher` for MediaProjection permission
-- [ ] `MainViewModel` exposes `isMediaProjectionGranted: StateFlow<Boolean>` and stores MediaProjection result
-- [ ] The notification channel for screen capture (`screen_capture_channel`) is created centrally in `McpApplication.onCreate()` (Plan 6, Task 6.6.3) before any service calls `startForeground()`. ScreenCaptureService does NOT create its own channel.
-- [ ] Unit tests exist and pass for `ScreenshotEncoder` (image-to-bitmap, JPEG encoding, base64 encoding, quality parameter, bitmap recycling)
-- [ ] Unit tests exist and pass for `ScreenCaptureService` (projection state, capture failure when not active, mutex concurrency)
-- [ ] `make lint` passes with no warnings or errors
-- [ ] `make test-unit` passes with all tests green
-- [ ] `make build` succeeds without errors or warnings
+- [x] `ScreenshotData` data class exists with `format`, `data` (base64), `width`, `height` fields and is `@Serializable`
+- [x] `ScreenshotEncoder` utility class converts `Image` to `Bitmap`, encodes `Bitmap` to JPEG, and base64-encodes the result
+- [x] `ScreenshotEncoder` handles row padding correctly when `rowStride != width * pixelStride`
+- [x] `ScreenshotEncoder` recycles bitmaps after encoding to prevent memory leaks
+- [x] `ScreenCaptureService` extends `Service()` and implements the bound service pattern with `LocalBinder`
+- [x] `ScreenCaptureService` calls `startForeground()` within 5 seconds of `onStartCommand()` with a valid notification
+- [x] `ScreenCaptureService` notification uses channel `screen_capture_channel` (already defined in `strings.xml` from Plan 1, channel created in `McpApplication.onCreate()` from Plan 6)
+- [x] `ScreenCaptureService` MUST be started via `startForegroundService()` BEFORE `bindService()` is called (from McpServerService in Plan 6), because `bindService()` alone does NOT trigger `onStartCommand()`, and `startForeground()` must be called within 5 seconds of `startForegroundService()`. The correct sequence in McpServerService is: (1) `startForegroundService(intent)` (2) `bindService(intent, connection, flags)`.
+- [x] `ScreenCaptureService.setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection()` using the activity result
+- [x] `ScreenCaptureService.isMediaProjectionActive()` returns correct boolean state
+- [x] `ScreenCaptureService.captureScreenshot(quality)` captures a screenshot with Mutex-based thread safety
+- [x] `ScreenCaptureService` handles `onDestroy()` correctly: stops MediaProjection, releases ImageReader/VirtualDisplay, cancels coroutines, logs shutdown
+- [x] `ScreenCaptureService` handles `onLowMemory()` and `onTrimMemory()` by releasing bitmap caches
+- [x] `ScreenCaptureService` registers `MediaProjection.Callback` to handle projection stop events gracefully
+- [x] `ScreenInfo` data class exists with `width`, `height`, `densityDpi`, `orientation` fields and is `@Serializable`
+- [x] `McpAccessibilityService.getScreenInfo()` returns correct screen metrics and orientation
+- [x] `MainActivity` registers `ActivityResultLauncher` for MediaProjection permission
+- [x] `MainViewModel` exposes `isMediaProjectionGranted: StateFlow<Boolean>` and stores MediaProjection result
+- [x] The notification channel for screen capture (`screen_capture_channel`) is created centrally in `McpApplication.onCreate()` (Plan 6, Task 6.6.3) before any service calls `startForeground()`. ScreenCaptureService does NOT create its own channel.
+- [x] Unit tests exist and pass for `ScreenshotEncoder` (image-to-bitmap, JPEG encoding, base64 encoding, quality parameter, bitmap recycling)
+- [x] Unit tests exist and pass for `ScreenCaptureService` (projection state, capture failure when not active, mutex concurrency)
+- [x] `make lint` passes with no warnings or errors
+- [x] `make test-unit` passes with all tests green
+- [x] `make build` succeeds without errors or warnings
 
 ### Commit Strategy
 
@@ -78,10 +78,10 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Create the `ScreenshotData` data class that represents a captured screenshot ready for MCP response serialization.
 
 **Acceptance Criteria**:
-- [ ] `ScreenshotData` is a `@Serializable` data class in package `services.screencapture`
-- [ ] Fields: `format: String` (defaults to `"jpeg"`), `data: String` (base64-encoded JPEG), `width: Int`, `height: Int`
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ScreenshotData` is a `@Serializable` data class in package `data.model` (per PROJECT.md)
+- [x] Fields: `format: String` (defaults to `"jpeg"`), `data: String` (base64-encoded JPEG), `width: Int`, `height: Int`
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 > **Implementation Note — Package location**: The acceptance criteria places `ScreenshotData` in `services.screencapture`, but PROJECT.md line 151 lists it under `data/model/`. Use the PROJECT.md location (`data/model/`) at implementation time, as noted in the existing discrepancy note at Action 5.1.1.
 
@@ -133,15 +133,15 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Create the `ScreenshotEncoder` utility class that handles the full pipeline of converting an `Image` (from ImageReader) to a `Bitmap`, encoding the `Bitmap` to JPEG, and base64-encoding the result.
 
 **Acceptance Criteria**:
-- [ ] `ScreenshotEncoder` has `@Inject constructor()` for Hilt injection
-- [ ] `imageToBitmap(image: Image): Bitmap` correctly handles row padding (when `rowStride != width * pixelStride`)
-- [ ] `encodeBitmapToJpeg(bitmap: Bitmap, quality: Int): ByteArray` compresses bitmap to JPEG
-- [ ] `encodeToBase64(bytes: ByteArray): String` produces base64 string with `NO_WRAP` flag
-- [ ] `bitmapToScreenshotData(bitmap: Bitmap, quality: Int): ScreenshotData` chains the full pipeline and returns a complete `ScreenshotData`
-- [ ] Bitmaps created in `imageToBitmap` are the caller's responsibility to recycle (documented)
-- [ ] Quality parameter is validated (clamped to 1-100 range)
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ScreenshotEncoder` has `@Inject constructor()` for Hilt injection
+- [x] `imageToBitmap(image: Image): Bitmap` correctly handles row padding (when `rowStride != width * pixelStride`)
+- [x] `encodeBitmapToJpeg(bitmap: Bitmap, quality: Int): ByteArray` compresses bitmap to JPEG
+- [x] `encodeToBase64(bytes: ByteArray): String` produces base64 string with `NO_WRAP` flag
+- [x] `bitmapToScreenshotData(bitmap: Bitmap, quality: Int): ScreenshotData` chains the full pipeline and returns a complete `ScreenshotData`
+- [x] Bitmaps created in `imageToBitmap` are the caller's responsibility to recycle (documented)
+- [x] Quality parameter is validated (clamped to 1-100 range)
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests in Task 5.7 (`ScreenshotEncoderTest.kt`).
 
@@ -268,16 +268,16 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Create a `MediaProjectionHelper.kt` class that encapsulates all MediaProjection lifecycle management: permission result handling, projection setup/teardown, and callback registration. This follows SOLID's Single Responsibility Principle -- `ScreenCaptureService` should focus on service lifecycle and screenshot coordination, while `MediaProjectionHelper` handles projection-specific logic. The class is injected into `ScreenCaptureService`.
 
 **Acceptance Criteria**:
-- [ ] `MediaProjectionHelper` is a class (not a service) in `services/screencapture/` package
-- [ ] `MediaProjectionHelper` has `setupProjection(context: Context, resultCode: Int, data: Intent)` method
-- [ ] `MediaProjectionHelper` has `stopProjection()` method for cleanup
-- [ ] `MediaProjectionHelper` has `isProjectionActive(): Boolean` method
-- [ ] `MediaProjectionHelper` has `getProjection(): MediaProjection?` accessor
-- [ ] `MediaProjectionHelper` registers `MediaProjection.Callback` to handle system-initiated stops
-- [ ] `MediaProjectionHelper` provides an `onProjectionStopped: (() -> Unit)?` callback for the service to react to projection loss
-- [ ] `MediaProjectionHelper` is `@Inject`-able via Hilt (empty constructor or Hilt module binding)
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `MediaProjectionHelper` is a class (not a service) in `services/screencapture/` package
+- [x] `MediaProjectionHelper` has `setupProjection(context: Context, resultCode: Int, data: Intent)` method
+- [x] `MediaProjectionHelper` has `stopProjection()` method for cleanup
+- [x] `MediaProjectionHelper` has `isProjectionActive(): Boolean` method
+- [x] `MediaProjectionHelper` has `getProjection(): MediaProjection?` accessor
+- [x] `MediaProjectionHelper` registers `MediaProjection.Callback` to handle system-initiated stops
+- [x] `MediaProjectionHelper` provides an `onProjectionStopped: (() -> Unit)?` callback for the service to react to projection loss
+- [x] `MediaProjectionHelper` is `@Inject`-able via Hilt (empty constructor or Hilt module binding)
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Tested indirectly via `ScreenCaptureServiceTest`. Since `MediaProjectionHelper` wraps Android framework APIs (`android.media.projection.MediaProjectionManager` system service), direct unit testing requires mocking. Tests added in Task 5.8.
 
@@ -397,25 +397,25 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Replace the stub `ScreenCaptureService` (from Plan 1) with a full implementation: a bound foreground service that manages MediaProjection, handles lifecycle correctly, and provides thread-safe screenshot capture.
 
 **Acceptance Criteria**:
-- [ ] `ScreenCaptureService` extends `Service()` and is annotated with `@AndroidEntryPoint` for Hilt injection
-- [ ] Inner class `LocalBinder : Binder()` exposes `fun getService(): ScreenCaptureService`
-- [ ] `onBind()` returns `LocalBinder` instance
-- [ ] `onStartCommand()` calls `startForeground()` with a notification on channel `screen_capture_channel`
-- [ ] Notification channel is NOT created by the service itself -- it relies on centralized channel creation in `McpApplication.onCreate()` (see Plan 6, Task 6.6.3). The channel MUST already exist before `startForeground()` is called.
-- [ ] `onDestroy()` delegates to `MediaProjectionHelper.stopProjection()`, releases ImageReader/VirtualDisplay, cancels coroutine scope, clears singleton, logs shutdown
-- [ ] `onLowMemory()` and `onTrimMemory()` log the event (no bitmap caches to release at this layer since bitmaps are created and recycled within a single capture call)
-- [ ] `setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection(context, resultCode, data)`
-- [ ] `isMediaProjectionActive()` delegates to `MediaProjectionHelper.isProjectionActive()`
-- [ ] `captureScreenshot(quality)` acquires mutex, checks projection active, creates ImageReader/VirtualDisplay, waits for image via `suspendCancellableCoroutine`, converts image, returns `Result<ScreenshotData>`
-- [ ] `captureScreenshot()` returns `Result.failure()` with descriptive message when projection is not active
-- [ ] ImageReader uses `PixelFormat.RGBA_8888` with buffer size 2 (double-buffered)
-- [ ] VirtualDisplay uses `DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR`
-- [ ] `MediaProjectionHelper.onProjectionStopped` callback set to release resources and log
-- [ ] Companion object stores singleton instance for inter-service access (following accessibility service pattern from Plan 4)
-- [ ] Screenshot capture uses `Dispatchers.Default` for CPU-intensive encoding work
-- [ ] `ScreenshotEncoder` and `MediaProjectionHelper` are `@Inject`ed via Hilt
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ScreenCaptureService` extends `Service()` and is annotated with `@AndroidEntryPoint` for Hilt injection
+- [x] Inner class `LocalBinder : Binder()` exposes `fun getService(): ScreenCaptureService`
+- [x] `onBind()` returns `LocalBinder` instance
+- [x] `onStartCommand()` calls `startForeground()` with a notification on channel `screen_capture_channel`
+- [x] Notification channel is NOT created by the service itself -- it relies on centralized channel creation in `McpApplication.onCreate()` (see Plan 6, Task 6.6.3). The channel MUST already exist before `startForeground()` is called.
+- [x] `onDestroy()` delegates to `MediaProjectionHelper.stopProjection()`, releases ImageReader/VirtualDisplay, cancels coroutine scope, clears singleton, logs shutdown
+- [x] `onLowMemory()` and `onTrimMemory()` log the event (no bitmap caches to release at this layer since bitmaps are created and recycled within a single capture call)
+- [x] `setupMediaProjection(resultCode, data)` delegates to `MediaProjectionHelper.setupProjection(context, resultCode, data)`
+- [x] `isMediaProjectionActive()` delegates to `MediaProjectionHelper.isProjectionActive()`
+- [x] `captureScreenshot(quality)` acquires mutex, checks projection active, creates ImageReader/VirtualDisplay, waits for image via `suspendCancellableCoroutine`, converts image, returns `Result<ScreenshotData>`
+- [x] `captureScreenshot()` returns `Result.failure()` with descriptive message when projection is not active
+- [x] ImageReader uses `PixelFormat.RGBA_8888` with buffer size 2 (double-buffered)
+- [x] VirtualDisplay uses `DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR`
+- [x] `MediaProjectionHelper.onProjectionStopped` callback set to release resources and log
+- [x] Companion object stores singleton instance for inter-service access (following accessibility service pattern from Plan 4)
+- [x] Screenshot capture uses `Dispatchers.Default` for CPU-intensive encoding work
+- [x] `ScreenshotEncoder` and `MediaProjectionHelper` are `@Inject`ed via Hilt
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Unit tests in Task 5.8 (`ScreenCaptureServiceTest.kt`).
 
@@ -750,11 +750,11 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Create the `ScreenInfo` data class that represents screen dimensions and orientation. This is returned by `McpAccessibilityService.getScreenInfo()` and will be used by the `get_screen_info` MCP tool.
 
 **Acceptance Criteria**:
-- [ ] `ScreenInfo` is a `@Serializable` data class
-- [ ] Fields: `width: Int`, `height: Int`, `densityDpi: Int`, `orientation: String`
-- [ ] Located in `services/accessibility/` package (since it is produced by the accessibility service)
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `ScreenInfo` is a `@Serializable` data class
+- [x] Fields: `width: Int`, `height: Int`, `densityDpi: Int`, `orientation: String`
+- [x] Located in `services/accessibility/` package (since it is produced by the accessibility service)
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Implicitly tested by the accessibility service unit tests. No separate test file for this data class.
 
@@ -806,12 +806,12 @@ This plan implements the ScreenCaptureService as a bound foreground service that
 **Description**: Add a `getScreenInfo()` method to `McpAccessibilityService` that returns the current screen dimensions, density, and orientation.
 
 **Acceptance Criteria**:
-- [ ] `getScreenInfo(): ScreenInfo` method is added to `McpAccessibilityService`
-- [ ] Method returns correct width, height, densityDpi from display metrics
-- [ ] Method returns correct orientation string ("portrait" or "landscape") based on `Configuration.orientation`
-- [ ] Method handles API level differences for getting display metrics (API 30+ vs older)
-- [ ] File compiles without errors
-- [ ] File passes ktlint and detekt
+- [x] `getScreenInfo(): ScreenInfo` method is added to `McpAccessibilityService`
+- [x] Method returns correct width, height, densityDpi from display metrics
+- [x] Method returns correct orientation string ("portrait" or "landscape") based on `Configuration.orientation`
+- [x] Method handles API level differences for getting display metrics (API 30+ vs older)
+- [x] File compiles without errors
+- [x] File passes ktlint and detekt
 
 **Tests**: Tested as part of accessibility service tests (Plan 4 tests or extended in Task 5.8). The method is straightforward and primarily delegates to Android framework APIs.
 
@@ -892,15 +892,15 @@ The following additions should be made to the existing file. The exact line numb
 **Description**: Add MediaProjection permission handling to `MainActivity` (ActivityResultLauncher) and `MainViewModel` (state tracking). This connects the "Grant" button in the PermissionsSection to the MediaProjection permission dialog.
 
 **Acceptance Criteria**:
-- [ ] `MainActivity` registers an `ActivityResultLauncher<Intent>` for `MediaProjectionManager.createScreenCaptureIntent()`
-- [ ] On successful result (`RESULT_OK`), the result code and data intent are stored in `MainViewModel`
-- [ ] `MainViewModel` exposes `isMediaProjectionGranted: StateFlow<Boolean>` for UI observation
-- [ ] `MainViewModel` has `fun setMediaProjectionResult(resultCode: Int, data: Intent)` to store the result
-- [ ] `MainViewModel` exposes `mediaProjectionResultCode: Int` and `mediaProjectionData: Intent?` for later retrieval by McpServerService
-- [ ] The PermissionsSection "Grant" button for MediaProjection calls the launcher
-- [ ] `strings.xml` is updated with any new strings needed for this task (if any)
-- [ ] Files compile without errors
-- [ ] Files pass ktlint and detekt
+- [x] `MainActivity` registers an `ActivityResultLauncher<Intent>` for `MediaProjectionManager.createScreenCaptureIntent()`
+- [x] On successful result (`RESULT_OK`), the result code and data intent are stored in `MainViewModel`
+- [x] `MainViewModel` exposes `isMediaProjectionGranted: StateFlow<Boolean>` for UI observation
+- [x] `MainViewModel` has `fun setMediaProjectionResult(resultCode: Int, data: Intent)` to store the result
+- [x] `MainViewModel` exposes `mediaProjectionResultCode: Int` and `mediaProjectionData: Intent?` for later retrieval by McpServerService
+- [x] The PermissionsSection "Grant" button for MediaProjection calls the launcher
+- [x] `strings.xml` is updated with any new strings needed for this task (if any)
+- [x] Files compile without errors
+- [x] Files pass ktlint and detekt
 
 **Tests**: MainViewModel updates are tested as part of `MainViewModelTest` (from Plan 3, extended here). UI interactions are tested in integration tests.
 
@@ -1033,18 +1033,18 @@ The following additions should be made to the existing file:
 **Description**: Create unit tests for the `ScreenshotEncoder` class covering image-to-bitmap conversion, JPEG encoding, base64 encoding, quality parameter handling, and the full pipeline.
 
 **Acceptance Criteria**:
-- [ ] Tests use JUnit 5 (`@Test` annotations from `org.junit.jupiter.api`)
-- [ ] Tests use MockK for mocking Android framework classes (`Image`, `Image.Plane`)
-- [ ] Tests follow Arrange-Act-Assert pattern
-- [ ] Test: `imageToBitmap` handles row padding (mocked `Image` with `rowStride > width * pixelStride`)
-- [ ] Test: `imageToBitmap` handles no row padding (mocked `Image` with `rowStride == width * pixelStride`)
-- [ ] Test: `encodeBitmapToJpeg` produces non-empty byte array
-- [ ] Test: `encodeBitmapToJpeg` clamps quality to valid range (test with quality 0 and 101)
-- [ ] Test: `encodeToBase64` produces valid base64 string
-- [ ] Test: `bitmapToScreenshotData` returns correct format, dimensions, and non-empty data
-- [ ] Test: quality parameter affects output size (low quality < high quality for same bitmap)
-- [ ] All tests pass
-- [ ] File passes ktlint and detekt
+- [x] Tests use JUnit 5 (`@Test` annotations from `org.junit.jupiter.api`)
+- [x] Tests use MockK for mocking Android framework classes (`Image`, `Image.Plane`)
+- [x] Tests follow Arrange-Act-Assert pattern
+- [x] Test: `imageToBitmap` handles row padding (mocked `Image` with `rowStride > width * pixelStride`)
+- [x] Test: `imageToBitmap` handles no row padding (mocked `Image` with `rowStride == width * pixelStride`)
+- [x] Test: `encodeBitmapToJpeg` produces non-empty byte array
+- [x] Test: `encodeBitmapToJpeg` clamps quality to valid range (test with quality 0 and 101)
+- [x] Test: `encodeToBase64` produces valid base64 string
+- [x] Test: `bitmapToScreenshotData` returns correct format, dimensions, and non-empty data
+- [x] Test: quality parameter affects output size (low quality < high quality for same bitmap)
+- [x] All tests pass
+- [x] File passes ktlint and detekt
 
 **Tests**: This IS the test task. All tests are in `ScreenshotEncoderTest.kt`.
 
@@ -1310,16 +1310,16 @@ The following additions should be made to the existing file:
 **Description**: Create unit tests for the `ScreenCaptureService` class covering MediaProjection state, capture failure handling, and mutex concurrency behavior.
 
 **Acceptance Criteria**:
-- [ ] Tests use JUnit 5 (`@Test` annotations from `org.junit.jupiter.api`)
-- [ ] Tests use MockK for mocking Android framework classes (`MediaProjection`, `Context`) and project class (`MediaProjectionHelper`)
-- [ ] Tests follow Arrange-Act-Assert pattern
-- [ ] Test: `isMediaProjectionActive` returns `false` when not set up
-- [ ] Test: `isMediaProjectionActive` returns `true` after `setupMediaProjection` is called
-- [ ] Test: `captureScreenshot` returns failure when projection is not active
-- [ ] Test: `captureScreenshot` failure message is descriptive
-- [ ] Test: concurrent `captureScreenshot` calls are serialized (mutex test)
-- [ ] All tests pass
-- [ ] File passes ktlint and detekt
+- [x] Tests use JUnit 5 (`@Test` annotations from `org.junit.jupiter.api`)
+- [x] Tests use MockK for mocking Android framework classes (`MediaProjection`, `Context`) and project class (`MediaProjectionHelper`)
+- [x] Tests follow Arrange-Act-Assert pattern
+- [x] Test: `isMediaProjectionActive` returns `false` when not set up
+- [x] Test: `isMediaProjectionActive` returns `true` after `setupMediaProjection` is called
+- [x] Test: `captureScreenshot` returns failure when projection is not active
+- [x] Test: `captureScreenshot` failure message is descriptive
+- [x] Test: concurrent `captureScreenshot` calls are serialized (mutex test)
+- [x] All tests pass
+- [x] File passes ktlint and detekt
 
 > **Important Note on Service Testing**: Testing an Android `Service` in JVM unit tests requires careful mocking. The service inherits from `android.app.Service` which has many framework dependencies. Options:
 > 1. **Robolectric**: Provides a full shadow implementation of Service. Preferred if available.
@@ -1502,10 +1502,10 @@ The following additions should be made to the existing file:
 **Description**: Run all verification commands to ensure the implementation is correct, then create the commits.
 
 **Acceptance Criteria**:
-- [ ] `make build` succeeds (debug APK is generated without errors or warnings)
-- [ ] `make lint` succeeds (no ktlint or detekt violations)
-- [ ] `make test-unit` succeeds (all tests pass, including new and existing tests)
-- [ ] All 4 commits are created on the `feat/screen-capture-service` branch
+- [x] `make build` succeeds (debug APK is generated without errors or warnings)
+- [x] `make lint` succeeds (no ktlint or detekt violations)
+- [x] `make test-unit` succeeds (all tests pass, including new and existing tests)
+- [x] All 4 commits are created on the `feat/screen-capture-service` branch
 
 **Tests**: These are the verification steps, not unit tests.
 
