@@ -1729,8 +1729,8 @@ Fix any failures.
 **Goal**: Update project documentation to reflect the new tunnel feature.
 
 **Acceptance Criteria**:
-- [ ] `docs/PROJECT.md` updated with tunnel settings, providers, and architecture
-- [ ] `docs/ARCHITECTURE.md` updated with tunnel component in the architecture diagram
+- [x] `docs/PROJECT.md` updated with tunnel settings, providers, and architecture
+- [x] `docs/ARCHITECTURE.md` updated with tunnel component in the architecture diagram
 
 #### Action 15.1: Update `docs/PROJECT.md`
 
@@ -1752,7 +1752,7 @@ Add tunnel layer to the architecture diagram showing:
 - `NgrokTunnelProvider` (in-process JNI)
 
 **Definition of Done**:
-- [ ] Documentation is accurate and complete
+- [x] Documentation is accurate and complete
 
 ---
 
