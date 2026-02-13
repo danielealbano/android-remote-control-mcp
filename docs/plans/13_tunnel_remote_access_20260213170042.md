@@ -1689,11 +1689,11 @@ This step must be added BEFORE the test step(s) that run integration tests. The 
 **Goal**: Verify all quality gates pass.
 
 **Acceptance Criteria**:
-- [ ] `make lint` passes with no warnings/errors
-- [ ] `make lint-fix` applied if needed
-- [ ] `./gradlew build` succeeds without warnings
-- [ ] `make test-unit` passes (all unit + integration tests)
-- [ ] No TODOs, no dead code, no commented-out code
+- [x] `make lint` passes with no warnings/errors
+- [x] `make lint-fix` applied if needed
+- [x] `./gradlew build` succeeds without warnings
+- [x] `make test-unit` passes (all unit + integration tests)
+- [x] No TODOs, no dead code, no commented-out code
 
 #### Action 14.1: Run lint
 
@@ -1720,7 +1720,7 @@ make test-unit
 Fix any failures.
 
 **Definition of Done**:
-- [ ] All quality gates pass
+- [x] All quality gates pass
 
 ---
 

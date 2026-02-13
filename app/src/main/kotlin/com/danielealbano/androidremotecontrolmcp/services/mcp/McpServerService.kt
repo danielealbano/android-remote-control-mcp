@@ -13,7 +13,6 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
@@ -28,6 +27,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -116,7 +116,7 @@ class McpServerService : Service() {
         return START_STICKY
     }
 
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "LongMethod")
     private suspend fun startServer() {
         try {
             updateStatus(ServerStatus.Starting)
@@ -249,7 +249,7 @@ class McpServerService : Service() {
                 }
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            Log.w(TAG, "Tunnel stop timed out after ${TUNNEL_STOP_TIMEOUT_MS}ms, proceeding with shutdown")
+            Log.w(TAG, "Tunnel stop timed out after ${TUNNEL_STOP_TIMEOUT_MS}ms, proceeding with shutdown", e)
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping tunnel", e)
         }

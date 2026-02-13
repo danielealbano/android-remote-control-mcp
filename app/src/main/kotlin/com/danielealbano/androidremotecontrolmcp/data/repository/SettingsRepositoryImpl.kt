@@ -149,6 +149,7 @@ class SettingsRepositoryImpl
          * Maps raw [Preferences] to a [ServerConfig] instance, applying defaults
          * for any missing keys.
          */
+        @Suppress("CyclomaticComplexMethod")
         private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
             val bindingAddressName = prefs[BINDING_ADDRESS_KEY] ?: BindingAddress.LOCALHOST.name
             val certificateSourceName = prefs[CERTIFICATE_SOURCE_KEY] ?: CertificateSource.AUTO_GENERATED.name

@@ -74,7 +74,9 @@ class CloudflareTunnelProvider
 
                     startStderrReader(proc)
                     startProcessMonitor(proc)
-                } catch (e: Exception) {
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
                     Log.e(TAG, "Failed to start cloudflared process", e)
                     _status.value = TunnelStatus.Error("Failed to start cloudflared: ${e.message}")
                     process = null
@@ -125,7 +127,9 @@ class CloudflareTunnelProvider
                                     )
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") e: Exception,
+                    ) {
                         if (isActive) {
                             Log.w(TAG, "Error reading cloudflared stderr", e)
                         }
