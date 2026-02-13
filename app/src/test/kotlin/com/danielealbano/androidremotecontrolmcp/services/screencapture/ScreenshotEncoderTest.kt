@@ -430,5 +430,81 @@ class ScreenshotEncoderTest {
             val result = encoder.resizeBitmapProportional(bitmap, 1, 1)
             assertSame(scaledBitmap, result)
         }
+
+        @Test
+        @DisplayName("zero width coerces to minimum 1 pixel")
+        fun zeroWidthCoercesToMinimum() {
+            // maxWidth=0, maxHeight=null → scale = 0/1080 = 0.0
+            // targetWidth = 0, targetHeight = (1920 * 0.0).toInt() = 0
+            // Both coerced to 1
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 1, 1, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 0, null)
+            assertSame(scaledBitmap, result)
+            verify { Bitmap.createScaledBitmap(bitmap, 1, 1, true) }
+        }
+
+        @Test
+        @DisplayName("zero height coerces to minimum 1 pixel")
+        fun zeroHeightCoercesToMinimum() {
+            // maxWidth=null, maxHeight=0 → scale = 0/1920 = 0.0
+            // targetWidth = (1080 * 0.0).toInt() = 0, targetHeight = 0
+            // Both coerced to 1
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 1, 1, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, null, 0)
+            assertSame(scaledBitmap, result)
+            verify { Bitmap.createScaledBitmap(bitmap, 1, 1, true) }
+        }
+
+        @Test
+        @DisplayName("negative width coerces to minimum 1 pixel")
+        fun negativeWidthCoercesToMinimum() {
+            // maxWidth=-5, maxHeight=null → scale = -5/1080 = -0.00463
+            // targetWidth = -5, targetHeight = (1920 * -0.00463).toInt() = -8
+            // Both coerced to 1
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 1, 1, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, -5, null)
+            assertSame(scaledBitmap, result)
+            verify { Bitmap.createScaledBitmap(bitmap, 1, 1, true) }
+        }
+
+        @Test
+        @DisplayName("negative height coerces to minimum 1 pixel")
+        fun negativeHeightCoercesToMinimum() {
+            // maxWidth=null, maxHeight=-10 → scale = -10/1920 = -0.00521
+            // targetWidth = (1080 * -0.00521).toInt() = -5, targetHeight = -10
+            // Both coerced to 1
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 1, 1, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, null, -10)
+            assertSame(scaledBitmap, result)
+            verify { Bitmap.createScaledBitmap(bitmap, 1, 1, true) }
+        }
     }
 }

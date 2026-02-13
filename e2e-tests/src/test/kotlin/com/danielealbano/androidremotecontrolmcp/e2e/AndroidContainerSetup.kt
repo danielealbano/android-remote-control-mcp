@@ -36,7 +36,7 @@ object AndroidContainerSetup {
     private const val DEFAULT_EMULATOR_BOOT_TIMEOUT_MS = 180_000L
     private const val DEFAULT_SERVER_READY_TIMEOUT_MS = 60_000L
     private const val POLL_INTERVAL_MS = 2_000L
-    private const val HEALTH_POLL_INTERVAL_MS = 1_000L
+    private const val SERVER_READY_POLL_INTERVAL_MS = 1_000L
 
     /**
      * Default bearer token for E2E tests.
@@ -450,7 +450,7 @@ object AndroidContainerSetup {
                     lastError = errorMsg
                 }
             }
-            Thread.sleep(HEALTH_POLL_INTERVAL_MS)
+            Thread.sleep(SERVER_READY_POLL_INTERVAL_MS)
         }
 
         // Dump diagnostics before failing

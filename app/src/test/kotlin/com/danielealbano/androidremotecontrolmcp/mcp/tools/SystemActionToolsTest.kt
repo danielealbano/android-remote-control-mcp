@@ -95,10 +95,9 @@ class SystemActionToolsTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
+                assertThrows<McpToolException.PermissionDenied> {
+                    handler.execute(null)
+                }
             }
 
         @Test
@@ -113,7 +112,7 @@ class SystemActionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.ActionFailed> {
                         handler.execute(null)
                     }
                 assertTrue(exception.message!!.contains("Global action failed"))
@@ -149,7 +148,7 @@ class SystemActionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.PermissionDenied> { handler.execute(null) }
             }
 
         @Test
@@ -160,7 +159,7 @@ class SystemActionToolsTest {
                     Result.failure(
                         RuntimeException("Action failed"),
                     )
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.ActionFailed> { handler.execute(null) }
             }
     }
 
@@ -193,7 +192,7 @@ class SystemActionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.PermissionDenied> { handler.execute(null) }
             }
 
         @Test
@@ -204,7 +203,7 @@ class SystemActionToolsTest {
                     Result.failure(
                         RuntimeException("Action failed"),
                     )
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.ActionFailed> { handler.execute(null) }
             }
     }
 
@@ -237,7 +236,7 @@ class SystemActionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.PermissionDenied> { handler.execute(null) }
             }
 
         @Test
@@ -248,7 +247,7 @@ class SystemActionToolsTest {
                     Result.failure(
                         RuntimeException("Action failed"),
                     )
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.ActionFailed> { handler.execute(null) }
             }
     }
 
@@ -281,7 +280,7 @@ class SystemActionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.PermissionDenied> { handler.execute(null) }
             }
 
         @Test
@@ -292,7 +291,7 @@ class SystemActionToolsTest {
                     Result.failure(
                         RuntimeException("Action failed"),
                     )
-                val exception = assertThrows<McpToolException> { handler.execute(null) }
+                assertThrows<McpToolException.ActionFailed> { handler.execute(null) }
             }
     }
 
@@ -364,7 +363,7 @@ class SystemActionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.InvalidParams> {
                         handler.execute(params)
                     }
                 assertTrue(exception.message!!.contains("last_lines"))
@@ -379,7 +378,7 @@ class SystemActionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.InvalidParams> {
                         handler.execute(params)
                     }
                 assertTrue(exception.message!!.contains("last_lines"))
@@ -394,7 +393,7 @@ class SystemActionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.InvalidParams> {
                         handler.execute(params)
                     }
                 assertTrue(exception.message!!.contains("integer"))
@@ -409,7 +408,7 @@ class SystemActionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.InvalidParams> {
                         handler.execute(params)
                     }
                 assertTrue(exception.message!!.contains("level"))

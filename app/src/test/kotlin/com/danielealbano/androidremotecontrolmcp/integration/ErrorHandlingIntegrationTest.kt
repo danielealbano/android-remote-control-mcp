@@ -2,16 +2,21 @@
 
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -142,6 +147,89 @@ class ErrorHandlingIntegrationTest {
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Unexpected internal error"))
+            }
+        }
+
+    @Test
+    fun `wait_for_element timeout returns informational non-error result`() =
+        runTest {
+            mockkStatic(SystemClock::class)
+            try {
+                var clockMs = 0L
+                every { SystemClock.elapsedRealtime() } answers { clockMs }
+
+                val deps = McpIntegrationTestHelper.createMockDependencies()
+                val mockRootNode = mockk<AccessibilityNodeInfo>()
+                every { deps.accessibilityServiceProvider.isReady() } returns true
+                every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
+                every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
+                every { mockRootNode.recycle() } returns Unit
+                every {
+                    deps.elementFinder.findElements(sampleTree, FindBy.TEXT, "nonexistent_element_xyz", false)
+                } answers {
+                    clockMs += 600L
+                    emptyList()
+                }
+
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "wait_for_element",
+                            arguments =
+                                mapOf(
+                                    "by" to "text",
+                                    "value" to "nonexistent_element_xyz",
+                                    "timeout" to 1000,
+                                ),
+                        )
+                    assertNotEquals(true, result.isError)
+                    val text = (result.content[0] as TextContent).text
+                    assertTrue(text.contains("timed out"))
+                }
+            } finally {
+                unmockkStatic(SystemClock::class)
+            }
+        }
+
+    @Test
+    fun `wait_for_idle timeout returns informational non-error result`() =
+        runTest {
+            mockkStatic(SystemClock::class)
+            try {
+                var clockMs = 0L
+                every { SystemClock.elapsedRealtime() } answers { clockMs }
+
+                val deps = McpIntegrationTestHelper.createMockDependencies()
+                val mockRootNode = mockk<AccessibilityNodeInfo>()
+                every { deps.accessibilityServiceProvider.isReady() } returns true
+                every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
+                every { mockRootNode.recycle() } returns Unit
+
+                var callCount = 0
+                every { deps.treeParser.parseTree(mockRootNode) } answers {
+                    callCount++
+                    clockMs += 600L
+                    AccessibilityNodeData(
+                        id = "node_root",
+                        className = "android.widget.FrameLayout",
+                        text = "changing_text_$callCount",
+                        bounds = BoundsData(0, 0, 1080, 2400),
+                        visible = true,
+                    )
+                }
+
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "wait_for_idle",
+                            arguments = mapOf("timeout" to 1000),
+                        )
+                    assertNotEquals(true, result.isError)
+                    val text = (result.content[0] as TextContent).text
+                    assertTrue(text.contains("timed out"))
+                }
+            } finally {
+                unmockkStatic(SystemClock::class)
             }
         }
 }

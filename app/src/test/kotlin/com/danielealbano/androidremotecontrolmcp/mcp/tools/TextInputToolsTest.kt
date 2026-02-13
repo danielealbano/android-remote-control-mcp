@@ -105,7 +105,7 @@ class TextInputToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 
@@ -202,7 +202,7 @@ class TextInputToolsTest {
             runTest {
                 val params = buildJsonObject { put("key", "ESCAPE") }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Invalid key"))
             }
 
@@ -211,7 +211,7 @@ class TextInputToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 }
