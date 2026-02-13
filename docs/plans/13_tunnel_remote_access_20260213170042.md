@@ -536,15 +536,15 @@ Note: `useLegacyPackaging = true` ensures `.so` files are stored uncompressed in
 **Goal**: Implement the Cloudflare Quick Tunnel provider that runs `cloudflared` as a child process.
 
 **Acceptance Criteria**:
-- [ ] `CloudflareTunnelProvider` implements `TunnelProvider`
-- [ ] `start(localPort, config)` signature matches `TunnelProvider` interface (config is available but Cloudflare does not use it)
-- [ ] Starts `cloudflared tunnel --url http://localhost:<port> --output json` as a child process
-- [ ] Parses the public `https://*.trycloudflare.com` URL from stderr (JSON output)
-- [ ] Updates status flow: `Disconnected` → `Connecting` → `Connected(url)` or `Error(msg)`
-- [ ] Stops the process gracefully on `stop()` (SIGTERM via `process.destroy()`)
-- [ ] Handles process death (unexpected termination) by updating status to `Error`
-- [ ] Handles case where cloudflared binary is not found
-- [ ] Unit tests pass
+- [x] `CloudflareTunnelProvider` implements `TunnelProvider`
+- [x] `start(localPort, config)` signature matches `TunnelProvider` interface (config is available but Cloudflare does not use it)
+- [x] Starts `cloudflared tunnel --url http://localhost:<port> --output json` as a child process
+- [x] Parses the public `https://*.trycloudflare.com` URL from stderr (JSON output)
+- [x] Updates status flow: `Disconnected` → `Connecting` → `Connected(url)` or `Error(msg)`
+- [x] Stops the process gracefully on `stop()` (SIGTERM via `process.destroy()`)
+- [x] Handles process death (unexpected termination) by updating status to `Error`
+- [x] Handles case where cloudflared binary is not found
+- [x] Unit tests pass
 
 #### Action 5.1: Create `CloudflaredBinaryResolver` interface and implementation
 
@@ -602,8 +602,8 @@ abstract fun bindCloudflareBinaryResolver(
 ```
 
 **Definition of Done**:
-- [ ] Interface and implementation compile
-- [ ] Hilt binding wired
+- [x] Interface and implementation compile
+- [x] Hilt binding wired
 
 #### Action 5.2: Create `CloudflareTunnelProvider`
 
@@ -629,8 +629,8 @@ Key constants:
 - `SHUTDOWN_TIMEOUT_MS = 5_000L`
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] Follows existing provider patterns (ScreenCaptureProviderImpl)
+- [x] Compiles without warnings
+- [x] Follows existing provider patterns (ScreenCaptureProviderImpl)
 
 #### Action 5.3: Create `CloudflareTunnelProviderTest`
 
@@ -650,7 +650,7 @@ Use MockK to mock `CloudflaredBinaryResolver` (return a known path or null).
 Use a mock process or process builder to simulate cloudflared output.
 
 **Definition of Done**:
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.CloudflareTunnelProviderTest"`
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.CloudflareTunnelProviderTest"`
 
 ---
 
@@ -659,13 +659,13 @@ Use a mock process or process builder to simulate cloudflared output.
 **Goal**: Implement the ngrok tunnel provider using the ngrok-java library.
 
 **Acceptance Criteria**:
-- [ ] `NgrokTunnelProvider` implements `TunnelProvider`
-- [ ] Uses `Session.forwardHttp()` pattern to forward traffic to localhost
-- [ ] Accepts authtoken and optional domain from `config` parameter (not from `SettingsRepository` directly)
-- [ ] Updates status flow appropriately
-- [ ] Closes session and forwarder on `stop()`
-- [ ] Returns graceful error on unsupported ABI (x86_64)
-- [ ] Unit tests pass
+- [x] `NgrokTunnelProvider` implements `TunnelProvider`
+- [x] Uses `Session.forwardHttp()` pattern to forward traffic to localhost
+- [x] Accepts authtoken and optional domain from `config` parameter (not from `SettingsRepository` directly)
+- [x] Updates status flow appropriately
+- [x] Closes session and forwarder on `stop()`
+- [x] Returns graceful error on unsupported ABI (x86_64)
+- [x] Unit tests pass
 
 #### Action 6.1: Create `NgrokTunnelProvider`
 
@@ -687,8 +687,8 @@ Implementation details:
 - Use `Mutex` to prevent concurrent start/stop
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] Handles all error cases (invalid authtoken, network error, unsupported ABI)
+- [x] Compiles without warnings
+- [x] Handles all error cases (invalid authtoken, network error, unsupported ABI)
 
 #### Action 6.2: Create `NgrokTunnelProviderTest`
 
@@ -709,7 +709,7 @@ Mock `Session`, `Forwarder`, `HttpBuilder` using MockK.
 Mock `Build.SUPPORTED_ABIS` for ABI checks.
 
 **Definition of Done**:
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.NgrokTunnelProviderTest"`
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.NgrokTunnelProviderTest"`
 
 ---
 
@@ -718,13 +718,13 @@ Mock `Build.SUPPORTED_ABIS` for ABI checks.
 **Goal**: Create a singleton manager that orchestrates tunnel provider lifecycle, selected by settings.
 
 **Acceptance Criteria**:
-- [ ] `TunnelManager` is a `@Singleton` Hilt-injected class
-- [ ] Exposes `tunnelStatus: StateFlow<TunnelStatus>`
-- [ ] `start(localPort)` reads settings, creates appropriate provider, starts tunnel
-- [ ] `stop()` stops the active provider
-- [ ] Provider is created on-demand based on current settings (not cached across restarts)
-- [ ] Thread-safe (Mutex for start/stop)
-- [ ] Unit tests pass
+- [x] `TunnelManager` is a `@Singleton` Hilt-injected class
+- [x] Exposes `tunnelStatus: StateFlow<TunnelStatus>`
+- [x] `start(localPort)` reads settings, creates appropriate provider, starts tunnel
+- [x] `stop()` stops the active provider
+- [x] Provider is created on-demand based on current settings (not cached across restarts)
+- [x] Thread-safe (Mutex for start/stop)
+- [x] Unit tests pass
 
 #### Action 7.1: Create `TunnelManager`
 
@@ -754,8 +754,8 @@ Implementation details:
 - Note: `scope` is never cancelled because TunnelManager is `@Singleton` and lives for the entire app lifecycle. Individual relay jobs are cancelled in `stop()`.
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] Follows singleton patterns used elsewhere in the project
+- [x] Compiles without warnings
+- [x] Follows singleton patterns used elsewhere in the project
 
 #### Action 7.2: Create `TunnelManagerTest`
 
@@ -773,7 +773,7 @@ Tests:
 Mock `SettingsRepository`, `javax.inject.Provider<CloudflareTunnelProvider>` factory, and `javax.inject.Provider<NgrokTunnelProvider>` factory. Each factory mock returns a fresh mock provider on `.get()`. This mirrors the actual DI setup where `TunnelManager` receives factories, not singleton providers.
 
 **Definition of Done**:
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.TunnelManagerTest"`
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.TunnelManagerTest"`
 
 ---
 
@@ -782,9 +782,9 @@ Mock `SettingsRepository`, `javax.inject.Provider<CloudflareTunnelProvider>` fac
 **Goal**: Wire `TunnelManager` and providers into the Hilt DI graph.
 
 **Acceptance Criteria**:
-- [ ] `CloudflareTunnelProvider` and `NgrokTunnelProvider` are injectable
-- [ ] `TunnelManager` is `@Singleton` and injectable
-- [ ] No circular dependencies
+- [x] `CloudflareTunnelProvider` and `NgrokTunnelProvider` are injectable
+- [x] `TunnelManager` is `@Singleton` and injectable
+- [x] No circular dependencies
 
 #### Action 8.1: Add tunnel bindings to `AppModule.kt`
 
@@ -813,8 +813,8 @@ class TunnelManager @Inject constructor(
 No explicit module binding needed — Hilt can provide `javax.inject.Provider<T>` automatically for any injectable class.
 
 **Definition of Done**:
-- [ ] Hilt graph compiles without errors
-- [ ] `TunnelManager` is injectable in `McpServerService`
+- [x] Hilt graph compiles without errors
+- [x] `TunnelManager` is injectable in `McpServerService`
 
 ---
 
