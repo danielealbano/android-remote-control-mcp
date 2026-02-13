@@ -35,6 +35,7 @@ private val DisabledColor = Color(0xFFF44336)
 fun PermissionsSection(
     isAccessibilityEnabled: Boolean,
     isMediaProjectionGranted: Boolean,
+    isNotificationPermissionGranted: Boolean,
     onOpenAccessibilitySettings: () -> Unit,
     onRequestMediaProjectionPermission: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
@@ -85,10 +86,15 @@ fun PermissionsSection(
 
             PermissionRow(
                 label = stringResource(R.string.permission_notifications),
-                isEnabled = true,
-                buttonText = stringResource(R.string.permission_grant),
+                isEnabled = isNotificationPermissionGranted,
+                buttonText =
+                    if (isNotificationPermissionGranted) {
+                        stringResource(R.string.permission_granted)
+                    } else {
+                        stringResource(R.string.permission_grant)
+                    },
                 onAction = onRequestNotificationPermission,
-                actionEnabled = true,
+                actionEnabled = !isNotificationPermissionGranted,
             )
         }
     }
@@ -142,6 +148,7 @@ private fun PermissionsSectionPreview() {
         PermissionsSection(
             isAccessibilityEnabled = false,
             isMediaProjectionGranted = false,
+            isNotificationPermissionGranted = false,
             onOpenAccessibilitySettings = {},
             onRequestMediaProjectionPermission = {},
             onRequestNotificationPermission = {},

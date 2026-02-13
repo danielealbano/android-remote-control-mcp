@@ -1,8 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -20,6 +22,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private lateinit var mediaProjectionLauncher: ActivityResultLauncher<Intent>
+    private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,10 +35,18 @@ class MainActivity : ComponentActivity() {
                 viewModel.setMediaProjectionResult(result.resultCode, result.data)
             }
 
+        notificationPermissionLauncher =
+            registerForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { _ ->
+                viewModel.refreshPermissionStatus(this)
+            }
+
         setContent {
             AndroidRemoteControlMcpTheme {
                 HomeScreen(
                     onRequestMediaProjectionPermission = ::requestMediaProjectionPermission,
+                    onRequestNotificationPermission = ::requestNotificationPermission,
                 )
             }
         }
@@ -75,6 +86,18 @@ class MainActivity : ComponentActivity() {
         val projectionManager =
             getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
+    }
+
+    /**
+     * Requests the POST_NOTIFICATIONS runtime permission (Android 13+).
+     *
+     * On Android 12 and below, notification permission is always granted so
+     * this is a no-op — the UI will already show the permission as granted.
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     companion object {
