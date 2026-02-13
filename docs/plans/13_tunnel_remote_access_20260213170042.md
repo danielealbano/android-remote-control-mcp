@@ -1614,13 +1614,13 @@ Add tests verifying new defaults:
 **Goal**: Create an integration test that starts a real Cloudflare Quick Tunnel and verifies it works end-to-end.
 
 **Acceptance Criteria**:
-- [ ] Test starts a **simple standalone HTTP test server** on a random local port (NOT the MCP server — this is a tunnel-layer test, not an MCP protocol test)
-- [ ] Test creates a real Cloudflare tunnel to the local test server
-- [ ] Test verifies the tunnel URL is accessible from the test (HTTP GET to tunnel URL returns expected response from the test server)
-- [ ] Test cleans up the tunnel after completion
-- [ ] Test has a reasonable timeout (60 seconds for tunnel establishment)
-- [ ] Test FAILS (not skips) if cloudflared binary is not available on the host
-- [ ] CI pipeline updated to install cloudflared before running tests
+- [x] Test starts a **simple standalone HTTP test server** on a random local port (NOT the MCP server — this is a tunnel-layer test, not an MCP protocol test)
+- [x] Test creates a real Cloudflare tunnel to the local test server
+- [x] Test verifies the tunnel URL is accessible from the test (HTTP GET to tunnel URL returns expected response from the test server)
+- [x] Test cleans up the tunnel after completion
+- [x] Test has a reasonable timeout (60 seconds for tunnel establishment)
+- [x] Test FAILS (not skips) if cloudflared binary is not available on the host
+- [x] CI pipeline updated to install cloudflared before running tests
 
 > **Plan 12 Note**: Plan 12 removes the `/health` endpoint from the MCP server. This test uses a standalone simple HTTP test server (not the MCP server), so the `/health` removal does not affect it. The test verifies tunnel connectivity, not MCP protocol compliance.
 
@@ -1658,8 +1658,8 @@ val binaryPath = HostCloudflareBinaryResolver().resolve()
 ```
 
 **Definition of Done**:
-- [ ] Test passes when cloudflared is available on the host
-- [ ] Test FAILS with a clear error message if cloudflared is not installed
+- [x] Test passes when cloudflared is available on the host
+- [x] Test FAILS with a clear error message if cloudflared is not installed
 
 #### Action 13.2: Update CI pipeline to install cloudflared
 
@@ -1678,9 +1678,9 @@ Add a step to install cloudflared before the test jobs run. Cloudflared provides
 This step must be added BEFORE the test step(s) that run integration tests. The exact placement depends on the current CI structure (inspect the file at implementation time).
 
 **Definition of Done**:
-- [ ] CI pipeline installs cloudflared
-- [ ] Integration test passes in CI
-- [ ] `cloudflared --version` prints in CI logs for traceability
+- [x] CI pipeline installs cloudflared
+- [x] Integration test passes in CI
+- [x] `cloudflared --version` prints in CI logs for traceability
 
 ---
 
