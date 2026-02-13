@@ -1,13 +1,12 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.every
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -31,13 +30,10 @@ class SystemActionIntegrationTest {
             every { deps.accessibilityServiceProvider.isReady() } returns true
             coEvery { deps.actionExecutor.pressHome() } returns Result.success(Unit)
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "press_home")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(name = "press_home", arguments = emptyMap())
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
             }
         }
 
@@ -48,13 +44,12 @@ class SystemActionIntegrationTest {
             every { deps.accessibilityServiceProvider.isReady() } returns true
             coEvery { deps.actionExecutor.pressBack() } returns Result.success(Unit)
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "press_back")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(name = "press_back", arguments = emptyMap())
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("executed successfully"))
             }
         }
 }

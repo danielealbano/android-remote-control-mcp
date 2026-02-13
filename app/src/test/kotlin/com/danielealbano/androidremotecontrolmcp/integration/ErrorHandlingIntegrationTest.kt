@@ -3,20 +3,16 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
 import android.view.accessibility.AccessibilityNodeInfo
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
-import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -42,26 +38,24 @@ class ErrorHandlingIntegrationTest {
     }
 
     @Test
-    fun `permission denied exception returns JSON-RPC error code -32001`() =
+    fun `permission denied returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.accessibilityServiceProvider.isReady() } returns false
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "press_back")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_PERMISSION_DENIED,
-                    rpcResponse.error!!.code,
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "press_back",
+                    arguments = emptyMap(),
                 )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Accessibility service not enabled"))
             }
         }
 
     @Test
-    fun `element not found exception returns JSON-RPC error code -32002`() =
+    fun `element not found returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             val mockRootNode = mockk<AccessibilityNodeInfo>()
@@ -75,28 +69,19 @@ class ErrorHandlingIntegrationTest {
                     NoSuchElementException("Node 'nonexistent' not found"),
                 )
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "click_element",
-                        arguments =
-                            buildJsonObject {
-                                put("element_id", "nonexistent")
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_ELEMENT_NOT_FOUND,
-                    rpcResponse.error!!.code,
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "click_element",
+                    arguments = mapOf("element_id" to "nonexistent"),
                 )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("nonexistent"))
             }
         }
 
     @Test
-    fun `action failed exception returns JSON-RPC error code -32003`() =
+    fun `action failed returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             val mockRootNode = mockk<AccessibilityNodeInfo>()
@@ -110,77 +95,33 @@ class ErrorHandlingIntegrationTest {
                     IllegalStateException("Node 'node_root' is not clickable"),
                 )
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "click_element",
-                        arguments =
-                            buildJsonObject {
-                                put("element_id", "node_root")
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_ACTION_FAILED,
-                    rpcResponse.error!!.code,
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "click_element",
+                    arguments = mapOf("element_id" to "node_root"),
                 )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("not clickable"))
             }
         }
 
     @Test
-    fun `timeout exception returns JSON-RPC error code -32004`() =
+    fun `invalid params returns error result`() =
         runTest {
-            val deps = McpIntegrationTestHelper.createMockDependencies()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            coEvery {
-                deps.actionExecutor.pressHome()
-            } throws
-                McpToolException.Timeout(
-                    "Operation timed out",
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.callTool(
+                    name = "tap",
+                    arguments = mapOf("x" to "not_a_number", "y" to 100),
                 )
-
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "press_home")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_TIMEOUT,
-                    rpcResponse.error!!.code,
-                )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.isNotEmpty())
             }
         }
 
     @Test
-    fun `invalid params exception returns JSON-RPC error code -32602`() =
-        runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "tap",
-                        arguments =
-                            buildJsonObject {
-                                put("x", "not_a_number")
-                                put("y", 100)
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_INVALID_PARAMS,
-                    rpcResponse.error!!.code,
-                )
-            }
-        }
-
-    @Test
-    fun `internal error exception returns JSON-RPC error code -32603`() =
+    fun `internal error returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.accessibilityServiceProvider.isReady() } returns true
@@ -188,16 +129,14 @@ class ErrorHandlingIntegrationTest {
                 deps.actionExecutor.pressBack()
             } throws RuntimeException("Unexpected internal error")
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "press_back")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_INTERNAL,
-                    rpcResponse.error!!.code,
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "press_back",
+                    arguments = emptyMap(),
                 )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Unexpected internal error"))
             }
         }
 }

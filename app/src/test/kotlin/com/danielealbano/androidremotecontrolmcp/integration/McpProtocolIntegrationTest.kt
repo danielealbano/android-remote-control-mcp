@@ -1,25 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -38,189 +22,86 @@ class McpProtocolIntegrationTest {
     }
 
     @Test
-    fun `initialize returns server info with correct protocol version`() =
+    fun `client connects successfully and completes initialize handshake`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val body =
-                    buildJsonObject {
-                        put("jsonrpc", "2.0")
-                        put("id", 1)
-                        put("method", "initialize")
-                    }
-
-                val response =
-                    client.post(McpIntegrationTestHelper.INITIALIZE_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                        contentType(ContentType.Application.Json)
-                        setBody(Json.encodeToString(JsonObject.serializer(), body))
-                    }
-
-                assertEquals(HttpStatusCode.OK, response.status)
-
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val result = rpcResponse.result!!.jsonObject
-                assertEquals(
-                    McpProtocolHandler.PROTOCOL_VERSION,
-                    result["protocolVersion"]?.jsonPrimitive?.content,
-                )
-                assertEquals(
-                    McpProtocolHandler.SERVER_NAME,
-                    result["serverInfo"]?.jsonObject?.get("name")?.jsonPrimitive?.content,
-                )
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                // If connect() succeeds, the initialize handshake completed
+                assertNotNull(client.serverCapabilities)
+                assertNotNull(client.serverVersion)
+                assertEquals("android-remote-control-mcp", client.serverVersion?.name)
             }
         }
 
     @Test
-    fun `tools-list returns all 29 registered tools`() =
+    fun `listTools returns all 29 registered tools`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    client.get(McpIntegrationTestHelper.TOOLS_LIST_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                    }
-
-                assertEquals(HttpStatusCode.OK, response.status)
-
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val tools = rpcResponse.result!!.jsonObject["tools"]!!.jsonArray
-                assertEquals(EXPECTED_TOOL_COUNT, tools.size)
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.listTools()
+                assertEquals(EXPECTED_TOOL_COUNT, result.tools.size)
             }
         }
 
     @Test
-    fun `tools-list includes correct input schemas for each tool`() =
+    fun `listTools includes correct tool metadata for each tool`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    client.get(McpIntegrationTestHelper.TOOLS_LIST_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                    }
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.listTools()
 
-                val rpcResponse = response.toJsonRpcResponse()
-                val tools = rpcResponse.result!!.jsonObject["tools"]!!.jsonArray
-
-                tools.forEach { tool ->
-                    val toolObj = tool.jsonObject
-                    assertNotNull(toolObj["name"], "Tool missing 'name' field")
-                    assertNotNull(toolObj["description"], "Tool missing 'description' field")
-                    assertNotNull(toolObj["inputSchema"], "Tool missing 'inputSchema' field")
-
-                    val schema = toolObj["inputSchema"]!!.jsonObject
-                    assertEquals(
-                        "object",
-                        schema["type"]?.jsonPrimitive?.content,
-                        "inputSchema.type must be 'object' for tool ${toolObj["name"]}",
-                    )
+                result.tools.forEach { tool ->
+                    assertNotNull(tool.name, "Tool missing name")
+                    assertNotNull(tool.description, "Tool ${tool.name} missing description")
+                    assertNotNull(tool.inputSchema, "Tool ${tool.name} missing inputSchema")
                 }
             }
         }
 
     @Test
-    fun `unknown method returns JSON-RPC error -32601 method not found`() =
+    fun `server capabilities include tools`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val body =
-                    buildJsonObject {
-                        put("jsonrpc", "2.0")
-                        put("id", 1)
-                        put("method", "nonexistent/method")
-                    }
-
-                val response =
-                    client.post(McpIntegrationTestHelper.INITIALIZE_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                        contentType(ContentType.Application.Json)
-                        setBody(Json.encodeToString(JsonObject.serializer(), body))
-                    }
-
-                assertEquals(HttpStatusCode.OK, response.status)
-
-                val rpcResponse = response.toJsonRpcResponse()
-                val error = rpcResponse.error
-                assertNotNull(error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_METHOD_NOT_FOUND,
-                    error!!.code,
-                )
-                assertTrue(error.message.contains("not found"))
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                assertNotNull(client.serverCapabilities?.tools)
             }
         }
 
     @Test
-    fun `malformed JSON body returns JSON-RPC error -32700 parse error`() =
+    fun `listTools contains expected tool names`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    client.post(McpIntegrationTestHelper.TOOLS_CALL_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                        contentType(ContentType.Application.Json)
-                        setBody("{invalid json")
-                    }
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.listTools()
+                val toolNames = result.tools.map { it.name }.toSet()
 
-                assertEquals(HttpStatusCode.OK, response.status)
-
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(McpProtocolHandler.ERROR_PARSE, rpcResponse.error!!.code)
-            }
-        }
-
-    @Test
-    fun `wrong jsonrpc version returns JSON-RPC error -32600 invalid request`() =
-        runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val body =
-                    buildJsonObject {
-                        put("jsonrpc", "1.0")
-                        put("id", 1)
-                        put("method", "tools/call")
-                    }
-
-                val response =
-                    client.post(McpIntegrationTestHelper.TOOLS_CALL_PATH) {
-                        header(
-                            "Authorization",
-                            "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}",
-                        )
-                        contentType(ContentType.Application.Json)
-                        setBody(Json.encodeToString(JsonObject.serializer(), body))
-                    }
-
-                assertEquals(HttpStatusCode.OK, response.status)
-
-                val rpcResponse = response.toJsonRpcResponse()
-                val error = rpcResponse.error
-                assertNotNull(error)
-                assertEquals(
-                    McpProtocolHandler.ERROR_INVALID_REQUEST,
-                    error!!.code,
-                )
-                assertTrue(error.message.contains("version"))
+                EXPECTED_TOOL_NAMES.forEach { expectedName ->
+                    assertTrue(
+                        toolNames.contains(expectedName),
+                        "Expected tool '$expectedName' not found in: $toolNames",
+                    )
+                }
             }
         }
 
     companion object {
         private const val EXPECTED_TOOL_COUNT = 29
+
+        private val EXPECTED_TOOL_NAMES = setOf(
+            // Touch actions
+            "tap", "long_press", "double_tap", "swipe", "scroll",
+            // Gestures
+            "pinch", "custom_gesture",
+            // Element actions
+            "find_elements", "click_element", "long_click_element",
+            "set_text", "scroll_to_element",
+            // Screen introspection
+            "get_accessibility_tree", "capture_screenshot",
+            "get_current_app", "get_screen_info",
+            // System actions
+            "press_back", "press_home", "press_recents",
+            "open_notifications", "open_quick_settings",
+            "get_device_logs",
+            // Text input
+            "input_text", "clear_text", "press_key",
+            // Utility
+            "get_clipboard", "set_clipboard",
+            "wait_for_element", "wait_for_idle",
+        )
     }
 }

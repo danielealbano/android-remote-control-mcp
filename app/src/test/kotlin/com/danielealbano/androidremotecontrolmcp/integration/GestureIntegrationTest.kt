@@ -1,14 +1,12 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -33,48 +31,35 @@ class GestureIntegrationTest {
                 deps.actionExecutor.pinch(540f, 1200f, 2.0f, any())
             } returns Result.success(Unit)
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "pinch",
-                        arguments =
-                            buildJsonObject {
-                                put("center_x", 540)
-                                put("center_y", 1200)
-                                put("scale", 2.0)
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "pinch",
+                    arguments = mapOf(
+                        "center_x" to 540,
+                        "center_y" to 1200,
+                        "scale" to 2.0,
+                    ),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
             }
         }
 
     @Test
-    fun `pinch with invalid scale returns error -32602`() =
+    fun `pinch with invalid scale returns error`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "pinch",
-                        arguments =
-                            buildJsonObject {
-                                put("center_x", 540)
-                                put("center_y", 1200)
-                                put("scale", 0.0)
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(INVALID_PARAMS_CODE, rpcResponse.error!!.code)
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.callTool(
+                    name = "pinch",
+                    arguments = mapOf(
+                        "center_x" to 540,
+                        "center_y" to 1200,
+                        "scale" to 0.0,
+                    ),
+                )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("scale"))
             }
         }
-
-    companion object {
-        private const val INVALID_PARAMS_CODE = -32602
-    }
 }

@@ -1235,7 +1235,7 @@ Add tests for `CaptureScreenshotHandler`:
 
 #### Action 9.7: Run unit tests
 
-- [ ] **Completed** _(deferred: integration test files reference deleted types, preventing test compilation; will run after Task 10)_
+- [x] **Completed** _(was deferred; ran successfully after Task 10 completion — all 396 tests pass)_
 
 Run `./gradlew test --tests "com.danielealbano.androidremotecontrolmcp.mcp.*" --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.*"` and verify all pass.
 
@@ -1247,7 +1247,7 @@ Run `./gradlew test --tests "com.danielealbano.androidremotecontrolmcp.mcp.*" --
 
 #### Action 10.1: Rewrite `McpIntegrationTestHelper.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../integration/McpIntegrationTestHelper.kt`
 
@@ -1311,7 +1311,7 @@ testApplication {
 
 #### Action 10.2: Rewrite `AuthIntegrationTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../integration/AuthIntegrationTest.kt`
 
@@ -1324,7 +1324,7 @@ The valid-token test can use the SDK client connection as proof of success.
 
 #### Action 10.3: Rewrite `McpProtocolIntegrationTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../integration/McpProtocolIntegrationTest.kt`
 
@@ -1336,7 +1336,7 @@ Tests for MCP protocol compliance via SDK client:
 
 #### Action 10.4: Rewrite tool integration tests (7 files)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Files:**
 - `app/src/test/kotlin/.../integration/TouchActionIntegrationTest.kt`
@@ -1368,7 +1368,7 @@ assertContains(text, "Tap executed")
 
 #### Action 10.5: Rewrite `ErrorHandlingIntegrationTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../integration/ErrorHandlingIntegrationTest.kt`
 
@@ -1381,7 +1381,7 @@ Error handling changes significantly:
 
 #### Action 10.6: Run integration tests
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Run `./gradlew test --tests "com.danielealbano.androidremotecontrolmcp.integration.*"` and verify all pass.
 
