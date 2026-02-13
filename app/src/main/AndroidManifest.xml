@@ -8,7 +8,6 @@
 
     <!-- Foreground services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Boot receiver -->
@@ -47,12 +46,6 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="MCP server providing remote device control" />
         </service>
-
-        <!-- Screen Capture Foreground Service -->
-        <service
-            android:name=".services.screencapture.ScreenCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
 
         <!-- Accessibility Service -->
         <service
