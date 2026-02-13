@@ -95,6 +95,10 @@ object SharedAndroidContainer {
                 // after the server is running, the system can immediately bind.
                 AndroidContainerSetup.enableAccessibilityService(c)
 
+                // NOTE: MediaProjection permission (for screenshots) requires interactive
+                // user consent that cannot be automated via adb. Screenshot tests are
+                // disabled in E2E and must be tested manually or on a physical device.
+
                 // Create and initialize the MCP client
                 val client = McpClient(url, AndroidContainerSetup.E2E_BEARER_TOKEN)
                 client.initialize()
