@@ -74,7 +74,7 @@ class ScreenIntrospectionIntegrationTest {
     fun `capture_screenshot returns base64 image from mocked service`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            every { deps.screenCaptureProvider.isMediaProjectionActive() } returns true
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
             coEvery {
                 deps.screenCaptureProvider.captureScreenshot(any())
             } returns
@@ -141,7 +141,7 @@ class ScreenIntrospectionIntegrationTest {
     fun `capture_screenshot when permission denied returns error -32001`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            every { deps.screenCaptureProvider.isMediaProjectionActive() } returns false
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns false
 
             McpIntegrationTestHelper.withTestApplication(deps) { _ ->
                 val response = sendToolCall(toolName = "capture_screenshot")

@@ -106,7 +106,7 @@ class GetAccessibilityTreeHandler
  * **Input**: `{ "quality": 80 }` (optional, default 80, range 1-100)
  * **Output**: `{ "content": [{ "type": "image", "data": "<base64>", "mimeType": "image/jpeg" }] }`
  * **Errors**:
- *   - -32001 if MediaProjection permission not granted
+ *   - -32001 if screen capture is not available (accessibility service not enabled)
  *   - -32602 if quality parameter is out of range
  *   - -32003 if screenshot capture fails
  */
@@ -118,9 +118,9 @@ class CaptureScreenshotHandler
         override suspend fun execute(params: JsonObject?): JsonElement {
             val quality = parseQuality(params)
 
-            if (!screenCaptureProvider.isMediaProjectionActive()) {
+            if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                 throw McpToolException.PermissionDenied(
-                    "MediaProjection permission not granted. Please grant screen capture permission in the app.",
+                    "Screen capture not available. Please enable the accessibility service in Android Settings.",
                 )
             }
 

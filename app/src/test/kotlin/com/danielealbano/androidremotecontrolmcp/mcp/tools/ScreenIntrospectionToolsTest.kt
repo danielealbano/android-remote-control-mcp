@@ -164,7 +164,7 @@ class ScreenIntrospectionToolsTest {
         fun capturesScreenshotWithDefaultQuality() =
             runTest {
                 // Arrange
-                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery { mockScreenCaptureProvider.captureScreenshot(80) } returns
                     Result.success(
                         ScreenshotData(data = "base64data", width = 1080, height = 2400),
@@ -189,7 +189,7 @@ class ScreenIntrospectionToolsTest {
         fun capturesScreenshotWithCustomQuality() =
             runTest {
                 // Arrange
-                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery { mockScreenCaptureProvider.captureScreenshot(50) } returns
                     Result.success(
                         ScreenshotData(data = "base64data50", width = 1080, height = 2400),
@@ -267,11 +267,11 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when MediaProjection not granted")
-        fun throwsErrorWhenMediaProjectionNotGranted() =
+        @DisplayName("throws error -32001 when screen capture not available")
+        fun throwsErrorWhenScreenCaptureNotAvailable() =
             runTest {
                 // Arrange
-                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns false
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns false
 
                 // Act & Assert
                 val exception =
@@ -279,7 +279,7 @@ class ScreenIntrospectionToolsTest {
                         handler.execute(null)
                     }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
-                assertTrue(exception.message!!.contains("MediaProjection"))
+                assertTrue(exception.message!!.contains("Screen capture not available"))
             }
 
         @Test
@@ -287,7 +287,7 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenCaptureFails() =
             runTest {
                 // Arrange
-                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery { mockScreenCaptureProvider.captureScreenshot(80) } returns
                     Result.failure(
                         RuntimeException("Capture timeout"),

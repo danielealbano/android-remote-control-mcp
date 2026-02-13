@@ -2,7 +2,6 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -59,17 +58,8 @@ class MainViewModel
         private val _serverLogs = MutableStateFlow<List<ServerLogEntry>>(emptyList())
         val serverLogs: StateFlow<List<ServerLogEntry>> = _serverLogs.asStateFlow()
 
-        private val _isMediaProjectionGranted = MutableStateFlow(false)
-        val isMediaProjectionGranted: StateFlow<Boolean> = _isMediaProjectionGranted.asStateFlow()
-
         private val _isNotificationPermissionGranted = MutableStateFlow(false)
         val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
-
-        private var _mediaProjectionResultCode: Int = Activity.RESULT_CANCELED
-        val mediaProjectionResultCode: Int get() = _mediaProjectionResultCode
-
-        private var _mediaProjectionData: Intent? = null
-        val mediaProjectionData: Intent? get() = _mediaProjectionData
 
         init {
             viewModelScope.launch(ioDispatcher) {
@@ -202,26 +192,6 @@ class MainViewModel
                 )
             _isNotificationPermissionGranted.value =
                 PermissionUtils.isNotificationPermissionGranted(context)
-        }
-
-        /**
-         * Stores the MediaProjection activity result for later use when starting the
-         * ScreenCaptureService.
-         *
-         * Called for both granted (RESULT_OK with non-null data) and denied/cancelled
-         * results. On denial, clears any previously stored result so that
-         * [isMediaProjectionGranted] correctly reflects the current state.
-         *
-         * @param resultCode The result code from the activity result.
-         * @param data The intent data containing the MediaProjection token, or null if denied/cancelled.
-         */
-        fun setMediaProjectionResult(
-            resultCode: Int,
-            data: Intent?,
-        ) {
-            _mediaProjectionResultCode = resultCode
-            _mediaProjectionData = data
-            _isMediaProjectionGranted.value = (resultCode == Activity.RESULT_OK && data != null)
         }
 
         fun addServerLogEntry(entry: ServerLogEntry) {
