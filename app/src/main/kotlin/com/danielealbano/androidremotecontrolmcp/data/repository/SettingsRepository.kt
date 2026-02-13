@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.data.repository
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -86,4 +87,16 @@ interface SettingsRepository {
      * @return [Result.success] with the validated hostname, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateCertificateHostname(hostname: String): Result<String>
+
+    /** Updates the tunnel enabled toggle. */
+    suspend fun updateTunnelEnabled(enabled: Boolean)
+
+    /** Updates the tunnel provider type. */
+    suspend fun updateTunnelProvider(provider: TunnelProviderType)
+
+    /** Updates the ngrok authtoken. */
+    suspend fun updateNgrokAuthtoken(authtoken: String)
+
+    /** Updates the ngrok domain (optional, empty string means auto-assigned). */
+    suspend fun updateNgrokDomain(domain: String)
 }
