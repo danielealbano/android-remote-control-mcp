@@ -12,9 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolRegistry
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
@@ -28,6 +26,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +58,7 @@ import javax.inject.Inject
 class McpServerService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
 
-    @Inject lateinit var protocolHandler: McpProtocolHandler
-
     @Inject lateinit var certificateManager: CertificateManager
-
-    @Inject lateinit var toolRegistry: ToolRegistry
 
     @Inject lateinit var actionExecutor: ActionExecutor
 
@@ -133,8 +131,19 @@ class McpServerService : Service() {
                     null
                 }
 
-            // Register all MCP tools before starting the server
-            registerAllTools()
+            // Create SDK Server instance and register all tools
+            val sdkServer = Server(
+                serverInfo = Implementation(
+                    name = "android-remote-control-mcp",
+                    version = com.danielealbano.androidremotecontrolmcp.BuildConfig.VERSION_NAME,
+                ),
+                options = ServerOptions(
+                    capabilities = ServerCapabilities(
+                        tools = ServerCapabilities.Tools(listChanged = false),
+                    ),
+                ),
+            )
+            registerAllTools(sdkServer)
 
             // Create and start the Ktor server
             mcpServer =
@@ -142,7 +151,7 @@ class McpServerService : Service() {
                     config = config,
                     keyStore = keyStore,
                     keyStorePassword = keyStorePassword,
-                    protocolHandler = protocolHandler,
+                    mcpSdkServer = sdkServer,
                 )
             mcpServer?.start()
 
@@ -161,25 +170,14 @@ class McpServerService : Service() {
         }
     }
 
-    private fun registerAllTools() {
-        registerScreenIntrospectionTools(
-            toolRegistry,
-            treeParser,
-            accessibilityServiceProvider,
-            screenCaptureProvider,
-        )
-        registerSystemActionTools(toolRegistry, actionExecutor, accessibilityServiceProvider)
-        registerTouchActionTools(toolRegistry, actionExecutor)
-        registerGestureTools(toolRegistry, actionExecutor)
-        registerElementActionTools(
-            toolRegistry,
-            treeParser,
-            elementFinder,
-            actionExecutor,
-            accessibilityServiceProvider,
-        )
-        registerTextInputTools(toolRegistry, treeParser, actionExecutor, accessibilityServiceProvider)
-        registerUtilityTools(toolRegistry, treeParser, elementFinder, accessibilityServiceProvider)
+    private fun registerAllTools(server: Server) {
+        registerScreenIntrospectionTools(server, treeParser, accessibilityServiceProvider, screenCaptureProvider)
+        registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider)
+        registerTouchActionTools(server, actionExecutor)
+        registerGestureTools(server, actionExecutor)
+        registerElementActionTools(server, treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
+        registerTextInputTools(server, treeParser, actionExecutor, accessibilityServiceProvider)
+        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider)
     }
 
     override fun onDestroy() {

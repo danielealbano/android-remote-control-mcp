@@ -1,11 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
 import android.util.Log
-import com.danielealbano.androidremotecontrolmcp.BuildConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.engine.EmbeddedServer
@@ -14,18 +11,7 @@ import io.ktor.server.engine.sslConnector
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.request.receive
-import io.ktor.server.response.respond
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
-import io.ktor.server.routing.routing
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -34,22 +20,20 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Configures and runs an embedded Netty server with:
  * - HTTP by default, optional HTTPS when enabled in settings
- * - JSON content negotiation (kotlinx.serialization)
- * - Bearer token authentication on `/mcp` routes
- * - Health check endpoint (unauthenticated)
- * - MCP JSON-RPC 2.0 protocol routes
- * - Status pages for error handling
+ * - JSON content negotiation (required by SDK's StreamableHttpServerTransport)
+ * - Global bearer token authentication
+ * - MCP Streamable HTTP transport at `/mcp` (JSON-only mode, no SSE)
  *
  * @param config The server configuration (port, binding address, bearer token).
  * @param keyStore The SSL KeyStore for HTTPS (null when HTTPS is disabled).
  * @param keyStorePassword The KeyStore password (null when HTTPS is disabled).
- * @param protocolHandler The MCP protocol handler for JSON-RPC processing.
+ * @param mcpSdkServer The MCP SDK Server instance with registered tools.
  */
 class McpServer(
     private val config: ServerConfig,
     private val keyStore: KeyStore?,
     private val keyStorePassword: CharArray?,
-    private val protocolHandler: McpProtocolHandler,
+    private val mcpSdkServer: io.modelcontextprotocol.kotlin.sdk.server.Server,
 ) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     private val running = AtomicBoolean(false)
@@ -128,94 +112,20 @@ class McpServer(
         )
 
     private fun io.ktor.server.application.Application.configureApplication() {
-        configurePlugins()
-        configureRouting()
-    }
-
-    private fun io.ktor.server.application.Application.configurePlugins() {
+        // JSON serialization — required by StreamableHttpServerTransport
+        // which uses call.respond(JSONRPCResponse/Error) internally
         install(ContentNegotiation) {
-            json(
-                Json {
-                    prettyPrint = false
-                    isLenient = false
-                    ignoreUnknownKeys = true
-                    encodeDefaults = true
-                },
-            )
+            json(McpJson)
         }
 
-        install(StatusPages) {
-            exception<Throwable> { call, cause ->
-                Log.e(TAG, "Unhandled exception in request handler", cause)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    buildJsonObject {
-                        put("error", "internal_server_error")
-                        put("message", cause.message ?: "Unknown error")
-                    },
-                )
-            }
+        // Global bearer token authentication (all requests)
+        install(BearerTokenAuthPlugin) {
+            expectedToken = config.bearerToken
         }
-    }
 
-    private fun io.ktor.server.application.Application.configureRouting() {
-        routing {
-            // Health endpoint — unauthenticated
-            get("/health") {
-                call.respondText(
-                    contentType = ContentType.Application.Json,
-                    text =
-                        Json.encodeToString(
-                            JsonObject.serializer(),
-                            buildJsonObject {
-                                put("status", "healthy")
-                                put("version", BuildConfig.VERSION_NAME)
-                                put("server", "running")
-                            },
-                        ),
-                )
-            }
-
-            // MCP routes — authenticated
-            route("/mcp") {
-                install(BearerTokenAuthPlugin) {
-                    expectedToken = config.bearerToken
-                }
-
-                route("/v1") {
-                    post("/initialize") {
-                        val request = receiveJsonRpcRequest(call, "/initialize") ?: return@post
-                        val response = protocolHandler.handleRequest(request)
-                        call.respond(response)
-                    }
-
-                    post("/tools/list") {
-                        val request = receiveJsonRpcRequest(call, "/tools/list") ?: return@post
-                        val response = protocolHandler.handleRequest(request)
-                        call.respond(response)
-                    }
-
-                    post("/tools/call") {
-                        val request = receiveJsonRpcRequest(call, "/tools/call") ?: return@post
-                        val response = protocolHandler.handleRequest(request)
-                        call.respond(response)
-                    }
-                }
-            }
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private suspend fun receiveJsonRpcRequest(
-        call: io.ktor.server.application.ApplicationCall,
-        endpointName: String,
-    ): JsonRpcRequest? {
-        return try {
-            call.receive<JsonRpcRequest>()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse JSON-RPC request on $endpointName: ${e.message}")
-            call.respond(protocolHandler.parseError(null))
-            null
+        // MCP Streamable HTTP transport at /mcp (JSON-only mode, no SSE)
+        mcpStreamableHttp {
+            mcpSdkServer
         }
     }
 
