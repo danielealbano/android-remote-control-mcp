@@ -207,9 +207,10 @@ class ScreenIntrospectionToolsTest {
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery {
                     mockScreenCaptureProvider.captureScreenshot(80, 720, null)
-                } returns Result.success(
-                    ScreenshotData(data = "resized", width = 720, height = 1600),
-                )
+                } returns
+                    Result.success(
+                        ScreenshotData(data = "resized", width = 720, height = 1600),
+                    )
                 val params = buildJsonObject { put("width", 720) }
 
                 // Act
@@ -232,9 +233,10 @@ class ScreenIntrospectionToolsTest {
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery {
                     mockScreenCaptureProvider.captureScreenshot(80, null, 1200)
-                } returns Result.success(
-                    ScreenshotData(data = "resized_h", width = 540, height = 1200),
-                )
+                } returns
+                    Result.success(
+                        ScreenshotData(data = "resized_h", width = 540, height = 1200),
+                    )
                 val params = buildJsonObject { put("height", 1200) }
 
                 // Act
@@ -257,9 +259,10 @@ class ScreenIntrospectionToolsTest {
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery {
                     mockScreenCaptureProvider.captureScreenshot(80, 720, 1200)
-                } returns Result.success(
-                    ScreenshotData(data = "resized_wh", width = 720, height = 1200),
-                )
+                } returns
+                    Result.success(
+                        ScreenshotData(data = "resized_wh", width = 720, height = 1200),
+                    )
                 val params =
                     buildJsonObject {
                         put("width", 720)

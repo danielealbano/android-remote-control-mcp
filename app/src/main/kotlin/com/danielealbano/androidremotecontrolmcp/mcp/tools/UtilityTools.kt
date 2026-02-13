@@ -36,6 +36,7 @@ class GetClipboardTool
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount", "UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val context =
                 accessibilityServiceProvider.getContext()
@@ -106,6 +107,7 @@ class SetClipboardTool
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val text =
                 arguments?.get("text")?.jsonPrimitive?.contentOrNull
@@ -180,7 +182,7 @@ class WaitForElementTool
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
-        @Suppress("CyclomaticComplexity", "LongMethod")
+        @Suppress("CyclomaticComplexity", "LongMethod", "ThrowsCount", "InstanceOfCheckForException")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
             val byStr =
@@ -321,7 +323,7 @@ class WaitForIdleTool
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
-        @Suppress("NestedBlockDepth")
+        @Suppress("NestedBlockDepth", "ThrowsCount", "InstanceOfCheckForException")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val timeout =
                 arguments?.get("timeout")?.jsonPrimitive?.longOrNull

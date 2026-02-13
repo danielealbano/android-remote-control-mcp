@@ -37,6 +37,7 @@ class InputTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val text =
                 arguments?.get("text")?.jsonPrimitive?.contentOrNull
@@ -211,6 +212,7 @@ class PressKeyTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val key =
                 arguments?.get("key")?.jsonPrimitive?.contentOrNull

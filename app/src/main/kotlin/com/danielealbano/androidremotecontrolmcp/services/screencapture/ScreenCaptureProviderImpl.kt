@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Build
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
@@ -27,6 +28,7 @@ class ScreenCaptureProviderImpl
             data class Invalid(val error: McpToolException) : ServiceValidation()
         }
 
+        @SuppressLint("NewApi") // API 30 guard in validateService()
         @Suppress("ReturnCount")
         override suspend fun captureScreenshot(
             quality: Int,

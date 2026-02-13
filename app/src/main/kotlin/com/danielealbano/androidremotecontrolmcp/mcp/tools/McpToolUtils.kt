@@ -244,8 +244,7 @@ internal object McpToolUtils {
     /**
      * Creates a [CallToolResult] containing a single [TextContent] item.
      */
-    fun textResult(text: String): CallToolResult =
-        CallToolResult(content = listOf(TextContent(text = text)))
+    fun textResult(text: String): CallToolResult = CallToolResult(content = listOf(TextContent(text = text)))
 
     /**
      * Creates a [CallToolResult] containing a single [ImageContent] item.
@@ -253,8 +252,7 @@ internal object McpToolUtils {
     fun imageResult(
         data: String,
         mimeType: String,
-    ): CallToolResult =
-        CallToolResult(content = listOf(ImageContent(data = data, mimeType = mimeType)))
+    ): CallToolResult = CallToolResult(content = listOf(ImageContent(data = data, mimeType = mimeType)))
 
     /** Maximum duration in milliseconds for any gesture/action. */
     const val MAX_DURATION_MS = 60000L

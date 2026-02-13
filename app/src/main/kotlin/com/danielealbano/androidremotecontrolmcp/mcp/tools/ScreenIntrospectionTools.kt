@@ -41,6 +41,7 @@ class GetAccessibilityTreeHandler
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!accessibilityServiceProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
@@ -230,6 +231,7 @@ class GetCurrentAppHandler
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!accessibilityServiceProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
@@ -284,6 +286,7 @@ class GetScreenInfoHandler
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
             val resultJson =

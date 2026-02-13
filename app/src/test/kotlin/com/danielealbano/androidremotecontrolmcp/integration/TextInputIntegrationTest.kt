@@ -69,10 +69,11 @@ class TextInputIntegrationTest {
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "input_text",
-                    arguments = mapOf("text" to "Hello World", "element_id" to "node_edit"),
-                )
+                val result =
+                    client.callTool(
+                        name = "input_text",
+                        arguments = mapOf("text" to "Hello World", "element_id" to "node_edit"),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }
@@ -82,10 +83,11 @@ class TextInputIntegrationTest {
     fun `input_text with missing text parameter returns error`() =
         runTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
-                val result = client.callTool(
-                    name = "input_text",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "input_text",
+                        arguments = emptyMap(),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.isNotEmpty())
