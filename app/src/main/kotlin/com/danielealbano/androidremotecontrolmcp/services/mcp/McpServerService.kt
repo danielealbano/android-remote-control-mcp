@@ -260,14 +260,27 @@ class McpServerService : Service() {
      */
     fun getScreenCaptureService(): ScreenCaptureService? = screenCaptureService
 
+    @Suppress("TooGenericExceptionCaught")
     private fun bindToScreenCaptureService() {
         val intent = Intent(this, ScreenCaptureService::class.java)
         // MUST start as foreground service first, THEN bind.
         // bindService() alone does NOT trigger onStartCommand(), so startForeground()
         // would never be called, violating the 5-second foreground service requirement.
-        startForegroundService(intent)
-        isBoundToScreenCapture = bindService(intent, screenCaptureConnection, Context.BIND_AUTO_CREATE)
-        Log.d(TAG, "Started and binding to ScreenCaptureService: $isBoundToScreenCapture")
+        try {
+            startForegroundService(intent)
+            isBoundToScreenCapture = bindService(intent, screenCaptureConnection, Context.BIND_AUTO_CREATE)
+            Log.d(TAG, "Started and binding to ScreenCaptureService: $isBoundToScreenCapture")
+        } catch (e: Exception) {
+            // On Android 14+, starting a foreground service with mediaProjection type
+            // requires user consent via MediaProjection permission dialog. In E2E tests
+            // or when the user hasn't granted permission, this will throw SecurityException.
+            // The MCP server can still run without screenshot functionality.
+            Log.w(
+                TAG,
+                "Could not start ScreenCaptureService — screenshot functionality unavailable: ${e.message}",
+            )
+            isBoundToScreenCapture = false
+        }
     }
 
     private fun updateStatus(status: ServerStatus) {

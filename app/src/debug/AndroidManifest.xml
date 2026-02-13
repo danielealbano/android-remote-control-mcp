@@ -3,13 +3,15 @@
 
     <!--
       Debug-only manifest overlay.
-      Registers E2EConfigReceiver for test configuration injection.
+      Registers E2EConfigReceiver for test configuration injection via adb shell.
       This receiver is NOT included in release builds.
+      exported=true is required because adb shell runs as a different user (shell)
+      and Android 14+ blocks broadcasts to non-exported receivers from external callers.
     -->
     <application>
         <receiver
             android:name=".debug.E2EConfigReceiver"
-            android:exported="false">
+            android:exported="true">
         </receiver>
     </application>
 

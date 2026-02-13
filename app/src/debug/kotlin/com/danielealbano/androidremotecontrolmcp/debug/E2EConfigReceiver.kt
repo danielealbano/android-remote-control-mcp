@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,12 +24,18 @@ import javax.inject.Inject
  *
  * **Usage** (from E2E test via adb):
  * ```
+ * # Configure settings
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_CONFIGURE \
  *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver \
  *   --es bearer_token "test-token-uuid" \
  *   --es binding_address "0.0.0.0" \
  *   --ei port 8080
+ *
+ * # Start the MCP server (runs inside app process, avoids exported=false restriction)
+ * adb shell am broadcast \
+ *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_START_SERVER \
+ *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver
  * ```
  */
 @AndroidEntryPoint
@@ -42,11 +49,21 @@ class E2EConfigReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
-        if (intent.action != ACTION_E2E_CONFIGURE) {
-            Log.w(TAG, "Ignoring unexpected action: ${intent.action}")
-            return
-        }
+        // Log immediately to verify receiver is being called
+        Log.i(TAG, "!!! onReceive called with action: ${intent.action}")
 
+        try {
+            when (intent.action) {
+                ACTION_E2E_CONFIGURE -> handleConfigure(intent)
+                ACTION_E2E_START_SERVER -> handleStartServer(context)
+                else -> Log.w(TAG, "Ignoring unexpected action: ${intent.action}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in onReceive", e)
+        }
+    }
+
+    private fun handleConfigure(intent: Intent) {
         Log.i(TAG, "Received E2E configuration broadcast")
 
         val bearerToken = intent.getStringExtra(EXTRA_BEARER_TOKEN)
@@ -76,9 +93,20 @@ class E2EConfigReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun handleStartServer(context: Context) {
+        Log.i(TAG, "Received E2E start server broadcast")
+        val intent =
+            Intent(context, McpServerService::class.java).apply {
+                action = McpServerService.ACTION_START
+            }
+        context.startForegroundService(intent)
+        Log.i(TAG, "McpServerService start command sent")
+    }
+
     companion object {
         private const val TAG = "E2E:ConfigReceiver"
         const val ACTION_E2E_CONFIGURE = "com.danielealbano.androidremotecontrolmcp.debug.E2E_CONFIGURE"
+        const val ACTION_E2E_START_SERVER = "com.danielealbano.androidremotecontrolmcp.debug.E2E_START_SERVER"
         private const val EXTRA_BEARER_TOKEN = "bearer_token"
         private const val EXTRA_BINDING_ADDRESS = "binding_address"
         private const val EXTRA_PORT = "port"

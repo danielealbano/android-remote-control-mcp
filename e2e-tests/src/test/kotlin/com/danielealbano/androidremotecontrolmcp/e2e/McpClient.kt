@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -160,15 +161,14 @@ class McpClient(
             .url(url)
             .post(requestBody)
             .addHeader("Authorization", "Bearer $bearerToken")
-            .addHeader("Content-Type", "application/json")
             .build()
 
         val response = executeRequest(request)
         val responseObj = response.jsonObject
 
-        // Check for JSON-RPC error
+        // Check for JSON-RPC error (guard against JsonNull)
         val error = responseObj["error"]
-        if (error != null) {
+        if (error != null && error !is JsonNull) {
             val errorObj = error.jsonObject
             val code = errorObj["code"]?.let {
                 (it as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
@@ -180,9 +180,12 @@ class McpClient(
             throw McpRpcException(code, message, data)
         }
 
-        // Return the result field
-        return responseObj["result"]?.jsonObject
-            ?: throw McpRpcException(-1, "Response missing 'result' field")
+        // Return the result field (JsonNull is a valid JsonElement, not Kotlin null)
+        val result = responseObj["result"]
+        if (result == null || result is JsonNull) {
+            return buildJsonObject { }
+        }
+        return result.jsonObject
     }
 
     /**
@@ -194,6 +197,10 @@ class McpClient(
             val body = response.body.string()
 
             if (!response.isSuccessful) {
+                System.err.println(
+                    "[McpClient] HTTP ${response.code} ${response.message} " +
+                        "for ${request.method} ${request.url} — body: $body"
+                )
                 throw McpClientException(response.code, body)
             }
 
