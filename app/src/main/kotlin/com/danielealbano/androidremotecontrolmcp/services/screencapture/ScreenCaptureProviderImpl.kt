@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
 
+import android.graphics.Bitmap
 import android.os.Build
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -27,7 +28,11 @@ class ScreenCaptureProviderImpl
         }
 
         @Suppress("ReturnCount")
-        override suspend fun captureScreenshot(quality: Int): Result<ScreenshotData> {
+        override suspend fun captureScreenshot(
+            quality: Int,
+            maxWidth: Int?,
+            maxHeight: Int?,
+        ): Result<ScreenshotData> {
             val validation = validateService()
             if (validation is ServiceValidation.Invalid) {
                 return Result.failure(validation.error)
@@ -40,10 +45,18 @@ class ScreenCaptureProviderImpl
                         McpToolException.ActionFailed("Screenshot capture failed or timed out"),
                     )
 
+            var resizedBitmap: Bitmap? = null
             return try {
-                val screenshotData = screenshotEncoder.bitmapToScreenshotData(bitmap, quality)
+                resizedBitmap = screenshotEncoder.resizeBitmapProportional(bitmap, maxWidth, maxHeight)
+                val screenshotData = screenshotEncoder.bitmapToScreenshotData(resizedBitmap, quality)
                 Result.success(screenshotData)
             } finally {
+                // resizeBitmapProportional returns the SAME bitmap if no resize needed,
+                // or a NEW bitmap if resized. Recycle the resized one first (if different),
+                // then always recycle the original.
+                if (resizedBitmap != null && resizedBitmap !== bitmap) {
+                    resizedBitmap.recycle()
+                }
                 bitmap.recycle()
             }
         }
