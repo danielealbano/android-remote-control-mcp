@@ -24,8 +24,9 @@ dependencies {
     testImplementation(libs.testcontainers)
     testImplementation(libs.testcontainers.junit.jupiter)
 
-    // HTTP client
-    testImplementation(libs.okhttp)
+    // MCP SDK client (Streamable HTTP transport)
+    testImplementation(libs.mcp.kotlin.sdk.client)
+    testImplementation(libs.ktor.client.cio)
 
     // Serialization
     testImplementation(libs.kotlinx.serialization.json)
