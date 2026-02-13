@@ -121,7 +121,7 @@ Run `./gradlew dependencies --configuration releaseRuntimeClasspath` (or just sy
 
 #### Action 2.1: Remove `code` property from `McpToolException`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/McpToolException.kt`
 
@@ -166,7 +166,7 @@ Remove:
 
 #### Action 2.1b: Fix `e.code` references in `UtilityTools.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/UtilityTools.kt`
 
@@ -194,7 +194,7 @@ Also remove the import of `McpProtocolHandler` from UtilityTools.kt (line 7).
 
 #### Action 2.2: Update `McpToolUtils` to use SDK types
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/McpToolUtils.kt`
 

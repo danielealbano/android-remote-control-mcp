@@ -1,7 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import kotlinx.serialization.json.JsonElement
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -217,14 +219,14 @@ internal object McpToolUtils {
      * - [IllegalStateException] with "not available" -> [McpToolException.PermissionDenied]
      * - All other exceptions -> [McpToolException.ActionFailed]
      *
-     * On success, returns the result of [McpContentBuilder.textContent] with [successMessage].
+     * On success, returns a [CallToolResult] with [successMessage] as [TextContent].
      */
     fun handleActionResult(
         result: Result<Unit>,
         successMessage: String,
-    ): JsonElement {
+    ): CallToolResult {
         if (result.isSuccess) {
-            return McpContentBuilder.textContent(successMessage)
+            return textResult(successMessage)
         }
 
         val exception = result.exceptionOrNull()!!
@@ -238,6 +240,21 @@ internal object McpToolUtils {
 
         throw McpToolException.ActionFailed(message)
     }
+
+    /**
+     * Creates a [CallToolResult] containing a single [TextContent] item.
+     */
+    fun textResult(text: String): CallToolResult =
+        CallToolResult(content = listOf(TextContent(text = text)))
+
+    /**
+     * Creates a [CallToolResult] containing a single [ImageContent] item.
+     */
+    fun imageResult(
+        data: String,
+        mimeType: String,
+    ): CallToolResult =
+        CallToolResult(content = listOf(ImageContent(data = data, mimeType = mimeType)))
 
     /** Maximum duration in milliseconds for any gesture/action. */
     const val MAX_DURATION_MS = 60000L

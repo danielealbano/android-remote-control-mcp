@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.SystemClock
 import android.util.Log
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -252,7 +251,7 @@ class WaitForElementTool
                     }
                 } catch (e: McpToolException) {
                     // If accessibility service becomes unavailable during polling, propagate
-                    if (e.code == McpProtocolHandler.ERROR_PERMISSION_DENIED) throw e
+                    if (e is McpToolException.PermissionDenied) throw e
                     // Other errors (e.g., stale tree) — retry on next poll
                     Log.d(TAG, "wait_for_element: poll attempt $attemptCount failed: ${e.message}")
                 }
@@ -366,7 +365,7 @@ class WaitForIdleTool
 
                     previousHash = currentHash
                 } catch (e: McpToolException) {
-                    if (e.code == McpProtocolHandler.ERROR_PERMISSION_DENIED) throw e
+                    if (e is McpToolException.PermissionDenied) throw e
                     // Tree parse failures during transitions — reset idle counter
                     consecutiveIdleChecks = 0
                     previousHash = null
