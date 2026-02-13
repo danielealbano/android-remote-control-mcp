@@ -62,6 +62,9 @@ class MainViewModel
         private val _isMediaProjectionGranted = MutableStateFlow(false)
         val isMediaProjectionGranted: StateFlow<Boolean> = _isMediaProjectionGranted.asStateFlow()
 
+        private val _isNotificationPermissionGranted = MutableStateFlow(false)
+        val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
+
         private var _mediaProjectionResultCode: Int = Activity.RESULT_CANCELED
         val mediaProjectionResultCode: Int get() = _mediaProjectionResultCode
 
@@ -197,6 +200,8 @@ class MainViewModel
                     context,
                     McpAccessibilityService::class.java,
                 )
+            _isNotificationPermissionGranted.value =
+                PermissionUtils.isNotificationPermissionGranted(context)
         }
 
         /**
