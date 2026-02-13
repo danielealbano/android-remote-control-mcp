@@ -51,7 +51,7 @@ The application is a **service-based Android app** that exposes an MCP server ov
 - **Purpose**: Run HTTP server implementing MCP protocol
 - **Lifecycle**: User-controlled via MainActivity (start/stop)
 - **Capabilities**: HTTP/HTTPS server using Ktor, MCP JSON-RPC 2.0 protocol, bearer token authentication, configurable binding address (127.0.0.1 or 0.0.0.0), orchestrates calls to AccessibilityService
-- **Implementation**: Foreground service with persistent notification, Kotlin coroutines for async request handling, reads configuration from DataStore, exposes MCP endpoints (`/mcp/v1/tools`, `/mcp/v1/call`), graceful shutdown on service stop
+- **Implementation**: Foreground service with persistent notification, Kotlin coroutines for async request handling, reads configuration from DataStore, exposes Streamable HTTP endpoint at `/mcp` via MCP Kotlin SDK, graceful shutdown on service stop
 
 #### 3. MainActivity
 
@@ -99,7 +99,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **DataStore**: Settings persistence (modern replacement for SharedPreferences)
 - **Hilt**: Dependency injection (Dagger-based, official Android DI)
 - **Ktor Server**: HTTP/HTTPS server (Kotlin-native, async, coroutine-based)
-- **MCP Kotlin SDK**: Official Model Context Protocol implementation (from Anthropic/ModelContextProtocol)
+- **MCP Kotlin SDK**: Official Model Context Protocol implementation v0.8.3 (from Anthropic/ModelContextProtocol), including `Server`, `StreamableHttpServerTransport`, and type-safe tool registration via `Server.addTool()`
+- **SLF4J-Android**: Routes MCP SDK internal SLF4J logs to `android.util.Log`
 - **Kotlinx Serialization**: JSON serialization for MCP protocol
 - **Kotlinx Coroutines**: Async/concurrency
 - **Android Log**: Logging (standard Android Log class)
@@ -112,7 +113,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **Turbine**: Flow testing library
 - **Compose UI Test**: Jetpack Compose testing
 - **Testcontainers Kotlin**: Container-based E2E tests
-- **OkHttp**: HTTP client for E2E tests
+- **MCP Kotlin SDK Client**: SDK `Client` + `StreamableHttpClientTransport` for E2E tests
 
 ### Build Tools
 
@@ -129,8 +130,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
-  - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
+  - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -162,38 +163,23 @@ The application implements the **Model Context Protocol (MCP)** specification fr
 
 ### Transport Layer
 
-- **Protocol**: HTTP/HTTPS with JSON-RPC 2.0
+- **Transport**: Streamable HTTP (JSON-only, no SSE) via the MCP Kotlin SDK's `StreamableHttpServerTransport(enableJsonResponse = true)`
+- **Endpoint**: `POST /mcp` — Single MCP endpoint handling all protocol messages (initialize, tools/list, tools/call, etc.)
 - **Framework**: Ktor Server (async, coroutine-based)
-- **Endpoints**:
-  - `GET /health` — Health check (unauthenticated)
-  - `POST /mcp/v1/initialize` — Initialize MCP session
-  - `GET /mcp/v1/tools/list` — List available MCP tools
-  - `POST /mcp/v1/tools/call` — Execute an MCP tool
-- **Authentication**: Bearer token (`Authorization: Bearer <token>`)
+- **Authentication**: Global Application-level bearer token (`Authorization: Bearer <token>`) — all routes require authentication (no unauthenticated endpoints)
 - **Content-Type**: `application/json`
+- **Compatibility**: Standard MCP clients (`mcp-remote`, Claude Desktop, etc.) can connect via the standard `/mcp` endpoint
 
-### Error Codes
+### Error Handling
 
-Standard MCP error codes:
-- `-32700`: Parse error (invalid JSON)
-- `-32600`: Invalid request (malformed JSON-RPC)
-- `-32601`: Method not found (unknown tool name)
-- `-32602`: Invalid params (missing or invalid tool arguments)
-- `-32603`: Internal error (server-side error)
-
-Custom error codes:
-- `-32001`: Permission not granted (accessibility or screenshot permission missing)
-- `-32002`: Element not found (UI element search failed)
-- `-32003`: Action failed (accessibility action execution failed)
-- `-32004`: Timeout (operation timed out)
+Tool errors are returned as `CallToolResult(isError = true)` with an error message in `TextContent`, following the standard MCP SDK pattern. The SDK handles protocol-level errors (parse errors, invalid requests) automatically. Custom JSON-RPC error codes (`-32001` to `-32004`) are no longer exposed to clients — the server catches `McpToolException` subtypes and wraps them as tool-level error results.
 
 ### Authentication
 
-- Every MCP request must include `Authorization: Bearer <token>` header
-- Token is validated by `BearerTokenAuth` middleware (constant-time comparison to prevent timing attacks)
+- Every request must include `Authorization: Bearer <token>` header
+- Token is validated by `BearerTokenAuth` Application-level plugin (constant-time comparison to prevent timing attacks)
 - Invalid/missing token returns `401 Unauthorized`
 - Token is stored in DataStore, configurable via UI
-- `GET /health` endpoint is unauthenticated
 
 ---
 
@@ -206,11 +192,11 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | Tool | Description | Parameters | Output |
 |------|-------------|------------|--------|
 | `get_accessibility_tree` | Returns full UI hierarchy of current screen | None | JSON accessibility tree with node IDs, text, bounds, class names, etc. |
-| `capture_screenshot` | Captures screenshot as base64-encoded JPEG | `quality` (int, 1-100, default 80, optional) | Base64 JPEG data with width, height, mimeType |
+| `capture_screenshot` | Captures screenshot as base64-encoded JPEG | `quality` (int, 1-100, default 80, optional), `width` (int, optional), `height` (int, optional) | `ImageContent` with base64 JPEG data and mimeType. Optional `width`/`height` params resize proportionally (fit bounding box, maintain aspect ratio). |
 | `get_current_app` | Returns package and activity of focused app | None | packageName, activityName |
 | `get_screen_info` | Returns screen dimensions, DPI, orientation | None | width, height, densityDpi, orientation |
 
-**Error**: `-32001` if accessibility permission not granted or screen capture not available.
+**Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
 **Note**: `get_accessibility_tree` returns full tree depth. Future optimization planned for configurable depth limiting.
 
@@ -224,7 +210,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | `swipe` | Swipe from point A to B | `x1`, `y1`, `x2`, `y2` (all number) | `duration` (number, ms, default 300) |
 | `scroll` | Scroll in direction | `direction` (string: up/down/left/right) | `amount` (string: small/medium/large, default medium) |
 
-**Errors**: `-32001` if accessibility not enabled, `-32003` if action execution failed.
+**Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
 ### 3. Element Action Tools (5 tools)
 
@@ -236,7 +222,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | `set_text` | Set text on editable node | `element_id` (string), `text` (string) | — |
 | `scroll_to_element` | Scroll to make element visible | `element_id` (string) | — |
 
-**Errors**: `-32002` if element not found (ID invalid or stale), `-32003` if element not clickable/editable. `find_elements` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable/editable. `find_elements` returns empty array (not error) when no matches found.
 
 ### 4. Text Input Tools (3 tools)
 
@@ -270,10 +256,10 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 |------|-------------|-----------------|-----------------|
 | `get_clipboard` | Get current clipboard content | — | — |
 | `set_clipboard` | Set clipboard content | `text` (string) | — |
-| `wait_for_element` | Wait until element appears | `by` (string), `value` (string) | `timeout` (number, ms, default 5000) |
-| `wait_for_idle` | Wait for UI to become idle | — | `timeout` (number, ms, default 3000) |
+| `wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
+| `wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
 
-**Errors**: `wait_for_element` returns `-32004` on timeout.
+**Timeout behavior**: Both `wait_for_element` and `wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
 ---
 
@@ -298,7 +284,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 
 - **Accessibility**: User must enable manually in Settings (provide deep link). Also provides screenshot capture via `takeScreenshot()` API (Android 11+)
 - **Internet**: Declared in manifest, granted automatically
-- Always check permission state before operations; return MCP error `-32001` if permission missing
+- Always check permission state before operations; return `CallToolResult(isError = true)` if permission missing
 
 ### Background Restrictions & Memory Management
 
@@ -397,16 +383,16 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Framework**: Ktor `testApplication`, JUnit 5, MockK
 - **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 7 tool categories, error code propagation
-- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`) via interfaces; real `McpProtocolHandler` and `ToolRegistry`
-- **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; `sendToolCall()` helper sends JSON-RPC requests
+- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
+- **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; uses SDK `Client` + `StreamableHttpClientTransport` for type-safe MCP communication
 - **Run**: `make test-integration` or `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
 - **Note**: JVM-based, no emulator or device required. Runs as part of `make test-unit` since both are under `app/src/test/`
 
 ### E2E Tests
 
-- **Framework**: Testcontainers Kotlin (`budtmo/docker-android-x86:emulator_14.0`), JUnit 5, OkHttp
+- **Framework**: Testcontainers Kotlin (`budtmo/docker-android-x86:emulator_14.0`), JUnit 5, MCP Kotlin SDK Client
 - **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, element not found)
-- **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility handles HTTP and HTTPS/self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
+- **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` with trust-all TLS for self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
 
