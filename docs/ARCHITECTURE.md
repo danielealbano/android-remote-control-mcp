@@ -41,16 +41,7 @@ It focuses on **how** components interact at runtime rather than **what** they a
 |  |  |                    -> ToolHandlers          |   |    |
 |  |  +--------------------------------------------+   |    |
 |  |                                                    |    |
-|  +----+----------------------------------------------+    |
-|       |                                                    |
-|       | Bound Service                                      |
-|       |                                                    |
-|  +----v-------------------------------------------+       |
-|  |          ScreenCaptureService                   |       |
-|  |          (Foreground Service)                    |       |
-|  |                                                 |       |
-|  |  MediaProjection -> ImageReader -> JPEG encode  |       |
-|  +-------------------------------------------------+       |
+|  +----------------------------------------------------+    |
 |                                                            |
 +------------------------------------------------------------+
          |
@@ -73,17 +64,15 @@ It focuses on **how** components interact at runtime rather than **what** they a
 2. **User enables accessibility** -> System starts `McpAccessibilityService`
    - `onServiceConnected()` stores `instance` in companion object
    - Service remains running until disabled in Settings
-3. **User grants MediaProjection** -> Permission stored for `ScreenCaptureService`
-4. **User taps "Start Server"** -> `MainViewModel.startServer()` called
+3. **User taps "Start Server"** -> `MainViewModel.startServer()` called
    - Sends `ACTION_START` intent to `McpServerService`
    - `McpServerService.onStartCommand()`:
      a. Calls `startForeground()` with notification (within 5 seconds)
      b. Reads `ServerConfig` from `SettingsRepository`
      c. Gets/creates SSL keystore from `CertificateManager` (only if HTTPS enabled)
      d. Creates `McpServer` with config, keystore, and `McpProtocolHandler`
-     e. Binds to `ScreenCaptureService` via `ServiceConnection`
-     f. Starts Ktor server (HTTP by default, HTTPS if enabled)
-     g. Updates `ServerStatus.Running` via companion-level StateFlow
+     e. Starts Ktor server (HTTP by default, HTTPS if enabled)
+     f. Updates `ServerStatus.Running` via companion-level StateFlow
 
 ### Shutdown Sequence
 
@@ -92,8 +81,7 @@ It focuses on **how** components interact at runtime rather than **what** they a
    - `McpServerService.onDestroy()`:
      a. Updates `ServerStatus.Stopping` via companion-level StateFlow
      b. Stops Ktor server gracefully (1s grace + 5s timeout)
-     c. Unbinds from `ScreenCaptureService`
-     d. Cancels coroutine scope
+     c. Cancels coroutine scope
      e. Clears singleton instance
      f. Updates `ServerStatus.Stopped` via companion-level StateFlow
 
@@ -126,7 +114,6 @@ It focuses on **how** components interact at runtime rather than **what** they a
 | MainViewModel         | `viewModelScope`          | ViewModel lifecycle          |
 | McpServerService      | Custom `CoroutineScope`   | Service onCreate to onDestroy|
 | McpAccessibilityService| Custom `CoroutineScope`  | Service lifecycle            |
-| ScreenCaptureService  | Custom `CoroutineScope`   | Service lifecycle            |
 
 ### Thread Safety
 
@@ -257,7 +244,7 @@ running requires a restart (UI disables config editing when server is running).
 | RECEIVE_BOOT_COMPLETED   | Normal        | Auto-granted (manifest)            | Auto-start on boot        |
 | POST_NOTIFICATIONS       | Runtime (13+) | System dialog                      | Foreground notifications  |
 | Accessibility Service    | Special       | User enables in Settings           | UI introspection/actions  |
-| MediaProjection          | Special       | User confirms system dialog        | Screenshots               |
+| AccessibilityService takeScreenshot | Special | User enables in Settings | Screenshots (Android 11+) |
 
 ---
 

@@ -38,7 +38,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - Material Design 3 configuration UI with dark mode
 - Server status monitoring (running/stopped)
 - Connection info display (IP, port, token)
-- Permission management (Accessibility, MediaProjection)
+- Permission management (Accessibility, Notifications)
 - Server log viewer
 
 ---
@@ -87,8 +87,7 @@ make install
 
 ### 3. Configure Permissions
 
-1. **Enable Accessibility Service**: Open the app, tap "Enable Accessibility Service", and toggle it on in Android Settings.
-2. **Grant Screen Capture**: When prompted by the app, grant the MediaProjection permission.
+1. **Enable Accessibility Service**: Open the app, tap "Enable Accessibility Service", and toggle it on in Android Settings. This also enables screenshot capture via the `takeScreenshot()` API (Android 11+).
 
 ### 4. Start the MCP Server
 
@@ -216,12 +215,11 @@ Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/htm
 
 ## Architecture
 
-The application is a **service-based Android app** with four main components:
+The application is a **service-based Android app** with three main components:
 
-1. **AccessibilityService** - UI introspection and action execution via Android Accessibility APIs
-2. **ScreenCaptureService** - Screenshot capture via MediaProjection
-3. **McpServerService** - Foreground service running the Ktor HTTP/HTTPS server
-4. **MainActivity** - Jetpack Compose UI for configuration and control
+1. **AccessibilityService** - UI introspection, action execution, and screenshot capture via Android Accessibility APIs (`takeScreenshot()` on Android 11+)
+2. **McpServerService** - Foreground service running the Ktor HTTP/HTTPS server
+3. **MainActivity** - Jetpack Compose UI for configuration and control
 
 ```
 MCP Client (AI Model)
@@ -235,13 +233,10 @@ McpServerService (Ktor)
     |       |--- 29 MCP Tool Handlers
     |
     |--- AccessibilityService
-    |       |--- AccessibilityTreeParser
-    |       |--- ElementFinder
-    |       |--- ActionExecutor
-    |
-    |--- ScreenCaptureService
-            |--- MediaProjection
-            |--- ScreenshotEncoder
+            |--- AccessibilityTreeParser
+            |--- ElementFinder
+            |--- ActionExecutor
+            |--- ScreenshotEncoder (via takeScreenshot API)
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
@@ -303,8 +298,7 @@ When the server is bound to `0.0.0.0`:
 - Security warning dialog displayed when switching to network mode
 
 ### Permissions
-- **Accessibility Service**: Required for UI introspection and actions (user must enable manually)
-- **MediaProjection**: Required for screenshots (one-time user grant)
+- **Accessibility Service**: Required for UI introspection, actions, and screenshots (user must enable manually)
 - **Internet**: For running the HTTP/HTTPS server
 - **Foreground Service**: For keeping services alive in background
 - No root access required

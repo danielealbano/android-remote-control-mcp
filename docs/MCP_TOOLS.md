@@ -130,7 +130,7 @@ Successful tool calls return a `content` array with typed entries:
 
 | Code | Name | Description |
 |------|------|-------------|
-| -32001 | Permission Denied | Accessibility service or MediaProjection not enabled |
+| -32001 | Permission Denied | Accessibility service not enabled or screen capture not available |
 | -32002 | Element Not Found | UI element not found by ID or criteria |
 | -32003 | Action Failed | Accessibility action execution failed |
 | -32004 | Timeout | Operation timed out |
@@ -254,7 +254,7 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
 ```
 
 **Error Cases**:
-- `-32001`: MediaProjection permission not granted
+- `-32001`: Screen capture not available (accessibility service not enabled)
 - `-32602`: Quality parameter out of range (must be 1-100)
 - `-32003`: Screenshot capture failed
 

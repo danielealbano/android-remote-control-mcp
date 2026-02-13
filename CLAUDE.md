@@ -114,7 +114,7 @@ A change is DONE only if all are true:
 - All relevant automated tests are written AND passing (unit, integration, e2e as appropriate).
 - No linting warnings/errors (ktlint or detekt for Kotlin).
 - The project builds without errors and without warnings (`./gradlew build` succeeds).
-- All Android Services (AccessibilityService, McpServerService, ScreenCaptureService) handle lifecycle correctly (no memory leaks, proper cleanup).
+- All Android Services (AccessibilityService, McpServerService) handle lifecycle correctly (no memory leaks, proper cleanup).
 - No TODOs, no commented-out dead code, no "temporary hacks".
 - Changes are small, readable, and aligned with existing Kotlin/Android patterns.
 - MCP protocol compliance verified (if MCP tools are modified).
@@ -144,16 +144,15 @@ When running potentially long commands:
 
 ### Interface-first and testability
 - Default to interfaces for components that:
-  - Access Android services (AccessibilityService, MediaProjectionManager),
+  - Access Android services (AccessibilityService),
   - Implement MCP protocol handling,
   - Contain business logic that should be unit tested,
   - Manage configuration/settings (DataStore access).
 
 ### Service-based architecture
 - The application is **service-centric**, not activity-centric.
-- **AccessibilityService**: Extends `android.accessibilityservice.AccessibilityService`, provides UI introspection and action execution.
+- **AccessibilityService**: Extends `android.accessibilityservice.AccessibilityService`, provides UI introspection, action execution, and screenshot capture via `takeScreenshot()` API (Android 11+).
 - **McpServerService**: Foreground service running Ktor HTTP server, orchestrates MCP protocol.
-- **ScreenCaptureService**: Foreground service managing MediaProjection for screenshots.
 - **MainActivity**: Lightweight UI for configuration, does NOT contain business logic.
 
 ### Service lifecycle rules
@@ -161,7 +160,6 @@ When running potentially long commands:
 - All services MUST clean up resources in `onDestroy()` (stop coroutines, release bindings, recycle accessibility nodes).
 - Services MUST handle `onLowMemory()` and `onTrimMemory()` callbacks appropriately.
 - Use singleton pattern for accessing AccessibilityService instance (stored in companion object).
-- Use bound service pattern for ScreenCaptureService (bound to McpServerService).
 
 ### Repository pattern for settings
 - All DataStore access MUST go through `SettingsRepository`.
@@ -240,7 +238,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - **Services** contain business logic:
   - `McpServerService`: Orchestrate MCP protocol, HTTP server lifecycle,
   - `AccessibilityService`: Handle accessibility events, execute actions,
-  - `ScreenCaptureService`: Manage MediaProjection, capture screenshots.
+  - Screenshot capture is handled via `AccessibilityService.takeScreenshot()` API (Android 11+), abstracted behind `ScreenCaptureProvider` interface.
 - **Repositories** abstract data access:
   - `SettingsRepository`: DataStore access.
 - **MCP Tool Implementations** are isolated:
@@ -262,7 +260,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 
 ### Permission handling
 - **Accessibility permission**: Check `isAccessibilityServiceEnabled()` before accessibility operations.
-- **MediaProjection permission**: Check `mediaProjection != null` before screenshot operations.
+- **Screen capture**: Check `isScreenCaptureAvailable()` via `ScreenCaptureProvider` before screenshot operations.
 - Return MCP error `-32001` (permission not granted) if permission missing.
 - Provide clear error messages guiding user to grant permissions.
 
@@ -355,7 +353,7 @@ All references to "tests" in this document mean automated tests (unit tests, int
 - ViewModel logic (`MainViewModelTest`).
 
 **Mocking strategy**:
-- Mock Android framework classes (`AccessibilityNodeInfo`, `MediaProjection`, `Context`) using MockK.
+- Mock Android framework classes (`AccessibilityNodeInfo`, `Context`) using MockK.
 - Mock repositories when testing ViewModels.
 - Use `@MockK`, `@RelaxedMockK` annotations.
 - Verify interactions with `verify {}`.
@@ -524,12 +522,6 @@ Local development requires Android SDK, emulator/device, and standard Android de
 ### Graceful shutdown (Android Services)
 - **McpServerService**: Handle `onDestroy()`:
   - Stop Ktor server gracefully (wait for in-flight requests with timeout),
-  - Unbind from ScreenCaptureService,
-  - Cancel coroutine scopes,
-  - Log shutdown event.
-- **ScreenCaptureService**: Handle `onDestroy()`:
-  - Stop MediaProjection (`mediaProjection.stop()`),
-  - Release resources (ImageReader, VirtualDisplay),
   - Cancel coroutine scopes,
   - Log shutdown event.
 - **AccessibilityService**: Handle `onDestroy()`:
