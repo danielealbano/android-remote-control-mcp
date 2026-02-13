@@ -1128,7 +1128,7 @@ Run `./gradlew assembleDebug` and verify it succeeds with **no errors**. Warning
 
 #### Action 9.1: Delete `McpProtocolHandlerTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Delete file:** `app/src/test/kotlin/.../mcp/McpProtocolHandlerTest.kt`
 
@@ -1136,7 +1136,7 @@ The protocol handler is deleted. Its functionality (JSON-RPC dispatch, initializ
 
 #### Action 9.2: Update `BearerTokenAuthTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../mcp/auth/BearerTokenAuthTest.kt`
 
@@ -1144,7 +1144,7 @@ Update to test the Application-level plugin (`createApplicationPlugin`) instead 
 
 #### Action 9.3: Update `McpToolUtilsTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../mcp/tools/McpToolUtilsTest.kt`
 
@@ -1156,7 +1156,7 @@ Add tests for new `textResult()` and `imageResult()` helpers.
 
 #### Action 9.4: Update tool unit test files (7 files)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Files:**
 - `app/src/test/kotlin/.../mcp/tools/TouchActionToolsTest.kt`
@@ -1204,7 +1204,7 @@ For each file, update:
 
 #### Action 9.5: Add `ScreenshotEncoder` resizing tests
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../services/screencapture/ScreenshotEncoderTest.kt`
 
@@ -1221,7 +1221,7 @@ Add tests for `resizeBitmapProportional()`:
 
 #### Action 9.6: Update `ScreenIntrospectionToolsTest.kt` for screenshot `width`/`height` params
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/test/kotlin/.../mcp/tools/ScreenIntrospectionToolsTest.kt`
 
@@ -1235,7 +1235,7 @@ Add tests for `CaptureScreenshotHandler`:
 
 #### Action 9.7: Run unit tests
 
-- [ ] **Completed**
+- [ ] **Completed** _(deferred: integration test files reference deleted types, preventing test compilation; will run after Task 10)_
 
 Run `./gradlew test --tests "com.danielealbano.androidremotecontrolmcp.mcp.*" --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.*"` and verify all pass.
 

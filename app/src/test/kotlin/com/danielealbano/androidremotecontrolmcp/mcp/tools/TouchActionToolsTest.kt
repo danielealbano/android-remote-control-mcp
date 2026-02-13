@@ -8,11 +8,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -32,15 +30,12 @@ class TouchActionToolsTest {
     }
 
     /**
-     * Extracts the text content from a standard MCP response.
-     * Expected format: { "content": [{ "type": "text", "text": "..." }] }
+     * Extracts the text content from a CallToolResult.
      */
-    private fun extractTextContent(result: JsonElement): String {
-        val content = result.jsonObject["content"]!!.jsonArray
-        assertEquals(1, content.size)
-        val item = content[0].jsonObject
-        assertEquals("text", item["type"]!!.jsonPrimitive.content)
-        return item["text"]!!.jsonPrimitive.content
+    private fun extractTextContent(result: CallToolResult): String {
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        return textContent.text ?: ""
     }
 
     // ─────────────────────────────────────────────────────────────────────

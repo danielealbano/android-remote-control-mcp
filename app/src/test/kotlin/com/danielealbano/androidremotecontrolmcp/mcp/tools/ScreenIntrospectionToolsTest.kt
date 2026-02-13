@@ -2,7 +2,6 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -11,19 +10,19 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -49,6 +48,15 @@ class ScreenIntrospectionToolsTest {
     @AfterEach
     fun tearDown() {
         unmockkAll()
+    }
+
+    /**
+     * Extracts the text content from a CallToolResult.
+     */
+    private fun extractTextContent(result: CallToolResult): String {
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        return textContent.text ?: ""
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -88,17 +96,12 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                assertEquals(1, content!!.size)
-                assertEquals("text", content[0].jsonObject["type"]?.jsonPrimitive?.content)
-                val textContent = content[0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("root_0"))
+                val text = extractTextContent(result)
+                assertTrue(text.contains("root_0"))
             }
 
         @Test
-        @DisplayName("throws error -32001 when service is not available")
+        @DisplayName("throws error when service is not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
@@ -109,27 +112,24 @@ class ScreenIntrospectionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(null)
                     }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
                 assertTrue(exception.message!!.contains("Accessibility service not enabled"))
             }
 
         @Test
-        @DisplayName("throws error -32001 when service is not ready")
+        @DisplayName("throws error when service is not ready")
         fun throwsErrorWhenServiceNotReady() =
             runTest {
                 // Arrange
                 every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(null)
+                }
             }
 
         @Test
-        @DisplayName("throws error -32003 when root node is null")
+        @DisplayName("throws error when root node is null")
         fun throwsErrorWhenRootNodeNull() =
             runTest {
                 // Arrange
@@ -137,11 +137,9 @@ class ScreenIntrospectionToolsTest {
                 every { mockAccessibilityServiceProvider.getRootNode() } returns null
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(null)
+                }
             }
     }
 
@@ -174,14 +172,10 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                assertEquals(1, content!!.size)
-                assertEquals("image", content[0].jsonObject["type"]?.jsonPrimitive?.content)
-                assertEquals("base64data", content[0].jsonObject["data"]?.jsonPrimitive?.content)
-                assertEquals("image/jpeg", content[0].jsonObject["mimeType"]?.jsonPrimitive?.content)
-                assertEquals(1080, content[0].jsonObject["width"]?.jsonPrimitive?.int)
-                assertEquals(2400, content[0].jsonObject["height"]?.jsonPrimitive?.int)
+                assertEquals(1, result.content.size)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("image/jpeg", imageContent.mimeType)
+                assertEquals("base64data", imageContent.data)
             }
 
         @Test
@@ -200,9 +194,133 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                assertEquals("base64data50", content!![0].jsonObject["data"]?.jsonPrimitive?.content)
+                assertEquals(1, result.content.size)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("base64data50", imageContent.data)
+            }
+
+        @Test
+        @DisplayName("captures screenshot with width only")
+        fun capturesScreenshotWithWidthOnly() =
+            runTest {
+                // Arrange
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+                coEvery {
+                    mockScreenCaptureProvider.captureScreenshot(80, 720, null)
+                } returns Result.success(
+                    ScreenshotData(data = "resized", width = 720, height = 1600),
+                )
+                val params = buildJsonObject { put("width", 720) }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                assertEquals(1, result.content.size)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("resized", imageContent.data)
+                coVerify(exactly = 1) {
+                    mockScreenCaptureProvider.captureScreenshot(80, 720, null)
+                }
+            }
+
+        @Test
+        @DisplayName("captures screenshot with height only")
+        fun capturesScreenshotWithHeightOnly() =
+            runTest {
+                // Arrange
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+                coEvery {
+                    mockScreenCaptureProvider.captureScreenshot(80, null, 1200)
+                } returns Result.success(
+                    ScreenshotData(data = "resized_h", width = 540, height = 1200),
+                )
+                val params = buildJsonObject { put("height", 1200) }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                assertEquals(1, result.content.size)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("resized_h", imageContent.data)
+                coVerify(exactly = 1) {
+                    mockScreenCaptureProvider.captureScreenshot(80, null, 1200)
+                }
+            }
+
+        @Test
+        @DisplayName("captures screenshot with both width and height")
+        fun capturesScreenshotWithBothWidthAndHeight() =
+            runTest {
+                // Arrange
+                every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+                coEvery {
+                    mockScreenCaptureProvider.captureScreenshot(80, 720, 1200)
+                } returns Result.success(
+                    ScreenshotData(data = "resized_wh", width = 720, height = 1200),
+                )
+                val params =
+                    buildJsonObject {
+                        put("width", 720)
+                        put("height", 1200)
+                    }
+
+                // Act
+                val result = handler.execute(params)
+
+                // Assert
+                assertEquals(1, result.content.size)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("resized_wh", imageContent.data)
+                coVerify(exactly = 1) {
+                    mockScreenCaptureProvider.captureScreenshot(80, 720, 1200)
+                }
+            }
+
+        @Test
+        @DisplayName("rejects negative width")
+        fun rejectsNegativeWidth() =
+            runTest {
+                // Arrange
+                val params = buildJsonObject { put("width", -1) }
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception is McpToolException.InvalidParams)
+            }
+
+        @Test
+        @DisplayName("rejects zero height")
+        fun rejectsZeroHeight() =
+            runTest {
+                // Arrange
+                val params = buildJsonObject { put("height", 0) }
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception is McpToolException.InvalidParams)
+            }
+
+        @Test
+        @DisplayName("rejects non-integer width (string)")
+        fun rejectsNonIntegerWidth() =
+            runTest {
+                // Arrange
+                val params = buildJsonObject { put("width", "large") }
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception is McpToolException.InvalidParams)
             }
 
         @Test
@@ -217,7 +335,6 @@ class ScreenIntrospectionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(params)
                     }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("between 1 and 100"))
             }
 
@@ -229,11 +346,9 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive(101)) }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(params)
+                }
             }
 
         @Test
@@ -244,11 +359,9 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive(-1)) }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(params)
+                }
             }
 
         @Test
@@ -259,15 +372,13 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive("high")) }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(params)
+                }
             }
 
         @Test
-        @DisplayName("throws error -32001 when screen capture not available")
+        @DisplayName("throws error when screen capture not available")
         fun throwsErrorWhenScreenCaptureNotAvailable() =
             runTest {
                 // Arrange
@@ -278,12 +389,11 @@ class ScreenIntrospectionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(null)
                     }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
                 assertTrue(exception.message!!.contains("Screen capture not available"))
             }
 
         @Test
-        @DisplayName("throws error -32003 when capture fails")
+        @DisplayName("throws error when capture fails")
         fun throwsErrorWhenCaptureFails() =
             runTest {
                 // Arrange
@@ -298,7 +408,6 @@ class ScreenIntrospectionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(null)
                     }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
                 assertTrue(exception.message!!.contains("Capture timeout"))
             }
     }
@@ -330,12 +439,9 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("com.android.calculator2"))
-                assertTrue(textContent.contains(".Calculator"))
+                val text = extractTextContent(result)
+                assertTrue(text.contains("com.android.calculator2"))
+                assertTrue(text.contains(".Calculator"))
             }
 
         @Test
@@ -351,24 +457,21 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertTrue(textContent!!.contains("unknown"))
+                val text = extractTextContent(result)
+                assertTrue(text.contains("unknown"))
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws error when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
                 every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(null)
+                }
             }
     }
 
@@ -403,18 +506,15 @@ class ScreenIntrospectionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("1080"))
-                assertTrue(textContent.contains("2400"))
-                assertTrue(textContent.contains("420"))
-                assertTrue(textContent.contains("portrait"))
+                val text = extractTextContent(result)
+                assertTrue(text.contains("1080"))
+                assertTrue(text.contains("2400"))
+                assertTrue(text.contains("420"))
+                assertTrue(text.contains("portrait"))
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws error when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
@@ -422,11 +522,9 @@ class ScreenIntrospectionToolsTest {
                     McpToolException.PermissionDenied("Accessibility service not enabled")
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
+                assertThrows<McpToolException> {
+                    handler.execute(null)
+                }
             }
     }
 }

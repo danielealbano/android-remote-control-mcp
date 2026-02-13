@@ -1,6 +1,5 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
@@ -10,13 +9,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -49,16 +46,16 @@ class SystemActionToolsTest {
      * Verifies the standard text content response format.
      */
     private fun assertTextContentResponse(
-        result: JsonElement,
+        result: CallToolResult,
         containsText: String,
     ) {
-        val content = result.jsonObject["content"]?.jsonArray
-        assertNotNull(content)
-        assertEquals(1, content!!.size)
-        assertEquals("text", content[0].jsonObject["type"]?.jsonPrimitive?.content)
-        val text = content[0].jsonObject["text"]?.jsonPrimitive?.content
-        assertNotNull(text)
-        assertTrue(text!!.contains(containsText), "Expected text to contain '$containsText' but was '$text'")
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        assertNotNull(textContent.text)
+        assertTrue(
+            textContent.text!!.contains(containsText),
+            "Expected text to contain '$containsText' but was '${textContent.text}'",
+        )
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -102,7 +99,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(null)
                     }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
 
         @Test
@@ -120,7 +116,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(null)
                     }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
                 assertTrue(exception.message!!.contains("Global action failed"))
             }
     }
@@ -155,7 +150,6 @@ class SystemActionToolsTest {
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
 
         @Test
@@ -167,7 +161,6 @@ class SystemActionToolsTest {
                         RuntimeException("Action failed"),
                     )
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
             }
     }
 
@@ -201,7 +194,6 @@ class SystemActionToolsTest {
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
 
         @Test
@@ -213,7 +205,6 @@ class SystemActionToolsTest {
                         RuntimeException("Action failed"),
                     )
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
             }
     }
 
@@ -247,7 +238,6 @@ class SystemActionToolsTest {
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
 
         @Test
@@ -259,7 +249,6 @@ class SystemActionToolsTest {
                         RuntimeException("Action failed"),
                     )
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
             }
     }
 
@@ -293,7 +282,6 @@ class SystemActionToolsTest {
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
 
         @Test
@@ -305,7 +293,6 @@ class SystemActionToolsTest {
                         RuntimeException("Action failed"),
                     )
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
             }
     }
 
@@ -344,15 +331,12 @@ class SystemActionToolsTest {
                 val result = handler.execute(null)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                assertEquals(1, content!!.size)
-                assertEquals("text", content[0].jsonObject["type"]?.jsonPrimitive?.content)
-                val textContent = content[0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("logs"))
-                assertTrue(textContent.contains("line_count"))
-                assertTrue(textContent.contains("truncated"))
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertNotNull(textContent.text)
+                assertTrue(textContent.text!!.contains("logs"))
+                assertTrue(textContent.text!!.contains("line_count"))
+                assertTrue(textContent.text!!.contains("truncated"))
             }
 
         @Test
@@ -366,9 +350,9 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                assertEquals("text", content!![0].jsonObject["type"]?.jsonPrimitive?.content)
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertNotNull(textContent.text)
             }
 
         @Test
@@ -383,7 +367,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(params)
                     }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("last_lines"))
             }
 
@@ -399,7 +382,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(params)
                     }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("last_lines"))
             }
 
@@ -415,7 +397,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(params)
                     }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("integer"))
             }
 
@@ -431,7 +412,6 @@ class SystemActionToolsTest {
                     assertThrows<McpToolException> {
                         handler.execute(params)
                     }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("level"))
             }
 
@@ -443,8 +423,7 @@ class SystemActionToolsTest {
                 for (level in listOf("V", "D", "I", "W", "E", "F")) {
                     val params = buildJsonObject { put("level", JsonPrimitive(level)) }
                     val result = handler.execute(params)
-                    val content = result.jsonObject["content"]?.jsonArray
-                    assertNotNull(content, "Expected content for level $level")
+                    assertTrue(result.content.isNotEmpty(), "Expected content for level $level")
                 }
             }
 
@@ -463,8 +442,7 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
+                assertTrue(result.content.isNotEmpty())
             }
 
         @Test
@@ -481,8 +459,7 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
+                assertTrue(result.content.isNotEmpty())
             }
 
         @Test
@@ -505,12 +482,11 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("Before line"))
-                assertTrue(!textContent.contains("After line"))
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertNotNull(textContent.text)
+                assertTrue(textContent.text!!.contains("Before line"))
+                assertTrue(!textContent.text!!.contains("After line"))
             }
 
         @Test
@@ -542,11 +518,10 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                assertNotNull(content)
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("App log"))
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertNotNull(textContent.text)
+                assertTrue(textContent.text!!.contains("App log"))
             }
 
         @Test
@@ -565,11 +540,11 @@ class SystemActionToolsTest {
                 val result = handler.execute(params)
 
                 // Assert
-                val content = result.jsonObject["content"]?.jsonArray
-                val textContent = content!![0].jsonObject["text"]?.jsonPrimitive?.content
-                assertNotNull(textContent)
-                assertTrue(textContent!!.contains("\"truncated\":true"))
-                assertTrue(textContent.contains("\"line_count\":1"))
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertNotNull(textContent.text)
+                assertTrue(textContent.text!!.contains("\"truncated\":true"))
+                assertTrue(textContent.text!!.contains("\"line_count\":1"))
             }
     }
 }

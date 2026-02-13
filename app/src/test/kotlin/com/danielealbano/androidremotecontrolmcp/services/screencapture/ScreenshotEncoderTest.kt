@@ -12,6 +12,7 @@ import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -315,6 +316,119 @@ class ScreenshotEncoderTest {
             assertEquals(base64Data, result.data)
             assertEquals(width, result.width)
             assertEquals(height, result.height)
+        }
+    }
+
+    @Nested
+    @DisplayName("resizeBitmapProportional")
+    inner class ResizeBitmapProportionalTests {
+        @Test
+        @DisplayName("returns same bitmap when both maxWidth and maxHeight are null")
+        fun returnsSameBitmapWhenBothNull() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+
+            val result = encoder.resizeBitmapProportional(bitmap, null, null)
+            assertSame(bitmap, result)
+        }
+
+        @Test
+        @DisplayName("returns same bitmap when dimensions match original")
+        fun returnsSameBitmapWhenDimensionsMatch() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+
+            val result = encoder.resizeBitmapProportional(bitmap, 1080, 1920)
+            assertSame(bitmap, result)
+        }
+
+        @Test
+        @DisplayName("scales to exact width with proportional height when only maxWidth specified")
+        fun scalesToWidthOnly() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            // 540/1080 = 0.5 scale → height = 1920 * 0.5 = 960
+            every { Bitmap.createScaledBitmap(bitmap, 540, 960, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 540, null)
+            assertSame(scaledBitmap, result)
+        }
+
+        @Test
+        @DisplayName("scales to exact height with proportional width when only maxHeight specified")
+        fun scalesToHeightOnly() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            // 960/1920 = 0.5 scale → width = 1080 * 0.5 = 540
+            every { Bitmap.createScaledBitmap(bitmap, 540, 960, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, null, 960)
+            assertSame(scaledBitmap, result)
+        }
+
+        @Test
+        @DisplayName("fits within bounding box with landscape constraining side")
+        fun fitsWithinBoundingBoxLandscapeConstraining() {
+            // 1920x1080 (landscape) → fit in 480x480 → width is constraining
+            // widthRatio = 480/1920 = 0.25, heightRatio = 480/1080 = 0.444
+            // scale = min(0.25, 0.444) = 0.25 → 480x270
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1920
+                    every { height } returns 1080
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 480, 270, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 480, 480)
+            assertSame(scaledBitmap, result)
+        }
+
+        @Test
+        @DisplayName("fits within bounding box with portrait constraining side")
+        fun fitsWithinBoundingBoxPortraitConstraining() {
+            // 1080x1920 (portrait) → fit in 480x480 → height is constraining
+            // widthRatio = 480/1080 = 0.444, heightRatio = 480/1920 = 0.25
+            // scale = min(0.444, 0.25) = 0.25 → 270x480
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 270, 480, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 480, 480)
+            assertSame(scaledBitmap, result)
+        }
+
+        @Test
+        @DisplayName("handles very small target producing 1x1 bitmap")
+        fun handlesVerySmallTarget() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 1080
+                    every { height } returns 1920
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            every { Bitmap.createScaledBitmap(bitmap, 1, 1, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 1, 1)
+            assertSame(scaledBitmap, result)
         }
     }
 }
