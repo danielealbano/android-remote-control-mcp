@@ -39,6 +39,13 @@ It focuses on **how** components interact at runtime rather than **what** they a
 |  |  |                    -> Server.addTool()      |   |    |
 |  |  +--------------------------------------------+   |    |
 |  |                                                    |    |
+|  |  +--------------------------------------------+   |    |
+|  |  |         TunnelManager (optional)            |   |    |
+|  |  |  CloudflareTunnelProvider (process-based)   |   |    |
+|  |  |  NgrokTunnelProvider (in-process JNI)       |   |    |
+|  |  |  -> Public HTTPS URL (*.trycloudflare.com) |   |    |
+|  |  +--------------------------------------------+   |    |
+|  |                                                    |    |
 |  +----------------------------------------------------+    |
 |                                                            |
 +------------------------------------------------------------+
@@ -71,6 +78,8 @@ It focuses on **how** components interact at runtime rather than **what** they a
      d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
      e. Starts Ktor server (HTTP by default, HTTPS if enabled)
      f. Updates `ServerStatus.Running` via companion-level StateFlow
+     g. If tunnel enabled: starts `TunnelManager` (connects to Cloudflare or ngrok)
+     h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence
 
@@ -78,8 +87,9 @@ It focuses on **how** components interact at runtime rather than **what** they a
    - Sends `ACTION_STOP` intent to `McpServerService`
    - `McpServerService.onDestroy()`:
      a. Updates `ServerStatus.Stopping` via companion-level StateFlow
-     b. Stops Ktor server gracefully (1s grace + 5s timeout)
-     c. Cancels coroutine scope
+     b. Stops tunnel (with 3s ANR-safe timeout) — tunnel stops BEFORE server
+     c. Stops Ktor server gracefully (1s grace + 5s timeout)
+     d. Cancels coroutine scope
      e. Clears singleton instance
      f. Updates `ServerStatus.Stopped` via companion-level StateFlow
 

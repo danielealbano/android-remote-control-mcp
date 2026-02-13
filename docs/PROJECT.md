@@ -57,7 +57,7 @@ The application is a **service-based Android app** that exposes an MCP server ov
 
 - **Type**: Android Activity (Jetpack Compose UI)
 - **Purpose**: Configuration and control interface
-- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS toggle and certificate management), quick links (enable accessibility service), connection info display, server logs viewer (recent MCP requests)
+- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS toggle and certificate management, remote access tunnel toggle and provider selection), quick links (enable accessibility service), connection info display (with tunnel public URL when connected), server logs viewer (recent server events including MCP tool calls and tunnel events)
 - **Implementation**: Material Design 3 with dark mode support, Jetpack Compose, ViewModel for state management, observes service status via Flow/StateFlow
 
 ### Inter-Service Communication
@@ -130,16 +130,17 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
+  - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
   - `ui/screens/` — `HomeScreen.kt`
-  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`
+  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
-  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`
+  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
@@ -354,7 +355,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 
 ### Screen Structure
 
-HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent MCP requests), and ConnectionInfoCard (IP, port, token for client setup).
+HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
 
 ### Accessibility (UI)
 
@@ -459,10 +460,24 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 - **HTTP is the default and primary transport.** The server starts on plain HTTP. This is intentional and the recommended mode for most users.
 - **Why HTTP is the priority**: The MCP server runs on an Android device whose IP address changes frequently (WiFi reconnects, mobile data, different networks). Standard/public Certificate Authorities (CAs) cannot issue valid TLS certificates for bare IP addresses or dynamic IPs. Any HTTPS certificate the device can generate will be self-signed, meaning every MCP client would need to explicitly trust it or disable certificate verification. This makes HTTPS impractical as a default — it adds configuration friction with no real security benefit for the primary use case (localhost via ADB port forwarding, where traffic never leaves the USB cable).
 - **HTTPS is a nice-to-have, not a priority.** It exists for users who need encrypted transport over a local network (binding to `0.0.0.0`), but even then the certificate will be self-signed and clients must allow insecure/untrusted certificates. Users who enable HTTPS must understand this trade-off.
-- **Future direction**: Proper HTTPS exposure may be achieved via integration with tunneling services like ngrok or Tailscale, which provide valid certificates for dynamically-assigned endpoints. This is planned for a future release, not the current scope.
+- **Remote access tunnels**: The app integrates with **Cloudflare Quick Tunnels** (no account required, random `*.trycloudflare.com` URL) and **ngrok** (account required, optional custom domain) to expose the local MCP server via a public HTTPS URL with valid certificates. See the Remote Access / Tunnel section below.
 - **When HTTPS is enabled** (user opt-in via UI toggle):
   - **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable. Clients must allow insecure/self-signed certificates.
   - **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage.
+
+### Remote Access / Tunnel
+
+The app supports exposing the local MCP server to the internet via tunnel providers. This allows MCP clients to connect from anywhere without port forwarding or VPN configuration.
+
+- **Cloudflare Quick Tunnels** (default): Runs the `cloudflared` binary as a child process. Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL. No account or configuration needed. The cloudflared binary is bundled as a native library (`libcloudflared.so`) via a git submodule in `vendor/cloudflared/`.
+- **ngrok**: Uses the `ngrok-java` library (JNI-based, in-process). Requires an ngrok authtoken (free tier available). Supports optional custom domains. Only available on ARM64 devices.
+
+Tunnel architecture:
+- `TunnelProvider` interface defines `start(localPort, config)` / `stop()` with `status: StateFlow<TunnelStatus>`
+- `TunnelManager` orchestrates provider lifecycle, reads `ServerConfig` to select the active provider
+- `McpServerService` starts tunnel AFTER the Ktor server is running and stops tunnel BEFORE the server on shutdown
+- Tunnel failure does NOT prevent the MCP server from running locally
+- Tunnel URL is logged to both logcat and the UI server logs via `McpServerService.serverLogEvents` SharedFlow
 
 ### Network Security
 
@@ -499,6 +514,10 @@ Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMP
 - **Bearer Token**: Auto-generated UUID on first launch
 - **HTTPS**: Disabled by default (HTTP is the primary transport). When enabled by the user, uses auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity. Clients must allow insecure/self-signed certificates.
 - **Auto-start on Boot**: Disabled
+- **Remote Access Tunnel**: Disabled by default
+- **Tunnel Provider**: Cloudflare (no account required)
+- **ngrok Authtoken**: Empty (required when using ngrok)
+- **ngrok Domain**: Empty (auto-assigned when empty)
 
 ### MCP Defaults
 
