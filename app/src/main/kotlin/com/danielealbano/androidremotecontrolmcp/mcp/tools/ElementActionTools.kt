@@ -485,8 +485,8 @@ internal fun mapFindBy(by: String): FindBy? {
  * Gets a fresh accessibility tree by obtaining the root node from the
  * accessibility service and parsing it.
  *
- * @throws McpToolException with -32001 if accessibility service is not available.
- * @throws McpToolException with -32001 if no root node is available.
+ * @throws McpToolException with PermissionDenied if accessibility service is not available.
+ * @throws McpToolException with PermissionDenied if no root node is available.
  */
 internal fun getFreshTree(
     treeParser: AccessibilityTreeParser,

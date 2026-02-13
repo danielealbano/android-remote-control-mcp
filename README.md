@@ -13,12 +13,11 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 
 ### MCP Server
 - HTTP server running directly on Android (Ktor + Netty), with optional HTTPS
-- JSON-RPC 2.0 protocol (MCP specification compliant)
-- Bearer token authentication
+- Streamable HTTP transport at `/mcp` (MCP specification compliant, JSON-only, no SSE)
+- Bearer token authentication (global, all requests)
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1) or network (0.0.0.0)
 - Auto-start on boot
-- Health check endpoint (`GET /health`)
 
 ### 29 MCP Tools across 7 Categories
 
@@ -102,31 +101,31 @@ make forward-port
 
 Test the connection:
 ```bash
-curl http://localhost:8080/health
-```
-
-Expected response:
-```json
-{"status": "healthy", "version": "1.0.0", "server": "running"}
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
 ```
 
 ### 6. Make MCP Tool Calls
 
+All requests are sent as JSON-RPC 2.0 via `POST /mcp` (Streamable HTTP transport):
+
 ```bash
 # List available tools
-curl -X POST http://localhost:8080/mcp/v1/tools/list \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Get the accessibility tree
-curl -X POST http://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_accessibility_tree","arguments":{}}}'
 
 # Tap at coordinates
-curl -X POST http://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tap","arguments":{"x":540,"y":1200}}}'
@@ -176,7 +175,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover MCP protocol handling, accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 29 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 29 MCP tool handlers.
 
 ### Integration Tests
 
@@ -224,13 +223,13 @@ The application is a **service-based Android app** with three main components:
 ```
 MCP Client (AI Model)
     |
-    | HTTP/HTTPS + Bearer Token
+    | HTTP/HTTPS POST /mcp + Bearer Token
     v
 McpServerService (Ktor)
     |
-    |--- McpProtocolHandler (JSON-RPC 2.0)
+    |--- Streamable HTTP /mcp (JSON-only, no SSE)
     |       |
-    |       |--- 29 MCP Tool Handlers
+    |       |--- SDK Server (MCP Kotlin SDK) -> 29 MCP Tools
     |
     |--- AccessibilityService
             |--- AccessibilityTreeParser
@@ -263,8 +262,11 @@ When the server is bound to `127.0.0.1` (default, most secure):
 # Forward device port to host
 adb forward tcp:8080 tcp:8080
 
-# Connect from host
-curl http://localhost:8080/health
+# Test connection from host
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
 ```
 
 ### Using over Network
@@ -272,7 +274,7 @@ curl http://localhost:8080/health
 When the server is bound to `0.0.0.0`:
 
 1. Find the device's IP address (shown in the app's connection info)
-2. Connect directly: `curl http://DEVICE_IP:8080/health`
+2. Connect directly via `POST http://DEVICE_IP:8080/mcp` with bearer token
 
 **Warning**: Binding to `0.0.0.0` exposes the server to all devices on the same network. Only use on trusted private networks.
 

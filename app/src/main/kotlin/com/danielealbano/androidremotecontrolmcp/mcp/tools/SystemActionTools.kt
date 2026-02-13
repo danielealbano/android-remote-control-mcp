@@ -29,7 +29,7 @@ import javax.inject.Inject
  *
  * @param actionName Human-readable name of the action (for error/success messages).
  * @param action Suspend function that performs the system action and returns [Result].
- * @return MCP content [JsonElement] with confirmation message.
+ * @return [CallToolResult] with confirmation message.
  */
 private suspend fun executeSystemAction(
     accessibilityServiceProvider: AccessibilityServiceProvider,
@@ -64,8 +64,8 @@ private suspend fun executeSystemAction(
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "Back button press executed successfully" }] }`
  * **Errors**:
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if action execution failed
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if action execution failed
  */
 class PressBackHandler
     @Inject
@@ -109,8 +109,8 @@ class PressBackHandler
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "Home button press executed successfully" }] }`
  * **Errors**:
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if action execution failed
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if action execution failed
  */
 class PressHomeHandler
     @Inject
@@ -154,8 +154,8 @@ class PressHomeHandler
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "Recents button press executed successfully" }] }`
  * **Errors**:
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if action execution failed
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if action execution failed
  */
 class PressRecentsHandler
     @Inject
@@ -199,8 +199,8 @@ class PressRecentsHandler
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "Open notifications executed successfully" }] }`
  * **Errors**:
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if action execution failed
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if action execution failed
  */
 class OpenNotificationsHandler
     @Inject
@@ -244,8 +244,8 @@ class OpenNotificationsHandler
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "Open quick settings executed successfully" }] }`
  * **Errors**:
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if action execution failed
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if action execution failed
  */
 class OpenQuickSettingsHandler
     @Inject
@@ -292,8 +292,8 @@ class OpenQuickSettingsHandler
  * **Output**: `{ "content": [{ "type": "text",
  *   "text": "{\"logs\":\"...\",\"line_count\":100,\"truncated\":false}" }] }`
  * **Errors**:
- *   - -32602 if parameters are invalid
- *   - -32003 if logcat execution fails
+ *   - InvalidParams if parameters are invalid
+ *   - ActionFailed if logcat execution fails
  */
 class GetDeviceLogsHandler
     @Inject

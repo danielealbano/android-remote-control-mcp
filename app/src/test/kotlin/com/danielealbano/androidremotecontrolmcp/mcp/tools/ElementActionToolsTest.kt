@@ -153,7 +153,7 @@ class ElementActionToolsTest {
                         put("value", "test")
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Invalid 'by' value"))
             }
 
@@ -166,7 +166,7 @@ class ElementActionToolsTest {
                         put("value", "")
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("non-empty"))
             }
 
@@ -175,7 +175,7 @@ class ElementActionToolsTest {
             runTest {
                 val params = buildJsonObject { put("value", "test") }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 
@@ -202,7 +202,7 @@ class ElementActionToolsTest {
                     Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
             }
 
         @Test
@@ -212,7 +212,7 @@ class ElementActionToolsTest {
                     Result.failure(IllegalStateException("Node 'node_abc' is not clickable"))
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
             }
 
         @Test
@@ -220,7 +220,7 @@ class ElementActionToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 
@@ -293,7 +293,7 @@ class ElementActionToolsTest {
                         put("text", "Hi")
                     }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
             }
     }
 
@@ -321,7 +321,7 @@ class ElementActionToolsTest {
                 every { mockElementFinder.findNodeById(sampleTree, "node_xyz") } returns null
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
             }
     }
 }
