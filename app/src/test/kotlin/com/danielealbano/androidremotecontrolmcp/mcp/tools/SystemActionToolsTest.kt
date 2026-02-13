@@ -53,7 +53,7 @@ class SystemActionToolsTest {
         val textContent = result.content[0] as TextContent
         assertNotNull(textContent.text)
         assertTrue(
-            textContent.text!!.contains(containsText),
+            textContent.text.contains(containsText),
             "Expected text to contain '$containsText' but was '${textContent.text}'",
         )
     }
@@ -334,9 +334,9 @@ class SystemActionToolsTest {
                 assertEquals(1, result.content.size)
                 val textContent = result.content[0] as TextContent
                 assertNotNull(textContent.text)
-                assertTrue(textContent.text!!.contains("logs"))
-                assertTrue(textContent.text!!.contains("line_count"))
-                assertTrue(textContent.text!!.contains("truncated"))
+                assertTrue(textContent.text.contains("logs"))
+                assertTrue(textContent.text.contains("line_count"))
+                assertTrue(textContent.text.contains("truncated"))
             }
 
         @Test
@@ -485,8 +485,8 @@ class SystemActionToolsTest {
                 assertEquals(1, result.content.size)
                 val textContent = result.content[0] as TextContent
                 assertNotNull(textContent.text)
-                assertTrue(textContent.text!!.contains("Before line"))
-                assertTrue(!textContent.text!!.contains("After line"))
+                assertTrue(textContent.text.contains("Before line"))
+                assertTrue(!textContent.text.contains("After line"))
             }
 
         @Test
@@ -521,7 +521,7 @@ class SystemActionToolsTest {
                 assertEquals(1, result.content.size)
                 val textContent = result.content[0] as TextContent
                 assertNotNull(textContent.text)
-                assertTrue(textContent.text!!.contains("App log"))
+                assertTrue(textContent.text.contains("App log"))
             }
 
         @Test
@@ -543,8 +543,8 @@ class SystemActionToolsTest {
                 assertEquals(1, result.content.size)
                 val textContent = result.content[0] as TextContent
                 assertNotNull(textContent.text)
-                assertTrue(textContent.text!!.contains("\"truncated\":true"))
-                assertTrue(textContent.text!!.contains("\"line_count\":1"))
+                assertTrue(textContent.text.contains("\"truncated\":true"))
+                assertTrue(textContent.text.contains("\"line_count\":1"))
             }
     }
 }

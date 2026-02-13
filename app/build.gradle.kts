@@ -157,6 +157,9 @@ dependencies {
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.mcp.kotlin.sdk.client)
+    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.sse)
 }
 
 tasks.withType<Test> {

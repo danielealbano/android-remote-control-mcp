@@ -7,21 +7,19 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -80,26 +78,15 @@ class ElementActionIntegrationTest {
                     ),
                 )
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "find_elements",
-                        arguments =
-                            buildJsonObject {
-                                put("by", "text")
-                                put("value", "OK")
-                            },
-                    )
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "find_elements",
+                    arguments = mapOf("by" to "text", "value" to "OK"),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
 
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val textContent =
-                    rpcResponse.result!!.jsonObject["content"]!!
-                        .jsonArray[0]
-                        .jsonObject["text"]!!.jsonPrimitive.content
+                val textContent = (result.content[0] as TextContent).text
                 val parsed = Json.parseToJsonElement(textContent).jsonObject
                 val elements = parsed["elements"]!!.jsonArray
                 assertEquals(1, elements.size)
@@ -122,20 +109,13 @@ class ElementActionIntegrationTest {
                 deps.actionExecutor.clickNode("node_btn", sampleTree)
             } returns Result.success(Unit)
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "click_element",
-                        arguments =
-                            buildJsonObject {
-                                put("element_id", "node_btn")
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "click_element",
+                    arguments = mapOf("element_id" to "node_btn"),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
             }
         }
 
@@ -151,24 +131,14 @@ class ElementActionIntegrationTest {
                 deps.actionExecutor.clickNode("node_xyz", sampleTree)
             } returns Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "click_element",
-                        arguments =
-                            buildJsonObject {
-                                put("element_id", "node_xyz")
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(ELEMENT_NOT_FOUND_CODE, rpcResponse.error!!.code)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "click_element",
+                    arguments = mapOf("element_id" to "node_xyz"),
+                )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("node_xyz"))
             }
         }
-
-    companion object {
-        private const val ELEMENT_NOT_FOUND_CODE = -32002
-    }
 }

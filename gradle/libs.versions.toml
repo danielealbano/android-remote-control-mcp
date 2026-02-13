@@ -105,8 +105,10 @@ mcp-kotlin-sdk-client = { group = "io.modelcontextprotocol", name = "kotlin-sdk-
 # SLF4J Android binding
 slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j-android" }
 
-# Ktor Client (E2E tests - SDK client transport needs Ktor client engine)
+# Ktor Client (E2E tests and integration tests - SDK client transport needs Ktor client engine)
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-sse = { group = "io.ktor", name = "ktor-sse", version.ref = "ktor" }
 
 # Kotlinx
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }

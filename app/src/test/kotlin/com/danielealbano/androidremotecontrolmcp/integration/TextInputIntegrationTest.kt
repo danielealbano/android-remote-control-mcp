@@ -5,17 +5,15 @@ package com.danielealbano.androidremotecontrolmcp.integration
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -70,42 +68,27 @@ class TextInputIntegrationTest {
                 deps.actionExecutor.setTextOnNode("node_edit", "Hello World", sampleTree)
             } returns Result.success(Unit)
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "input_text",
-                        arguments =
-                            buildJsonObject {
-                                put("text", "Hello World")
-                                put("element_id", "node_edit")
-                            },
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "input_text",
+                    arguments = mapOf("text" to "Hello World", "element_id" to "node_edit"),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
             }
         }
 
     @Test
-    fun `input_text with missing text parameter returns error -32602`() =
+    fun `input_text with missing text parameter returns error`() =
         runTest {
-            McpIntegrationTestHelper.withTestApplication { _ ->
-                val response =
-                    sendToolCall(
-                        toolName = "input_text",
-                        arguments = buildJsonObject {},
-                    )
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(INVALID_PARAMS_CODE, rpcResponse.error!!.code)
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result = client.callTool(
+                    name = "input_text",
+                    arguments = emptyMap(),
+                )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.isNotEmpty())
             }
         }
-
-    companion object {
-        private const val INVALID_PARAMS_CODE = -32602
-    }
 }

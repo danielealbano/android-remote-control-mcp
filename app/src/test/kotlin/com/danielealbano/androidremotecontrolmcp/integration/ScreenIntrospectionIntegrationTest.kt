@@ -6,19 +6,20 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -53,18 +54,15 @@ class ScreenIntrospectionIntegrationTest {
             every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
             every { mockRootNode.recycle() } returns Unit
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "get_accessibility_tree")
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "get_accessibility_tree",
+                    arguments = emptyMap(),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
 
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val textContent =
-                    rpcResponse.result!!.jsonObject["content"]!!
-                        .jsonArray[0]
-                        .jsonObject["text"]!!.jsonPrimitive.content
+                val textContent = (result.content[0] as TextContent).text
                 val parsed = Json.parseToJsonElement(textContent).jsonObject
                 assertNotNull(parsed["nodes"])
             }
@@ -86,18 +84,17 @@ class ScreenIntrospectionIntegrationTest {
                     ),
                 )
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "capture_screenshot")
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "capture_screenshot",
+                    arguments = emptyMap(),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
 
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val content = rpcResponse.result!!.jsonObject["content"]!!.jsonArray
-                val imageItem = content[0].jsonObject
-                assertEquals("image", imageItem["type"]?.jsonPrimitive?.content)
-                assertEquals("image/jpeg", imageItem["mimeType"]?.jsonPrimitive?.content)
+                val imageContent = result.content[0] as ImageContent
+                assertEquals("image/jpeg", imageContent.mimeType)
+                assertEquals("dGVzdA==", imageContent.data)
             }
         }
 
@@ -113,18 +110,15 @@ class ScreenIntrospectionIntegrationTest {
                 deps.accessibilityServiceProvider.getCurrentActivityName()
             } returns "MainActivity"
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "get_current_app")
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "get_current_app",
+                    arguments = emptyMap(),
+                )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
 
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNull(rpcResponse.error)
-                assertNotNull(rpcResponse.result)
-
-                val textContent =
-                    rpcResponse.result!!.jsonObject["content"]!!
-                        .jsonArray[0]
-                        .jsonObject["text"]!!.jsonPrimitive.content
+                val textContent = (result.content[0] as TextContent).text
                 val parsed = Json.parseToJsonElement(textContent).jsonObject
                 assertEquals(
                     "com.example.app",
@@ -138,22 +132,19 @@ class ScreenIntrospectionIntegrationTest {
         }
 
     @Test
-    fun `capture_screenshot when permission denied returns error -32001`() =
+    fun `capture_screenshot when permission denied returns error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns false
 
-            McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-                val response = sendToolCall(toolName = "capture_screenshot")
-
-                assertEquals(HttpStatusCode.OK, response.status)
-                val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
-                assertEquals(PERMISSION_DENIED_CODE, rpcResponse.error!!.code)
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(
+                    name = "capture_screenshot",
+                    arguments = emptyMap(),
+                )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Screen capture not available"))
             }
         }
-
-    companion object {
-        private const val PERMISSION_DENIED_CODE = -32001
-    }
 }
