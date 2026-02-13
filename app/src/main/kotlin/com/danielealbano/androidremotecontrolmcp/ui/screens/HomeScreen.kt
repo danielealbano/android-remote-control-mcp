@@ -30,9 +30,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConfigurationSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.PermissionsSection
+import com.danielealbano.androidremotecontrolmcp.ui.components.RemoteAccessSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
@@ -56,6 +58,9 @@ fun HomeScreen(
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
+    val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
+    val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
+    val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
 
     val isServerRunning =
         serverStatus is ServerStatus.Running ||
@@ -124,6 +129,19 @@ fun HomeScreen(
                 onHostnameChange = viewModel::updateCertificateHostname,
             )
 
+            RemoteAccessSection(
+                tunnelEnabled = serverConfig.tunnelEnabled,
+                tunnelProvider = serverConfig.tunnelProvider,
+                ngrokAuthtoken = ngrokAuthtokenInput,
+                ngrokDomain = ngrokDomainInput,
+                tunnelStatus = tunnelStatus,
+                isServerRunning = isServerRunning,
+                onTunnelEnabledChange = viewModel::updateTunnelEnabled,
+                onTunnelProviderChange = viewModel::updateTunnelProvider,
+                onNgrokAuthtokenChange = viewModel::updateNgrokAuthtoken,
+                onNgrokDomainChange = viewModel::updateNgrokDomain,
+            )
+
             PermissionsSection(
                 isAccessibilityEnabled = isAccessibilityEnabled,
                 isNotificationPermissionGranted = isNotificationPermissionGranted,
@@ -145,9 +163,11 @@ fun HomeScreen(
                 port = serverConfig.port,
                 httpsEnabled = serverConfig.httpsEnabled,
                 bearerToken = serverConfig.bearerToken,
+                tunnelUrl = (tunnelStatus as? TunnelStatus.Connected)?.url,
                 onCopyAll = { connectionString ->
                     viewModel.copyToClipboard(context, connectionString)
                 },
+                onShare = { text -> viewModel.shareText(context, text) },
             )
         }
     }

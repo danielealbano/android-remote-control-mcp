@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ElevatedCard
@@ -42,6 +43,8 @@ fun ConnectionInfoCard(
     httpsEnabled: Boolean,
     bearerToken: String,
     onCopyAll: (String) -> Unit,
+    tunnelUrl: String? = null,
+    onShare: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showToken by remember { mutableStateOf(false) }
@@ -80,6 +83,12 @@ fun ConnectionInfoCard(
                 label = stringResource(R.string.connection_info_url),
                 value = serverUrl,
             )
+            tunnelUrl?.let { url ->
+                ConnectionInfoRow(
+                    label = stringResource(R.string.remote_access_public_url_label),
+                    value = url,
+                )
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -114,19 +123,34 @@ fun ConnectionInfoCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            val connectionString = "URL: $serverUrl\nToken: $bearerToken"
-            TextButton(
-                onClick = { onCopyAll(connectionString) },
+            val connectionString =
+                buildString {
+                    append("URL: $serverUrl\nToken: $bearerToken")
+                    tunnelUrl?.let { append("\nPublic URL: $it") }
+                }
+            Row(
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = null,
-                )
-                Text(
-                    text = stringResource(R.string.connection_info_copy_all),
-                    modifier = Modifier.padding(start = 4.dp),
-                )
+                TextButton(onClick = { onCopyAll(connectionString) }) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                    )
+                    Text(
+                        text = stringResource(R.string.connection_info_copy_all),
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
+                TextButton(onClick = { onShare(connectionString) }) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                    )
+                    Text(
+                        text = stringResource(R.string.connection_info_share),
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
             }
         }
     }
@@ -162,7 +186,9 @@ private fun ConnectionInfoCardPreview() {
             port = 8080,
             httpsEnabled = false,
             bearerToken = "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            tunnelUrl = "https://random-words.trycloudflare.com",
             onCopyAll = {},
+            onShare = {},
         )
     }
 }

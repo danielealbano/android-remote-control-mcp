@@ -1371,15 +1371,15 @@ Add new tests:
 **Goal**: Add Remote Access section to the UI with tunnel provider selection, configuration, and status display.
 
 **Acceptance Criteria**:
-- [ ] "Remote Access" section visible in HomeScreen between ConfigurationSection and PermissionsSection
-- [ ] Toggle to enable/disable remote access
-- [ ] Provider selector uses RadioButtons with description tags (same style as `CertificateSourceSelector`), NOT SegmentedButtons
-- [ ] ngrok-specific fields visible when ngrok is selected: authtoken (password field), domain (optional text field)
-- [ ] Tunnel status indicator (connecting/connected/error)
-- [ ] Public URL displayed when connected (copy/share handled by ConnectionInfoCard, NOT in this section)
-- [ ] All settings disabled when server is running (same pattern as other settings)
-- [ ] String resources added for all new UI text
-- [ ] Compose preview updated
+- [x] "Remote Access" section visible in HomeScreen between ConfigurationSection and PermissionsSection
+- [x] Toggle to enable/disable remote access
+- [x] Provider selector uses RadioButtons with description tags (same style as `CertificateSourceSelector`), NOT SegmentedButtons
+- [x] ngrok-specific fields visible when ngrok is selected: authtoken (password field), domain (optional text field)
+- [x] Tunnel status indicator (connecting/connected/error)
+- [x] Public URL displayed when connected (copy/share handled by ConnectionInfoCard, NOT in this section)
+- [x] All settings disabled when server is running (same pattern as other settings)
+- [x] String resources added for all new UI text
+- [x] Compose preview updated
 
 #### Action 11.1: Add string resources
 
@@ -1410,7 +1410,7 @@ Add new strings:
 ```
 
 **Definition of Done**:
-- [ ] All strings added, build succeeds
+- [x] All strings added, build succeeds
 
 #### Action 11.2: Create `RemoteAccessSection` composable
 
@@ -1457,8 +1457,8 @@ fun RemoteAccessSection(
 Include `@Preview` composable at the bottom.
 
 **Definition of Done**:
-- [ ] Composable compiles and renders in preview
-- [ ] Follows existing Material Design 3 patterns and spacing
+- [x] Composable compiles and renders in preview
+- [x] Follows existing Material Design 3 patterns and spacing
 
 #### Action 11.3: Add `RemoteAccessSection` to `HomeScreen`
 
@@ -1490,7 +1490,7 @@ RemoteAccessSection(
 ```
 
 **Definition of Done**:
-- [ ] HomeScreen compiles and renders with new section
+- [x] HomeScreen compiles and renders with new section
 
 #### Action 11.4: Update `ConnectionInfoCard` to show tunnel URL and add Share button
 
@@ -1571,10 +1571,10 @@ Update `HomeScreen.kt` to pass tunnel URL and share callback:
 ```
 
 **Definition of Done**:
-- [ ] ConnectionInfoCard shows tunnel URL when connected
-- [ ] Share button sends connection info via `Intent.ACTION_SEND`
-- [ ] Copy All includes tunnel URL when present
-- [ ] Preview updated with new parameters and compiles
+- [x] ConnectionInfoCard shows tunnel URL when connected
+- [x] Share button sends connection info via `Intent.ACTION_SEND`
+- [x] Copy All includes tunnel URL when present
+- [x] Preview updated with new parameters and compiles
 
 ---
 
