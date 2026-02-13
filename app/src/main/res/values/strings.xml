@@ -60,6 +60,24 @@
     <string name="server_logs_title">Server Logs</string>
     <string name="server_logs_empty">No log entries yet</string>
 
+    <!-- Remote Access / Tunnel -->
+    <string name="remote_access_title">Remote Access</string>
+    <string name="remote_access_enabled_label">Enable Remote Access</string>
+    <string name="remote_access_provider_label">Tunnel Provider</string>
+    <string name="remote_access_provider_cloudflare">Cloudflare</string>
+    <string name="remote_access_provider_cloudflare_desc">No account required</string>
+    <string name="remote_access_provider_ngrok">ngrok</string>
+    <string name="remote_access_provider_ngrok_desc">Account required</string>
+    <string name="remote_access_ngrok_authtoken_label">ngrok Authtoken</string>
+    <string name="remote_access_ngrok_domain_label">Domain (optional)</string>
+    <string name="remote_access_ngrok_domain_hint">Leave empty for auto-assigned</string>
+    <string name="remote_access_status_disconnected">Disconnected</string>
+    <string name="remote_access_status_connecting">Connecting…</string>
+    <string name="remote_access_status_connected">Connected</string>
+    <string name="remote_access_status_error">Error: %1$s</string>
+    <string name="remote_access_public_url_label">Public URL</string>
+    <string name="remote_access_ngrok_unsupported">ngrok is not available on this device (requires ARM64)</string>
+
     <!-- Connection Info -->
     <string name="connection_info_title">Connection Info</string>
     <string name="connection_info_ip">IP Address</string>
@@ -67,4 +85,5 @@
     <string name="connection_info_url">URL</string>
     <string name="connection_info_token">Token</string>
     <string name="connection_info_copy_all">Copy All</string>
+    <string name="connection_info_share">Share</string>
 </resources>
