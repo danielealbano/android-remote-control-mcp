@@ -202,7 +202,7 @@ class WaitForElementTool
                     )
 
             val timeout =
-                arguments?.get("timeout")?.jsonPrimitive?.longOrNull
+                arguments["timeout"]?.jsonPrimitive?.longOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'timeout'")
             if (timeout <= 0 || timeout > MAX_TIMEOUT_MS) {
                 throw McpToolException.InvalidParams(

@@ -1086,7 +1086,7 @@ mcpServer?.start()
 
 #### Action 8.1: Delete `McpProtocolHandler.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Delete file:** `app/src/main/kotlin/.../mcp/McpProtocolHandler.kt`
 
@@ -1094,7 +1094,7 @@ This file contains: `ToolHandler` interface, `JsonRpcRequest`, `JsonRpcResponse`
 
 #### Action 8.2: Delete `ToolRegistry.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Delete file:** `app/src/main/kotlin/.../mcp/tools/ToolRegistry.kt`
 
@@ -1102,7 +1102,7 @@ This file contains: `ToolDefinition` data class and `ToolRegistry` class. Both r
 
 #### Action 8.3: Delete `McpContentBuilder.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Delete file:** `app/src/main/kotlin/.../mcp/tools/McpContentBuilder.kt`
 
@@ -1110,13 +1110,13 @@ Replaced by SDK's `TextContent` and `ImageContent` types, accessed via `McpToolU
 
 #### Action 8.4: Clean up unused imports across all modified files
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Review all files modified in Tasks 2-7 and remove any remaining references to deleted types (`ToolHandler`, `JsonRpcRequest`, `JsonRpcResponse`, `JsonRpcError`, `ToolRegistry`, `ToolDefinition`, `McpContentBuilder`, `McpProtocolHandler`).
 
 #### Action 8.5: Verify compilation
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Run `./gradlew assembleDebug` and verify it succeeds with **no errors**. Warnings should also be investigated and resolved if related to the migration.
 
