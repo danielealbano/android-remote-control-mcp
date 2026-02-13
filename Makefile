@@ -152,9 +152,6 @@ grant-permissions: ## Grant permissions via adb (accessibility + notifications)
 	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.POST_NOTIFICATIONS
 	@echo "   Done."
 	@echo ""
-	@echo "NOTE: Screen capture (MediaProjection) requires manual approval via the"
-	@echo "system dialog in the app — it cannot be granted via adb."
-	@echo ""
 
 # Note: start-server defaults to the debug application ID (APP_ID_DEBUG).
 # To launch the release build, use: make start-server APP_ID_TARGET=$(APP_ID)

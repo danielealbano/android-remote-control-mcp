@@ -10,8 +10,8 @@ import javax.inject.Inject
  * Production implementation of [ScreenCaptureProvider] that uses
  * AccessibilityService.takeScreenshot() (Android 11+) for capturing screenshots.
  *
- * This approach does NOT require user consent or MediaProjection permission.
- * The accessibility service must be enabled and have canTakeScreenshot="true".
+ * This approach does NOT require user consent or additional permissions beyond
+ * the accessibility service being enabled with canTakeScreenshot="true".
  *
  * This class is Hilt-injectable and stateless.
  */
@@ -74,7 +74,7 @@ class ScreenCaptureProviderImpl
             return ServiceValidation.Valid(service)
         }
 
-        override fun isMediaProjectionActive(): Boolean {
+        override fun isScreenCaptureAvailable(): Boolean {
             val service = McpAccessibilityService.instance ?: return false
             return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && service.canTakeScreenshot()
         }

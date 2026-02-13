@@ -26,22 +26,11 @@ class McpApplication : Application() {
                 description = "Notification for the running MCP server"
             }
 
-        val screenCaptureChannel =
-            NotificationChannel(
-                SCREEN_CAPTURE_CHANNEL_ID,
-                getString(R.string.notification_channel_screen_capture_name),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = "Notification for active screen capture"
-            }
-
         notificationManager.createNotificationChannel(mcpServerChannel)
-        notificationManager.createNotificationChannel(screenCaptureChannel)
     }
 
     companion object {
         private const val TAG = "MCP:Application"
         const val MCP_SERVER_CHANNEL_ID = "mcp_server_channel"
-        const val SCREEN_CAPTURE_CHANNEL_ID = "screen_capture_channel"
     }
 }

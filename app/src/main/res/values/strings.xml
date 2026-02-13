@@ -7,12 +7,8 @@
     <!-- Notification Channel -->
     <string name="notification_channel_mcp_server_id">mcp_server_channel</string>
     <string name="notification_channel_mcp_server_name">MCP Server</string>
-    <string name="notification_channel_screen_capture_id">screen_capture_channel</string>
-    <string name="notification_channel_screen_capture_name">Screen Capture</string>
-
     <!-- Notification Content -->
     <string name="notification_mcp_server_title">MCP Server Running</string>
-    <string name="notification_screen_capture_title">Screen Capture Active</string>
 
     <!-- App Bar -->
     <string name="app_bar_title">MCP Remote Control</string>
@@ -54,7 +50,6 @@
     <!-- Permissions -->
     <string name="permissions_title">Permissions</string>
     <string name="permission_accessibility">Accessibility Service</string>
-    <string name="permission_screen_capture">Screen Capture</string>
     <string name="permission_notifications">Notifications</string>
     <string name="permission_enable">Enable</string>
     <string name="permission_enabled">Enabled</string>

@@ -3,10 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -30,7 +27,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -52,10 +48,9 @@ import javax.inject.Inject
  * 1. Started via intent from MainActivity (start/stop button)
  * 2. Calls startForeground() with persistent notification
  * 3. Reads configuration from SettingsRepository
- * 4. Binds to ScreenCaptureService for screenshot support
- * 5. Creates and starts McpServer (Ktor HTTP, optionally HTTPS)
- * 6. Updates ServerStatus via companion-level StateFlow (collected by MainViewModel)
- * 7. On stop: gracefully shuts down server, unbinds services, clears singleton
+ * 4. Creates and starts McpServer (Ktor HTTP, optionally HTTPS)
+ * 5. Updates ServerStatus via companion-level StateFlow (collected by MainViewModel)
+ * 6. On stop: gracefully shuts down server, clears singleton
  */
 @AndroidEntryPoint
 class McpServerService : Service() {
@@ -80,25 +75,6 @@ class McpServerService : Service() {
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
     private var mcpServer: McpServer? = null
-    private var screenCaptureService: ScreenCaptureService? = null
-    private var isBoundToScreenCapture = false
-
-    private val screenCaptureConnection =
-        object : ServiceConnection {
-            override fun onServiceConnected(
-                name: ComponentName?,
-                binder: IBinder?,
-            ) {
-                val localBinder = binder as? ScreenCaptureService.LocalBinder
-                screenCaptureService = localBinder?.getService()
-                Log.i(TAG, "Bound to ScreenCaptureService")
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {
-                screenCaptureService = null
-                Log.i(TAG, "Disconnected from ScreenCaptureService")
-            }
-        }
 
     override fun onCreate() {
         super.onCreate()
@@ -142,9 +118,6 @@ class McpServerService : Service() {
                 TAG,
                 "Starting MCP server with config: port=${config.port}, binding=${config.bindingAddress.address}",
             )
-
-            // Bind to ScreenCaptureService
-            bindToScreenCaptureService()
 
             // Only get/create SSL keystore when HTTPS is enabled
             val keyStore =
@@ -226,18 +199,6 @@ class McpServerService : Service() {
         mcpServer = null
         serverStarting.set(false)
 
-        // Unbind from ScreenCaptureService
-        if (isBoundToScreenCapture) {
-            @Suppress("TooGenericExceptionCaught")
-            try {
-                unbindService(screenCaptureConnection)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error unbinding from ScreenCaptureService", e)
-            }
-            isBoundToScreenCapture = false
-        }
-        screenCaptureService = null
-
         // Cancel coroutine scope
         coroutineScope.cancel()
 
@@ -251,37 +212,6 @@ class McpServerService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    /**
-     * Returns the bound [ScreenCaptureService] instance, or null if not yet bound.
-     *
-     * Used by MCP tools (e.g., [CaptureScreenshotHandler]) to access screenshot
-     * capture functionality.
-     */
-    fun getScreenCaptureService(): ScreenCaptureService? = screenCaptureService
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun bindToScreenCaptureService() {
-        val intent = Intent(this, ScreenCaptureService::class.java)
-        // MUST start as foreground service first, THEN bind.
-        // bindService() alone does NOT trigger onStartCommand(), so startForeground()
-        // would never be called, violating the 5-second foreground service requirement.
-        try {
-            startForegroundService(intent)
-            isBoundToScreenCapture = bindService(intent, screenCaptureConnection, Context.BIND_AUTO_CREATE)
-            Log.d(TAG, "Started and binding to ScreenCaptureService: $isBoundToScreenCapture")
-        } catch (e: Exception) {
-            // On Android 14+, starting a foreground service with mediaProjection type
-            // requires user consent via MediaProjection permission dialog. In E2E tests
-            // or when the user hasn't granted permission, this will throw SecurityException.
-            // The MCP server can still run without screenshot functionality.
-            Log.w(
-                TAG,
-                "Could not start ScreenCaptureService — screenshot functionality unavailable: ${e.message}",
-            )
-            isBoundToScreenCapture = false
-        }
-    }
 
     private fun updateStatus(status: ServerStatus) {
         _serverStatus.value = status
