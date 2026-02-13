@@ -433,9 +433,9 @@ Add Go check to `check-deps` target (as optional/informational, since Go is only
 **Goal**: Add ngrok-java dependency and create a Gradle task to extract Android native libraries into `jniLibs/`.
 
 **Acceptance Criteria**:
-- [ ] `ngrok-java` dependency added to version catalog and `build.gradle.kts`
-- [ ] Custom Gradle task extracts `ngrok-java-native` `.so` files for `linux-android-aarch_64` into `jniLibs/arm64-v8a/`
-- [ ] Build succeeds with ngrok-java on classpath
+- [x] `ngrok-java` dependency added to version catalog and `build.gradle.kts`
+- [x] Custom Gradle task extracts `ngrok-java-native` `.so` files for `linux-android-aarch_64` into `jniLibs/arm64-v8a/`
+- [x] Build succeeds with ngrok-java on classpath
 
 #### Action 4.1: Add ngrok-java to version catalog
 
@@ -453,7 +453,7 @@ ngrok-java-native-android-arm64 = { group = "com.ngrok", name = "ngrok-java-nati
 ```
 
 **Definition of Done**:
-- [ ] Version catalog entries compile
+- [x] Version catalog entries compile
 
 #### Action 4.2: Add ngrok-java dependencies to `build.gradle.kts`
 
@@ -500,8 +500,8 @@ tasks.named("preBuild") {
 ```
 
 **Definition of Done**:
-- [ ] `./gradlew preBuild` extracts the ngrok `.so` into `jniLibs/arm64-v8a/`
-- [ ] Build succeeds
+- [x] `./gradlew preBuild` extracts the ngrok `.so` into `jniLibs/arm64-v8a/`
+- [x] Build succeeds
 
 #### Action 4.3: Add packaging exclusion for ngrok native metadata
 
@@ -527,7 +527,7 @@ In the `packaging` block, add exclusions for ngrok JNI metadata that may conflic
 Note: `useLegacyPackaging = true` ensures `.so` files are stored uncompressed in the APK (required for JNI loading on some devices).
 
 **Definition of Done**:
-- [ ] Build succeeds with no packaging conflicts
+- [x] Build succeeds with no packaging conflicts
 
 ---
 
