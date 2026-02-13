@@ -29,12 +29,11 @@ This document is the source of truth for the Android Remote Control MCP project.
 
 ### Overview
 
-The application is a **service-based Android app** that exposes an MCP server over HTTP (with optional HTTPS). It consists of four main components:
+The application is a **service-based Android app** that exposes an MCP server over HTTP (with optional HTTPS). It consists of three main components:
 
-1. **AccessibilityService** — Provides UI introspection and action execution
-2. **ScreenCaptureService** — Manages MediaProjection for screenshot capture
-3. **McpServerService** — Runs the HTTP server implementing MCP protocol
-4. **MainActivity** — UI for configuration and control
+1. **AccessibilityService** — Provides UI introspection and action execution (including screenshot capture via `takeScreenshot()` API on Android 11+)
+2. **McpServerService** — Runs the HTTP server implementing MCP protocol
+3. **MainActivity** — UI for configuration and control
 
 ### Component Details
 
@@ -46,39 +45,30 @@ The application is a **service-based Android app** that exposes an MCP server ov
 - **Capabilities**: Traverse accessibility tree (full depth), find elements by text/content description/resource ID/class name, perform actions (click, long-click, scroll, swipe, set text), execute global actions (back, home, recents, notifications, quick settings)
 - **Implementation**: Extends `android.accessibilityservice.AccessibilityService`, registers for all event types and all packages, stores singleton instance for inter-service communication, uses coroutines for non-blocking operations
 
-#### 2. ScreenCaptureService
-
-- **Type**: Android Foreground Service
-- **Purpose**: Maintain continuous MediaProjection for screenshot capture
-- **Lifecycle**: Started/stopped by McpServerService
-- **Capabilities**: Request MediaProjection permission (one-time user grant), maintain active session, capture screenshots on demand, encode to JPEG
-- **Implementation**: Uses `MediaProjectionManager` and `ImageReader`, runs as foreground service (persistent notification), singleton pattern, handles permission expiration and re-request
-
-#### 3. McpServerService
+#### 2. McpServerService
 
 - **Type**: Android Foreground Service
 - **Purpose**: Run HTTP server implementing MCP protocol
 - **Lifecycle**: User-controlled via MainActivity (start/stop)
-- **Capabilities**: HTTP/HTTPS server using Ktor, MCP JSON-RPC 2.0 protocol, bearer token authentication, configurable binding address (127.0.0.1 or 0.0.0.0), orchestrates calls to AccessibilityService and ScreenCaptureService
+- **Capabilities**: HTTP/HTTPS server using Ktor, MCP JSON-RPC 2.0 protocol, bearer token authentication, configurable binding address (127.0.0.1 or 0.0.0.0), orchestrates calls to AccessibilityService
 - **Implementation**: Foreground service with persistent notification, Kotlin coroutines for async request handling, reads configuration from DataStore, exposes MCP endpoints (`/mcp/v1/tools`, `/mcp/v1/call`), graceful shutdown on service stop
 
-#### 4. MainActivity
+#### 3. MainActivity
 
 - **Type**: Android Activity (Jetpack Compose UI)
 - **Purpose**: Configuration and control interface
-- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS toggle and certificate management), quick links (enable accessibility service, grant MediaProjection), connection info display, server logs viewer (recent MCP requests)
+- **Features**: Server status display (running/stopped), start/stop MCP server toggle, configuration settings (binding address, port, bearer token, auto-start on boot, HTTPS toggle and certificate management), quick links (enable accessibility service), connection info display, server logs viewer (recent MCP requests)
 - **Implementation**: Material Design 3 with dark mode support, Jetpack Compose, ViewModel for state management, observes service status via Flow/StateFlow
 
 ### Inter-Service Communication
 
-**Pattern**: Singleton + Bound Service hybrid
-- **AccessibilityService**: Stores singleton instance in companion object for direct access (system-managed, long-lived)
-- **ScreenCaptureService**: Bound service pattern — McpServerService binds to it (lifecycle tied to McpServerService)
+**Pattern**: Singleton + StateFlow
+- **AccessibilityService**: Stores singleton instance in companion object for direct access (system-managed, long-lived). Also provides screenshot capture via `takeScreenshot()` API (Android 11+)
 - **McpServerService**: Exposes status via companion-level StateFlow for UI observation
 
 ### Service Lifecycle
 
-The typical startup flow: User opens app → enables Accessibility Service in Android Settings → grants MediaProjection permission → starts MCP server via button → McpServerService starts as foreground service → binds to ScreenCaptureService → starts Ktor HTTP/HTTPS server → MCP server ready on configured address:port → user minimizes app (services continue in background) → MCP clients can connect and control device.
+The typical startup flow: User opens app → enables Accessibility Service in Android Settings → starts MCP server via button → McpServerService starts as foreground service → starts Ktor HTTP/HTTPS server → MCP server ready on configured address:port → user minimizes app (services continue in background) → MCP clients can connect and control device.
 
 **Auto-start on Boot** (if enabled): Device boots → `BootCompletedReceiver` triggers → if auto-start enabled in settings → McpServerService starts automatically.
 
@@ -137,7 +127,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
-  - `services/screencapture/` — `ScreenCaptureService.kt`, `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `MediaProjectionHelper.kt`, `ScreenshotEncoder.kt`
+  - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
   - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
@@ -220,7 +210,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | `get_current_app` | Returns package and activity of focused app | None | packageName, activityName |
 | `get_screen_info` | Returns screen dimensions, DPI, orientation | None | width, height, densityDpi, orientation |
 
-**Error**: `-32001` if accessibility/MediaProjection permission not granted.
+**Error**: `-32001` if accessibility permission not granted or screen capture not available.
 
 **Note**: `get_accessibility_tree` returns full tree depth. Future optimization planned for configurable depth limiting.
 
@@ -291,10 +281,8 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 
 ### Service Lifecycle Management
 
-- All long-running services (McpServerService, ScreenCaptureService) MUST run as foreground services with persistent notifications
+- All long-running services (McpServerService) MUST run as foreground services with persistent notifications
 - Call `startForeground()` within 5 seconds of service start, `stopForeground()` before destruction
-- Use bound service pattern for services with lifecycle tied to client (ScreenCaptureService)
-- Always unbind in `onDestroy()` to prevent memory leaks
 - Service-to-UI communication via Flow/StateFlow (LocalBroadcastManager is deprecated and NOT used)
 
 ### AccessibilityService Best Practices
@@ -308,8 +296,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 
 ### Permission Handling
 
-- **MediaProjection**: Request via `MediaProjectionManager.createScreenCaptureIntent()`
-- **Accessibility**: User must enable manually in Settings (provide deep link)
+- **Accessibility**: User must enable manually in Settings (provide deep link). Also provides screenshot capture via `takeScreenshot()` API (Android 11+)
 - **Internet**: Declared in manifest, granted automatically
 - Always check permission state before operations; return MCP error `-32001` if permission missing
 
@@ -317,7 +304,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 
 - Foreground services are exempt from Doze restrictions
 - Never store Activity context in long-lived objects — use ApplicationContext
-- Cancel coroutine scopes in `onDestroy()`; call `MediaProjection.stop()` when done; recycle large bitmaps after encoding; use `use {}` for automatic stream closure
+- Cancel coroutine scopes in `onDestroy()`; recycle large bitmaps after encoding; use `use {}` for automatic stream closure
 
 ### Threading Rules
 
@@ -402,7 +389,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Framework**: JUnit 5, MockK, Turbine (for Flows)
 - **Scope**: MCP protocol parsing/formatting, accessibility tree parsing, element finding, screenshot encoding, network utils, settings repository, ViewModel logic
-- **Mocking**: Mock Android framework classes (AccessibilityNodeInfo, MediaProjection) with MockK; use `@MockK`/`@RelaxedMockK` annotations; verify interactions with `verify {}`
+- **Mocking**: Mock Android framework classes (AccessibilityNodeInfo, Context) with MockK; use `@MockK`/`@RelaxedMockK` annotations; verify interactions with `verify {}`
 - **Pattern**: Arrange-Act-Assert consistently
 - **Run**: `make test-unit` or `./gradlew test`
 
@@ -507,7 +494,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 ### Permission Security
 
-Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, Accessibility Service (user-granted via Settings), MediaProjection (user-granted via dialog). Display clear explanations before requesting.
+Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, Accessibility Service (user-granted via Settings). Display clear explanations before requesting.
 
 ### Code Security
 
@@ -586,7 +573,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 | `install` | Install debug APK on connected device/emulator |
 | `install-release` | Install release APK |
 | `uninstall` | Uninstall app from device |
-| `grant-permissions` | Display instructions for granting accessibility/MediaProjection permissions |
+| `grant-permissions` | Display instructions for granting accessibility permissions |
 | `start-server` | Launch MainActivity on device via adb |
 | `forward-port` | Set up adb port forwarding (device 8080 → host 8080) |
 
