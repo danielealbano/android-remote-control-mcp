@@ -8,9 +8,9 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,6 +34,7 @@ class InputTextTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val text =
@@ -44,12 +45,12 @@ class InputTextTool
 
             if (elementId != null && elementId.isNotEmpty()) {
                 // Target specific element: click to focus, then set text
-                val tree = getFreshTree(treeParser)
+                val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val clickResult = actionExecutor.clickNode(elementId, tree)
                 clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                 // Re-parse after click (focus may have changed the tree)
-                val freshTree = getFreshTree(treeParser)
+                val freshTree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val setResult = actionExecutor.setTextOnNode(elementId, text, freshTree)
                 setResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -57,7 +58,7 @@ class InputTextTool
             } else {
                 // Find currently focused editable node
                 val focusedNode =
-                    findFocusedEditableNode()
+                    findFocusedEditableNode(accessibilityServiceProvider)
                         ?: throw McpToolException.ElementNotFound(
                             "No focused editable element found. Focus an input field first or provide element_id.",
                         )
@@ -125,13 +126,14 @@ class ClearTextTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val elementId = params?.get("element_id")?.jsonPrimitive?.contentOrNull
 
             if (elementId != null && elementId.isNotEmpty()) {
                 // Clear specific element's text
-                val tree = getFreshTree(treeParser)
+                val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val result = actionExecutor.setTextOnNode(elementId, "", tree)
                 result.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -139,7 +141,7 @@ class ClearTextTool
             } else {
                 // Find currently focused editable node and clear it
                 val focusedNode =
-                    findFocusedEditableNode()
+                    findFocusedEditableNode(accessibilityServiceProvider)
                         ?: throw McpToolException.ElementNotFound(
                             "No focused editable element found. Focus an input field first or provide element_id.",
                         )
@@ -208,6 +210,7 @@ class PressKeyTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val key =
@@ -246,7 +249,7 @@ class PressKeyTool
 
         private fun pressEnter() {
             val focusedNode =
-                findFocusedEditableNode()
+                findFocusedEditableNode(accessibilityServiceProvider)
                     ?: throw McpToolException.ElementNotFound(
                         "No focused element found for ENTER key",
                     )
@@ -278,7 +281,7 @@ class PressKeyTool
 
         private fun pressDelete() {
             val focusedNode =
-                findFocusedEditableNode()
+                findFocusedEditableNode(accessibilityServiceProvider)
                     ?: throw McpToolException.ElementNotFound(
                         "No focused editable element found for DEL key",
                     )
@@ -308,7 +311,7 @@ class PressKeyTool
 
         private fun appendCharToFocused(char: Char) {
             val focusedNode =
-                findFocusedEditableNode()
+                findFocusedEditableNode(accessibilityServiceProvider)
                     ?: throw McpToolException.ElementNotFound(
                         "No focused editable element found for key input",
                     )
@@ -372,12 +375,15 @@ class PressKeyTool
 /**
  * Registers all text input tools with the [ToolRegistry].
  */
-fun registerTextInputTools(toolRegistry: ToolRegistry) {
-    val treeParser = AccessibilityTreeParser()
-    val actionExecutor = ActionExecutor()
-    InputTextTool(treeParser, actionExecutor).register(toolRegistry)
-    ClearTextTool(treeParser, actionExecutor).register(toolRegistry)
-    PressKeyTool(actionExecutor).register(toolRegistry)
+fun registerTextInputTools(
+    toolRegistry: ToolRegistry,
+    treeParser: AccessibilityTreeParser,
+    actionExecutor: ActionExecutor,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+) {
+    InputTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    ClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -393,15 +399,14 @@ fun registerTextInputTools(toolRegistry: ToolRegistry) {
  * @return The focused [AccessibilityNodeInfo], or null if no editable node is focused.
  *         The caller is responsible for recycling the returned node.
  */
-@Suppress("ReturnCount")
-internal fun findFocusedEditableNode(): AccessibilityNodeInfo? {
-    val service =
-        McpAccessibilityService.instance
-            ?: throw McpToolException.PermissionDenied(
-                "Accessibility service is not enabled",
-            )
-
-    val rootNode = service.getRootNode() ?: return null
+@Suppress("ReturnCount", "MaxLineLength")
+internal fun findFocusedEditableNode(accessibilityServiceProvider: AccessibilityServiceProvider): AccessibilityNodeInfo? {
+    if (!accessibilityServiceProvider.isReady()) {
+        throw McpToolException.PermissionDenied(
+            "Accessibility service is not enabled",
+        )
+    }
+    val rootNode = accessibilityServiceProvider.getRootNode() ?: return null
     val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
     @Suppress("DEPRECATION")

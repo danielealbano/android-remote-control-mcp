@@ -16,14 +16,14 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Field
 
-@DisplayName("ActionExecutor")
-class ActionExecutorTest {
-    private lateinit var executor: ActionExecutor
+@DisplayName("ActionExecutorImpl")
+class ActionExecutorImplTest {
+    private lateinit var executor: ActionExecutorImpl
     private lateinit var mockService: McpAccessibilityService
 
     @BeforeEach
     fun setUp() {
-        executor = ActionExecutor()
+        executor = ActionExecutorImpl()
         mockService = mockk<McpAccessibilityService>(relaxed = true)
     }
 

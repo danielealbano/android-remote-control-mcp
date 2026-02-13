@@ -2,8 +2,8 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -30,26 +30,19 @@ import java.io.ByteArrayInputStream
 
 @DisplayName("System Action Tools")
 class SystemActionToolsTest {
-    private lateinit var mockService: McpAccessibilityService
+    private lateinit var mockAccessibilityServiceProvider: AccessibilityServiceProvider
     private lateinit var mockActionExecutor: ActionExecutor
 
     @BeforeEach
     fun setUp() {
-        mockService = mockk<McpAccessibilityService>(relaxed = true)
+        mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>(relaxed = true)
         mockActionExecutor = mockk<ActionExecutor>()
-        setAccessibilityServiceInstance(mockService)
+        every { mockAccessibilityServiceProvider.isReady() } returns true
     }
 
     @AfterEach
     fun tearDown() {
-        setAccessibilityServiceInstance(null)
         unmockkAll()
-    }
-
-    private fun setAccessibilityServiceInstance(instance: McpAccessibilityService?) {
-        val field = McpAccessibilityService::class.java.getDeclaredField("instance")
-        field.isAccessible = true
-        field.set(null, instance)
     }
 
     /**
@@ -79,7 +72,7 @@ class SystemActionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = PressBackHandler(mockActionExecutor)
+            handler = PressBackHandler(mockActionExecutor, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -102,7 +95,7 @@ class SystemActionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
                 val exception =
@@ -143,7 +136,7 @@ class SystemActionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = PressHomeHandler(mockActionExecutor)
+            handler = PressHomeHandler(mockActionExecutor, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -160,7 +153,7 @@ class SystemActionToolsTest {
         @DisplayName("throws error -32001 when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
@@ -189,7 +182,7 @@ class SystemActionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = PressRecentsHandler(mockActionExecutor)
+            handler = PressRecentsHandler(mockActionExecutor, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -206,7 +199,7 @@ class SystemActionToolsTest {
         @DisplayName("throws error -32001 when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
@@ -235,7 +228,7 @@ class SystemActionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = OpenNotificationsHandler(mockActionExecutor)
+            handler = OpenNotificationsHandler(mockActionExecutor, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -252,7 +245,7 @@ class SystemActionToolsTest {
         @DisplayName("throws error -32001 when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }
@@ -281,7 +274,7 @@ class SystemActionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = OpenQuickSettingsHandler(mockActionExecutor)
+            handler = OpenQuickSettingsHandler(mockActionExecutor, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -298,7 +291,7 @@ class SystemActionToolsTest {
         @DisplayName("throws error -32001 when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
                 val exception = assertThrows<McpToolException> { handler.execute(null) }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
             }

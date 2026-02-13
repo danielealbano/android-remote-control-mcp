@@ -4,8 +4,8 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -32,13 +32,15 @@ import javax.inject.Inject
  * @return MCP content [JsonElement] with confirmation message.
  */
 private suspend fun executeSystemAction(
+    accessibilityServiceProvider: AccessibilityServiceProvider,
     actionName: String,
     action: suspend () -> Result<Unit>,
 ): JsonElement {
-    McpAccessibilityService.instance
-        ?: throw McpToolException.PermissionDenied(
+    if (!accessibilityServiceProvider.isReady()) {
+        throw McpToolException.PermissionDenied(
             "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
         )
+    }
 
     val result = action()
     result.onFailure { exception ->
@@ -69,9 +71,10 @@ class PressBackHandler
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            return executeSystemAction("Back button press") {
+            return executeSystemAction(accessibilityServiceProvider, "Back button press") {
                 actionExecutor.pressBack()
             }
         }
@@ -114,9 +117,10 @@ class PressHomeHandler
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            return executeSystemAction("Home button press") {
+            return executeSystemAction(accessibilityServiceProvider, "Home button press") {
                 actionExecutor.pressHome()
             }
         }
@@ -159,9 +163,10 @@ class PressRecentsHandler
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            return executeSystemAction("Recents button press") {
+            return executeSystemAction(accessibilityServiceProvider, "Recents button press") {
                 actionExecutor.pressRecents()
             }
         }
@@ -204,9 +209,10 @@ class OpenNotificationsHandler
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            return executeSystemAction("Open notifications") {
+            return executeSystemAction(accessibilityServiceProvider, "Open notifications") {
                 actionExecutor.openNotifications()
             }
         }
@@ -249,9 +255,10 @@ class OpenQuickSettingsHandler
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            return executeSystemAction("Open quick settings") {
+            return executeSystemAction(accessibilityServiceProvider, "Open quick settings") {
                 actionExecutor.openQuickSettings()
             }
         }
@@ -529,12 +536,15 @@ class GetDeviceLogsHandler
  *
  * Called from [McpServerService.startServer] during server startup.
  */
-fun registerSystemActionTools(toolRegistry: ToolRegistry) {
-    val actionExecutor = ActionExecutor()
-    PressBackHandler(actionExecutor).register(toolRegistry)
-    PressHomeHandler(actionExecutor).register(toolRegistry)
-    PressRecentsHandler(actionExecutor).register(toolRegistry)
-    OpenNotificationsHandler(actionExecutor).register(toolRegistry)
-    OpenQuickSettingsHandler(actionExecutor).register(toolRegistry)
+fun registerSystemActionTools(
+    toolRegistry: ToolRegistry,
+    actionExecutor: ActionExecutor,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+) {
+    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
     GetDeviceLogsHandler().register(toolRegistry)
 }
