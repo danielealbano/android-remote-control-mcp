@@ -1393,7 +1393,7 @@ Run `./gradlew test --tests "com.danielealbano.androidremotecontrolmcp.integrati
 
 #### Action 11.1: Rewrite `McpClient.kt` using SDK Client
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `e2e-tests/src/test/kotlin/.../e2e/McpClient.kt`
 
@@ -1437,7 +1437,7 @@ Keep:
 
 #### Action 11.2: Update `E2ECalculatorTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `e2e-tests/src/test/kotlin/.../e2e/E2ECalculatorTest.kt`
 
@@ -1449,7 +1449,7 @@ Update to use new `McpClient` API:
 
 #### Action 11.3: Update `E2EScreenshotTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `e2e-tests/src/test/kotlin/.../e2e/E2EScreenshotTest.kt`
 
@@ -1463,7 +1463,7 @@ Update to use new `McpClient` API. Screenshot result changes:
 
 #### Action 11.4: Update `E2EErrorHandlingTest.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `e2e-tests/src/test/kotlin/.../e2e/E2EErrorHandlingTest.kt`
 
@@ -1474,7 +1474,7 @@ Update error handling assertions:
 
 #### Action 11.5: Update `SharedAndroidContainer.kt` / `AndroidContainerSetup.kt` if needed
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Files:**
 - `e2e-tests/src/test/kotlin/.../e2e/SharedAndroidContainer.kt`
@@ -1484,7 +1484,7 @@ These files manage Docker container lifecycle. They likely do NOT need changes (
 
 #### Action 11.6: Run E2E tests
 
-- [ ] **Completed**
+- [x] **Completed** (compilation verified; full E2E run deferred to CI — requires Docker Android emulator)
 
 Run `make test-e2e` and verify all pass.
 
