@@ -109,20 +109,17 @@ object AndroidContainerSetup {
         println("[E2E Setup] Setting up port forwarding (container:$MCP_DEFAULT_PORT -> emulator:$MCP_DEFAULT_PORT)...")
 
         // Step 1: Install socat (not included in the Docker image by default).
-        println("[E2E Setup] Installing socat for port bridging...")
         container.execInContainer(
             "sh", "-c",
             "apt-get update -qq && apt-get install -y -qq socat > /dev/null 2>&1"
         )
-        println("[E2E Setup] socat installed")
 
         // Step 2: Set up adb forward from container's localhost to the emulator.
         // This binds to 127.0.0.1:ADB_FORWARD_PORT inside the container.
-        val adbResult = execInContainer(
+        execInContainer(
             container,
             "adb", "forward", "tcp:$ADB_FORWARD_PORT", "tcp:$MCP_DEFAULT_PORT"
         )
-        println("[E2E Setup] adb forward established on 127.0.0.1:$ADB_FORWARD_PORT: $adbResult")
 
         // Step 3: Use socat to bridge from 0.0.0.0:MCP_DEFAULT_PORT (Docker port mapping)
         // to 127.0.0.1:ADB_FORWARD_PORT (adb forward). Run in background.
@@ -132,7 +129,7 @@ object AndroidContainerSetup {
         )
         Thread.sleep(1_000)
 
-        println("[E2E Setup] Port forwarding chain established: 0.0.0.0:$MCP_DEFAULT_PORT -> 127.0.0.1:$ADB_FORWARD_PORT -> emulator:$MCP_DEFAULT_PORT")
+        println("[E2E Setup] Port forwarding established")
     }
 
     /**
@@ -198,17 +195,6 @@ object AndroidContainerSetup {
         }
 
         println("[E2E Setup] APK installed successfully")
-
-        // Verify E2EConfigReceiver is registered in the APK
-        try {
-            val pkgDump = container.execInContainer(
-                "sh", "-c",
-                "adb shell pm dump $APP_PACKAGE | grep -A 20 'Receiver Resolver Table' | head -30"
-            )
-            println("[E2E Setup] Registered receivers:\n${pkgDump.stdout}")
-        } catch (e: Exception) {
-            println("[E2E Setup] Could not dump receivers: ${e.message}")
-        }
     }
 
     /**
@@ -220,7 +206,7 @@ object AndroidContainerSetup {
      * IMPORTANT: This must be called AFTER the app process is running (i.e., after
      * startMcpServer), because force-stop in configureServerSettings kills the
      * process and disconnects any previously-bound accessibility service. Enabling
-     * after the app is running ensures the system can immediately bind to the service.
+     * after the app is running ensures the system can immediately bind.
      *
      * After writing the settings, this method polls `dumpsys accessibility` to verify
      * the service is actually connected before returning.
@@ -249,15 +235,7 @@ object AndroidContainerSetup {
             "accessibility_enabled", "1"
         )
 
-        // Verify the settings were written correctly
-        val verifyResult = execInContainer(
-            container,
-            "adb", "shell", "settings", "get", "secure", "enabled_accessibility_services"
-        )
-        println("[E2E Setup] Accessibility settings value: ${verifyResult.trim()}")
-
         // Poll dumpsys accessibility to verify the service is actually connected.
-        // The service component name appears in dumpsys output when connected.
         println("[E2E Setup] Waiting for accessibility service to connect (timeout: ${timeoutMs}ms)...")
         val startTime = System.currentTimeMillis()
         while (System.currentTimeMillis() - startTime < timeoutMs) {
@@ -270,7 +248,6 @@ object AndroidContainerSetup {
                     dumpsys.stdout.contains("Service")
                 ) {
                     println("[E2E Setup] Accessibility service connected (${System.currentTimeMillis() - startTime}ms)")
-                    println("[E2E Setup] dumpsys match: ${dumpsys.stdout.trim()}")
                     return
                 }
             } catch (_: Exception) {
@@ -279,21 +256,154 @@ object AndroidContainerSetup {
             Thread.sleep(POLL_INTERVAL_MS)
         }
 
-        // Dump full accessibility state for debugging
-        try {
-            val fullDump = container.execInContainer(
-                "sh", "-c",
-                "adb shell dumpsys accessibility | head -50"
-            )
-            println("[E2E Setup] Full accessibility dump:\n${fullDump.stdout}")
-        } catch (e: Exception) {
-            println("[E2E Setup] Full dump failed: ${e.message}")
-        }
-
         throw IllegalStateException(
             "Accessibility service did not connect within ${timeoutMs}ms. " +
                 "Component: $serviceComponent"
         )
+    }
+
+    /**
+     * Grant MediaProjection permission by triggering the system permission dialog
+     * and using adb to click the "Start now" button.
+     *
+     * MediaProjection requires user consent via a system dialog. In E2E tests,
+     * we automate this by:
+     * 1. Launching MainActivity with an extra to auto-trigger the permission request
+     * 2. Waiting for the system dialog to appear
+     * 3. Using uiautomator to find the "Start now" button and tap it
+     *
+     * @param container the running Docker container
+     */
+    @Suppress("TooGenericExceptionCaught", "MagicNumber")
+    fun grantMediaProjectionPermission(container: GenericContainer<*>) {
+        println("[E2E Setup] Granting MediaProjection permission...")
+
+        // Step 1: Try to grant via appops (works on some Android versions)
+        try {
+            container.execInContainer(
+                "adb", "shell", "appops", "set", APP_PACKAGE, "PROJECT_MEDIA", "allow"
+            )
+            println("[E2E Setup] Attempted appops PROJECT_MEDIA grant")
+        } catch (e: Exception) {
+            println("[E2E Setup] appops grant failed (expected on API 34): ${e.message}")
+        }
+
+        // Step 2: Launch MainActivity with extra to trigger MediaProjection dialog
+        // Use FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK to fully restart the activity
+        // 0x10000000 = FLAG_ACTIVITY_NEW_TASK, 0x00008000 = FLAG_ACTIVITY_CLEAR_TASK
+        container.execInContainer(
+            "adb", "shell", "am", "start",
+            "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS",
+            "-f", "0x10008000",  // FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK
+            "--ez", "request_media_projection", "true"
+        )
+        println("[E2E Setup] Launched MainActivity with request_media_projection=true (NEW_TASK|CLEAR_TASK)")
+
+        // Wait for the permission dialog to appear
+        Thread.sleep(3_000)
+
+        // Check if MainActivity received the intent
+        try {
+            val mainActivityLogs = container.execInContainer(
+                "sh", "-c",
+                "adb shell logcat -d -t 50 | grep -iE '(MCP:MainActivity|request_media|mediaProjection)'"
+            )
+            println("[E2E Setup] MainActivity/MediaProjection logs:\n${mainActivityLogs.stdout}")
+        } catch (e: Exception) {
+            println("[E2E Setup] Could not get MainActivity logs: ${e.message}")
+        }
+
+        // Step 3: Use uiautomator to dump the UI and find the "Start now" button
+        try {
+            val dumpResult = container.execInContainer(
+                "adb", "shell", "uiautomator", "dump", "/sdcard/window_dump.xml"
+            )
+            println("[E2E Setup] uiautomator dump: ${dumpResult.stdout.trim()}")
+
+            val xmlResult = container.execInContainer(
+                "adb", "shell", "cat", "/sdcard/window_dump.xml"
+            )
+            val xml = xmlResult.stdout
+
+            // Debug: Print a portion of the XML to see what's on screen
+            println("[E2E Setup] UI dump excerpt (first 2000 chars): ${xml.take(2000)}")
+
+            // Look for "Start now" or "Start" button with bounds attribute
+            // Format: bounds="[left,top][right,bottom]"
+            val buttonPatterns = listOf("Start now", "Start", "Allow", "OK")
+            var tapped = false
+
+            for (pattern in buttonPatterns) {
+                if (tapped) break
+
+                // Simple regex to find the button and its bounds
+                val regex = Regex("""text="$pattern"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"""")
+                val match = regex.find(xml)
+                if (match != null) {
+                    val left = match.groupValues[1].toInt()
+                    val top = match.groupValues[2].toInt()
+                    val right = match.groupValues[3].toInt()
+                    val bottom = match.groupValues[4].toInt()
+
+                    // Tap the center of the button
+                    val x = (left + right) / 2
+                    val y = (top + bottom) / 2
+
+                    println("[E2E Setup] Found '$pattern' button at bounds [$left,$top][$right,$bottom], tapping ($x, $y)")
+                    container.execInContainer("adb", "shell", "input", "tap", x.toString(), y.toString())
+                    tapped = true
+                    Thread.sleep(1_000)
+                }
+            }
+
+            if (!tapped) {
+                println("[E2E Setup] Could not find permission button in UI dump. Trying DPAD navigation...")
+
+                // Fallback: Use keyboard navigation (TAB to button, ENTER to click)
+                // On the MediaProjection dialog, the "Start now" button is usually focused
+                // or can be reached by pressing TAB/DPAD_RIGHT
+                container.execInContainer("adb", "shell", "input", "keyevent", "KEYCODE_TAB")
+                Thread.sleep(300)
+                container.execInContainer("adb", "shell", "input", "keyevent", "KEYCODE_TAB")
+                Thread.sleep(300)
+                container.execInContainer("adb", "shell", "input", "keyevent", "KEYCODE_ENTER")
+                println("[E2E Setup] Sent TAB+TAB+ENTER for keyboard navigation")
+            }
+        } catch (e: Exception) {
+            println("[E2E Setup] uiautomator approach failed: ${e.message}")
+
+            // Final fallback: Try common button positions
+            val fallbackPositions = listOf(
+                Pair(850, 1300),  // Lower right for newer dialogs
+                Pair(800, 1200),
+                Pair(540, 1300),  // Center bottom
+            )
+            for ((x, y) in fallbackPositions) {
+                try {
+                    container.execInContainer("adb", "shell", "input", "tap", x.toString(), y.toString())
+                    println("[E2E Setup] Fallback tap at ($x, $y)")
+                    Thread.sleep(500)
+                } catch (tapEx: Exception) {
+                    println("[E2E Setup] Fallback tap failed: ${tapEx.message}")
+                }
+            }
+        }
+
+        // Wait for permission to be processed
+        Thread.sleep(2_000)
+
+        // Verify by checking if ScreenCaptureService has MediaProjection active
+        try {
+            val logcat = container.execInContainer(
+                "sh", "-c",
+                "adb shell logcat -d -t 30 | grep -iE '(MediaProjection|ScreenCapture|setupProjection)'"
+            )
+            println("[E2E Setup] MediaProjection logcat: ${logcat.stdout.trim()}")
+        } catch (e: Exception) {
+            println("[E2E Setup] Could not check MediaProjection status: ${e.message}")
+        }
+
+        println("[E2E Setup] MediaProjection permission grant attempted")
     }
 
     /**
@@ -306,40 +416,15 @@ object AndroidContainerSetup {
      * @param container the running Docker container
      */
     fun configureServerSettings(container: GenericContainer<*>) {
-        println("[E2E Setup] Configuring MCP server settings for E2E testing...")
-
-        // Check if receiver is registered in the package
-        try {
-            val pkgDump = container.execInContainer(
-                "sh", "-c",
-                "adb shell dumpsys package $APP_PACKAGE | grep -A3 E2EConfigReceiver"
-            )
-            println("[E2E Setup] Package receiver info: ${pkgDump.stdout}")
-            if (pkgDump.stderr.isNotEmpty()) {
-                println("[E2E Setup] Package dump stderr: ${pkgDump.stderr}")
-            }
-        } catch (e: Exception) {
-            println("[E2E Setup] Package dump failed: ${e.message}")
-        }
+        println("[E2E Setup] Configuring MCP server settings...")
 
         // Step 1: Launch the app briefly to trigger initial DataStore creation
-        val startResult = execInContainer(
+        execInContainer(
             container,
             "adb", "shell", "am", "start",
             "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
         )
-        println("[E2E Setup] Activity start result: $startResult")
         Thread.sleep(5_000)
-
-        // Check if app process is running
-        try {
-            val pidResult = container.execInContainer(
-                "adb", "shell", "pidof", APP_PACKAGE
-            )
-            println("[E2E Setup] App PID after activity start: ${pidResult.stdout.trim()}")
-        } catch (e: Exception) {
-            println("[E2E Setup] pidof failed (app might not be running): ${e.message}")
-        }
 
         // Step 2: Force-stop the app so DataStore files are flushed to disk
         execInContainer(
@@ -348,11 +433,11 @@ object AndroidContainerSetup {
         )
         Thread.sleep(1_000)
 
-        // Step 3: Write settings via adb broadcast to the debug-only E2EConfigReceiver
-        // Use --include-stopped-packages since the app was just force-stopped
-        // Use explicit FQCN for the component to avoid any resolution ambiguity
+        // Step 3: Write settings via adb broadcast to the debug-only E2EConfigReceiver.
+        // Use --include-stopped-packages since the app was just force-stopped.
+        // Use explicit FQCN for the component to avoid any resolution ambiguity.
         val configAction = "$APP_PACKAGE.E2E_CONFIGURE"
-        val configResult = execInContainer(
+        execInContainer(
             container,
             "adb", "shell", "am", "broadcast",
             "--include-stopped-packages",
@@ -362,21 +447,9 @@ object AndroidContainerSetup {
             "--es", "binding_address", "0.0.0.0",
             "--ei", "port", MCP_DEFAULT_PORT.toString()
         )
-        println("[E2E Setup] Configure broadcast result: $configResult")
         Thread.sleep(3_000)
 
-        // Check logcat for crashes or our app entries
-        try {
-            val crashes = container.execInContainer(
-                "sh", "-c",
-                "adb shell logcat -d | grep -E '(FATAL|AndroidRuntime|E2E:ConfigReceiver)' | tail -20"
-            )
-            println("[E2E Setup] Logcat crashes/receiver after configure: ${crashes.stdout}")
-        } catch (e: Exception) {
-            println("[E2E Setup] Logcat check failed: ${e.message}")
-        }
-
-        println("[E2E Setup] Server settings configured via broadcast intent")
+        println("[E2E Setup] Server settings configured")
     }
 
     /**
@@ -393,84 +466,31 @@ object AndroidContainerSetup {
         println("[E2E Setup] Starting MCP server...")
 
         // Launch MainActivity to initialize the app
-        val activityResult = execInContainer(
+        execInContainer(
             container,
             "adb", "shell", "am", "start",
             "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
         )
-        println("[E2E Setup] Activity start result: $activityResult")
         Thread.sleep(5_000)
-
-        // Verify app process is running
-        try {
-            val pidResult = container.execInContainer(
-                "adb", "shell", "pidof", APP_PACKAGE
-            )
-            println("[E2E Setup] App PID before broadcast: ${pidResult.stdout.trim()}")
-        } catch (e: Exception) {
-            println("[E2E Setup] pidof failed (app might not be running): ${e.message}")
-        }
 
         // Start the McpServerService via broadcast to the debug-only E2EConfigReceiver.
         // This runs inside the app process, bypassing the exported=false restriction.
-        // Use explicit FQCN for the component to avoid any resolution ambiguity
         val startServerAction = "$APP_PACKAGE.E2E_START_SERVER"
-        val startResult = execInContainer(
+        execInContainer(
             container,
             "adb", "shell", "am", "broadcast",
             "-a", startServerAction,
             "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS"
         )
-        println("[E2E Setup] Start server broadcast result: $startResult")
         Thread.sleep(5_000)
 
-        // Get PID-filtered logcat for the app process
-        try {
-            val pidResult = container.execInContainer("adb", "shell", "pidof", APP_PACKAGE)
-            val pid = pidResult.stdout.trim()
-            if (pid.isNotEmpty()) {
-                val logcat = container.execInContainer(
-                    "sh", "-c",
-                    "adb shell logcat -d --pid=$pid | tail -30"
-                )
-                println("[E2E Setup] App logcat (PID $pid):\n${logcat.stdout}")
-            }
-        } catch (e: Exception) {
-            println("[E2E Setup] PID logcat failed: ${e.message}")
-        }
-
-        // Check for crashes
-        try {
-            val crashes = container.execInContainer(
-                "sh", "-c",
-                "adb shell logcat -d | grep -E '(FATAL|AndroidRuntime|E2E:ConfigReceiver)' | tail -20"
-            )
-            if (crashes.stdout.isNotEmpty()) {
-                println("[E2E Setup] CRASHES/FATAL:\n${crashes.stdout}")
-            } else {
-                println("[E2E Setup] No crashes detected in logcat")
-            }
-        } catch (e: Exception) {
-            println("[E2E Setup] Crash check failed: ${e.message}")
-        }
-
-        // Check if server port is listening
-        try {
-            val ss = container.execInContainer(
-                "sh", "-c",
-                "adb shell ss -tlnp 2>/dev/null | grep LISTEN"
-            )
-            println("[E2E Setup] Emulator LISTEN ports: ${ss.stdout}")
-        } catch (e: Exception) {
-            println("[E2E Setup] ss failed: ${e.message}")
-        }
-
-        println("[E2E Setup] MCP server start commands sent (activity + broadcast)")
+        println("[E2E Setup] MCP server start commands sent")
     }
 
     /**
      * Poll the /health endpoint until the MCP server is ready.
      *
+     * @param container the running Docker container (used for diagnostics on timeout)
      * @param baseUrl the base URL of the MCP server (e.g., "http://localhost:8080")
      * @param bearerToken the bearer token (not used for health, but needed to construct McpClient)
      * @param timeoutMs maximum time to wait for server ready (default 60 seconds)
@@ -496,7 +516,6 @@ object AndroidContainerSetup {
                     println("[E2E Setup] MCP server is ready (${System.currentTimeMillis() - startTime}ms)")
                     return
                 }
-                println("[E2E Setup] Health check returned non-healthy status: $health")
             } catch (e: Exception) {
                 val errorMsg = "${e.javaClass.simpleName}: ${e.message}"
                 if (errorMsg != lastError) {
@@ -528,64 +547,40 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Dump diagnostic information to help debug port forwarding / server issues.
+     * Dump diagnostic information to help debug server readiness issues.
+     * Only called when the health check times out.
      */
     private fun dumpDiagnostics(container: GenericContainer<*>) {
-        println("[E2E Diagnostics] === Begin diagnostics dump ===")
+        System.err.println("[E2E Diagnostics] === Server readiness timeout — dumping diagnostics ===")
 
         try {
             val adbForwardList = container.execInContainer("adb", "forward", "--list")
-            println("[E2E Diagnostics] adb forward list: stdout=${adbForwardList.stdout} stderr=${adbForwardList.stderr}")
+            System.err.println("[E2E Diagnostics] adb forward list: ${adbForwardList.stdout.trim()}")
         } catch (e: Exception) {
-            println("[E2E Diagnostics] adb forward --list failed: ${e.message}")
+            System.err.println("[E2E Diagnostics] adb forward --list failed: ${e.message}")
         }
 
         try {
-            val socatPs = container.execInContainer("sh", "-c", "ps aux | grep socat | grep -v grep")
-            println("[E2E Diagnostics] socat processes: stdout=${socatPs.stdout} stderr=${socatPs.stderr}")
-        } catch (e: Exception) {
-            println("[E2E Diagnostics] socat ps check failed: ${e.message}")
-        }
-
-        try {
-            val netstat = container.execInContainer(
+            val ss = container.execInContainer(
                 "sh", "-c",
-                "adb shell netstat -tlnp 2>/dev/null | grep LISTEN"
+                "adb shell ss -tlnp 2>/dev/null | grep LISTEN"
             )
-            println("[E2E Diagnostics] emulator LISTEN ports: ${netstat.stdout}")
+            System.err.println("[E2E Diagnostics] emulator LISTEN ports: ${ss.stdout.trim()}")
         } catch (e: Exception) {
-            println("[E2E Diagnostics] emulator netstat failed: ${e.message}")
-        }
-
-        try {
-            val wgetForward = container.execInContainer(
-                "sh", "-c", "wget -q -O - --timeout=3 http://127.0.0.1:$ADB_FORWARD_PORT/health 2>&1 || echo 'wget_failed'"
-            )
-            println("[E2E Diagnostics] wget adb-forward port ($ADB_FORWARD_PORT): stdout=${wgetForward.stdout} stderr=${wgetForward.stderr}")
-        } catch (e: Exception) {
-            println("[E2E Diagnostics] wget adb-forward port failed: ${e.message}")
-        }
-
-        try {
-            val wgetSocat = container.execInContainer(
-                "sh", "-c", "wget -q -O - --timeout=3 http://0.0.0.0:$MCP_DEFAULT_PORT/health 2>&1 || echo 'wget_failed'"
-            )
-            println("[E2E Diagnostics] wget socat port ($MCP_DEFAULT_PORT): stdout=${wgetSocat.stdout} stderr=${wgetSocat.stderr}")
-        } catch (e: Exception) {
-            println("[E2E Diagnostics] wget socat port failed: ${e.message}")
+            System.err.println("[E2E Diagnostics] emulator ss failed: ${e.message}")
         }
 
         try {
             val logcat = container.execInContainer(
                 "sh", "-c",
-                "adb shell logcat -d -t 200 | grep -iE '(MCP|E2E|McpServer|Ktor|ServerService)'"
+                "adb shell logcat -d -t 50 | grep -iE '(MCP|E2E|McpServer|FATAL)' | tail -20"
             )
-            println("[E2E Diagnostics] logcat (MCP/E2E): stdout=${logcat.stdout}")
+            System.err.println("[E2E Diagnostics] logcat (MCP/E2E): ${logcat.stdout.trim()}")
         } catch (e: Exception) {
-            println("[E2E Diagnostics] logcat failed: ${e.message}")
+            System.err.println("[E2E Diagnostics] logcat failed: ${e.message}")
         }
 
-        println("[E2E Diagnostics] === End diagnostics dump ===")
+        System.err.println("[E2E Diagnostics] === End diagnostics dump ===")
     }
 
     /**
@@ -594,9 +589,6 @@ object AndroidContainerSetup {
     private fun execInContainer(container: GenericContainer<*>, vararg command: String): String {
         val result = container.execInContainer(*command)
         if (result.exitCode != 0) {
-            if (result.stderr.isNotEmpty()) {
-                println("[E2E Setup] Command '${command.joinToString(" ")}' stderr: ${result.stderr}")
-            }
             throw IllegalStateException(
                 "[E2E Setup] Command '${command.joinToString(" ")}' failed with exit code " +
                     "${result.exitCode}. stdout: ${result.stdout} stderr: ${result.stderr}"
