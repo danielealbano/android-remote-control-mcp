@@ -3,31 +3,21 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 /**
  * Sealed exception hierarchy for MCP tool errors.
  *
- * When thrown from [ToolHandler.execute], the [McpProtocolHandler] catches
- * this exception and produces the appropriate JSON-RPC error response
- * with the given [code] and [message].
+ * When thrown from a tool's `execute` method, the SDK catches
+ * this exception and returns it as `CallToolResult(isError = true)`.
  *
- * Each subclass maps to a specific MCP/JSON-RPC error code.
- *
- * @property code The MCP/JSON-RPC error code.
+ * Each subclass classifies a specific failure mode.
  */
-@Suppress("MagicNumber")
-sealed class McpToolException(message: String, val code: Int) : Exception(message) {
-    /** Invalid parameters (error code -32602). */
-    class InvalidParams(message: String) : McpToolException(message, -32602)
+sealed class McpToolException(message: String) : Exception(message) {
+    class InvalidParams(message: String) : McpToolException(message)
 
-    /** Internal server error (error code -32603). */
-    class InternalError(message: String) : McpToolException(message, -32603)
+    class InternalError(message: String) : McpToolException(message)
 
-    /** Permission not granted (error code -32001). */
-    class PermissionDenied(message: String) : McpToolException(message, -32001)
+    class PermissionDenied(message: String) : McpToolException(message)
 
-    /** Element not found by ID or criteria (error code -32002). */
-    class ElementNotFound(message: String) : McpToolException(message, -32002)
+    class ElementNotFound(message: String) : McpToolException(message)
 
-    /** Accessibility action execution failed (error code -32003). */
-    class ActionFailed(message: String) : McpToolException(message, -32003)
+    class ActionFailed(message: String) : McpToolException(message)
 
-    /** Operation timed out (error code -32004). */
-    class Timeout(message: String) : McpToolException(message, -32004)
+    class Timeout(message: String) : McpToolException(message)
 }
