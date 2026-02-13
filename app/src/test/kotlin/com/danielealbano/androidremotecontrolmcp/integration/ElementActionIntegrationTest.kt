@@ -79,10 +79,11 @@ class ElementActionIntegrationTest {
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "find_elements",
-                    arguments = mapOf("by" to "text", "value" to "OK"),
-                )
+                val result =
+                    client.callTool(
+                        name = "find_elements",
+                        arguments = mapOf("by" to "text", "value" to "OK"),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
@@ -110,10 +111,11 @@ class ElementActionIntegrationTest {
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "click_element",
-                    arguments = mapOf("element_id" to "node_btn"),
-                )
+                val result =
+                    client.callTool(
+                        name = "click_element",
+                        arguments = mapOf("element_id" to "node_btn"),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }
@@ -132,10 +134,11 @@ class ElementActionIntegrationTest {
             } returns Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "click_element",
-                    arguments = mapOf("element_id" to "node_xyz"),
-                )
+                val result =
+                    client.callTool(
+                        name = "click_element",
+                        arguments = mapOf("element_id" to "node_xyz"),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("node_xyz"))

@@ -26,11 +26,11 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
+import dagger.hilt.android.AndroidEntryPoint
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -132,17 +132,21 @@ class McpServerService : Service() {
                 }
 
             // Create SDK Server instance and register all tools
-            val sdkServer = Server(
-                serverInfo = Implementation(
-                    name = "android-remote-control-mcp",
-                    version = com.danielealbano.androidremotecontrolmcp.BuildConfig.VERSION_NAME,
-                ),
-                options = ServerOptions(
-                    capabilities = ServerCapabilities(
-                        tools = ServerCapabilities.Tools(listChanged = false),
-                    ),
-                ),
-            )
+            val sdkServer =
+                Server(
+                    serverInfo =
+                        Implementation(
+                            name = "android-remote-control-mcp",
+                            version = com.danielealbano.androidremotecontrolmcp.BuildConfig.VERSION_NAME,
+                        ),
+                    options =
+                        ServerOptions(
+                            capabilities =
+                                ServerCapabilities(
+                                    tools = ServerCapabilities.Tools(listChanged = false),
+                                ),
+                        ),
+                )
             registerAllTools(sdkServer)
 
             // Create and start the Ktor server

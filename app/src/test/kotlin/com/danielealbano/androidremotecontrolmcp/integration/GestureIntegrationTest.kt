@@ -32,14 +32,16 @@ class GestureIntegrationTest {
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "pinch",
-                    arguments = mapOf(
-                        "center_x" to 540,
-                        "center_y" to 1200,
-                        "scale" to 2.0,
-                    ),
-                )
+                val result =
+                    client.callTool(
+                        name = "pinch",
+                        arguments =
+                            mapOf(
+                                "center_x" to 540,
+                                "center_y" to 1200,
+                                "scale" to 2.0,
+                            ),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }
@@ -49,14 +51,16 @@ class GestureIntegrationTest {
     fun `pinch with invalid scale returns error`() =
         runTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
-                val result = client.callTool(
-                    name = "pinch",
-                    arguments = mapOf(
-                        "center_x" to 540,
-                        "center_y" to 1200,
-                        "scale" to 0.0,
-                    ),
-                )
+                val result =
+                    client.callTool(
+                        name = "pinch",
+                        arguments =
+                            mapOf(
+                                "center_x" to 540,
+                                "center_y" to 1200,
+                                "scale" to 0.0,
+                            ),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("scale"))

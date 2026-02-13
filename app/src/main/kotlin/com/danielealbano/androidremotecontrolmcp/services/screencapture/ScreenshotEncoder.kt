@@ -120,6 +120,7 @@ class ScreenshotEncoder
          * @param maxHeight Target maximum height in pixels, or null.
          * @return The original bitmap if no resize is needed, or a new scaled bitmap.
          */
+        @Suppress("ReturnCount")
         fun resizeBitmapProportional(
             bitmap: Bitmap,
             maxWidth: Int?,
