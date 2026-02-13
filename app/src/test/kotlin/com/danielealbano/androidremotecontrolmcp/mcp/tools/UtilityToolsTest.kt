@@ -70,7 +70,7 @@ class UtilityToolsTest {
     private fun extractTextContent(result: CallToolResult): String {
         assertEquals(1, result.content.size)
         val textContent = result.content[0] as TextContent
-        return textContent.text ?: ""
+        return textContent.text
     }
 
     @BeforeEach
