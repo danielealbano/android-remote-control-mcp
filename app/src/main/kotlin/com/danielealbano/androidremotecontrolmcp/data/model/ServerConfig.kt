@@ -14,6 +14,10 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property httpsEnabled Whether HTTPS is enabled (disabled by default).
  * @property certificateSource The source of the HTTPS certificate.
  * @property certificateHostname The hostname for auto-generated certificates.
+ * @property tunnelEnabled Whether remote access via tunnel is enabled.
+ * @property tunnelProvider The tunnel provider type (Cloudflare or ngrok).
+ * @property ngrokAuthtoken The ngrok authtoken (required when using ngrok).
+ * @property ngrokDomain The ngrok domain (optional, empty means auto-assigned).
  */
 data class ServerConfig(
     val port: Int = DEFAULT_PORT,
@@ -23,6 +27,10 @@ data class ServerConfig(
     val httpsEnabled: Boolean = false,
     val certificateSource: CertificateSource = CertificateSource.AUTO_GENERATED,
     val certificateHostname: String = DEFAULT_CERTIFICATE_HOSTNAME,
+    val tunnelEnabled: Boolean = false,
+    val tunnelProvider: TunnelProviderType = TunnelProviderType.CLOUDFLARE,
+    val ngrokAuthtoken: String = "",
+    val ngrokDomain: String = "",
 ) {
     companion object {
         /** Default server port. */
