@@ -762,7 +762,7 @@ inputSchema = ToolSchema(
 
 #### Action 6.1a: Create local `McpStreamableHttpExtension.kt`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File (NEW):** `app/src/main/kotlin/.../mcp/McpStreamableHttpExtension.kt`
 
@@ -912,7 +912,7 @@ private suspend fun lookupTransport(
 
 #### Action 6.1b: Rewrite `McpServer` constructor and class
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/McpServer.kt`
 
@@ -928,7 +928,7 @@ class McpServer(
 
 #### Action 6.2: Rewrite `configureApplication()`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/McpServer.kt`
 
@@ -984,7 +984,7 @@ The `start()`, `stop()`, `isRunning()`, `createHttpServer()`, `createHttpsServer
 
 #### Action 7.1: Update injected dependencies
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/mcp/McpServerService.kt`
 
@@ -1004,7 +1004,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolRegistry
 
 #### Action 7.2: Create SDK `Server` instance in `startServer()`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/mcp/McpServerService.kt`
 
@@ -1032,7 +1032,7 @@ val sdkServer = Server(
 
 #### Action 7.3: Update `registerAllTools()` to use SDK `Server`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/mcp/McpServerService.kt`
 
@@ -1061,7 +1061,7 @@ private fun registerAllTools(server: Server) {
 
 #### Action 7.4: Update `McpServer` creation to pass SDK Server
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/mcp/McpServerService.kt`
 
