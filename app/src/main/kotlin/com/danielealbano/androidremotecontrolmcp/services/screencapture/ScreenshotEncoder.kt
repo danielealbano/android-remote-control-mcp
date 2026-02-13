@@ -134,21 +134,22 @@ class ScreenshotEncoder
             val (targetWidth, targetHeight) =
                 when {
                     maxWidth != null && maxHeight != null -> {
-                        // Fit within bounding box: scale based on the side that needs more reduction
+                        // Fit within bounding box: scale based on the side that needs more
+                        // reduction, but never upscale beyond the original size
                         val widthRatio = maxWidth.toFloat() / originalWidth
                         val heightRatio = maxHeight.toFloat() / originalHeight
-                        val scale = minOf(widthRatio, heightRatio)
+                        val scale = minOf(widthRatio, heightRatio, 1f)
                         Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
                     }
                     maxWidth != null -> {
-                        // Scale to exact width, proportional height
-                        val scale = maxWidth.toFloat() / originalWidth
-                        Pair(maxWidth, (originalHeight * scale).toInt())
+                        // Scale to width (as an upper bound), proportional height; never upscale
+                        val scale = (maxWidth.toFloat() / originalWidth).coerceAtMost(1f)
+                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
                     }
                     else -> {
-                        // maxHeight != null: scale to exact height, proportional width
-                        val scale = maxHeight!!.toFloat() / originalHeight
-                        Pair((originalWidth * scale).toInt(), maxHeight)
+                        // maxHeight != null: scale to height (as an upper bound); never upscale
+                        val scale = (maxHeight!!.toFloat() / originalHeight).coerceAtMost(1f)
+                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
                     }
                 }
 

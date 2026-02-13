@@ -5,9 +5,10 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import java.net.HttpURLConnection
+import java.net.URI
 
 /**
  * E2E test: Error handling and authentication verification.
@@ -29,28 +30,46 @@ class E2EErrorHandlingTest {
     private val baseUrl = SharedAndroidContainer.mcpServerUrl
 
     @Test
-    fun `missing bearer token returns 401 Unauthorized`() = runBlocking {
-        val noAuthClient = McpClient(baseUrl, "")
+    fun `missing bearer token returns 401 Unauthorized`() {
+        // Use raw HTTP to assert the exact 401 status code, avoiding false positives
+        // from unrelated exceptions (network errors, TLS failures, etc.)
+        val conn = URI("$baseUrl/mcp").toURL()
+            .openConnection() as HttpURLConnection
         try {
-            noAuthClient.connect()
-            fail("Expected exception for missing bearer token")
-        } catch (_: Exception) {
-            // Expected: server rejects unauthenticated requests
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            conn.setRequestProperty("Content-Type", "application/json")
+            // Intentionally omit Authorization header
+            conn.doOutput = true
+            conn.outputStream.use {
+                it.write("""{"jsonrpc":"2.0","method":"ping","id":1}""".toByteArray())
+            }
+            assertEquals(401, conn.responseCode, "Missing token should return HTTP 401")
         } finally {
-            noAuthClient.close()
+            conn.disconnect()
         }
     }
 
     @Test
-    fun `invalid bearer token returns 401 Unauthorized`() = runBlocking {
-        val badAuthClient = McpClient(baseUrl, "invalid-token-that-does-not-match")
+    fun `invalid bearer token returns 401 Unauthorized`() {
+        // Use raw HTTP to assert the exact 401 status code, avoiding false positives
+        // from unrelated exceptions (network errors, TLS failures, etc.)
+        val conn = URI("$baseUrl/mcp").toURL()
+            .openConnection() as HttpURLConnection
         try {
-            badAuthClient.connect()
-            fail("Expected exception for invalid bearer token")
-        } catch (_: Exception) {
-            // Expected: server rejects unauthenticated requests
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Authorization", "Bearer invalid-token-that-does-not-match")
+            conn.doOutput = true
+            conn.outputStream.use {
+                it.write("""{"jsonrpc":"2.0","method":"ping","id":1}""".toByteArray())
+            }
+            assertEquals(401, conn.responseCode, "Invalid token should return HTTP 401")
         } finally {
-            badAuthClient.close()
+            conn.disconnect()
         }
     }
 

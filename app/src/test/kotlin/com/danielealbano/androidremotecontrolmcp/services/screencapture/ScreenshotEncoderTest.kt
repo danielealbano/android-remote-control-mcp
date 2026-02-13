@@ -417,6 +417,45 @@ class ScreenshotEncoderTest {
         }
 
         @Test
+        @DisplayName("does not upscale when maxWidth exceeds original width")
+        fun doesNotUpscaleForLargerMaxWidth() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 500
+                    every { height } returns 1000
+                }
+
+            val result = encoder.resizeBitmapProportional(bitmap, 2000, null)
+            assertSame(bitmap, result)
+        }
+
+        @Test
+        @DisplayName("does not upscale when maxHeight exceeds original height")
+        fun doesNotUpscaleForLargerMaxHeight() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 500
+                    every { height } returns 1000
+                }
+
+            val result = encoder.resizeBitmapProportional(bitmap, null, 5000)
+            assertSame(bitmap, result)
+        }
+
+        @Test
+        @DisplayName("does not upscale when both max dimensions exceed original")
+        fun doesNotUpscaleForLargerBoundingBox() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 500
+                    every { height } returns 1000
+                }
+
+            val result = encoder.resizeBitmapProportional(bitmap, 2000, 5000)
+            assertSame(bitmap, result)
+        }
+
+        @Test
         @DisplayName("handles very small target producing 1x1 bitmap")
         fun handlesVerySmallTarget() {
             val bitmap =
