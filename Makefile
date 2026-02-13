@@ -140,21 +140,20 @@ uninstall: ## Uninstall app from connected device/emulator
 	$(ADB) uninstall $(APP_ID) 2>/dev/null || true
 	$(ADB) uninstall $(APP_ID_DEBUG) 2>/dev/null || true
 
-grant-permissions: ## Display instructions for granting permissions
-	@echo "=== Permission Setup Instructions ==="
+grant-permissions: ## Grant permissions via adb (accessibility + notifications)
+	@echo "=== Granting permissions via adb ==="
 	@echo ""
-	@echo "1. Accessibility Service (must be enabled manually):"
-	@echo "   Settings > Accessibility > Android Remote Control MCP > Enable"
+	@echo "1. Enabling Accessibility Service..."
+	$(ADB) shell settings put secure enabled_accessibility_services \
+		$(APP_ID_DEBUG)/com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
+	@echo "   Done."
 	@echo ""
-	@echo "   Or open Settings directly:"
-	@echo "   $(ADB) shell am start -a android.settings.ACCESSIBILITY_SETTINGS"
+	@echo "2. Granting POST_NOTIFICATIONS permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.POST_NOTIFICATIONS
+	@echo "   Done."
 	@echo ""
-	@echo "2. MediaProjection (granted when prompted in app):"
-	@echo "   Start the MCP server in the app and grant the screen capture permission"
-	@echo "   when the system dialog appears."
-	@echo ""
-	@echo "3. Notifications (Android 13+):"
-	@echo "   The app will request notification permission on first launch."
+	@echo "NOTE: Screen capture (MediaProjection) requires manual approval via the"
+	@echo "system dialog in the app — it cannot be granted via adb."
 	@echo ""
 
 # Note: start-server defaults to the debug application ID (APP_ID_DEBUG).
