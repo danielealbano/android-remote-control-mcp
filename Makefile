@@ -101,16 +101,16 @@ clean: ## Clean build artifacts
 # Testing
 # ─────────────────────────────────────────────────────────────────────────────
 
-test-unit: ## Run unit tests
+test-unit: ## Run unit tests (includes integration tests since both are JVM-based)
 	$(GRADLE) :app:test
 
-test-integration: ## Run integration tests (requires Docker)
-	bash scripts/run-integration-tests.sh
+test-integration: ## Run integration tests (JVM-based, no emulator required)
+	$(GRADLE) :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"
 
 test-e2e: ## Run E2E tests (requires Docker)
 	$(GRADLE) :e2e-tests:test
 
-test: test-unit test-integration test-e2e ## Run all tests
+test: test-unit test-e2e ## Run all tests
 
 coverage: ## Generate code coverage report (Jacoco)
 	$(GRADLE) jacocoTestReport
