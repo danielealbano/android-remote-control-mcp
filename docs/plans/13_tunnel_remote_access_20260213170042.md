@@ -1583,10 +1583,10 @@ Update `HomeScreen.kt` to pass tunnel URL and share callback:
 **Goal**: Ensure all new code is unit tested.
 
 **Acceptance Criteria**:
-- [ ] `TunnelStatus` tests (sealed class variants)
-- [ ] `TunnelProviderType` tests (enum values)
-- [ ] `ServerConfig` test updated for new defaults
-- [ ] All tests pass: `./gradlew :app:test`
+- [x] `TunnelStatus` tests (sealed class variants)
+- [x] `TunnelProviderType` tests (enum values)
+- [x] `ServerConfig` test updated for new defaults
+- [x] All tests pass: `./gradlew :app:test`
 
 #### Action 12.1: Create `TunnelStatusTest`
 
@@ -1605,7 +1605,7 @@ Add tests verifying new defaults:
 - `ngrokDomain defaults to empty string`
 
 **Definition of Done**:
-- [ ] All unit tests pass: `./gradlew :app:test`
+- [x] All unit tests pass: `./gradlew :app:test`
 
 ---
 
