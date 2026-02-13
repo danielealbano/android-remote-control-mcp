@@ -88,7 +88,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws PermissionDenied when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
@@ -102,7 +102,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32003 when action fails")
+        @DisplayName("throws ActionFailed when action fails")
         fun throwsErrorWhenActionFails() =
             runTest {
                 // Arrange
@@ -145,7 +145,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws PermissionDenied when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
@@ -153,7 +153,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32003 when action fails")
+        @DisplayName("throws ActionFailed when action fails")
         fun throwsErrorWhenActionFails() =
             runTest {
                 coEvery { mockActionExecutor.pressHome() } returns
@@ -189,7 +189,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws PermissionDenied when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
@@ -197,7 +197,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32003 when action fails")
+        @DisplayName("throws ActionFailed when action fails")
         fun throwsErrorWhenActionFails() =
             runTest {
                 coEvery { mockActionExecutor.pressRecents() } returns
@@ -233,7 +233,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws PermissionDenied when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
@@ -241,7 +241,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32003 when action fails")
+        @DisplayName("throws ActionFailed when action fails")
         fun throwsErrorWhenActionFails() =
             runTest {
                 coEvery { mockActionExecutor.openNotifications() } returns
@@ -277,7 +277,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when service not available")
+        @DisplayName("throws PermissionDenied when service not available")
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
@@ -285,7 +285,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32003 when action fails")
+        @DisplayName("throws ActionFailed when action fails")
         fun throwsErrorWhenActionFails() =
             runTest {
                 coEvery { mockActionExecutor.openQuickSettings() } returns
@@ -356,7 +356,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32602 when last_lines is below minimum (0)")
+        @DisplayName("throws InvalidParams when last_lines is below minimum (0)")
         fun throwsErrorWhenLastLinesBelowMinimum() =
             runTest {
                 // Arrange
@@ -371,7 +371,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32602 when last_lines exceeds maximum (1001)")
+        @DisplayName("throws InvalidParams when last_lines exceeds maximum (1001)")
         fun throwsErrorWhenLastLinesExceedsMaximum() =
             runTest {
                 // Arrange
@@ -386,7 +386,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32602 when last_lines is non-integer")
+        @DisplayName("throws InvalidParams when last_lines is non-integer")
         fun throwsErrorWhenLastLinesNonInteger() =
             runTest {
                 // Arrange
@@ -401,7 +401,7 @@ class SystemActionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32602 for invalid log level")
+        @DisplayName("throws InvalidParams for invalid log level")
         fun throwsErrorForInvalidLogLevel() =
             runTest {
                 // Arrange
