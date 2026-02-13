@@ -136,8 +136,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
-  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ScreenInfo.kt`
-  - `services/screencapture/` — `ScreenCaptureService.kt`, `MediaProjectionHelper.kt`, `ScreenshotEncoder.kt`
+  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
+  - `services/screencapture/` — `ScreenCaptureService.kt`, `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `MediaProjectionHelper.kt`, `ScreenshotEncoder.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
   - `mcp/` — `McpServer.kt`, `McpProtocolHandler.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `ToolRegistry.kt`, `McpContentBuilder.kt`, `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
@@ -154,8 +154,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
 - `app/src/main/AndroidManifest.xml`
 - `app/src/debug/` — `AndroidManifest.xml` (debug overlay), `kotlin/.../debug/E2EConfigReceiver.kt`
-- `app/src/test/kotlin/` — Unit tests
-- `app/src/androidTest/kotlin/` — Integration tests (instrumented)
+- `app/src/test/kotlin/` — Unit tests and JVM-based integration tests
+- `app/src/test/kotlin/.../integration/` — Integration tests (Ktor `testApplication`, no emulator)
 - `e2e-tests/` — E2E tests (Docker Android, JVM-only module)
 - `gradle/libs.versions.toml` — Gradle version catalog
 - `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`
@@ -408,10 +408,12 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 ### Integration Tests
 
-- **Framework**: AndroidX Test, Compose UI Test, MockK, Hilt Test
-- **Scope**: MainActivity UI interactions, Compose screen rendering and state, ViewModel+repository integration, service binding/unbinding
-- **Mocking**: Mock all Android services; use real DataStore (in-memory); no real network calls
-- **Run**: `make test-integration` or `./gradlew connectedAndroidTest`
+- **Framework**: Ktor `testApplication`, JUnit 5, MockK
+- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 7 tool categories, error code propagation
+- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`) via interfaces; real `McpProtocolHandler` and `ToolRegistry`
+- **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; `sendToolCall()` helper sends JSON-RPC requests
+- **Run**: `make test-integration` or `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
+- **Note**: JVM-based, no emulator or device required. Runs as part of `make test-unit` since both are under `app/src/test/`
 
 ### E2E Tests
 
@@ -428,7 +430,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 ### Continuous Testing
 
-- Unit tests on every commit (fast); integration tests on PR (medium); E2E tests on PR and pre-merge (slow, comprehensive)
+- Unit tests and JVM integration tests on every commit (fast); E2E tests on PR and pre-merge (slow, comprehensive)
 
 ---
 
@@ -459,8 +461,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### CI/CD (GitHub Actions)
 
 - **Trigger**: Push to main, pull requests
-- **Pipeline**: lint → test-unit → test-integration → test-e2e → build-release (sequential)
-- **Integration tests**: Use `reactivecircus/android-emulator-runner` with API 34, x86_64
+- **Pipeline**: lint → test-unit (includes JVM integration tests) → test-e2e → build-release (sequential)
 - **E2E tests**: Docker pre-installed on GitHub Actions runners, Testcontainers works out of the box
 - **Artifacts**: Debug and release APKs uploaded on successful build
 
@@ -565,10 +566,10 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 | Target | Description | Underlying Command |
 |--------|-------------|-------------------|
-| `test-unit` | Run unit tests | `./gradlew test` |
-| `test-integration` | Run integration tests (requires device/emulator) | `./gradlew connectedAndroidTest` |
+| `test-unit` | Run unit and JVM integration tests | `./gradlew test` |
+| `test-integration` | Run JVM integration tests only | `./gradlew :app:testDebugUnitTest --tests "...integration.*"` |
 | `test-e2e` | Run E2E tests (requires Docker) | `./gradlew :e2e-tests:test` |
-| `test` | Run all tests sequentially | test-unit + test-integration + test-e2e |
+| `test` | Run all tests sequentially | test-unit + test-e2e |
 | `coverage` | Generate Jacoco coverage report | `./gradlew jacocoTestReport` |
 
 ### Linting
@@ -608,7 +609,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 | `version-bump-major` | Increment major version (1.0.0 → 2.0.0) |
 | `check-deps` | Check for required tools (Android SDK, Java 17+, Gradle, adb, Docker) |
 | `all` | Run full workflow: clean → build → lint → test-unit |
-| `ci` | Run CI workflow: check-deps → lint → test-unit → test-integration → test-e2e → build-release |
+| `ci` | Run CI workflow: check-deps → lint → test-unit (includes JVM integration) → test-e2e → build-release |
 
 ---
 
