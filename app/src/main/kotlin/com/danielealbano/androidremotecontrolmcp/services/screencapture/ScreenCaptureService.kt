@@ -94,7 +94,17 @@ class ScreenCaptureService : Service() {
         startId: Int,
     ): Int {
         Log.i(TAG, "ScreenCaptureService starting")
-        startForeground(NOTIFICATION_ID, createNotification())
+        try {
+            startForeground(NOTIFICATION_ID, createNotification())
+        } catch (e: SecurityException) {
+            Log.w(
+                TAG,
+                "Cannot start as foreground service — MediaProjection permission not granted. " +
+                    "Screenshot functionality will be unavailable: ${e.message}",
+            )
+            stopSelf()
+            return START_NOT_STICKY
+        }
         instance = this
         return START_NOT_STICKY
     }
