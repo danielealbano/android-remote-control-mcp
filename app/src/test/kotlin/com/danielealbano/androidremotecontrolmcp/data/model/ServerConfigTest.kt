@@ -53,6 +53,30 @@ class ServerConfigTest {
             val config = ServerConfig()
             assertEquals("android-mcp.local", config.certificateHostname)
         }
+
+        @Test
+        fun `default tunnelEnabled is false`() {
+            val config = ServerConfig()
+            assertFalse(config.tunnelEnabled)
+        }
+
+        @Test
+        fun `default tunnelProvider is CLOUDFLARE`() {
+            val config = ServerConfig()
+            assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
+        }
+
+        @Test
+        fun `default ngrokAuthtoken is empty`() {
+            val config = ServerConfig()
+            assertEquals("", config.ngrokAuthtoken)
+        }
+
+        @Test
+        fun `default ngrokDomain is empty`() {
+            val config = ServerConfig()
+            assertEquals("", config.ngrokDomain)
+        }
     }
 
     @Nested
