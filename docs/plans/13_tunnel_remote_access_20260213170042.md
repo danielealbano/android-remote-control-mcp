@@ -825,15 +825,15 @@ No explicit module binding needed — Hilt can provide `javax.inject.Provider<T>
 **Goal**: Start and stop the tunnel with the MCP server lifecycle. Expose server log events from the service to the UI via a companion-level `SharedFlow` (same architectural pattern as `serverStatus`).
 
 **Acceptance Criteria**:
-- [ ] `McpServerService` injects `TunnelManager`
-- [ ] `McpServerService` has a companion-level `SharedFlow<ServerLogEntry>` for emitting log events to the UI
-- [ ] `startServer()` calls `tunnelManager.start(config.port)` after Ktor server starts
-- [ ] `onDestroy()` calls `tunnelManager.stop()` before stopping Ktor server
-- [ ] Tunnel URL is logged to **logcat** when connected (via `Log.i`)
-- [ ] Tunnel URL is logged to **UI server logs** when connected (via companion `serverLogEvents` SharedFlow)
-- [ ] `ServerLogEntry` generalized to support tunnel events (type enum: TOOL_CALL, TUNNEL, SERVER)
-- [ ] `ServerLogsSection.kt` UI composable updated to render different entry types correctly
-- [ ] No existing **production** `ServerLogEntry` call sites need updating (there are currently none in production code); **test** call sites in `MainViewModelTest.kt` are updated in Task 10 Action 10.2
+- [x] `McpServerService` injects `TunnelManager`
+- [x] `McpServerService` has a companion-level `SharedFlow<ServerLogEntry>` for emitting log events to the UI
+- [x] `startServer()` calls `tunnelManager.start(config.port)` after Ktor server starts
+- [x] `onDestroy()` calls `tunnelManager.stop()` before stopping Ktor server
+- [x] Tunnel URL is logged to **logcat** when connected (via `Log.i`)
+- [x] Tunnel URL is logged to **UI server logs** when connected (via companion `serverLogEvents` SharedFlow)
+- [x] `ServerLogEntry` generalized to support tunnel events (type enum: TOOL_CALL, TUNNEL, SERVER)
+- [x] `ServerLogsSection.kt` UI composable updated to render different entry types correctly
+- [x] No existing **production** `ServerLogEntry` call sites need updating (there are currently none in production code); **test** call sites in `MainViewModelTest.kt` are updated in Task 10 Action 10.2
 
 #### Action 9.1: Add `TunnelManager` injection and companion-level `serverLogEvents` SharedFlow to `McpServerService`
 
@@ -882,9 +882,9 @@ private fun emitLogEntry(entry: ServerLogEntry) {
 ```
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] `serverLogEvents` accessible from `McpServerService.serverLogEvents` (companion-level)
-- [ ] `emitLogEntry()` callable from instance methods (`startServer()`, tunnel status observer)
+- [x] Compiles without warnings
+- [x] `serverLogEvents` accessible from `McpServerService.serverLogEvents` (companion-level)
+- [x] `emitLogEntry()` callable from instance methods (`startServer()`, tunnel status observer)
 
 #### Action 9.2: Generalize `ServerLogEntry` to support tunnel events
 
@@ -925,8 +925,8 @@ The current `ServerLogEntry` has `toolName`, `params`, `durationMs` fields which
 **NOTE**: As of this writing, there are **zero existing call sites in production code** that create `ServerLogEntry` instances. The `addServerLogEntry()` method exists on `MainViewModel` but is never called from production code. However, **test code** (`MainViewModelTest.kt` lines 274-310) DOES construct `ServerLogEntry` instances using the old 4-parameter constructor — these tests MUST be updated in Action 10.2. Additionally, if any new production call sites are added before this plan is implemented, they must include `type = ServerLogEntry.Type.TOOL_CALL` and `message = toolName`.
 
 **Definition of Done**:
-- [ ] `ServerLogEntry` generalized with `Type` enum
-- [ ] Existing unit tests updated for new structure (if any reference the old constructor signature)
+- [x] `ServerLogEntry` generalized with `Type` enum
+- [x] Existing unit tests updated for new structure (if any reference the old constructor signature)
 
 #### Action 9.3: Update `ServerLogsSection.kt` to handle different entry types
 
@@ -1083,10 +1083,10 @@ Also update the `@Preview` composable to use the new constructor:
 ```
 
 **Definition of Done**:
-- [ ] `ServerLogEntryRow` handles all three entry types without NPE
-- [ ] `TOOL_CALL` entries display the same as before (toolName, params, durationMs)
-- [ ] `TUNNEL`/`SERVER` entries display timestamp + message only
-- [ ] Preview compiles and renders both entry types
+- [x] `ServerLogEntryRow` handles all three entry types without NPE
+- [x] `TOOL_CALL` entries display the same as before (toolName, params, durationMs)
+- [x] `TUNNEL`/`SERVER` entries display timestamp + message only
+- [x] Preview compiles and renders both entry types
 
 #### Action 9.4: Start tunnel after server starts and log tunnel URL
 
@@ -1155,9 +1155,9 @@ coroutineScope.launch {
 Note: Tunnel failure does NOT prevent the MCP server from running. The server continues locally even if the tunnel fails.
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] Tunnel starts after Ktor server
-- [ ] Tunnel status logged to logcat and emitted to companion SharedFlow
+- [x] Compiles without warnings
+- [x] Tunnel starts after Ktor server
+- [x] Tunnel status logged to logcat and emitted to companion SharedFlow
 
 #### Action 9.5: Stop tunnel in `onDestroy()`
 
@@ -1204,10 +1204,10 @@ Additionally, `TunnelManager.stop()` should ensure its own providers have hard-k
 - `NgrokTunnelProvider.stop()`: calls `forwarder.close()` + `session.close()` — these are in-process and should complete quickly
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] Tunnel starts after server, stops before server
-- [ ] `onDestroy()` cannot block main thread longer than 3 seconds due to tunnel stop
-- [ ] No ANR risk from tunnel shutdown
+- [x] Compiles without warnings
+- [x] Tunnel starts after server, stops before server
+- [x] `onDestroy()` cannot block main thread longer than 3 seconds due to tunnel stop
+- [x] No ANR risk from tunnel shutdown
 
 ---
 
@@ -1216,12 +1216,12 @@ Additionally, `TunnelManager.stop()` should ensure its own providers have hard-k
 **Goal**: Expose tunnel status and settings to the UI.
 
 **Acceptance Criteria**:
-- [ ] `MainViewModel` exposes `tunnelStatus: StateFlow<TunnelStatus>`
-- [ ] `MainViewModel` collects `McpServerService.serverLogEvents` in `init` and feeds entries into `addServerLogEntry()`
-- [ ] `MainViewModel` has methods for updating tunnel settings
-- [ ] `MainViewModel` has fields for ngrok authtoken input and error validation
-- [ ] `MainViewModelTest` updated
-- [ ] Targeted test passes: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
+- [x] `MainViewModel` exposes `tunnelStatus: StateFlow<TunnelStatus>`
+- [x] `MainViewModel` collects `McpServerService.serverLogEvents` in `init` and feeds entries into `addServerLogEntry()`
+- [x] `MainViewModel` has methods for updating tunnel settings
+- [x] `MainViewModel` has fields for ngrok authtoken input and error validation
+- [x] `MainViewModelTest` updated
+- [x] Targeted test passes: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
 
 #### Action 10.1: Add tunnel state to `MainViewModel`
 
@@ -1322,8 +1322,8 @@ fun shareText(context: Context, text: String) {
 ```
 
 **Definition of Done**:
-- [ ] Compiles without warnings
-- [ ] `shareText` triggers Android share sheet
+- [x] Compiles without warnings
+- [x] `shareText` triggers Android share sheet
 
 #### Action 10.2: Update `MainViewModelTest`
 
@@ -1362,7 +1362,7 @@ Add new tests:
 - `shareText starts ACTION_SEND intent with correct text`
 
 **Definition of Done**:
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
 
 ---
 
