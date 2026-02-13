@@ -27,6 +27,7 @@ dependencies {
     // MCP SDK client (Streamable HTTP transport)
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.cio)
+    testImplementation(libs.ktor.sse)
 
     // Serialization
     testImplementation(libs.kotlinx.serialization.json)

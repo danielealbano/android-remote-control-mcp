@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import kotlinx.coroutines.runBlocking
 import org.testcontainers.containers.GenericContainer
 
 /**
@@ -88,7 +89,7 @@ object SharedAndroidContainer {
                 // Start MCP server (activity + explicit service start)
                 AndroidContainerSetup.startMcpServer(c)
 
-                // Wait for server to be ready (polls GET /health until 200 or timeout)
+                // Wait for server to be ready (polls HTTP POST to /mcp until responsive)
                 val url = AndroidContainerSetup.getMcpServerUrl(c)
                 AndroidContainerSetup.waitForServerReady(c, url)
 
@@ -98,9 +99,9 @@ object SharedAndroidContainer {
                 // after the server is running, the system can immediately bind.
                 AndroidContainerSetup.enableAccessibilityService(c)
 
-                // Create and initialize the MCP client
+                // Create and connect the MCP client
                 val client = McpClient(url, AndroidContainerSetup.E2E_BEARER_TOKEN)
-                client.initialize()
+                runBlocking { client.connect() }
 
                 // Store all values atomically
                 _mcpServerUrl = url

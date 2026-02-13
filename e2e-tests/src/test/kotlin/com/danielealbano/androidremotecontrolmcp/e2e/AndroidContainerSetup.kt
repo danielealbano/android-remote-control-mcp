@@ -401,38 +401,52 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Poll the /health endpoint until the MCP server is ready.
+     * Poll the MCP endpoint until the server is ready to accept requests.
+     *
+     * Sends an HTTP POST to `/mcp` with a minimal JSON-RPC body. Any HTTP
+     * response (even an error) proves the Ktor server is running and processing.
      *
      * @param container the running Docker container (used for diagnostics on timeout)
      * @param baseUrl the base URL of the MCP server (e.g., "http://localhost:8080")
-     * @param bearerToken the bearer token (not used for health, but needed to construct McpClient)
      * @param timeoutMs maximum time to wait for server ready (default 60 seconds)
      * @throws IllegalStateException if server does not become ready within timeout
      */
     fun waitForServerReady(
         container: GenericContainer<*>,
         baseUrl: String,
-        bearerToken: String = E2E_BEARER_TOKEN,
         timeoutMs: Long = DEFAULT_SERVER_READY_TIMEOUT_MS,
     ) {
         println("[E2E Setup] Waiting for MCP server to be ready at $baseUrl (timeout: ${timeoutMs}ms)...")
 
-        val client = McpClient(baseUrl, bearerToken)
         val startTime = System.currentTimeMillis()
         var lastError: String? = null
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             try {
-                val health = client.healthCheck()
-                val status = health["status"]?.toString()?.removeSurrounding("\"")
-                if (status == "healthy") {
-                    println("[E2E Setup] MCP server is ready (${System.currentTimeMillis() - startTime}ms)")
+                val conn = java.net.URI("$baseUrl/mcp").toURL()
+                    .openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 2_000
+                conn.readTimeout = 2_000
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("Authorization", "Bearer $E2E_BEARER_TOKEN")
+                conn.doOutput = true
+                conn.outputStream.use {
+                    it.write("""{"jsonrpc":"2.0","method":"ping","id":1}""".toByteArray())
+                }
+                val responseCode = conn.responseCode
+                // Any HTTP response means the server is up and processing requests
+                if (responseCode > 0) {
+                    println(
+                        "[E2E Setup] MCP server is ready " +
+                            "(HTTP $responseCode, ${System.currentTimeMillis() - startTime}ms)"
+                    )
                     return
                 }
             } catch (e: Exception) {
                 val errorMsg = "${e.javaClass.simpleName}: ${e.message}"
                 if (errorMsg != lastError) {
-                    println("[E2E Setup] Health check poll error: $errorMsg")
+                    println("[E2E Setup] Server readiness poll: $errorMsg")
                     lastError = errorMsg
                 }
             }
