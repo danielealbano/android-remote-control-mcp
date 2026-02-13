@@ -1761,47 +1761,47 @@ Add tunnel layer to the architecture diagram showing:
 **Goal**: Review everything implemented from the ground up, verifying correctness and completeness.
 
 **Acceptance Criteria**:
-- [ ] Re-read every new file and verify it matches the plan
-- [ ] Re-read every modified file and verify changes are correct and minimal
-- [ ] Verify all new classes have proper KDoc comments
-- [ ] Verify all new settings are persisted correctly (write + read + defaults)
-- [ ] Verify `TunnelProvider` interface is clean and minimal (`start(localPort, config)` signature)
-- [ ] Verify `CloudflaredBinaryResolver` interface and `AndroidCloudflareBinaryResolver` impl are correct
-- [ ] Verify `CloudflareTunnelProvider` handles all edge cases (binary not found, process crash, timeout)
-- [ ] Verify `NgrokTunnelProvider` handles all edge cases (invalid token, unsupported ABI, network error)
-- [ ] Verify `NgrokTunnelProvider` does NOT inject `SettingsRepository` (receives config via `start()`)
-- [ ] Verify `TunnelManager` correctly relays status from active provider (with its own coroutine scope and relay job)
-- [ ] Verify `TunnelManager` uses `javax.inject.Provider<T>` factories for fresh provider instances
-- [ ] Verify `McpServerService` starts tunnel AFTER server and stops tunnel BEFORE server
-- [ ] Verify `onDestroy()` has `withTimeout(3_000L)` for tunnel stop — no ANR risk
-- [ ] Verify tunnel failure does NOT prevent MCP server from running locally
-- [ ] Verify tunnel URL is logged to **logcat** when connected
-- [ ] Verify tunnel URL is logged to **UI server logs** via companion-level `serverLogEvents` SharedFlow on `McpServerService`
-- [ ] Verify `McpServerService` has companion `serverLogEvents: SharedFlow<ServerLogEntry>` and instance `emitLogEntry()` helper
-- [ ] Verify `MainViewModel` collects `McpServerService.serverLogEvents` in `init` and feeds entries into `addServerLogEntry()`
-- [ ] Verify `ServerLogEntry` has `Type` enum (TOOL_CALL, TUNNEL, SERVER)
-- [ ] Verify `ServerLogsSection.kt` / `ServerLogEntryRow` handles all three entry types (TOOL_CALL shows toolName/params/duration, TUNNEL/SERVER shows message)
-- [ ] Verify `CloudflareTunnelProvider.start()` suppresses unused `config` parameter warning
-- [ ] Verify UI shows correct state for all tunnel statuses (Disconnected, Connecting, Connected, Error)
-- [ ] Verify provider selector uses **RadioButtons with description tags** (not SegmentedButtons)
-- [ ] Verify ngrok authtoken field uses password transformation (hidden by default)
-- [ ] Verify all settings are disabled when server is running
-- [ ] Verify `ConnectionInfoCard` shows tunnel URL, has Share button, and preview compiles
-- [ ] Verify `MainViewModel` has `shareText()` method using `Intent.ACTION_SEND`
-- [ ] Verify `RemoteAccessSection` does NOT have a copy/share button (handled by ConnectionInfoCard)
-- [ ] Verify `ServerConfig` has NO unnecessary import for `TunnelProviderType` (same package)
-- [ ] Verify Plan 12 cross-impacts: `McpServerService` diffs anchored in post-plan-12 code (no `protocolHandler`, no `toolRegistry`, `registerAllTools(server)` signature)
-- [ ] Verify Plan 12 cross-impacts: Cloudflare tunnel integration test does NOT reference `/health` endpoint (removed by Plan 12)
-- [ ] Verify Plan 12 cross-impacts: `docs/PROJECT.md` server logs description updated from "recent MCP requests" to include tunnel events
-- [ ] Verify cloudflared git submodule is pinned to correct tag in `vendor/cloudflared`
-- [ ] Verify non-FIPS standard build of cloudflared
-- [ ] Verify CI pipeline installs cloudflared before running integration tests
-- [ ] Verify string resources are complete and correctly referenced
-- [ ] Run `make lint` one final time
-- [ ] Run `make test-unit` one final time
-- [ ] Run `./gradlew build` one final time
-- [ ] Verify no TODOs, no dead code, no temporary hacks
-- [ ] Verify git diff is clean and all changes are committed
+- [x] Re-read every new file and verify it matches the plan
+- [x] Re-read every modified file and verify changes are correct and minimal
+- [x] Verify all new classes have proper KDoc comments
+- [x] Verify all new settings are persisted correctly (write + read + defaults)
+- [x] Verify `TunnelProvider` interface is clean and minimal (`start(localPort, config)` signature)
+- [x] Verify `CloudflaredBinaryResolver` interface and `AndroidCloudflareBinaryResolver` impl are correct
+- [x] Verify `CloudflareTunnelProvider` handles all edge cases (binary not found, process crash, timeout)
+- [x] Verify `NgrokTunnelProvider` handles all edge cases (invalid token, unsupported ABI, network error)
+- [x] Verify `NgrokTunnelProvider` does NOT inject `SettingsRepository` (receives config via `start()`)
+- [x] Verify `TunnelManager` correctly relays status from active provider (with its own coroutine scope and relay job)
+- [x] Verify `TunnelManager` uses `javax.inject.Provider<T>` factories for fresh provider instances
+- [x] Verify `McpServerService` starts tunnel AFTER server and stops tunnel BEFORE server
+- [x] Verify `onDestroy()` has `withTimeout(3_000L)` for tunnel stop — no ANR risk
+- [x] Verify tunnel failure does NOT prevent MCP server from running locally
+- [x] Verify tunnel URL is logged to **logcat** when connected
+- [x] Verify tunnel URL is logged to **UI server logs** via companion-level `serverLogEvents` SharedFlow on `McpServerService`
+- [x] Verify `McpServerService` has companion `serverLogEvents: SharedFlow<ServerLogEntry>` and instance `emitLogEntry()` helper
+- [x] Verify `MainViewModel` collects `McpServerService.serverLogEvents` in `init` and feeds entries into `addServerLogEntry()`
+- [x] Verify `ServerLogEntry` has `Type` enum (TOOL_CALL, TUNNEL, SERVER)
+- [x] Verify `ServerLogsSection.kt` / `ServerLogEntryRow` handles all three entry types (TOOL_CALL shows toolName/params/duration, TUNNEL/SERVER shows message)
+- [x] Verify `CloudflareTunnelProvider.start()` suppresses unused `config` parameter warning
+- [x] Verify UI shows correct state for all tunnel statuses (Disconnected, Connecting, Connected, Error)
+- [x] Verify provider selector uses **RadioButtons with description tags** (not SegmentedButtons)
+- [x] Verify ngrok authtoken field uses password transformation (hidden by default)
+- [x] Verify all settings are disabled when server is running
+- [x] Verify `ConnectionInfoCard` shows tunnel URL, has Share button, and preview compiles
+- [x] Verify `MainViewModel` has `shareText()` method using `Intent.ACTION_SEND`
+- [x] Verify `RemoteAccessSection` does NOT have a copy/share button (handled by ConnectionInfoCard)
+- [x] Verify `ServerConfig` has NO unnecessary import for `TunnelProviderType` (same package)
+- [x] Verify Plan 12 cross-impacts: `McpServerService` diffs anchored in post-plan-12 code (no `protocolHandler`, no `toolRegistry`, `registerAllTools(server)` signature)
+- [x] Verify Plan 12 cross-impacts: Cloudflare tunnel integration test does NOT reference `/health` endpoint (removed by Plan 12)
+- [x] Verify Plan 12 cross-impacts: `docs/PROJECT.md` server logs description updated from "recent MCP requests" to include tunnel events
+- [x] Verify cloudflared git submodule is pinned to correct tag in `vendor/cloudflared`
+- [x] Verify non-FIPS standard build of cloudflared
+- [x] Verify CI pipeline installs cloudflared before running integration tests
+- [x] Verify string resources are complete and correctly referenced
+- [x] Run `make lint` one final time
+- [x] Run `make test-unit` one final time
+- [x] Run `./gradlew build` one final time
+- [x] Verify no TODOs, no dead code, no temporary hacks
+- [x] Verify git diff is clean and all changes are committed
 
 **Definition of Done**:
-- [ ] All items above checked and passing
+- [x] All items above checked and passing
