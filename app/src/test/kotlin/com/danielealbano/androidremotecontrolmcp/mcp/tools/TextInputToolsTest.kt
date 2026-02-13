@@ -7,15 +7,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
+import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -36,7 +35,7 @@ import org.junit.jupiter.api.assertThrows
 class TextInputToolsTest {
     private val mockTreeParser = mockk<AccessibilityTreeParser>()
     private val mockActionExecutor = mockk<ActionExecutor>()
-    private val mockService = mockk<McpAccessibilityService>()
+    private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockFocusedNode = mockk<AccessibilityNodeInfo>()
 
@@ -62,22 +61,21 @@ class TextInputToolsTest {
 
     @BeforeEach
     fun setUp() {
-        mockkObject(McpAccessibilityService.Companion)
-        every { McpAccessibilityService.instance } returns mockService
-        every { mockService.getRootNode() } returns mockRootNode
+        every { mockAccessibilityServiceProvider.isReady() } returns true
+        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
         every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
     }
 
     @AfterEach
     fun tearDown() {
-        unmockkObject(McpAccessibilityService.Companion)
+        unmockkAll()
     }
 
     @Nested
     @DisplayName("InputTextTool")
     inner class InputTextToolTests {
-        private val tool = InputTextTool(mockTreeParser, mockActionExecutor)
+        private val tool = InputTextTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `inputs text on specified element`() =
@@ -124,7 +122,7 @@ class TextInputToolsTest {
     @Nested
     @DisplayName("ClearTextTool")
     inner class ClearTextToolTests {
-        private val tool = ClearTextTool(mockTreeParser, mockActionExecutor)
+        private val tool = ClearTextTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `clears text on specified element`() =
@@ -155,7 +153,7 @@ class TextInputToolsTest {
     @Nested
     @DisplayName("PressKeyTool")
     inner class PressKeyToolTests {
-        private val tool = PressKeyTool(mockActionExecutor)
+        private val tool = PressKeyTool(mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `presses BACK key`() =

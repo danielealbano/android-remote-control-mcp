@@ -6,18 +6,17 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
+import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -40,7 +39,7 @@ class ElementActionToolsTest {
     private val mockTreeParser = mockk<AccessibilityTreeParser>()
     private val mockElementFinder = mockk<ElementFinder>()
     private val mockActionExecutor = mockk<ActionExecutor>()
-    private val mockService = mockk<McpAccessibilityService>()
+    private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
 
     private val sampleTree =
@@ -89,22 +88,20 @@ class ElementActionToolsTest {
 
     @BeforeEach
     fun setUp() {
-        mockkObject(McpAccessibilityService.Companion)
-        every { McpAccessibilityService.instance } returns mockService
-        every { mockService.getRootNode() } returns mockRootNode
+        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
         every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
     }
 
     @AfterEach
     fun tearDown() {
-        unmockkObject(McpAccessibilityService.Companion)
+        unmockkAll()
     }
 
     @Nested
     @DisplayName("FindElementsTool")
     inner class FindElementsToolTests {
-        private val tool = FindElementsTool(mockTreeParser, mockElementFinder)
+        private val tool = FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
 
         @Test
         fun `returns matching elements`() =
@@ -194,7 +191,7 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("ClickElementTool")
     inner class ClickElementToolTests {
-        private val tool = ClickElementTool(mockTreeParser, mockActionExecutor)
+        private val tool = ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `clicks element successfully`() =
@@ -242,7 +239,7 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("LongClickElementTool")
     inner class LongClickElementToolTests {
-        private val tool = LongClickElementTool(mockTreeParser, mockActionExecutor)
+        private val tool = LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `long-clicks element successfully`() =
@@ -259,7 +256,7 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("SetTextTool")
     inner class SetTextToolTests {
-        private val tool = SetTextTool(mockTreeParser, mockActionExecutor)
+        private val tool = SetTextTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `sets text on element`() =
@@ -316,7 +313,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("ScrollToElementTool")
     inner class ScrollToElementToolTests {
-        private val tool = ScrollToElementTool(mockTreeParser, mockElementFinder, mockActionExecutor)
+        private val tool =
+            ScrollToElementTool(mockTreeParser, mockElementFinder, mockActionExecutor, mockAccessibilityServiceProvider)
 
         @Test
         fun `returns immediately when element already visible`() =

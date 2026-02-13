@@ -438,8 +438,10 @@ class ScrollTool
  *
  * Called from [McpServerService.startServer] during server startup.
  */
-fun registerTouchActionTools(toolRegistry: ToolRegistry) {
-    val actionExecutor = ActionExecutor()
+fun registerTouchActionTools(
+    toolRegistry: ToolRegistry,
+    actionExecutor: ActionExecutor,
+) {
     TapTool(actionExecutor).register(toolRegistry)
     LongPressTool(actionExecutor).register(toolRegistry)
     DoubleTapTool(actionExecutor).register(toolRegistry)

@@ -3,10 +3,10 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
-import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -38,22 +38,18 @@ class GetAccessibilityTreeHandler
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            val service =
-                McpAccessibilityService.instance
-                    ?: throw McpToolException.PermissionDenied(
-                        "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
-                    )
-
-            if (!service.isReady()) {
+            if (!accessibilityServiceProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
-                    "Accessibility service is not ready. No active window available.",
+                    "Accessibility service not enabled or not ready. " +
+                        "Please enable it in Android Settings > Accessibility.",
                 )
             }
 
             val rootNode =
-                service.getRootNode()
+                accessibilityServiceProvider.getRootNode()
                     ?: throw McpToolException.ActionFailed(
                         "Failed to obtain root accessibility node.",
                     )
@@ -116,23 +112,19 @@ class GetAccessibilityTreeHandler
  */
 class CaptureScreenshotHandler
     @Inject
-    constructor() : ToolHandler {
+    constructor(
+        private val screenCaptureProvider: ScreenCaptureProvider,
+    ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val quality = parseQuality(params)
 
-            val screenCaptureService =
-                McpServerService.instance?.getScreenCaptureService()
-                    ?: throw McpToolException.PermissionDenied(
-                        "Screen capture service is not available. Ensure the MCP server is running.",
-                    )
-
-            if (!screenCaptureService.isMediaProjectionActive()) {
+            if (!screenCaptureProvider.isMediaProjectionActive()) {
                 throw McpToolException.PermissionDenied(
                     "MediaProjection permission not granted. Please grant screen capture permission in the app.",
                 )
             }
 
-            val result = screenCaptureService.captureScreenshot(quality)
+            val result = screenCaptureProvider.captureScreenshot(quality)
             val screenshotData =
                 result.getOrElse { exception ->
                     throw McpToolException.ActionFailed(
@@ -210,16 +202,18 @@ class CaptureScreenshotHandler
  */
 class GetCurrentAppHandler
     @Inject
-    constructor() : ToolHandler {
+    constructor(
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+    ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            val service =
-                McpAccessibilityService.instance
-                    ?: throw McpToolException.PermissionDenied(
-                        "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
-                    )
+            if (!accessibilityServiceProvider.isReady()) {
+                throw McpToolException.PermissionDenied(
+                    "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
+                )
+            }
 
-            val packageName = service.getCurrentPackageName() ?: "unknown"
-            val activityName = service.getCurrentActivityName() ?: "unknown"
+            val packageName = accessibilityServiceProvider.getCurrentPackageName() ?: "unknown"
+            val activityName = accessibilityServiceProvider.getCurrentActivityName() ?: "unknown"
 
             val resultJson =
                 buildJsonObject {
@@ -264,15 +258,11 @@ class GetCurrentAppHandler
  */
 class GetScreenInfoHandler
     @Inject
-    constructor() : ToolHandler {
+    constructor(
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+    ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            val service =
-                McpAccessibilityService.instance
-                    ?: throw McpToolException.PermissionDenied(
-                        "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
-                    )
-
-            val screenInfo = service.getScreenInfo()
+            val screenInfo = accessibilityServiceProvider.getScreenInfo()
             val resultJson =
                 Json.encodeToString(
                     ScreenInfo.serializer(),
@@ -310,10 +300,14 @@ class GetScreenInfoHandler
  *
  * Called from [McpServerService.startServer] during server startup.
  */
-fun registerScreenIntrospectionTools(toolRegistry: ToolRegistry) {
-    val treeParser = AccessibilityTreeParser()
-    GetAccessibilityTreeHandler(treeParser).register(toolRegistry)
-    CaptureScreenshotHandler().register(toolRegistry)
-    GetCurrentAppHandler().register(toolRegistry)
-    GetScreenInfoHandler().register(toolRegistry)
+fun registerScreenIntrospectionTools(
+    toolRegistry: ToolRegistry,
+    treeParser: AccessibilityTreeParser,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+    screenCaptureProvider: ScreenCaptureProvider,
+) {
+    GetAccessibilityTreeHandler(treeParser, accessibilityServiceProvider).register(toolRegistry)
+    CaptureScreenshotHandler(screenCaptureProvider).register(toolRegistry)
+    GetCurrentAppHandler(accessibilityServiceProvider).register(toolRegistry)
+    GetScreenInfoHandler(accessibilityServiceProvider).register(toolRegistry)
 }

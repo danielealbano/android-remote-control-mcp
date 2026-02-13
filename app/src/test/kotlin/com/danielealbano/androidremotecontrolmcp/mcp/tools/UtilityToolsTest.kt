@@ -4,22 +4,22 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
 import io.mockk.mockkStatic
-import io.mockk.unmockkObject
+import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
@@ -43,9 +43,10 @@ import org.junit.jupiter.api.assertThrows
 class UtilityToolsTest {
     private val mockTreeParser = mockk<AccessibilityTreeParser>()
     private val mockElementFinder = mockk<ElementFinder>()
-    private val mockService = mockk<McpAccessibilityService>()
+    private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockClipboardManager = mockk<ClipboardManager>()
+    private val mockContext = mockk<Context>()
 
     private val sampleTree =
         AccessibilityNodeData(
@@ -81,23 +82,22 @@ class UtilityToolsTest {
 
     @BeforeEach
     fun setUp() {
-        mockkObject(McpAccessibilityService.Companion)
-        every { McpAccessibilityService.instance } returns mockService
-        every { mockService.getRootNode() } returns mockRootNode
-        every { mockService.getSystemService(ClipboardManager::class.java) } returns mockClipboardManager
+        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
+        every { mockAccessibilityServiceProvider.getContext() } returns mockContext
+        every { mockContext.getSystemService(ClipboardManager::class.java) } returns mockClipboardManager
         every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
     }
 
     @AfterEach
     fun tearDown() {
-        unmockkObject(McpAccessibilityService.Companion)
+        unmockkAll()
     }
 
     @Nested
     @DisplayName("GetClipboardTool")
     inner class GetClipboardToolTests {
-        private val tool = GetClipboardTool()
+        private val tool = GetClipboardTool(mockAccessibilityServiceProvider)
 
         @Test
         fun `returns clipboard text`() =
@@ -133,7 +133,7 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("SetClipboardTool")
     inner class SetClipboardToolTests {
-        private val tool = SetClipboardTool()
+        private val tool = SetClipboardTool(mockAccessibilityServiceProvider)
 
         @Test
         fun `sets clipboard text`() =
@@ -160,7 +160,7 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForElementTool")
     inner class WaitForElementToolTests {
-        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder)
+        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
 
         @Test
         fun `finds element on first attempt`() =
@@ -292,7 +292,7 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForIdleTool")
     inner class WaitForIdleToolTests {
-        private val tool = WaitForIdleTool(mockTreeParser)
+        private val tool = WaitForIdleTool(mockTreeParser, mockAccessibilityServiceProvider)
 
         @Test
         fun `detects idle when tree does not change`() =

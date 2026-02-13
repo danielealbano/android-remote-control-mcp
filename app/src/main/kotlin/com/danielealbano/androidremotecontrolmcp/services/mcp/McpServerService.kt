@@ -25,6 +25,11 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -61,6 +66,16 @@ class McpServerService : Service() {
     @Inject lateinit var certificateManager: CertificateManager
 
     @Inject lateinit var toolRegistry: ToolRegistry
+
+    @Inject lateinit var actionExecutor: ActionExecutor
+
+    @Inject lateinit var accessibilityServiceProvider: AccessibilityServiceProvider
+
+    @Inject lateinit var screenCaptureProvider: ScreenCaptureProvider
+
+    @Inject lateinit var treeParser: AccessibilityTreeParser
+
+    @Inject lateinit var elementFinder: ElementFinder
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -146,13 +161,7 @@ class McpServerService : Service() {
                 }
 
             // Register all MCP tools before starting the server
-            registerScreenIntrospectionTools(toolRegistry)
-            registerSystemActionTools(toolRegistry)
-            registerTouchActionTools(toolRegistry)
-            registerGestureTools(toolRegistry)
-            registerElementActionTools(toolRegistry)
-            registerTextInputTools(toolRegistry)
-            registerUtilityTools(toolRegistry)
+            registerAllTools()
 
             // Create and start the Ktor server
             mcpServer =
@@ -177,6 +186,27 @@ class McpServerService : Service() {
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
             serverStarting.set(false)
         }
+    }
+
+    private fun registerAllTools() {
+        registerScreenIntrospectionTools(
+            toolRegistry,
+            treeParser,
+            accessibilityServiceProvider,
+            screenCaptureProvider,
+        )
+        registerSystemActionTools(toolRegistry, actionExecutor, accessibilityServiceProvider)
+        registerTouchActionTools(toolRegistry, actionExecutor)
+        registerGestureTools(toolRegistry, actionExecutor)
+        registerElementActionTools(
+            toolRegistry,
+            treeParser,
+            elementFinder,
+            actionExecutor,
+            accessibilityServiceProvider,
+        )
+        registerTextInputTools(toolRegistry, treeParser, actionExecutor, accessibilityServiceProvider)
+        registerUtilityTools(toolRegistry, treeParser, elementFinder, accessibilityServiceProvider)
     }
 
     override fun onDestroy() {
