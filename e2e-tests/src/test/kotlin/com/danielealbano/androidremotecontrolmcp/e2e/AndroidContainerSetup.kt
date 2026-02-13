@@ -24,6 +24,8 @@ object AndroidContainerSetup {
     private const val ADB_FORWARD_PORT = 18080
 
     private const val APP_PACKAGE = "com.danielealbano.androidremotecontrolmcp.debug"
+    private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
+    private const val CALCULATOR_APK_RESOURCE = "/simple-calculator.apk"
     private const val E2E_CONFIG_RECEIVER_CLASS =
         "com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver"
     private const val ACCESSIBILITY_SERVICE_CLASS =
@@ -195,6 +197,61 @@ object AndroidContainerSetup {
         }
 
         println("[E2E Setup] APK installed successfully")
+    }
+
+    /**
+     * Install the Simple Calculator APK for E2E testing.
+     *
+     * The calculator APK is bundled as a test resource and is used for
+     * interaction tests (e.g., calculate 7 + 3 = 10).
+     *
+     * @param container the running Docker container
+     */
+    fun installCalculatorApk(container: GenericContainer<*>) {
+        println("[E2E Setup] Installing calculator APK for testing...")
+
+        // Load calculator APK from test resources
+        val resourceStream = AndroidContainerSetup::class.java.getResourceAsStream(CALCULATOR_APK_RESOURCE)
+            ?: throw IllegalStateException("Calculator APK not found in test resources: $CALCULATOR_APK_RESOURCE")
+
+        // Write to a temp file
+        val tempFile = File.createTempFile("calculator", ".apk")
+        tempFile.deleteOnExit()
+        resourceStream.use { input ->
+            tempFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        // Copy APK into container
+        container.copyFileToContainer(
+            org.testcontainers.utility.MountableFile.forHostPath(tempFile.absolutePath),
+            "/tmp/calculator.apk"
+        )
+
+        // Install via adb
+        val result = execInContainer(container, "adb", "install", "-r", "/tmp/calculator.apk")
+        if (!result.contains("Success")) {
+            throw IllegalStateException("Calculator APK installation failed: $result")
+        }
+
+        println("[E2E Setup] Calculator APK installed successfully")
+    }
+
+    /**
+     * Launch the calculator app using monkey command.
+     *
+     * @param container the running Docker container
+     */
+    fun launchCalculator(container: GenericContainer<*>) {
+        execInContainer(
+            container,
+            "adb", "shell", "monkey",
+            "-p", CALCULATOR_PACKAGE,
+            "-c", "android.intent.category.LAUNCHER",
+            "1"
+        )
+        Thread.sleep(2_000)
     }
 
     /**

@@ -76,6 +76,9 @@ object SharedAndroidContainer {
                 // Install APK
                 AndroidContainerSetup.installApk(c, apkPath)
 
+                // Install calculator APK for E2E interaction tests
+                AndroidContainerSetup.installCalculatorApk(c)
+
                 // Configure server settings (binding 0.0.0.0, known bearer token)
                 // NOTE: This step force-stops the app to flush DataStore, which disconnects
                 // any accessibility service. Therefore, accessibility must be enabled AFTER
