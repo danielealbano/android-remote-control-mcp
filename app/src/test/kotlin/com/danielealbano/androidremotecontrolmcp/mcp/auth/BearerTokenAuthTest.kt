@@ -9,7 +9,6 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
-import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import io.mockk.every
@@ -108,11 +107,9 @@ class BearerTokenAuthTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
                 routing {
-                    route("/protected") {
-                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
-                        get("/resource") { call.respondText("OK") }
-                    }
+                    get("/protected/resource") { call.respondText("OK") }
                 }
             }
 
@@ -125,11 +122,9 @@ class BearerTokenAuthTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
                 routing {
-                    route("/protected") {
-                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
-                        get("/resource") { call.respondText("OK") }
-                    }
+                    get("/protected/resource") { call.respondText("OK") }
                 }
             }
 
@@ -145,11 +140,9 @@ class BearerTokenAuthTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
                 routing {
-                    route("/protected") {
-                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
-                        get("/resource") { call.respondText("OK") }
-                    }
+                    get("/protected/resource") { call.respondText("OK") }
                 }
             }
 
@@ -165,11 +158,9 @@ class BearerTokenAuthTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
                 routing {
-                    route("/protected") {
-                        install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
-                        get("/resource") { call.respondText("OK") }
-                    }
+                    get("/protected/resource") { call.respondText("OK") }
                 }
             }
 

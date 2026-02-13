@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -301,9 +303,9 @@ class McpToolUtilsTest {
         @DisplayName("returns text content on success")
         fun returnsTextContentOnSuccess() {
             val result = McpToolUtils.handleActionResult(Result.success(Unit), "Action done")
-            val text =
-                result.toString()
-            assertTrue(text.contains("Action done"))
+            assertEquals(1, result.content.size)
+            val textContent = result.content[0] as TextContent
+            assertEquals("Action done", textContent.text)
         }
 
         @Test
@@ -326,6 +328,50 @@ class McpToolUtilsTest {
                     McpToolUtils.handleActionResult(result, "Action done")
                 }
             assertTrue(exception.message!!.contains("Something broke"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // textResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("textResult")
+    inner class TextResultTests {
+        @Test
+        @DisplayName("returns CallToolResult with TextContent")
+        fun returnsCallToolResultWithTextContent() {
+            val result = McpToolUtils.textResult("Hello world")
+            assertEquals(1, result.content.size)
+            val textContent = result.content[0] as TextContent
+            assertEquals("Hello world", textContent.text)
+        }
+
+        @Test
+        @DisplayName("returns CallToolResult with empty text")
+        fun returnsCallToolResultWithEmptyText() {
+            val result = McpToolUtils.textResult("")
+            assertEquals(1, result.content.size)
+            val textContent = result.content[0] as TextContent
+            assertEquals("", textContent.text)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // imageResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("imageResult")
+    inner class ImageResultTests {
+        @Test
+        @DisplayName("returns CallToolResult with ImageContent")
+        fun returnsCallToolResultWithImageContent() {
+            val result = McpToolUtils.imageResult(data = "base64data", mimeType = "image/jpeg")
+            assertEquals(1, result.content.size)
+            val imageContent = result.content[0] as ImageContent
+            assertEquals("base64data", imageContent.data)
+            assertEquals("image/jpeg", imageContent.mimeType)
         }
     }
 }
