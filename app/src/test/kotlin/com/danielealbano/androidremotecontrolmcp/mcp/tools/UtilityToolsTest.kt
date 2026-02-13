@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -22,11 +21,11 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -68,16 +67,10 @@ class UtilityToolsTest {
             enabled = true,
         )
 
-    /**
-     * Extracts the text content from a standard MCP response.
-     * Expected format: { "content": [{ "type": "text", "text": "..." }] }
-     */
-    private fun extractTextContent(result: JsonElement): String {
-        val content = result.jsonObject["content"]!!.jsonArray
-        assertEquals(1, content.size)
-        val item = content[0].jsonObject
-        assertEquals("text", item["type"]!!.jsonPrimitive.content)
-        return item["text"]!!.jsonPrimitive.content
+    private fun extractTextContent(result: CallToolResult): String {
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        return textContent.text ?: ""
     }
 
     @BeforeEach
@@ -152,8 +145,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 
@@ -190,8 +182,7 @@ class UtilityToolsTest {
                         put("value", "test")
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -203,8 +194,7 @@ class UtilityToolsTest {
                         put("value", "")
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -218,7 +208,6 @@ class UtilityToolsTest {
                     }
 
                 val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("Timeout must be between"))
             }
 
@@ -232,8 +221,7 @@ class UtilityToolsTest {
                         put("timeout", -1)
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -261,7 +249,7 @@ class UtilityToolsTest {
             }
 
         @Test
-        fun `throws timeout when element never found`() =
+        fun `returns timed out message when element never found`() =
             runTest {
                 mockkStatic(SystemClock::class)
                 try {
@@ -280,9 +268,9 @@ class UtilityToolsTest {
                             put("timeout", 2000)
                         }
 
-                    val exception = assertThrows<McpToolException> { tool.execute(params) }
-                    assertEquals(McpProtocolHandler.ERROR_TIMEOUT, exception.code)
-                    assertTrue(exception.message!!.contains("Element not found within"))
+                    val result = tool.execute(params)
+                    val text = extractTextContent(result)
+                    assertTrue(text.contains("timed out"))
                 } finally {
                     unmockkStatic(SystemClock::class)
                 }
@@ -311,8 +299,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject { put("timeout", 50000) }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -320,8 +307,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject { put("timeout", 0) }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 }

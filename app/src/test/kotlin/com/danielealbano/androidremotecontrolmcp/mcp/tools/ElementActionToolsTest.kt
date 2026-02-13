@@ -3,7 +3,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -17,9 +16,10 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -74,16 +74,10 @@ class ElementActionToolsTest {
             enabled = true,
         )
 
-    /**
-     * Extracts the text content from a standard MCP response.
-     * Expected format: { "content": [{ "type": "text", "text": "..." }] }
-     */
-    private fun extractTextContent(result: JsonElement): String {
-        val content = result.jsonObject["content"]!!.jsonArray
-        assertEquals(1, content.size)
-        val item = content[0].jsonObject
-        assertEquals("text", item["type"]!!.jsonPrimitive.content)
-        return item["text"]!!.jsonPrimitive.content
+    private fun extractTextContent(result: CallToolResult): String {
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        return textContent.text ?: ""
     }
 
     @BeforeEach
@@ -160,7 +154,6 @@ class ElementActionToolsTest {
                     }
 
                 val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("Invalid 'by' value"))
             }
 
@@ -174,7 +167,6 @@ class ElementActionToolsTest {
                     }
 
                 val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("non-empty"))
             }
 
@@ -183,8 +175,7 @@ class ElementActionToolsTest {
             runTest {
                 val params = buildJsonObject { put("value", "test") }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 
@@ -211,8 +202,7 @@ class ElementActionToolsTest {
                     Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_ELEMENT_NOT_FOUND, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -222,8 +212,7 @@ class ElementActionToolsTest {
                     Result.failure(IllegalStateException("Node 'node_abc' is not clickable"))
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
 
         @Test
@@ -231,8 +220,7 @@ class ElementActionToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 
@@ -305,8 +293,7 @@ class ElementActionToolsTest {
                         put("text", "Hi")
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_ACTION_FAILED, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 
@@ -334,8 +321,7 @@ class ElementActionToolsTest {
                 every { mockElementFinder.findNodeById(sampleTree, "node_xyz") } returns null
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_ELEMENT_NOT_FOUND, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 }

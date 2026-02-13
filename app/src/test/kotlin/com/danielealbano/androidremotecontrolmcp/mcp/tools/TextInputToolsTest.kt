@@ -4,7 +4,6 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
-import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -16,11 +15,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -47,16 +44,10 @@ class TextInputToolsTest {
             visible = true,
         )
 
-    /**
-     * Extracts the text content from a standard MCP response.
-     * Expected format: { "content": [{ "type": "text", "text": "..." }] }
-     */
-    private fun extractTextContent(result: JsonElement): String {
-        val content = result.jsonObject["content"]!!.jsonArray
-        assertEquals(1, content.size)
-        val item = content[0].jsonObject
-        assertEquals("text", item["type"]!!.jsonPrimitive.content)
-        return item["text"]!!.jsonPrimitive.content
+    private fun extractTextContent(result: CallToolResult): String {
+        assertEquals(1, result.content.size)
+        val textContent = result.content[0] as TextContent
+        return textContent.text ?: ""
     }
 
     @BeforeEach
@@ -114,8 +105,7 @@ class TextInputToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 
@@ -213,7 +203,6 @@ class TextInputToolsTest {
                 val params = buildJsonObject { put("key", "ESCAPE") }
 
                 val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
                 assertTrue(exception.message!!.contains("Invalid key"))
             }
 
@@ -222,8 +211,7 @@ class TextInputToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
-                assertEquals(McpProtocolHandler.ERROR_INVALID_PARAMS, exception.code)
+                assertThrows<McpToolException> { tool.execute(params) }
             }
     }
 }
