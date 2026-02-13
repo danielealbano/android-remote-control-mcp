@@ -14,10 +14,13 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -32,6 +35,7 @@ class MainViewModel
     @Inject
     constructor(
         private val settingsRepository: SettingsRepository,
+        private val tunnelManager: TunnelManager,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _serverConfig = MutableStateFlow(ServerConfig())
@@ -61,12 +65,23 @@ class MainViewModel
         private val _isNotificationPermissionGranted = MutableStateFlow(false)
         val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
 
+        private val _tunnelStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
+        val tunnelStatus: StateFlow<TunnelStatus> = _tunnelStatus.asStateFlow()
+
+        private val _ngrokAuthtokenInput = MutableStateFlow("")
+        val ngrokAuthtokenInput: StateFlow<String> = _ngrokAuthtokenInput.asStateFlow()
+
+        private val _ngrokDomainInput = MutableStateFlow("")
+        val ngrokDomainInput: StateFlow<String> = _ngrokDomainInput.asStateFlow()
+
         init {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.serverConfig.collect { config ->
                     _serverConfig.value = config
                     _portInput.value = config.port.toString()
                     _hostnameInput.value = config.certificateHostname
+                    _ngrokAuthtokenInput.value = config.ngrokAuthtoken
+                    _ngrokDomainInput.value = config.ngrokDomain
                 }
             }
 
@@ -76,6 +91,19 @@ class MainViewModel
             viewModelScope.launch {
                 McpServerService.serverStatus.collect { status ->
                     _serverStatus.value = status
+                }
+            }
+
+            viewModelScope.launch {
+                tunnelManager.tunnelStatus.collect { status ->
+                    _tunnelStatus.value = status
+                }
+            }
+
+            // Collect server log events emitted by McpServerService
+            viewModelScope.launch {
+                McpServerService.serverLogEvents.collect { entry ->
+                    addServerLogEntry(entry)
                 }
             }
         }
@@ -192,6 +220,47 @@ class MainViewModel
                 )
             _isNotificationPermissionGranted.value =
                 PermissionUtils.isNotificationPermissionGranted(context)
+        }
+
+        fun updateTunnelEnabled(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateTunnelEnabled(enabled)
+            }
+        }
+
+        fun updateTunnelProvider(provider: TunnelProviderType) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateTunnelProvider(provider)
+            }
+        }
+
+        fun updateNgrokAuthtoken(authtoken: String) {
+            _ngrokAuthtokenInput.value = authtoken
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateNgrokAuthtoken(authtoken)
+            }
+        }
+
+        fun updateNgrokDomain(domain: String) {
+            _ngrokDomainInput.value = domain
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateNgrokDomain(domain)
+            }
+        }
+
+        fun shareText(
+            context: Context,
+            text: String,
+        ) {
+            val sendIntent =
+                Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, text)
+                    type = "text/plain"
+                }
+            val shareIntent = Intent.createChooser(sendIntent, null)
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
         }
 
         fun addServerLogEntry(entry: ServerLogEntry) {

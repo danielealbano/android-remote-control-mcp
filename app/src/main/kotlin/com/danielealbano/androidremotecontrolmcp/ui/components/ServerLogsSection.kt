@@ -80,49 +80,94 @@ private fun ServerLogEntryRow(entry: ServerLogEntry) {
     val timeFormat = SimpleDateFormat(TIME_FORMAT_PATTERN, Locale.getDefault())
     val timeString = timeFormat.format(Date(entry.timestamp))
 
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = timeString,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = entry.toolName,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "${entry.durationMs}ms",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    if (entry.params.isNotEmpty()) {
-        Text(
-            text = entry.params,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 56.dp, bottom = 4.dp),
-        )
+    when (entry.type) {
+        ServerLogEntry.Type.TOOL_CALL -> {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = entry.toolName ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${entry.durationMs ?: 0}ms",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!entry.params.isNullOrEmpty()) {
+                Text(
+                    text = entry.params,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 56.dp, bottom = 4.dp),
+                )
+            }
+        }
+        ServerLogEntry.Type.TUNNEL,
+        ServerLogEntry.Type.SERVER -> {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = entry.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun ServerLogsSectionEmptyPreview() {
+private fun ServerLogsSectionPreview() {
     AndroidRemoteControlMcpTheme {
-        ServerLogsSection(logs = emptyList())
+        ServerLogsSection(
+            logs =
+                listOf(
+                    ServerLogEntry(
+                        timestamp = System.currentTimeMillis(),
+                        type = ServerLogEntry.Type.TOOL_CALL,
+                        message = "tap",
+                        toolName = "tap",
+                        params = """{"x": 500, "y": 800}""",
+                        durationMs = 42,
+                    ),
+                    ServerLogEntry(
+                        timestamp = System.currentTimeMillis(),
+                        type = ServerLogEntry.Type.TUNNEL,
+                        message = "Tunnel connected: https://random-words.trycloudflare.com",
+                    ),
+                ),
+        )
     }
 }

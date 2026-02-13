@@ -9,8 +9,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.danielealbano.androidremotecontrolmcp.McpApplication
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
@@ -35,11 +38,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
@@ -69,6 +77,8 @@ class McpServerService : Service() {
     @Inject lateinit var treeParser: AccessibilityTreeParser
 
     @Inject lateinit var elementFinder: ElementFinder
+
+    @Inject lateinit var tunnelManager: TunnelManager
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -166,6 +176,48 @@ class McpServerService : Service() {
                 ),
             )
 
+            // Start tunnel if remote access is enabled
+            @Suppress("TooGenericExceptionCaught")
+            try {
+                tunnelManager.start(config.port)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to start tunnel (server continues without tunnel)", e)
+            }
+
+            // Observe tunnel status for logging
+            coroutineScope.launch {
+                tunnelManager.tunnelStatus.collect { status ->
+                    when (status) {
+                        is TunnelStatus.Connected -> {
+                            Log.i(TAG, "Tunnel connected: ${status.url} (provider: ${status.providerType})")
+                            emitLogEntry(
+                                ServerLogEntry(
+                                    timestamp = System.currentTimeMillis(),
+                                    type = ServerLogEntry.Type.TUNNEL,
+                                    message = "Tunnel connected: ${status.url}",
+                                ),
+                            )
+                        }
+                        is TunnelStatus.Error -> {
+                            Log.w(TAG, "Tunnel error: ${status.message}")
+                            emitLogEntry(
+                                ServerLogEntry(
+                                    timestamp = System.currentTimeMillis(),
+                                    type = ServerLogEntry.Type.TUNNEL,
+                                    message = "Tunnel error: ${status.message}",
+                                ),
+                            )
+                        }
+                        is TunnelStatus.Connecting -> {
+                            Log.i(TAG, "Tunnel connecting...")
+                        }
+                        is TunnelStatus.Disconnected -> {
+                            // No-op for initial state; logged at stop time
+                        }
+                    }
+                }
+            }
+
             Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start MCP server", e)
@@ -187,6 +239,20 @@ class McpServerService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "McpServerService destroying")
         updateStatus(ServerStatus.Stopping)
+
+        // Stop tunnel first (with ANR-safe timeout)
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            runBlocking {
+                withTimeout(TUNNEL_STOP_TIMEOUT_MS) {
+                    tunnelManager.stop()
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "Tunnel stop timed out after ${TUNNEL_STOP_TIMEOUT_MS}ms, proceeding with shutdown")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping tunnel", e)
+        }
 
         // Stop the Ktor server gracefully
         @Suppress("TooGenericExceptionCaught")
@@ -219,6 +285,10 @@ class McpServerService : Service() {
         _serverStatus.value = status
     }
 
+    private fun emitLogEntry(entry: ServerLogEntry) {
+        _serverLogEvents.tryEmit(entry)
+    }
+
     private fun createNotification(): Notification {
         val pendingIntent =
             PendingIntent.getActivity(
@@ -243,6 +313,7 @@ class McpServerService : Service() {
         const val NOTIFICATION_ID = 1001
         const val SHUTDOWN_GRACE_PERIOD_MS = 1000L
         const val SHUTDOWN_TIMEOUT_MS = 5000L
+        const val TUNNEL_STOP_TIMEOUT_MS = 3_000L
 
         /**
          * Shared server status flow. Collected by MainViewModel to update the UI.
@@ -251,6 +322,17 @@ class McpServerService : Service() {
          */
         private val _serverStatus = MutableStateFlow<ServerStatus>(ServerStatus.Stopped)
         val serverStatus: StateFlow<ServerStatus> = _serverStatus.asStateFlow()
+
+        /**
+         * Shared server log events flow. Collected by MainViewModel to display
+         * log entries in the UI. Uses a SharedFlow (not StateFlow) because each
+         * event is a discrete emission, not a current-state snapshot.
+         *
+         * extraBufferCapacity = 64 prevents dropped events during brief UI
+         * collection pauses (e.g., during configuration changes).
+         */
+        private val _serverLogEvents = MutableSharedFlow<ServerLogEntry>(extraBufferCapacity = 64)
+        val serverLogEvents: SharedFlow<ServerLogEntry> = _serverLogEvents.asSharedFlow()
 
         @Volatile
         var instance: McpServerService? = null
