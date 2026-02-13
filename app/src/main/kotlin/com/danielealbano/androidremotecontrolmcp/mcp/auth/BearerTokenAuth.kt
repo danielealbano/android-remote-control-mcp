@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.auth
 import android.util.Log
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.response.respondText
 import kotlinx.serialization.Serializable
@@ -36,6 +37,11 @@ class BearerTokenAuthConfig {
  * Uses [MessageDigest.isEqual] for constant-time token comparison to prevent
  * timing side-channel attacks.
  *
+ * Intercepts at [ApplicationCallPipeline.Plugins] and calls
+ * [finish][io.ktor.util.pipeline.PipelineContext.finish] on authentication
+ * failure to prevent downstream route handlers from executing side effects
+ * (e.g., MCP tool dispatch) on unauthenticated requests.
+ *
  * Usage:
  * ```kotlin
  * install(BearerTokenAuthPlugin) {
@@ -50,7 +56,8 @@ val BearerTokenAuthPlugin =
     ) {
         val expectedToken = pluginConfig.expectedToken
 
-        onCall { call ->
+        application.intercept(ApplicationCallPipeline.Plugins) {
+            val call = context
             val authHeader = call.request.headers["Authorization"]
 
             if (authHeader == null) {
@@ -67,7 +74,8 @@ val BearerTokenAuthPlugin =
                     ContentType.Application.Json,
                     HttpStatusCode.Unauthorized,
                 )
-                return@onCall
+                finish()
+                return@intercept
             }
 
             if (!authHeader.startsWith(BEARER_PREFIX, ignoreCase = true)) {
@@ -84,7 +92,8 @@ val BearerTokenAuthPlugin =
                     ContentType.Application.Json,
                     HttpStatusCode.Unauthorized,
                 )
-                return@onCall
+                finish()
+                return@intercept
             }
 
             // Use substring instead of removePrefix to handle case-insensitive "Bearer " prefix
@@ -104,7 +113,8 @@ val BearerTokenAuthPlugin =
                     ContentType.Application.Json,
                     HttpStatusCode.Unauthorized,
                 )
-                return@onCall
+                finish()
+                return@intercept
             }
         }
     }

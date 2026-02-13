@@ -422,8 +422,9 @@ object AndroidContainerSetup {
         var lastError: String? = null
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
+            var conn: java.net.HttpURLConnection? = null
             try {
-                val conn = java.net.URI("$baseUrl/mcp").toURL()
+                conn = java.net.URI("$baseUrl/mcp").toURL()
                     .openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.connectTimeout = 2_000
@@ -449,6 +450,8 @@ object AndroidContainerSetup {
                     println("[E2E Setup] Server readiness poll: $errorMsg")
                     lastError = errorMsg
                 }
+            } finally {
+                conn?.disconnect()
             }
             Thread.sleep(SERVER_READY_POLL_INTERVAL_MS)
         }

@@ -154,6 +154,26 @@ class BearerTokenAuthTest {
         }
 
     @Test
+    fun `plugin prevents route handler execution when auth fails`() =
+        testApplication {
+            var routeHandlerCalled = false
+            application {
+                install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = TEST_TOKEN }
+                routing {
+                    get("/protected/resource") {
+                        routeHandlerCalled = true
+                        call.respondText("OK")
+                    }
+                }
+            }
+
+            val response = client.get("/protected/resource")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertFalse(routeHandlerCalled, "Route handler must not execute when authentication fails")
+        }
+
+    @Test
     fun `plugin allows request with valid token`() =
         testApplication {
             application {
