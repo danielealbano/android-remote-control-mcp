@@ -85,6 +85,9 @@ android {
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -130,6 +133,9 @@ dependencies {
     implementation(libs.bouncy.castle.pkix)
     implementation(libs.bouncy.castle.prov)
 
+    // ngrok tunnel (in-process, JNI-based)
+    implementation(libs.ngrok.java)
+
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk.server)
     runtimeOnly(libs.slf4j.android)
@@ -160,6 +166,36 @@ dependencies {
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
+}
+
+// Extract ngrok-java native library for Android arm64
+val extractNgrokNative by tasks.registering {
+    description = "Extracts ngrok-java native .so for Android arm64 into jniLibs"
+
+    val ngrokNativeConfig = configurations.create("ngrokNativeAndroidArm64") {
+        isTransitive = false
+    }
+    dependencies {
+        ngrokNativeConfig(
+            libs.ngrok.java.native.android.arm64.get().toString() + ":linux-android-aarch_64",
+        )
+    }
+
+    doLast {
+        val targetDir = file("src/main/jniLibs/arm64-v8a")
+        targetDir.mkdirs()
+        ngrokNativeConfig.files.forEach { jar ->
+            zipTree(jar).matching {
+                include("**/*.so")
+            }.forEach { soFile ->
+                soFile.copyTo(File(targetDir, soFile.name), overwrite = true)
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn(extractNgrokNative)
 }
 
 tasks.withType<Test> {
