@@ -12,6 +12,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutorImpl
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.AndroidCloudflareBinaryResolver
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -78,4 +80,7 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindScreenCaptureProvider(impl: ScreenCaptureProviderImpl): ScreenCaptureProvider
+
+    @Binds
+    abstract fun bindCloudflareBinaryResolver(impl: AndroidCloudflareBinaryResolver): CloudflaredBinaryResolver
 }
