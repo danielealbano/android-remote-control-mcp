@@ -116,6 +116,8 @@ class CaptureScreenshotHandler
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val quality = parseQuality(arguments)
+            val maxWidth = parseOptionalPositiveInt(arguments, "width")
+            val maxHeight = parseOptionalPositiveInt(arguments, "height")
 
             if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                 throw McpToolException.PermissionDenied(
@@ -123,7 +125,7 @@ class CaptureScreenshotHandler
                 )
             }
 
-            val result = screenCaptureProvider.captureScreenshot(quality)
+            val result = screenCaptureProvider.captureScreenshot(quality, maxWidth, maxHeight)
             val screenshotData =
                 result.getOrElse { exception ->
                     throw McpToolException.ActionFailed(
@@ -153,6 +155,28 @@ class CaptureScreenshotHandler
             return quality
         }
 
+        @Suppress("SwallowedException", "TooGenericExceptionCaught")
+        private fun parseOptionalPositiveInt(
+            params: JsonObject?,
+            name: String,
+        ): Int? {
+            val element = params?.get(name) ?: return null
+            val value =
+                try {
+                    element.jsonPrimitive.int
+                } catch (e: Exception) {
+                    throw McpToolException.InvalidParams(
+                        "'$name' must be a positive integer, got $element",
+                    )
+                }
+            if (value <= 0) {
+                throw McpToolException.InvalidParams(
+                    "'$name' must be a positive integer, got $value",
+                )
+            }
+            return value
+        }
+
         fun register(server: Server) {
             server.addTool(
                 name = TOOL_NAME,
@@ -166,8 +190,16 @@ class CaptureScreenshotHandler
                                     put("description", "JPEG quality (1-100)")
                                     put("default", DEFAULT_QUALITY)
                                 }
+                                putJsonObject("width") {
+                                    put("type", "integer")
+                                    put("description", "Maximum width in pixels. Image is resized proportionally.")
+                                }
+                                putJsonObject("height") {
+                                    put("type", "integer")
+                                    put("description", "Maximum height in pixels. Image is resized proportionally.")
+                                }
                             },
-                        required = listOf(),
+                        required = emptyList(),
                     ),
             ) { request -> execute(request.arguments) }
         }

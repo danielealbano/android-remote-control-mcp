@@ -104,6 +104,62 @@ class ScreenshotEncoder
             )
         }
 
+        /**
+         * Resizes a [Bitmap] proportionally to fit within the specified dimensions.
+         *
+         * - If both [maxWidth] and [maxHeight] are null, returns the original bitmap unchanged.
+         * - If only [maxWidth] is specified, scales to exactly that width with proportional height.
+         * - If only [maxHeight] is specified, scales to exactly that height with proportional width.
+         * - If both are specified, scales to fit within the bounding box while maintaining aspect ratio.
+         *
+         * Does NOT recycle the input bitmap. If a new bitmap is returned (resize was needed),
+         * the caller is responsible for recycling both the original and the resized bitmap.
+         *
+         * @param bitmap The source bitmap.
+         * @param maxWidth Target maximum width in pixels, or null.
+         * @param maxHeight Target maximum height in pixels, or null.
+         * @return The original bitmap if no resize is needed, or a new scaled bitmap.
+         */
+        fun resizeBitmapProportional(
+            bitmap: Bitmap,
+            maxWidth: Int?,
+            maxHeight: Int?,
+        ): Bitmap {
+            if (maxWidth == null && maxHeight == null) return bitmap
+
+            val originalWidth = bitmap.width
+            val originalHeight = bitmap.height
+
+            val (targetWidth, targetHeight) =
+                when {
+                    maxWidth != null && maxHeight != null -> {
+                        // Fit within bounding box: scale based on the side that needs more reduction
+                        val widthRatio = maxWidth.toFloat() / originalWidth
+                        val heightRatio = maxHeight.toFloat() / originalHeight
+                        val scale = minOf(widthRatio, heightRatio)
+                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
+                    }
+                    maxWidth != null -> {
+                        // Scale to exact width, proportional height
+                        val scale = maxWidth.toFloat() / originalWidth
+                        Pair(maxWidth, (originalHeight * scale).toInt())
+                    }
+                    else -> {
+                        // maxHeight != null: scale to exact height, proportional width
+                        val scale = maxHeight!!.toFloat() / originalHeight
+                        Pair((originalWidth * scale).toInt(), maxHeight)
+                    }
+                }
+
+            // Guard: ensure dimensions are at least 1
+            val safeWidth = targetWidth.coerceAtLeast(1)
+            val safeHeight = targetHeight.coerceAtLeast(1)
+
+            if (safeWidth == originalWidth && safeHeight == originalHeight) return bitmap
+
+            return Bitmap.createScaledBitmap(bitmap, safeWidth, safeHeight, true)
+        }
+
         companion object {
             private const val MIN_QUALITY = 1
             private const val MAX_QUALITY = 100

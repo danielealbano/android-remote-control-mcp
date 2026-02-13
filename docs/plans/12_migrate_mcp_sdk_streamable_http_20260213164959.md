@@ -588,7 +588,7 @@ Additionally, when a timeout occurs, the tools currently throw `McpToolException
 
 #### Action 5.1: Add `resizeBitmapProportional()` to `ScreenshotEncoder`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/screencapture/ScreenshotEncoder.kt`
 
@@ -634,7 +634,7 @@ This method does NOT recycle the input bitmap. The caller must handle recycling 
 
 #### Action 5.2: Update `ScreenCaptureProvider` interface and `ScreenCaptureProviderImpl`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../services/screencapture/ScreenCaptureProvider.kt`
 
@@ -682,7 +682,7 @@ override suspend fun captureScreenshot(
 
 #### Action 5.3: Update `CaptureScreenshotHandler` to extract and pass `width`/`height` params
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/ScreenIntrospectionTools.kt`
 
@@ -726,7 +726,7 @@ private fun parseOptionalPositiveInt(params: JsonObject?, name: String): Int? {
 
 #### Action 5.4: Update `capture_screenshot` tool input schema
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/ScreenIntrospectionTools.kt`
 
