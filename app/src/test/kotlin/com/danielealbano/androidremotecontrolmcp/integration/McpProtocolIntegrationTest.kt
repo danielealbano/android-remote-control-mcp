@@ -154,12 +154,13 @@ class McpProtocolIntegrationTest {
                 assertEquals(HttpStatusCode.OK, response.status)
 
                 val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
+                val error = rpcResponse.error
+                assertNotNull(error)
                 assertEquals(
                     McpProtocolHandler.ERROR_METHOD_NOT_FOUND,
-                    rpcResponse.error!!.code,
+                    error!!.code,
                 )
-                assertTrue(rpcResponse.error!!.message.contains("not found"))
+                assertTrue(error.message.contains("not found"))
             }
         }
 
@@ -209,12 +210,13 @@ class McpProtocolIntegrationTest {
                 assertEquals(HttpStatusCode.OK, response.status)
 
                 val rpcResponse = response.toJsonRpcResponse()
-                assertNotNull(rpcResponse.error)
+                val error = rpcResponse.error
+                assertNotNull(error)
                 assertEquals(
                     McpProtocolHandler.ERROR_INVALID_REQUEST,
-                    rpcResponse.error!!.code,
+                    error!!.code,
                 )
-                assertTrue(rpcResponse.error!!.message.contains("version"))
+                assertTrue(error.message.contains("version"))
             }
         }
 
