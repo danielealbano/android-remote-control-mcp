@@ -29,9 +29,9 @@ import javax.inject.Inject
  * **Input**: `{ "center_x": <number>, "center_y": <number>, "scale": <number>, "duration": <number> }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Pinch (zoom in) executed at (...)" }] }`
  * **Errors**:
- *   - -32602 if parameters are missing or invalid (negative coords, scale <= 0, bad duration)
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if pinch gesture execution failed
+ *   - InvalidParams if parameters are missing or invalid (negative coords, scale <= 0, bad duration)
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if pinch gesture execution failed
  */
 class PinchTool
     @Inject
@@ -116,9 +116,9 @@ class PinchTool
  * **Input**: `{ "paths": [ [ { "x": <n>, "y": <n>, "time": <n> }, ... ], ... ] }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Custom gesture executed with N path(s), ..." }] }`
  * **Errors**:
- *   - -32602 if paths is missing, empty, has < 2 points per path, negative coords/times, or non-monotonic times
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if custom gesture execution failed
+ *   - InvalidParams if paths is missing, empty, has < 2 points per path, negative coords/times, or non-monotonic times
+ *   - PermissionDenied if accessibility service is not enabled
+ *   - ActionFailed if custom gesture execution failed
  */
 class CustomGestureTool
     @Inject

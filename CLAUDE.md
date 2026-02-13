@@ -344,7 +344,7 @@ All references to "tests" in this document mean automated tests (unit tests, int
 - Organize tests in `app/src/test/kotlin/` directory.
 
 **What to unit test**:
-- MCP protocol parsing and response formatting (`McpProtocolHandlerTest`),
+- MCP tool logic and SDK integration (tool unit tests per category),
 - Accessibility tree parsing logic (`AccessibilityTreeParserTest`),
 - Element finding algorithms (`ElementFinderTest`),
 - Screenshot encoding (`ScreenshotEncoderTest`),
@@ -383,13 +383,13 @@ fun `findByText returns matching nodes`() {
 - Organize tests in `app/src/test/kotlin/.../integration/` directory (runs as part of `./gradlew test`).
 
 **What to integration test**:
-- Full HTTP stack: authentication (bearer token), JSON-RPC protocol handling, tool dispatch,
+- Full HTTP stack: authentication (bearer token), Streamable HTTP transport, SDK protocol handling, tool dispatch,
 - All 7 tool categories (touch, element, gesture, screen, system, text, utility),
-- Error code propagation (-32001 through -32004, -32602, -32603).
+- Error handling (tool exceptions returned as `CallToolResult(isError=true)`).
 
 **Mocking strategy**:
 - Mock Android services via extracted interfaces (not concrete classes).
-- Use real `McpProtocolHandler` and `ToolRegistry` (real routing, real dispatching).
+- Use real SDK `Server` with `mcpStreamableHttp` routing (real routing, real dispatching).
 - `McpIntegrationTestHelper` configures `testApplication` mirroring production `McpServer` routing.
 
 **Example**:
@@ -399,14 +399,11 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
     val deps = McpIntegrationTestHelper.createMockDependencies()
     coEvery { deps.actionExecutor.tap(500f, 800f) } returns Result.success(Unit)
 
-    McpIntegrationTestHelper.withTestApplication(deps) { _ ->
-        val response = sendToolCall(
-            toolName = "tap",
-            arguments = buildJsonObject { put("x", 500); put("y", 800) },
-        )
-        assertEquals(HttpStatusCode.OK, response.status)
-        val rpcResponse = response.toJsonRpcResponse()
-        assertNull(rpcResponse.error)
+    McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+        val result = client.callTool(name = "tap", arguments = mapOf("x" to 500, "y" to 800))
+        assertNotEquals(true, result.isError)
+        val text = (result.content[0] as TextContent).text
+        assertContains(text, "Tap executed")
     }
 }
 ```
@@ -415,7 +412,7 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 - Use **Testcontainers Kotlin** for container orchestration.
 - Use **budtmo/docker-android-x86** Docker image (Android emulator in container).
 - Use **JUnit 5** for test framework.
-- Use **OkHttp** or MCP client library for HTTP requests.
+- Use **MCP Kotlin SDK client** with `StreamableHttpClientTransport` for MCP requests.
 - Organize tests in `e2e-tests/src/test/kotlin/` directory (separate Gradle module).
 
 **What to E2E test**:

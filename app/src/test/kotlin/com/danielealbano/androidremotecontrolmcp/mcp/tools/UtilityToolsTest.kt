@@ -145,7 +145,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject {}
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 
@@ -182,7 +182,7 @@ class UtilityToolsTest {
                         put("value", "test")
                     }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
@@ -194,7 +194,7 @@ class UtilityToolsTest {
                         put("value", "")
                     }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
@@ -207,7 +207,7 @@ class UtilityToolsTest {
                         put("timeout", 50000)
                     }
 
-                val exception = assertThrows<McpToolException> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Timeout must be between"))
             }
 
@@ -221,7 +221,7 @@ class UtilityToolsTest {
                         put("timeout", -1)
                     }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
@@ -299,7 +299,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject { put("timeout", 50000) }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
@@ -307,7 +307,7 @@ class UtilityToolsTest {
             runTest {
                 val params = buildJsonObject { put("timeout", 0) }
 
-                assertThrows<McpToolException> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
     }
 }

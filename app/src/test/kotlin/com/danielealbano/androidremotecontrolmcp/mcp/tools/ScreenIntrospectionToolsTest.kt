@@ -109,7 +109,7 @@ class ScreenIntrospectionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.PermissionDenied> {
                         handler.execute(null)
                     }
                 assertTrue(exception.message!!.contains("Accessibility service not enabled"))
@@ -123,7 +123,7 @@ class ScreenIntrospectionToolsTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.PermissionDenied> {
                     handler.execute(null)
                 }
             }
@@ -137,7 +137,7 @@ class ScreenIntrospectionToolsTest {
                 every { mockAccessibilityServiceProvider.getRootNode() } returns null
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.ActionFailed> {
                     handler.execute(null)
                 }
             }
@@ -289,11 +289,9 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("width", -1) }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertTrue(exception is McpToolException.InvalidParams)
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
             }
 
         @Test
@@ -304,11 +302,9 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("height", 0) }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertTrue(exception is McpToolException.InvalidParams)
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
             }
 
         @Test
@@ -319,11 +315,9 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("width", "large") }
 
                 // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(params)
-                    }
-                assertTrue(exception is McpToolException.InvalidParams)
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
             }
 
         @Test
@@ -335,7 +329,7 @@ class ScreenIntrospectionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.InvalidParams> {
                         handler.execute(params)
                     }
                 assertTrue(exception.message!!.contains("between 1 and 100"))
@@ -349,7 +343,7 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive(101)) }
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.InvalidParams> {
                     handler.execute(params)
                 }
             }
@@ -362,7 +356,7 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive(-1)) }
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.InvalidParams> {
                     handler.execute(params)
                 }
             }
@@ -375,7 +369,7 @@ class ScreenIntrospectionToolsTest {
                 val params = buildJsonObject { put("quality", JsonPrimitive("high")) }
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.InvalidParams> {
                     handler.execute(params)
                 }
             }
@@ -389,7 +383,7 @@ class ScreenIntrospectionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.PermissionDenied> {
                         handler.execute(null)
                     }
                 assertTrue(exception.message!!.contains("Screen capture not available"))
@@ -408,7 +402,7 @@ class ScreenIntrospectionToolsTest {
 
                 // Act & Assert
                 val exception =
-                    assertThrows<McpToolException> {
+                    assertThrows<McpToolException.ActionFailed> {
                         handler.execute(null)
                     }
                 assertTrue(exception.message!!.contains("Capture timeout"))
@@ -472,7 +466,7 @@ class ScreenIntrospectionToolsTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.PermissionDenied> {
                     handler.execute(null)
                 }
             }
@@ -525,7 +519,7 @@ class ScreenIntrospectionToolsTest {
                     McpToolException.PermissionDenied("Accessibility service not enabled")
 
                 // Act & Assert
-                assertThrows<McpToolException> {
+                assertThrows<McpToolException.PermissionDenied> {
                     handler.execute(null)
                 }
             }

@@ -33,7 +33,7 @@ import javax.inject.Inject
  *
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "<tree JSON>" }] }`
- * **Error**: -32001 if accessibility service is not enabled
+ * **Error**: PermissionDenied if accessibility service is not enabled
  */
 class GetAccessibilityTreeHandler
     @Inject
@@ -106,9 +106,9 @@ class GetAccessibilityTreeHandler
  * **Input**: `{ "quality": 80 }` (optional, default 80, range 1-100)
  * **Output**: `{ "content": [{ "type": "image", "data": "<base64>", "mimeType": "image/jpeg" }] }`
  * **Errors**:
- *   - -32001 if screen capture is not available (accessibility service not enabled)
- *   - -32602 if quality parameter is out of range
- *   - -32003 if screenshot capture fails
+ *   - PermissionDenied if screen capture is not available (accessibility service not enabled)
+ *   - InvalidParams if quality parameter is out of range
+ *   - ActionFailed if screenshot capture fails
  */
 class CaptureScreenshotHandler
     @Inject
@@ -224,7 +224,7 @@ class CaptureScreenshotHandler
  *
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "{\"packageName\":\"...\",\"activityName\":\"...\"}" }] }`
- * **Error**: -32001 if accessibility service is not enabled
+ * **Error**: PermissionDenied if accessibility service is not enabled
  */
 class GetCurrentAppHandler
     @Inject
@@ -279,7 +279,7 @@ class GetCurrentAppHandler
  *
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "{\"width\":1080,...}" }] }`
- * **Error**: -32001 if accessibility service is not enabled
+ * **Error**: PermissionDenied if accessibility service is not enabled
  */
 class GetScreenInfoHandler
     @Inject
