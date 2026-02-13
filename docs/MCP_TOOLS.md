@@ -2,8 +2,9 @@
 
 This document provides a comprehensive reference for all MCP tools available in the Android Remote Control MCP application. Each tool includes its schema, usage examples, and error handling information.
 
-**Protocol**: JSON-RPC 2.0 over HTTPS
-**Authentication**: Bearer token required for all tool calls
+**Transport**: Streamable HTTP at `/mcp` (JSON-only, no SSE)
+**Protocol**: JSON-RPC 2.0
+**Authentication**: Bearer token required for all requests (global Application-level plugin)
 **Content-Type**: `application/json`
 
 ---
@@ -37,10 +38,10 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 | Text Input | `input_text`, `clear_text`, `press_key` | 9 |
 | Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle` | 9 |
 
-### Endpoints
+### Endpoint
 
-- **List tools**: `GET /mcp/v1/tools/list` (returns all registered tools)
-- **Call tool**: `POST /mcp/v1/tools/call` (executes a tool)
+All MCP communication goes through a single endpoint:
+- **MCP endpoint**: `POST /mcp` — Streamable HTTP transport (JSON-only, no SSE). Handles all protocol messages: `initialize`, `tools/list`, `tools/call`, etc.
 
 ---
 
@@ -99,41 +100,33 @@ Successful tool calls return a `content` array with typed entries:
 }
 ```
 
-### Response Format (Error)
+### Response Format (Tool Error)
+
+Tool errors are returned as `CallToolResult(isError = true)` with the error message in `TextContent`:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "error": {
-    "code": -32001,
-    "message": "Accessibility service not enabled"
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Accessibility service not enabled"
+      }
+    ],
+    "isError": true
   }
 }
 ```
 
 ---
 
-## Error Codes
+## Error Handling
 
-### Standard JSON-RPC Error Codes
+Tool errors are **not** returned as JSON-RPC error codes. Instead, the SDK catches `McpToolException` subtypes and wraps them as `CallToolResult(isError = true)` with a descriptive message in `TextContent`. This follows the standard MCP SDK pattern.
 
-| Code | Name | Description |
-|------|------|-------------|
-| -32700 | Parse Error | Invalid JSON received |
-| -32600 | Invalid Request | Malformed JSON-RPC request |
-| -32601 | Method Not Found | Unknown tool name |
-| -32602 | Invalid Params | Missing or invalid tool arguments |
-| -32603 | Internal Error | Server-side error during tool execution |
-
-### Custom MCP Error Codes
-
-| Code | Name | Description |
-|------|------|-------------|
-| -32001 | Permission Denied | Accessibility service not enabled or screen capture not available |
-| -32002 | Element Not Found | UI element not found by ID or criteria |
-| -32003 | Action Failed | Accessibility action execution failed |
-| -32004 | Timeout | Operation timed out |
+Protocol-level errors (parse errors, invalid requests) are handled automatically by the SDK and returned as standard JSON-RPC errors.
 
 ---
 
@@ -182,8 +175,8 @@ Returns the full UI hierarchy of the current screen using accessibility services
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Failed to obtain root node
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Failed to obtain root node
 
 ---
 
@@ -200,13 +193,23 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
       "type": "integer",
       "description": "JPEG quality (1-100)",
       "default": 80
+    },
+    "width": {
+      "type": "integer",
+      "description": "Maximum width in pixels for proportional resizing (must be > 0)"
+    },
+    "height": {
+      "type": "integer",
+      "description": "Maximum height in pixels for proportional resizing (must be > 0)"
     }
   },
   "required": []
 }
 ```
 
-**Request Example** (default quality):
+**Resizing behavior**: When `width` and/or `height` are specified, the screenshot is resized proportionally to fit within the bounding box while maintaining the original aspect ratio. If only one dimension is provided, the other is calculated automatically. If neither is provided, the screenshot is returned at full resolution.
+
+**Request Example** (default quality, full resolution):
 ```json
 {
   "jsonrpc": "2.0",
@@ -219,7 +222,7 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
 }
 ```
 
-**Request Example** (custom quality):
+**Request Example** (custom quality with resizing):
 ```json
 {
   "jsonrpc": "2.0",
@@ -228,7 +231,8 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
   "params": {
     "name": "capture_screenshot",
     "arguments": {
-      "quality": 50
+      "quality": 50,
+      "width": 720
     }
   }
 }
@@ -244,19 +248,18 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
       {
         "type": "image",
         "data": "/9j/4AAQSkZJRgABAQ...<base64 JPEG data>",
-        "mimeType": "image/jpeg",
-        "width": 1080,
-        "height": 2400
+        "mimeType": "image/jpeg"
       }
     ]
   }
 }
 ```
 
-**Error Cases**:
-- `-32001`: Screen capture not available (accessibility service not enabled)
-- `-32602`: Quality parameter out of range (must be 1-100)
-- `-32003`: Screenshot capture failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- Screen capture not available (accessibility service not enabled)
+- Quality parameter out of range (must be 1-100)
+- Width or height must be positive integers
+- Screenshot capture failed
 
 ---
 
@@ -319,7 +322,7 @@ Returns the package name and activity name of the currently focused app.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
+- **Permission denied**: Accessibility service not enabled
 
 ---
 
@@ -366,7 +369,7 @@ Returns screen dimensions, orientation, and DPI.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
+- **Permission denied**: Accessibility service not enabled
 
 ---
 
@@ -415,8 +418,8 @@ Presses the back button (global accessibility action).
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Action execution failed
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Action execution failed
 
 ---
 
@@ -463,8 +466,8 @@ Navigates to the home screen.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Action execution failed
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Action execution failed
 
 ---
 
@@ -511,8 +514,8 @@ Opens the recent apps screen.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Action execution failed
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Action execution failed
 
 ---
 
@@ -559,8 +562,8 @@ Pulls down the notification shade.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Action execution failed
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Action execution failed
 
 ---
 
@@ -607,8 +610,8 @@ Opens the quick settings panel.
 ```
 
 **Error Cases**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Action execution failed
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Action execution failed
 
 ---
 
@@ -700,8 +703,8 @@ Retrieves device logcat logs filtered by time range, tag, level, or package name
 ```
 
 **Error Cases**:
-- `-32602`: Invalid parameter (e.g., `last_lines` out of range 1-1000, invalid `level`)
-- `-32003`: Logcat command execution failed
+- **Invalid params**: Invalid parameter (e.g., `last_lines` out of range 1-1000, invalid `level`)
+- **Action failed**: Logcat command execution failed
 
 ---
 
@@ -752,10 +755,10 @@ Performs a single tap at the specified coordinates.
 }
 ```
 
-**Error Codes**:
-- `-32602`: Missing or invalid parameters (x, y not numbers or negative)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Tap gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or invalid parameters (x, y not numbers or negative)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Tap gesture execution failed
 
 ---
 
@@ -803,10 +806,10 @@ Performs a long press at the specified coordinates.
 }
 ```
 
-**Error Codes**:
-- `-32602`: Missing or invalid parameters (x, y not numbers or negative; duration <= 0 or > 60000)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Long press gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or invalid parameters (x, y not numbers or negative; duration <= 0 or > 60000)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Long press gesture execution failed
 
 ---
 
@@ -852,10 +855,10 @@ Performs a double tap at the specified coordinates.
 }
 ```
 
-**Error Codes**:
-- `-32602`: Missing or invalid parameters
-- `-32001`: Accessibility service not enabled
-- `-32003`: Double tap gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or invalid parameters
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Double tap gesture execution failed
 
 ---
 
@@ -907,10 +910,10 @@ Performs a swipe gesture from one point to another.
 }
 ```
 
-**Error Codes**:
-- `-32602`: Missing or invalid parameters (coords not numbers or negative; duration <= 0 or > 60000)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Swipe gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or invalid parameters (coords not numbers or negative; duration <= 0 or > 60000)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Swipe gesture execution failed
 
 ---
 
@@ -956,10 +959,10 @@ Scrolls the screen in the specified direction. Calculates scroll distance as a p
 }
 ```
 
-**Error Codes**:
-- `-32602`: Invalid direction (not one of up/down/left/right) or invalid amount (not one of small/medium/large)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Scroll gesture execution failed (e.g., no root node available for screen dimensions)
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Invalid direction (not one of up/down/left/right) or invalid amount (not one of small/medium/large)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Scroll gesture execution failed (e.g., no root node available for screen dimensions)
 
 ---
 
@@ -1012,10 +1015,10 @@ Performs a pinch-to-zoom gesture centered at the specified coordinates.
 }
 ```
 
-**Error Codes**:
-- `-32602`: Missing or invalid parameters (coords negative; scale <= 0; duration <= 0 or > 60000)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Pinch gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or invalid parameters (coords negative; scale <= 0; duration <= 0 or > 60000)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Pinch gesture execution failed
 
 ---
 
@@ -1103,10 +1106,10 @@ Each path is an array of point objects:
 }
 ```
 
-**Error Codes**:
-- `-32602`: Invalid parameters (empty paths, path with < 2 points, negative coords/times, non-monotonic times, missing fields)
-- `-32001`: Accessibility service not enabled
-- `-32003`: Custom gesture execution failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Invalid parameters (empty paths, path with < 2 points, negative coords/times, non-monotonic times, missing fields)
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Custom gesture execution failed
 
 ---
 
@@ -1163,7 +1166,7 @@ Find UI elements matching the specified criteria in the accessibility tree.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1172,9 +1175,9 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Invalid `by` value, empty `value`, or missing required parameters
-- `-32001`: Accessibility service not enabled
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Invalid `by` value, empty `value`, or missing required parameters
+- **Permission denied**: Accessibility service not enabled
 
 ---
 
@@ -1197,7 +1200,7 @@ Click the specified accessibility node by element ID.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1206,11 +1209,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing or empty `element_id`
-- `-32001`: Accessibility service not enabled
-- `-32002`: Element not found in accessibility tree
-- `-32003`: Element is not clickable or click action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id`
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found in accessibility tree
+- **Action failed**: Element is not clickable or click action failed
 
 ---
 
@@ -1233,7 +1236,7 @@ Long-click the specified accessibility node by element ID.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1242,11 +1245,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing or empty `element_id`
-- `-32001`: Accessibility service not enabled
-- `-32002`: Element not found
-- `-32003`: Element is not long-clickable or action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id`
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found
+- **Action failed**: Element is not long-clickable or action failed
 
 ---
 
@@ -1270,7 +1273,7 @@ Set text on an editable accessibility node. Empty string clears the field.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1279,11 +1282,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing `element_id` or `text` parameter
-- `-32001`: Accessibility service not enabled
-- `-32002`: Element not found
-- `-32003`: Element is not editable or set text action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `element_id` or `text` parameter
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found
+- **Action failed**: Element is not editable or set text action failed
 
 ---
 
@@ -1306,7 +1309,7 @@ Scroll to make the specified element visible by scrolling its nearest scrollable
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1315,11 +1318,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing or empty `element_id`
-- `-32001`: Accessibility service not enabled
-- `-32002`: Element not found
-- `-32003`: No scrollable container found, scroll failed, or element not visible after max attempts (5)
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id`
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found
+- **Action failed**: No scrollable container found, scroll failed, or element not visible after max attempts (5)
 
 ---
 
@@ -1345,7 +1348,7 @@ Type text into the focused input field or a specified element. When `element_id`
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1354,11 +1357,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing `text` parameter
-- `-32001`: Accessibility service not enabled
-- `-32002`: No focused editable element found (when `element_id` not provided) or element not found
-- `-32003`: Text input action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `text` parameter
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: No focused editable element found (when `element_id` not provided) or element not found
+- **Action failed**: Text input action failed
 
 ---
 
@@ -1381,7 +1384,7 @@ Clear text from the focused input field or a specified element.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1390,10 +1393,10 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32001`: Accessibility service not enabled
-- `-32002`: No focused editable element found (when `element_id` not provided)
-- `-32003`: Clear text action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: No focused editable element found (when `element_id` not provided)
+- **Action failed**: Clear text action failed
 
 ---
 
@@ -1426,7 +1429,7 @@ Press a specific key. Supported keys: ENTER, BACK, DEL, HOME, TAB, SPACE.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1435,11 +1438,11 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing `key` parameter or invalid key name
-- `-32001`: Accessibility service not enabled
-- `-32002`: No focused element found (for ENTER, DEL, TAB, SPACE)
-- `-32003`: Key action failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `key` parameter or invalid key name
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: No focused element found (for ENTER, DEL, TAB, SPACE)
+- **Action failed**: Key action failed
 
 ---
 
@@ -1466,7 +1469,7 @@ Returns `{ "text": null }` when clipboard is empty.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1475,9 +1478,9 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32001`: Accessibility service not enabled
-- `-32003`: Clipboard access failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Clipboard access failed
 
 ---
 
@@ -1500,7 +1503,7 @@ Set the clipboard content to the specified text.
 
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1509,10 +1512,10 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Missing `text` parameter
-- `-32001`: Accessibility service not enabled
-- `-32003`: Clipboard set failed
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `text` parameter
+- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Clipboard set failed
 
 ---
 
@@ -1533,11 +1536,10 @@ Wait until an element matching the specified criteria appears in the accessibili
     "value": { "type": "string", "description": "Search value" },
     "timeout": {
       "type": "integer",
-      "description": "Timeout in milliseconds (1-30000)",
-      "default": 5000
+      "description": "Timeout in milliseconds (1-30000). Required."
     }
   },
-  "required": ["by", "value"]
+  "required": ["by", "value", "timeout"]
 }
 ```
 
@@ -1560,9 +1562,11 @@ Wait until an element matching the specified criteria appears in the accessibili
 }
 ```
 
+**Timeout behavior**: When the timeout expires without finding the element, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
+
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1571,10 +1575,9 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Invalid `by` value, empty `value`, missing required parameters, or timeout out of range (1-30000)
-- `-32001`: Accessibility service not enabled
-- `-32004`: Element not found within timeout
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- Invalid `by` value, empty `value`, missing required parameters, or timeout out of range (1-30000)
+- Accessibility service not enabled
 
 ---
 
@@ -1589,11 +1592,10 @@ Wait for the UI to become idle by detecting when the accessibility tree structur
   "properties": {
     "timeout": {
       "type": "integer",
-      "description": "Timeout in milliseconds (1-30000)",
-      "default": 3000
+      "description": "Timeout in milliseconds (1-30000). Required."
     }
   },
-  "required": []
+  "required": ["timeout"]
 }
 ```
 
@@ -1605,9 +1607,11 @@ Wait for the UI to become idle by detecting when the accessibility tree structur
 }
 ```
 
+**Timeout behavior**: When the timeout expires without the UI becoming idle, a **non-error** `CallToolResult` is returned with an informational message. This is not a tool error — the caller should check the message content.
+
 **Example**:
 ```bash
-curl -X POST https://localhost:8080/mcp/v1/tools/call \
+curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1616,7 +1620,6 @@ curl -X POST https://localhost:8080/mcp/v1/tools/call \
   }'
 ```
 
-**Error Codes**:
-- `-32602`: Timeout out of range (1-30000)
-- `-32001`: Accessibility service not enabled
-- `-32004`: UI did not become idle within timeout
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- Timeout out of range (1-30000) or missing
+- Accessibility service not enabled

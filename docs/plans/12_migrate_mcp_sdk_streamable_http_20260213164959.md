@@ -1496,7 +1496,7 @@ Run `make test-e2e` and verify all pass.
 
 #### Action 12.1: Update `docs/PROJECT.md`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Update sections:
 - Server transport: Streamable HTTP at `/mcp` (remove references to `/mcp/v1/initialize`, `/mcp/v1/tools/list`, `/mcp/v1/tools/call`)
@@ -1509,7 +1509,7 @@ Update sections:
 
 #### Action 12.2: Update `docs/ARCHITECTURE.md`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Update:
 - Server architecture diagram: replace the route listing with `Streamable HTTP /mcp (POST, DELETE; JSON-only, no SSE)`
@@ -1520,7 +1520,7 @@ Update:
 
 #### Action 12.3: Update `docs/MCP_TOOLS.md`
 
-- [ ] **Completed**
+- [x] **Completed**
 
 Update:
 - Response format: `CallToolResult` with `TextContent` / `ImageContent` (standard MCP types)
