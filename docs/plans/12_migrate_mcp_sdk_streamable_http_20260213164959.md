@@ -243,7 +243,7 @@ Changes:
 
 #### Action 3.1: Change plugin from route-scoped to Application-level
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/auth/BearerTokenAuth.kt`
 
