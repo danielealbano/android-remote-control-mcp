@@ -148,7 +148,6 @@ class E2ECalculatorTest {
 
     @Test
     @Order(4)
-    @Disabled("MediaProjection requires interactive user consent that cannot be automated via adb")
     fun `capture screenshot returns valid image data`() {
         val screenshot = mcpClient.callTool("capture_screenshot", mapOf("quality" to 80))
 

@@ -7,7 +7,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -31,7 +30,6 @@ class E2EScreenshotTest {
 
     @Test
     @Order(1)
-    @Disabled("MediaProjection requires interactive user consent that cannot be automated via adb")
     fun `capture screenshot of home screen returns valid JPEG data`() {
         // Navigate to home screen first
         mcpClient.callTool("press_home")
@@ -65,8 +63,10 @@ class E2EScreenshotTest {
 
     @Test
     @Order(2)
-    @Disabled("MediaProjection requires interactive user consent that cannot be automated via adb")
     fun `higher quality produces larger screenshot data`() {
+        // Wait for accessibility service to recover from previous test's screenshot
+        Thread.sleep(3_000)
+
         // Capture at low quality
         val lowQuality = mcpClient.callTool("capture_screenshot", mapOf("quality" to 10))
         val lowContentArray = lowQuality["content"]?.jsonArray
@@ -74,8 +74,8 @@ class E2EScreenshotTest {
         val lowData = lowContentArray!![0].jsonObject["data"]?.jsonPrimitive?.contentOrNull
         assertNotNull(lowData, "Low quality screenshot data should not be null")
 
-        // Small delay between captures
-        Thread.sleep(500)
+        // Delay between captures - accessibility service needs time to recover
+        Thread.sleep(2_000)
 
         // Capture at high quality
         val highQuality = mcpClient.callTool("capture_screenshot", mapOf("quality" to 95))
