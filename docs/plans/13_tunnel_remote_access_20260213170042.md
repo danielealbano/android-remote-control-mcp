@@ -320,11 +320,11 @@ Add nested test classes for each new setting, following the existing patterns (e
 **Goal**: Set up cloudflared as a git submodule, cross-compile the binary for Android (arm64-v8a and x86_64), and bundle it in the APK.
 
 **Acceptance Criteria**:
-- [ ] `cloudflared` repository added as a git submodule pinned to a specific tag/commit
-- [ ] Makefile target `compile-cloudflared` exists and cross-compiles from the submodule source for both ABIs
-- [ ] Compiled binaries placed in `app/src/main/jniLibs/arm64-v8a/libcloudflared.so` and `app/src/main/jniLibs/x86_64/libcloudflared.so`
-- [ ] Binaries are executable on Android
-- [ ] `.gitignore` updated to exclude compiled binaries from jniLibs (they are build artifacts)
+- [x] `cloudflared` repository added as a git submodule pinned to a specific tag/commit
+- [x] Makefile target `compile-cloudflared` exists and cross-compiles from the submodule source for both ABIs
+- [x] Compiled binaries placed in `app/src/main/jniLibs/arm64-v8a/libcloudflared.so` and `app/src/main/jniLibs/x86_64/libcloudflared.so`
+- [x] Binaries are executable on Android
+- [x] `.gitignore` updated to exclude compiled binaries from jniLibs (they are build artifacts)
 
 #### Action 3.0: Add cloudflared as a git submodule
 
@@ -354,9 +354,9 @@ Note: Ignore the entire `jniLibs/` directory because ALL `.so` files in it are b
 - ngrok native `.so` files (arm64-v8a) — extracted by the `extractNgrokNative` Gradle task during preBuild
 
 **Definition of Done**:
-- [ ] `vendor/cloudflared` submodule exists and points to the correct tag
-- [ ] `.gitmodules` file created with submodule entry
-- [ ] `.gitignore` updated for compiled binaries
+- [x] `vendor/cloudflared` submodule exists and points to the correct tag
+- [x] `.gitmodules` file created with submodule entry
+- [x] `.gitignore` updated for compiled binaries
 
 #### Action 3.1: Add Makefile target for cloudflared cross-compilation
 
@@ -404,9 +404,9 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 Also add `compile-cloudflared` to the `.PHONY` list at the top.
 
 **Definition of Done**:
-- [ ] `make compile-cloudflared` runs successfully (requires Go + Android NDK + initialized submodule)
-- [ ] Binaries exist in `app/src/main/jniLibs/arm64-v8a/libcloudflared.so` and `app/src/main/jniLibs/x86_64/libcloudflared.so`
-- [ ] Binaries are statically linked enough to run on Android (no glibc dependency)
+- [x] `make compile-cloudflared` runs successfully (requires Go + Android NDK + initialized submodule)
+- [x] Binaries exist in `app/src/main/jniLibs/arm64-v8a/libcloudflared.so` and `app/src/main/jniLibs/x86_64/libcloudflared.so`
+- [x] Binaries are statically linked enough to run on Android (no glibc dependency)
 
 #### Action 3.2: Add `check-deps` entry for Go (optional, for compilation)
 
@@ -424,7 +424,7 @@ Add Go check to `check-deps` target (as optional/informational, since Go is only
 ```
 
 **Definition of Done**:
-- [ ] `make check-deps` reports Go presence (or notes it as optional)
+- [x] `make check-deps` reports Go presence (or notes it as optional)
 
 ---
 
