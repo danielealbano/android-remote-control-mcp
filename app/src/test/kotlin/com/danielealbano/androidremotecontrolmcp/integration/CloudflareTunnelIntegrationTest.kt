@@ -4,8 +4,8 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflareTunnelProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
@@ -50,7 +50,8 @@ class CloudflareTunnelIntegrationTest {
             HostCloudflareBinaryResolver().resolve()
                 ?: fail(
                     "cloudflared binary not found on host. " +
-                        "Install it: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/",
+                        "Install it: https://developers.cloudflare.com/" +
+                        "cloudflare-one/connections/connect-networks/downloads/",
                 )
 
         provider =
@@ -97,7 +98,10 @@ class CloudflareTunnelIntegrationTest {
                             // Continue accepting
                         }
                     }
-                }.also { it.isDaemon = true; it.start() }
+                }.also {
+                    it.isDaemon = true
+                    it.start()
+                }
 
             // Start the tunnel
             provider.start(localPort, ServerConfig())

@@ -172,9 +172,10 @@ dependencies {
 val extractNgrokNative by tasks.registering {
     description = "Extracts ngrok-java native .so for Android arm64 into jniLibs"
 
-    val ngrokNativeConfig = configurations.create("ngrokNativeAndroidArm64") {
-        isTransitive = false
-    }
+    val ngrokNativeConfig =
+        configurations.create("ngrokNativeAndroidArm64") {
+            isTransitive = false
+        }
     dependencies {
         ngrokNativeConfig(
             libs.ngrok.java.native.android.arm64.get().toString() + ":linux-android-aarch_64",

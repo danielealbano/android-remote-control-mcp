@@ -28,7 +28,10 @@ interface TunnelProvider {
      *               and [ServerConfig.ngrokDomain]).
      * @throws IllegalStateException if the tunnel is already running.
      */
-    suspend fun start(localPort: Int, config: ServerConfig)
+    suspend fun start(
+        localPort: Int,
+        config: ServerConfig,
+    )
 
     /**
      * Stops the tunnel and releases all resources.

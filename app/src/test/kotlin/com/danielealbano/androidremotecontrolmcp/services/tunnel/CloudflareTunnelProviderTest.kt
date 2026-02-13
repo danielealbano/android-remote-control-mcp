@@ -1,7 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
-import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import io.mockk.every
 import io.mockk.mockk
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("CloudflareTunnelProvider")

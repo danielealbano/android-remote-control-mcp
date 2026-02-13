@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "UnusedPrivateMember")
+@file:Suppress("FunctionNaming", "UnusedPrivateMember", "LongMethod")
 
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
@@ -121,7 +121,8 @@ private fun ServerLogEntryRow(entry: ServerLogEntry) {
             }
         }
         ServerLogEntry.Type.TUNNEL,
-        ServerLogEntry.Type.SERVER -> {
+        ServerLogEntry.Type.SERVER,
+        -> {
             Row(
                 modifier =
                     Modifier
