@@ -1,15 +1,16 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -39,8 +40,8 @@ class GetAccessibilityTreeHandler
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!accessibilityServiceProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
                     "Accessibility service not enabled or not ready. " +
@@ -67,25 +68,23 @@ class GetAccessibilityTreeHandler
                             )
                         }
                     }
-                McpContentBuilder.textContent(Json.encodeToString(treeJson))
+                McpToolUtils.textResult(Json.encodeToString(treeJson))
             } finally {
                 @Suppress("DEPRECATION")
                 rootNode.recycle()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Returns the full UI hierarchy of the current screen using accessibility services.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -114,9 +113,9 @@ class CaptureScreenshotHandler
     @Inject
     constructor(
         private val screenCaptureProvider: ScreenCaptureProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val quality = parseQuality(params)
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val quality = parseQuality(arguments)
 
             if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                 throw McpToolException.PermissionDenied(
@@ -132,12 +131,7 @@ class CaptureScreenshotHandler
                     )
                 }
 
-            return McpContentBuilder.imageContent(
-                data = screenshotData.data,
-                mimeType = "image/jpeg",
-                width = screenshotData.width,
-                height = screenshotData.height,
-            )
+            return McpToolUtils.imageResult(data = screenshotData.data, mimeType = "image/jpeg")
         }
 
         @Suppress("SwallowedException", "TooGenericExceptionCaught")
@@ -159,24 +153,23 @@ class CaptureScreenshotHandler
             return quality
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Captures a screenshot of the current screen and returns it as base64-encoded JPEG.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("quality") {
-                                put("type", "integer")
-                                put("description", "JPEG quality (1-100)")
-                                put("default", DEFAULT_QUALITY)
-                            }
-                        }
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("quality") {
+                                    put("type", "integer")
+                                    put("description", "JPEG quality (1-100)")
+                                    put("default", DEFAULT_QUALITY)
+                                }
+                            },
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -204,8 +197,8 @@ class GetCurrentAppHandler
     @Inject
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!accessibilityServiceProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
                     "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
@@ -221,21 +214,19 @@ class GetCurrentAppHandler
                     put("activityName", activityName)
                 }
 
-            return McpContentBuilder.textContent(Json.encodeToString(resultJson))
+            return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Returns the package name and activity name of the currently focused app.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -260,8 +251,8 @@ class GetScreenInfoHandler
     @Inject
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
             val resultJson =
                 Json.encodeToString(
@@ -269,21 +260,19 @@ class GetScreenInfoHandler
                     screenInfo,
                 )
 
-            return McpContentBuilder.textContent(resultJson)
+            return McpToolUtils.textResult(resultJson)
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Returns screen dimensions, orientation, and DPI.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -296,18 +285,18 @@ class GetScreenInfoHandler
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Registers all screen introspection tools with the given [ToolRegistry].
+ * Registers all screen introspection tools with the given [Server].
  *
  * Called from [McpServerService.startServer] during server startup.
  */
 fun registerScreenIntrospectionTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     screenCaptureProvider: ScreenCaptureProvider,
 ) {
-    GetAccessibilityTreeHandler(treeParser, accessibilityServiceProvider).register(toolRegistry)
-    CaptureScreenshotHandler(screenCaptureProvider).register(toolRegistry)
-    GetCurrentAppHandler(accessibilityServiceProvider).register(toolRegistry)
-    GetScreenInfoHandler(accessibilityServiceProvider).register(toolRegistry)
+    GetAccessibilityTreeHandler(treeParser, accessibilityServiceProvider).register(server)
+    CaptureScreenshotHandler(screenCaptureProvider).register(server)
+    GetCurrentAppHandler(accessibilityServiceProvider).register(server)
+    GetScreenInfoHandler(accessibilityServiceProvider).register(server)
 }

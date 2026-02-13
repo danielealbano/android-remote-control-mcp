@@ -3,12 +3,13 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -17,7 +18,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
 
@@ -35,7 +35,7 @@ private suspend fun executeSystemAction(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     actionName: String,
     action: suspend () -> Result<Unit>,
-): JsonElement {
+): CallToolResult {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service not enabled. Please enable it in Android Settings > Accessibility.",
@@ -49,7 +49,7 @@ private suspend fun executeSystemAction(
         )
     }
 
-    return McpContentBuilder.textContent("$actionName executed successfully")
+    return McpToolUtils.textResult("$actionName executed successfully")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,25 +72,23 @@ class PressBackHandler
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Back button press") {
                 actionExecutor.pressBack()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Presses the back button (global accessibility action).",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -118,25 +116,23 @@ class PressHomeHandler
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Home button press") {
                 actionExecutor.pressHome()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Navigates to the home screen.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -164,25 +160,23 @@ class PressRecentsHandler
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Recents button press") {
                 actionExecutor.pressRecents()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Opens the recent apps screen.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -210,25 +204,23 @@ class OpenNotificationsHandler
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Open notifications") {
                 actionExecutor.openNotifications()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Pulls down the notification shade.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -256,25 +248,23 @@ class OpenQuickSettingsHandler
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Open quick settings") {
                 actionExecutor.openQuickSettings()
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Opens the quick settings panel.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -302,15 +292,15 @@ class OpenQuickSettingsHandler
  */
 class GetDeviceLogsHandler
     @Inject
-    constructor() : ToolHandler {
+    constructor() {
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val lastLines = parseLastLines(params)
-            val since = params?.get("since")?.jsonPrimitive?.contentOrNull
-            val until = params?.get("until")?.jsonPrimitive?.contentOrNull
-            val tag = params?.get("tag")?.jsonPrimitive?.contentOrNull
-            val levelStr = params?.get("level")?.jsonPrimitive?.contentOrNull ?: DEFAULT_LEVEL
-            val packageName = params?.get("package_name")?.jsonPrimitive?.contentOrNull
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val lastLines = parseLastLines(arguments)
+            val since = arguments?.get("since")?.jsonPrimitive?.contentOrNull
+            val until = arguments?.get("until")?.jsonPrimitive?.contentOrNull
+            val tag = arguments?.get("tag")?.jsonPrimitive?.contentOrNull
+            val levelStr = arguments?.get("level")?.jsonPrimitive?.contentOrNull ?: DEFAULT_LEVEL
+            val packageName = arguments?.get("package_name")?.jsonPrimitive?.contentOrNull
 
             if (levelStr !in VALID_LEVELS) {
                 throw McpToolException.InvalidParams(
@@ -348,7 +338,7 @@ class GetDeviceLogsHandler
                         put("truncated", truncated)
                     }
 
-                McpContentBuilder.textContent(Json.encodeToString(resultJson))
+                McpToolUtils.textResult(Json.encodeToString(resultJson))
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -468,51 +458,50 @@ class GetDeviceLogsHandler
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Retrieves device logcat logs filtered by time range, tag, level, or package name.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("last_lines") {
-                                put("type", "integer")
-                                put("description", "Number of most recent log lines to return (1-1000)")
-                                put("default", DEFAULT_LAST_LINES)
-                            }
-                            putJsonObject("since") {
-                                put("type", "string")
-                                put("description", "ISO 8601 timestamp to filter logs from (e.g., 2024-01-15T10:30:00)")
-                            }
-                            putJsonObject("until") {
-                                put("type", "string")
-                                put("description", "ISO 8601 timestamp to filter logs until (used with since)")
-                            }
-                            putJsonObject("tag") {
-                                put("type", "string")
-                                put("description", "Filter by log tag (exact match, e.g., MCP:ServerService)")
-                            }
-                            putJsonObject("level") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        VALID_LEVELS.forEach { add(JsonPrimitive(it)) }
-                                    },
-                                )
-                                put("description", "Minimum log level to include")
-                                put("default", DEFAULT_LEVEL)
-                            }
-                            putJsonObject("package_name") {
-                                put("type", "string")
-                                put("description", "Filter logs by package name")
-                            }
-                        }
-                        putJsonArray("required") {}
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("last_lines") {
+                                    put("type", "integer")
+                                    put("description", "Number of most recent log lines to return (1-1000)")
+                                    put("default", DEFAULT_LAST_LINES)
+                                }
+                                putJsonObject("since") {
+                                    put("type", "string")
+                                    put("description", "ISO 8601 timestamp to filter logs from (e.g., 2024-01-15T10:30:00)")
+                                }
+                                putJsonObject("until") {
+                                    put("type", "string")
+                                    put("description", "ISO 8601 timestamp to filter logs until (used with since)")
+                                }
+                                putJsonObject("tag") {
+                                    put("type", "string")
+                                    put("description", "Filter by log tag (exact match, e.g., MCP:ServerService)")
+                                }
+                                putJsonObject("level") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            VALID_LEVELS.forEach { add(JsonPrimitive(it)) }
+                                        },
+                                    )
+                                    put("description", "Minimum log level to include")
+                                    put("default", DEFAULT_LEVEL)
+                                }
+                                putJsonObject("package_name") {
+                                    put("type", "string")
+                                    put("description", "Filter logs by package name")
+                                }
+                            },
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -532,19 +521,19 @@ class GetDeviceLogsHandler
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Registers all system action tools with the given [ToolRegistry].
+ * Registers all system action tools with the given [Server].
  *
  * Called from [McpServerService.startServer] during server startup.
  */
 fun registerSystemActionTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
 ) {
-    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    GetDeviceLogsHandler().register(toolRegistry)
+    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(server)
+    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(server)
+    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(server)
+    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(server)
+    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(server)
+    GetDeviceLogsHandler().register(server)
 }

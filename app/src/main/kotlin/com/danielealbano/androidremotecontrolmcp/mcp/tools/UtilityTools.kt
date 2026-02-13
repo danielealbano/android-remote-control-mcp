@@ -5,14 +5,15 @@ import android.content.ClipboardManager
 import android.os.SystemClock
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -34,8 +35,8 @@ class GetClipboardTool
     @Inject
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val context =
                 accessibilityServiceProvider.getContext()
                     ?: throw McpToolException.PermissionDenied(
@@ -63,7 +64,7 @@ class GetClipboardTool
                     buildJsonObject {
                         put("text", text)
                     }
-                McpContentBuilder.textContent(Json.encodeToString(resultJson))
+                McpToolUtils.textResult(Json.encodeToString(resultJson))
             } catch (e: McpToolException) {
                 throw e
             } catch (
@@ -77,18 +78,16 @@ class GetClipboardTool
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Get the current clipboard text content",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {}
-                        put("required", buildJsonArray {})
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties = buildJsonObject {},
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -106,10 +105,10 @@ class SetClipboardTool
     @Inject
     constructor(
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val text =
-                params?.get("text")?.jsonPrimitive?.contentOrNull
+                arguments?.get("text")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
 
             val context =
@@ -130,7 +129,7 @@ class SetClipboardTool
 
                 Log.d(TAG, "set_clipboard: set ${text.length} chars")
 
-                McpContentBuilder.textContent("Clipboard set successfully (${text.length} characters)")
+                McpToolUtils.textResult("Clipboard set successfully (${text.length} characters)")
             } catch (e: McpToolException) {
                 throw e
             } catch (
@@ -144,23 +143,22 @@ class SetClipboardTool
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Set the clipboard content to the specified text",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("text") {
-                                put("type", "string")
-                                put("description", "Text to set in clipboard")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("text")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("text") {
+                                    put("type", "string")
+                                    put("description", "Text to set in clipboard")
+                                }
+                            },
+                        required = listOf("text"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -181,16 +179,16 @@ class WaitForElementTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
+    ) {
         @Suppress("CyclomaticComplexity", "LongMethod")
-        override suspend fun execute(params: JsonObject?): JsonElement {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
             val byStr =
-                params?.get("by")?.jsonPrimitive?.contentOrNull
+                arguments?.get("by")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'by'")
 
             val value =
-                params["value"]?.jsonPrimitive?.contentOrNull
+                arguments["value"]?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'value'")
 
             if (value.isEmpty()) {
@@ -203,7 +201,9 @@ class WaitForElementTool
                         "Invalid 'by' value: '$byStr'. Must be one of: text, content_desc, resource_id, class_name",
                     )
 
-            val timeout = params["timeout"]?.jsonPrimitive?.longOrNull ?: DEFAULT_TIMEOUT_MS
+            val timeout =
+                arguments?.get("timeout")?.jsonPrimitive?.longOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'timeout'")
             if (timeout <= 0 || timeout > MAX_TIMEOUT_MS) {
                 throw McpToolException.InvalidParams(
                     "Timeout must be between 1 and $MAX_TIMEOUT_MS ms, got: $timeout",
@@ -247,7 +247,7 @@ class WaitForElementTool
                                     put("enabled", element.enabled)
                                 }
                             }
-                        return McpContentBuilder.textContent(Json.encodeToString(resultJson))
+                        return McpToolUtils.textResult(Json.encodeToString(resultJson))
                     }
                 } catch (e: McpToolException) {
                     // If accessibility service becomes unavailable during polling, propagate
@@ -259,59 +259,51 @@ class WaitForElementTool
                 delay(POLL_INTERVAL_MS)
             }
 
-            throw McpToolException.Timeout(
-                "Element not found within ${timeout}ms (by=$byStr, value='$value', attempts=$attemptCount)",
+            return McpToolUtils.textResult(
+                "Operation timed out after ${timeout}ms waiting for element (by=$byStr, value='$value', " +
+                    "attempts=$attemptCount). Retry if the operation is long-running.",
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Wait until an element matching criteria appears (with timeout)",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("by") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        add(JsonPrimitive("text"))
-                                        add(JsonPrimitive("content_desc"))
-                                        add(JsonPrimitive("resource_id"))
-                                        add(JsonPrimitive("class_name"))
-                                    },
-                                )
-                                put("description", "Search criteria type")
-                            }
-                            putJsonObject("value") {
-                                put("type", "string")
-                                put("description", "Search value")
-                            }
-                            putJsonObject("timeout") {
-                                put("type", "integer")
-                                put("description", "Timeout in milliseconds (1-30000)")
-                                put("default", DEFAULT_TIMEOUT_MS.toInt())
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("by"))
-                                add(JsonPrimitive("value"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("by") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("text"))
+                                            add(JsonPrimitive("content_desc"))
+                                            add(JsonPrimitive("resource_id"))
+                                            add(JsonPrimitive("class_name"))
+                                        },
+                                    )
+                                    put("description", "Search criteria type")
+                                }
+                                putJsonObject("value") {
+                                    put("type", "string")
+                                    put("description", "Search value")
+                                }
+                                putJsonObject("timeout") {
+                                    put("type", "integer")
+                                    put("description", "Timeout in milliseconds (1-30000)")
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("by", "value", "timeout"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
             private const val TAG = "MCP:WaitForElementTool"
             private const val TOOL_NAME = "wait_for_element"
             private const val POLL_INTERVAL_MS = 500L
-            private const val DEFAULT_TIMEOUT_MS = 5000L
             private const val MAX_TIMEOUT_MS = 30000L
         }
     }
@@ -328,10 +320,12 @@ class WaitForIdleTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
+    ) {
         @Suppress("NestedBlockDepth")
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val timeout = params?.get("timeout")?.jsonPrimitive?.longOrNull ?: DEFAULT_TIMEOUT_MS
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val timeout =
+                arguments?.get("timeout")?.jsonPrimitive?.longOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'timeout'")
             if (timeout <= 0 || timeout > MAX_TIMEOUT_MS) {
                 throw McpToolException.InvalidParams(
                     "Timeout must be between 1 and $MAX_TIMEOUT_MS ms, got: $timeout",
@@ -357,7 +351,7 @@ class WaitForIdleTool
                                     put("message", "UI is idle")
                                     put("elapsedMs", elapsed)
                                 }
-                            return McpContentBuilder.textContent(Json.encodeToString(resultJson))
+                            return McpToolUtils.textResult(Json.encodeToString(resultJson))
                         }
                     } else {
                         consecutiveIdleChecks = 0
@@ -374,8 +368,9 @@ class WaitForIdleTool
                 delay(IDLE_CHECK_INTERVAL_MS)
             }
 
-            throw McpToolException.Timeout(
-                "UI did not become idle within ${timeout}ms",
+            return McpToolUtils.textResult(
+                "Operation timed out after ${timeout}ms waiting for UI idle. " +
+                    "Retry if the operation is long-running.",
             )
         }
 
@@ -397,31 +392,28 @@ class WaitForIdleTool
             return hash
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Wait for the UI to become idle (no changes detected)",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("timeout") {
-                                put("type", "integer")
-                                put("description", "Timeout in milliseconds (1-30000)")
-                                put("default", DEFAULT_TIMEOUT_MS.toInt())
-                            }
-                        }
-                        put("required", buildJsonArray {})
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("timeout") {
+                                    put("type", "integer")
+                                    put("description", "Timeout in milliseconds (1-30000)")
+                                }
+                            },
+                        required = listOf("timeout"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
             private const val TAG = "MCP:WaitForIdleTool"
             private const val TOOL_NAME = "wait_for_idle"
             private const val IDLE_CHECK_INTERVAL_MS = 500L
-            private const val DEFAULT_TIMEOUT_MS = 3000L
             private const val MAX_TIMEOUT_MS = 30000L
             private const val HASH_SEED = 17
             private const val HASH_MULTIPLIER = 31
@@ -432,16 +424,16 @@ class WaitForIdleTool
     }
 
 /**
- * Registers all utility tools with the [ToolRegistry].
+ * Registers all utility tools with the given [Server].
  */
 fun registerUtilityTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     treeParser: AccessibilityTreeParser,
     elementFinder: ElementFinder,
     accessibilityServiceProvider: AccessibilityServiceProvider,
 ) {
-    GetClipboardTool(accessibilityServiceProvider).register(toolRegistry)
-    SetClipboardTool(accessibilityServiceProvider).register(toolRegistry)
-    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(toolRegistry)
-    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(toolRegistry)
+    GetClipboardTool(accessibilityServiceProvider).register(server)
+    SetClipboardTool(accessibilityServiceProvider).register(server)
+    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
+    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(server)
 }
