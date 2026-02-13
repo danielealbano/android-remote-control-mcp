@@ -17,7 +17,10 @@ datastore = "1.1.1"                     # verify latest at implementation time
 ktor = "3.4.0"                          # verify latest at implementation time
 
 # MCP SDK
-mcp-kotlin-sdk = "0.4.0"               # verify latest at implementation time
+mcp-kotlin-sdk = "0.8.3"               # MCP Kotlin SDK (Streamable HTTP transport)
+
+# SLF4J (routes SDK logs to android.util.Log)
+slf4j-android = "1.7.36"
 
 # Certificate generation
 bouncy-castle = "1.83"                 # Bouncy Castle for X.509 cert generation with SAN support
@@ -96,7 +99,14 @@ bouncy-castle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", vers
 bouncy-castle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncy-castle" }
 
 # MCP SDK
-mcp-kotlin-sdk = { group = "io.modelcontextprotocol", name = "kotlin-sdk", version.ref = "mcp-kotlin-sdk" }
+mcp-kotlin-sdk-server = { group = "io.modelcontextprotocol", name = "kotlin-sdk-server", version.ref = "mcp-kotlin-sdk" }
+mcp-kotlin-sdk-client = { group = "io.modelcontextprotocol", name = "kotlin-sdk-client", version.ref = "mcp-kotlin-sdk" }
+
+# SLF4J Android binding
+slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j-android" }
+
+# Ktor Client (E2E tests - SDK client transport needs Ktor client engine)
+ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
 
 # Kotlinx
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
