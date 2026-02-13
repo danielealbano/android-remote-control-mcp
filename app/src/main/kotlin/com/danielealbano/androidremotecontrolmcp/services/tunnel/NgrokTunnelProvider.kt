@@ -86,7 +86,9 @@ class NgrokTunnelProvider
                                 providerType = TunnelProviderType.NGROK,
                             )
                     }
-                } catch (e: Exception) {
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
                     Log.e(TAG, "Failed to start ngrok tunnel", e)
                     _status.value = TunnelStatus.Error("Failed to start ngrok: ${e.message}")
                     cleanup()
