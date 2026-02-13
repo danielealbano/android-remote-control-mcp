@@ -2,11 +2,12 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.GesturePoint
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -36,12 +37,12 @@ class PinchTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val centerX = McpToolUtils.requireFloat(params, "center_x")
-            val centerY = McpToolUtils.requireFloat(params, "center_y")
-            val scale = McpToolUtils.requireFloat(params, "scale")
-            val duration = McpToolUtils.optionalLong(params, "duration", DEFAULT_DURATION_MS)
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val centerX = McpToolUtils.requireFloat(arguments, "center_x")
+            val centerY = McpToolUtils.requireFloat(arguments, "center_y")
+            val scale = McpToolUtils.requireFloat(arguments, "scale")
+            val duration = McpToolUtils.optionalLong(arguments, "duration", DEFAULT_DURATION_MS)
 
             McpToolUtils.validateNonNegative(centerX, "center_x")
             McpToolUtils.validateNonNegative(centerY, "center_y")
@@ -64,43 +65,35 @@ class PinchTool
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Performs a pinch-to-zoom gesture.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("center_x") {
-                                put("type", "number")
-                                put("description", "Center X coordinate")
-                            }
-                            putJsonObject("center_y") {
-                                put("type", "number")
-                                put("description", "Center Y coordinate")
-                            }
-                            putJsonObject("scale") {
-                                put("type", "number")
-                                put("description", "Scale factor (>1 = zoom in, <1 = zoom out)")
-                            }
-                            putJsonObject("duration") {
-                                put("type", "number")
-                                put("description", "Gesture duration in ms")
-                                put("default", DEFAULT_DURATION_MS)
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("center_x"))
-                                add(JsonPrimitive("center_y"))
-                                add(JsonPrimitive("scale"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("center_x") {
+                                    put("type", "number")
+                                    put("description", "Center X coordinate")
+                                }
+                                putJsonObject("center_y") {
+                                    put("type", "number")
+                                    put("description", "Center Y coordinate")
+                                }
+                                putJsonObject("scale") {
+                                    put("type", "number")
+                                    put("description", "Scale factor (>1 = zoom in, <1 = zoom out)")
+                                }
+                                putJsonObject("duration") {
+                                    put("type", "number")
+                                    put("description", "Gesture duration in ms")
+                                    put("default", DEFAULT_DURATION_MS)
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("center_x", "center_y", "scale"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -131,10 +124,10 @@ class CustomGestureTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val pathsElement =
-                params?.get("paths")
+                arguments?.get("paths")
                     ?: throw McpToolException.InvalidParams("Missing required parameter: 'paths'")
 
             val pathsArray =
@@ -316,53 +309,47 @@ class CustomGestureTool
             return longVal
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Executes a custom multi-touch gesture defined by path points.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("paths") {
-                                put("type", "array")
-                                putJsonObject("items") {
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("paths") {
                                     put("type", "array")
                                     putJsonObject("items") {
-                                        put("type", "object")
-                                        putJsonObject("properties") {
-                                            putJsonObject("x") {
-                                                put("type", "number")
+                                        put("type", "array")
+                                        putJsonObject("items") {
+                                            put("type", "object")
+                                            putJsonObject("properties") {
+                                                putJsonObject("x") {
+                                                    put("type", "number")
+                                                }
+                                                putJsonObject("y") {
+                                                    put("type", "number")
+                                                }
+                                                putJsonObject("time") {
+                                                    put("type", "number")
+                                                    put("description", "Time offset in ms")
+                                                }
                                             }
-                                            putJsonObject("y") {
-                                                put("type", "number")
-                                            }
-                                            putJsonObject("time") {
-                                                put("type", "number")
-                                                put("description", "Time offset in ms")
-                                            }
+                                            put(
+                                                "required",
+                                                buildJsonArray {
+                                                    add(JsonPrimitive("x"))
+                                                    add(JsonPrimitive("y"))
+                                                    add(JsonPrimitive("time"))
+                                                },
+                                            )
                                         }
-                                        put(
-                                            "required",
-                                            buildJsonArray {
-                                                add(JsonPrimitive("x"))
-                                                add(JsonPrimitive("y"))
-                                                add(JsonPrimitive("time"))
-                                            },
-                                        )
                                     }
                                 }
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("paths"))
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("paths"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -377,14 +364,14 @@ class CustomGestureTool
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Registers all gesture tools with the given [ToolRegistry].
+ * Registers all gesture tools with the given [Server].
  *
  * Called from [McpServerService.startServer] during server startup.
  */
 fun registerGestureTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     actionExecutor: ActionExecutor,
 ) {
-    PinchTool(actionExecutor).register(toolRegistry)
-    CustomGestureTool(actionExecutor).register(toolRegistry)
+    PinchTool(actionExecutor).register(server)
+    CustomGestureTool(actionExecutor).register(server)
 }
