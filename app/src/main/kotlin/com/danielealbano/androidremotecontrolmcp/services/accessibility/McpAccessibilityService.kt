@@ -5,15 +5,22 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
+import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.Executor
+import kotlin.coroutines.resume
 
 @Suppress("TooManyFunctions")
 class McpAccessibilityService : AccessibilityService() {
@@ -187,9 +194,56 @@ class McpAccessibilityService : AccessibilityService() {
             }
     }
 
+    /**
+     * Takes a screenshot using AccessibilityService.takeScreenshot() API.
+     * Available on Android 11+ (API 30+). Does NOT require user consent.
+     *
+     * @param timeoutMs Maximum time to wait for screenshot capture.
+     * @return Bitmap of the screenshot, or null if capture failed or timed out.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? {
+        return withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine { continuation ->
+                val executor = Executor { it.run() }
+                val callback =
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshot: ScreenshotResult) {
+                            val bitmap =
+                                Bitmap.wrapHardwareBuffer(
+                                    screenshot.hardwareBuffer,
+                                    screenshot.colorSpace,
+                                )
+                            screenshot.hardwareBuffer.close()
+                            if (continuation.isActive) {
+                                continuation.resume(bitmap)
+                            }
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            Log.e(TAG, "Screenshot failed with error code: $errorCode")
+                            if (continuation.isActive) {
+                                continuation.resume(null)
+                            }
+                        }
+                    }
+
+                takeScreenshot(Display.DEFAULT_DISPLAY, executor, callback)
+            }
+        }
+    }
+
+    /**
+     * Returns true if screenshot capability is available (Android 11+).
+     */
+    fun canTakeScreenshot(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+    }
+
     companion object {
         private const val TAG = "MCP:AccessibilityService"
         private const val NOTIFICATION_TIMEOUT_MS = 100L
+        private const val SCREENSHOT_TIMEOUT_MS = 5000L
 
         /**
          * Singleton instance of the accessibility service.
