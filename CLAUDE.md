@@ -378,35 +378,37 @@ fun `findByText returns matching nodes`() {
 }
 ```
 
-### Integration testing (Android Instrumented Tests)
-- Use **AndroidX Test** framework.
-- Use **Compose UI Test** for testing Compose UI.
-- Use **MockK** for mocking services.
-- Use **Hilt Test** for dependency injection in tests.
-- Organize tests in `app/src/androidTest/kotlin/` directory.
+### Integration testing (JVM-based, Ktor testApplication)
+- Use **Ktor `testApplication`** for in-process HTTP testing (no real sockets, no emulator).
+- Use **JUnit 5** as test framework.
+- Use **MockK** for mocking Android service interfaces (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`).
+- Organize tests in `app/src/test/kotlin/.../integration/` directory (runs as part of `./gradlew test`).
 
 **What to integration test**:
-- MainActivity UI interactions (`MainActivityTest`),
-- Compose screen rendering and state updates,
-- ViewModel and repository integration (with real DataStore, mocked services),
-- Service binding and unbinding (mocked actual Android services).
+- Full HTTP stack: authentication (bearer token), JSON-RPC protocol handling, tool dispatch,
+- All 7 tool categories (touch, element, gesture, screen, system, text, utility),
+- Error code propagation (-32001 through -32004, -32602, -32603).
 
 **Mocking strategy**:
-- Mock all Android services (AccessibilityService, MediaProjection, Ktor server).
-- Use real DataStore (in-memory for tests).
-- No real network calls, no real MCP server.
+- Mock Android services via extracted interfaces (not concrete classes).
+- Use real `McpProtocolHandler` and `ToolRegistry` (real routing, real dispatching).
+- `McpIntegrationTestHelper` configures `testApplication` mirroring production `McpServer` routing.
 
 **Example**:
 ```kotlin
-@HiltAndroidTest
-class MainActivityTest {
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
+@Test
+fun `tap with valid coordinates calls actionExecutor and returns success`() = runTest {
+    val deps = McpIntegrationTestHelper.createMockDependencies()
+    coEvery { deps.actionExecutor.tap(500f, 800f) } returns Result.success(Unit)
 
-    @Test
-    fun whenServerStarted_statusUpdates() {
-        composeTestRule.onNodeWithText("Start Server").performClick()
-        composeTestRule.onNodeWithText("Server Running").assertIsDisplayed()
+    McpIntegrationTestHelper.withTestApplication(deps) { _ ->
+        val response = sendToolCall(
+            toolName = "tap",
+            arguments = buildJsonObject { put("x", 500); put("y", 800) },
+        )
+        assertEquals(HttpStatusCode.OK, response.status)
+        val rpcResponse = response.toJsonRpcResponse()
+        assertNull(rpcResponse.error)
     }
 }
 ```
@@ -456,7 +458,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 - **Gradle**: Version 8.x (wrapper included in project, use `./gradlew`).
 - **adb**: Android Debug Bridge (part of Android SDK platform-tools).
 - **Docker**: Required for E2E tests (budtmo/docker-android-x86 image).
-- **Emulator or Device**: For integration tests and manual testing.
+- **Emulator or Device**: For E2E tests and manual testing.
 
 ### Environment setup
 - Set `ANDROID_HOME` environment variable (e.g., `export ANDROID_HOME=~/Android/Sdk`).
@@ -547,6 +549,6 @@ Local development requires Android SDK, emulator/device, and standard Android de
 ### CI/CD (GitHub Actions)
 - Workflow defined in `.github/workflows/ci.yml`.
 - Runs on: push to main, pull requests.
-- Jobs: lint → test-unit → test-integration → test-e2e → build-release.
+- Jobs: lint → test-unit (includes JVM integration tests) → test-e2e → build-release.
 - Upload APK as artifact on successful build.
 - Fail build if any test or lint check fails.
