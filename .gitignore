@@ -35,6 +35,8 @@ Thumbs.db
 *.apk
 *.ap_
 *.aab
+# Exception: test fixture APKs needed for E2E tests
+!e2e-tests/src/test/resources/*.apk
 
 # Generated files
 gen/
