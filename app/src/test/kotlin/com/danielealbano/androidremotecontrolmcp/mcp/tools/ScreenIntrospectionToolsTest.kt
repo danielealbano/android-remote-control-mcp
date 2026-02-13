@@ -5,12 +5,11 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
-import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureService
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,47 +33,22 @@ import org.junit.jupiter.api.assertThrows
 
 @DisplayName("Screen Introspection Tools")
 class ScreenIntrospectionToolsTest {
-    private lateinit var mockService: McpAccessibilityService
+    private lateinit var mockAccessibilityServiceProvider: AccessibilityServiceProvider
+    private lateinit var mockScreenCaptureProvider: ScreenCaptureProvider
     private lateinit var mockTreeParser: AccessibilityTreeParser
     private lateinit var mockRootNode: AccessibilityNodeInfo
-    private lateinit var mockScreenCaptureService: ScreenCaptureService
-    private lateinit var mockServerService: McpServerService
 
     @BeforeEach
     fun setUp() {
-        mockService = mockk<McpAccessibilityService>(relaxed = true)
+        mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>(relaxed = true)
+        mockScreenCaptureProvider = mockk<ScreenCaptureProvider>()
         mockTreeParser = mockk<AccessibilityTreeParser>()
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
-        mockScreenCaptureService = mockk<ScreenCaptureService>()
-        mockServerService = mockk<McpServerService>()
-
-        setAccessibilityServiceInstance(mockService)
-        setServerServiceInstance(mockServerService)
     }
 
     @AfterEach
     fun tearDown() {
-        setAccessibilityServiceInstance(null)
-        setServerServiceInstance(null)
         unmockkAll()
-    }
-
-    /**
-     * Sets [McpAccessibilityService.instance] via reflection for testing.
-     */
-    private fun setAccessibilityServiceInstance(instance: McpAccessibilityService?) {
-        val field = McpAccessibilityService::class.java.getDeclaredField("instance")
-        field.isAccessible = true
-        field.set(null, instance)
-    }
-
-    /**
-     * Sets [McpServerService.instance] via reflection for testing.
-     */
-    private fun setServerServiceInstance(instance: McpServerService?) {
-        val field = McpServerService::class.java.getDeclaredField("instance")
-        field.isAccessible = true
-        field.set(null, instance)
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -88,7 +62,7 @@ class ScreenIntrospectionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = GetAccessibilityTreeHandler(mockTreeParser)
+            handler = GetAccessibilityTreeHandler(mockTreeParser, mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -96,8 +70,8 @@ class ScreenIntrospectionToolsTest {
         fun returnsTreeJsonWhenServiceIsReady() =
             runTest {
                 // Arrange
-                every { mockService.isReady() } returns true
-                every { mockService.getRootNode() } returns mockRootNode
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
                 val mockTreeData =
                     AccessibilityNodeData(
                         id = "root_0",
@@ -128,7 +102,7 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
                 val exception =
@@ -144,7 +118,7 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenServiceNotReady() =
             runTest {
                 // Arrange
-                every { mockService.isReady() } returns false
+                every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
                 val exception =
@@ -152,7 +126,6 @@ class ScreenIntrospectionToolsTest {
                         handler.execute(null)
                     }
                 assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
-                assertTrue(exception.message!!.contains("not ready"))
             }
 
         @Test
@@ -160,8 +133,8 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenRootNodeNull() =
             runTest {
                 // Arrange
-                every { mockService.isReady() } returns true
-                every { mockService.getRootNode() } returns null
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every { mockAccessibilityServiceProvider.getRootNode() } returns null
 
                 // Act & Assert
                 val exception =
@@ -183,7 +156,7 @@ class ScreenIntrospectionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = CaptureScreenshotHandler()
+            handler = CaptureScreenshotHandler(mockScreenCaptureProvider)
         }
 
         @Test
@@ -191,9 +164,8 @@ class ScreenIntrospectionToolsTest {
         fun capturesScreenshotWithDefaultQuality() =
             runTest {
                 // Arrange
-                every { mockServerService.getScreenCaptureService() } returns mockScreenCaptureService
-                every { mockScreenCaptureService.isMediaProjectionActive() } returns true
-                coEvery { mockScreenCaptureService.captureScreenshot(80) } returns
+                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                coEvery { mockScreenCaptureProvider.captureScreenshot(80) } returns
                     Result.success(
                         ScreenshotData(data = "base64data", width = 1080, height = 2400),
                     )
@@ -217,9 +189,8 @@ class ScreenIntrospectionToolsTest {
         fun capturesScreenshotWithCustomQuality() =
             runTest {
                 // Arrange
-                every { mockServerService.getScreenCaptureService() } returns mockScreenCaptureService
-                every { mockScreenCaptureService.isMediaProjectionActive() } returns true
-                coEvery { mockScreenCaptureService.captureScreenshot(50) } returns
+                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                coEvery { mockScreenCaptureProvider.captureScreenshot(50) } returns
                     Result.success(
                         ScreenshotData(data = "base64data50", width = 1080, height = 2400),
                     )
@@ -300,8 +271,7 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenMediaProjectionNotGranted() =
             runTest {
                 // Arrange
-                every { mockServerService.getScreenCaptureService() } returns mockScreenCaptureService
-                every { mockScreenCaptureService.isMediaProjectionActive() } returns false
+                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns false
 
                 // Act & Assert
                 val exception =
@@ -313,28 +283,12 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
-        @DisplayName("throws error -32001 when screen capture service not available")
-        fun throwsErrorWhenServiceNotAvailable() =
-            runTest {
-                // Arrange
-                every { mockServerService.getScreenCaptureService() } returns null
-
-                // Act & Assert
-                val exception =
-                    assertThrows<McpToolException> {
-                        handler.execute(null)
-                    }
-                assertEquals(McpProtocolHandler.ERROR_PERMISSION_DENIED, exception.code)
-            }
-
-        @Test
         @DisplayName("throws error -32003 when capture fails")
         fun throwsErrorWhenCaptureFails() =
             runTest {
                 // Arrange
-                every { mockServerService.getScreenCaptureService() } returns mockScreenCaptureService
-                every { mockScreenCaptureService.isMediaProjectionActive() } returns true
-                coEvery { mockScreenCaptureService.captureScreenshot(80) } returns
+                every { mockScreenCaptureProvider.isMediaProjectionActive() } returns true
+                coEvery { mockScreenCaptureProvider.captureScreenshot(80) } returns
                     Result.failure(
                         RuntimeException("Capture timeout"),
                     )
@@ -360,7 +314,7 @@ class ScreenIntrospectionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = GetCurrentAppHandler()
+            handler = GetCurrentAppHandler(mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -368,8 +322,9 @@ class ScreenIntrospectionToolsTest {
         fun returnsPackageAndActivityName() =
             runTest {
                 // Arrange
-                every { mockService.getCurrentPackageName() } returns "com.android.calculator2"
-                every { mockService.getCurrentActivityName() } returns ".Calculator"
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.android.calculator2"
+                every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Calculator"
 
                 // Act
                 val result = handler.execute(null)
@@ -388,8 +343,9 @@ class ScreenIntrospectionToolsTest {
         fun returnsUnknownWhenNoAppFocused() =
             runTest {
                 // Arrange
-                every { mockService.getCurrentPackageName() } returns null
-                every { mockService.getCurrentActivityName() } returns null
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns null
+                every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns null
 
                 // Act
                 val result = handler.execute(null)
@@ -405,7 +361,7 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 // Act & Assert
                 val exception =
@@ -427,7 +383,7 @@ class ScreenIntrospectionToolsTest {
 
         @BeforeEach
         fun setUp() {
-            handler = GetScreenInfoHandler()
+            handler = GetScreenInfoHandler(mockAccessibilityServiceProvider)
         }
 
         @Test
@@ -435,7 +391,7 @@ class ScreenIntrospectionToolsTest {
         fun returnsScreenDimensionsAndOrientation() =
             runTest {
                 // Arrange
-                every { mockService.getScreenInfo() } returns
+                every { mockAccessibilityServiceProvider.getScreenInfo() } returns
                     ScreenInfo(
                         width = 1080,
                         height = 2400,
@@ -462,7 +418,8 @@ class ScreenIntrospectionToolsTest {
         fun throwsErrorWhenServiceNotAvailable() =
             runTest {
                 // Arrange
-                setAccessibilityServiceInstance(null)
+                every { mockAccessibilityServiceProvider.getScreenInfo() } throws
+                    McpToolException.PermissionDenied("Accessibility service not enabled")
 
                 // Act & Assert
                 val exception =

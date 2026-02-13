@@ -8,9 +8,9 @@ import com.danielealbano.androidremotecontrolmcp.mcp.McpProtocolHandler
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -33,17 +33,19 @@ import javax.inject.Inject
  */
 class GetClipboardTool
     @Inject
-    constructor() : ToolHandler {
+    constructor(
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+    ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
-            val service =
-                McpAccessibilityService.instance
+            val context =
+                accessibilityServiceProvider.getContext()
                     ?: throw McpToolException.PermissionDenied(
                         "Accessibility service is not enabled",
                     )
 
             return try {
                 val clipboardManager =
-                    service.getSystemService(ClipboardManager::class.java)
+                    context.getSystemService(ClipboardManager::class.java)
                         ?: throw McpToolException.ActionFailed(
                             "ClipboardManager not available",
                         )
@@ -103,21 +105,23 @@ class GetClipboardTool
  */
 class SetClipboardTool
     @Inject
-    constructor() : ToolHandler {
+    constructor(
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+    ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val text =
                 params?.get("text")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
 
-            val service =
-                McpAccessibilityService.instance
+            val context =
+                accessibilityServiceProvider.getContext()
                     ?: throw McpToolException.PermissionDenied(
                         "Accessibility service is not enabled",
                     )
 
             return try {
                 val clipboardManager =
-                    service.getSystemService(ClipboardManager::class.java)
+                    context.getSystemService(ClipboardManager::class.java)
                         ?: throw McpToolException.ActionFailed(
                             "ClipboardManager not available",
                         )
@@ -177,6 +181,7 @@ class WaitForElementTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         @Suppress("CyclomaticComplexity", "LongMethod")
         override suspend fun execute(params: JsonObject?): JsonElement {
@@ -214,7 +219,7 @@ class WaitForElementTool
                 attemptCount++
 
                 try {
-                    val tree = getFreshTree(treeParser)
+                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                     val elements = elementFinder.findElements(tree, findBy, value, false)
 
                     if (elements.isNotEmpty()) {
@@ -323,6 +328,7 @@ class WaitForIdleTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         @Suppress("NestedBlockDepth")
         override suspend fun execute(params: JsonObject?): JsonElement {
@@ -339,7 +345,7 @@ class WaitForIdleTool
 
             while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
-                    val tree = getFreshTree(treeParser)
+                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                     val currentHash = computeTreeHash(tree)
 
                     if (previousHash != null && currentHash == previousHash) {
@@ -429,11 +435,14 @@ class WaitForIdleTool
 /**
  * Registers all utility tools with the [ToolRegistry].
  */
-fun registerUtilityTools(toolRegistry: ToolRegistry) {
-    val treeParser = AccessibilityTreeParser()
-    val elementFinder = ElementFinder()
-    GetClipboardTool().register(toolRegistry)
-    SetClipboardTool().register(toolRegistry)
-    WaitForElementTool(treeParser, elementFinder).register(toolRegistry)
-    WaitForIdleTool(treeParser).register(toolRegistry)
+fun registerUtilityTools(
+    toolRegistry: ToolRegistry,
+    treeParser: AccessibilityTreeParser,
+    elementFinder: ElementFinder,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+) {
+    GetClipboardTool(accessibilityServiceProvider).register(toolRegistry)
+    SetClipboardTool(accessibilityServiceProvider).register(toolRegistry)
+    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(toolRegistry)
+    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(toolRegistry)
 }

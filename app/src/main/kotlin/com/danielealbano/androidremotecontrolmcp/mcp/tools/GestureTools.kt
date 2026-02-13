@@ -381,8 +381,10 @@ class CustomGestureTool
  *
  * Called from [McpServerService.startServer] during server startup.
  */
-fun registerGestureTools(toolRegistry: ToolRegistry) {
-    val actionExecutor = ActionExecutor()
+fun registerGestureTools(
+    toolRegistry: ToolRegistry,
+    actionExecutor: ActionExecutor,
+) {
     PinchTool(actionExecutor).register(toolRegistry)
     CustomGestureTool(actionExecutor).register(toolRegistry)
 }

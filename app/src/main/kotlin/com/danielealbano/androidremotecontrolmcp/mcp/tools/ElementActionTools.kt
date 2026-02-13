@@ -6,11 +6,11 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -36,6 +36,7 @@ class FindElementsTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             // Validate parameters
@@ -60,7 +61,7 @@ class FindElementsTool
                     )
 
             // Get fresh accessibility tree
-            val tree = getFreshTree(treeParser)
+            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
 
             // Search
             val elements = elementFinder.findElements(tree, findBy, value, exactMatch)
@@ -165,6 +166,7 @@ class ClickElementTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val elementId =
@@ -175,7 +177,7 @@ class ClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val tree = getFreshTree(treeParser)
+            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
 
             val result = actionExecutor.clickNode(elementId, tree)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
@@ -219,6 +221,7 @@ class LongClickElementTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val elementId =
@@ -229,7 +232,7 @@ class LongClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val tree = getFreshTree(treeParser)
+            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
 
             val result = actionExecutor.longClickNode(elementId, tree)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
@@ -273,6 +276,7 @@ class SetTextTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val elementId =
@@ -292,7 +296,7 @@ class SetTextTool
                     ?: throw McpToolException.InvalidParams("Parameter 'text' must be a string")
             val text = textPrimitive.contentOrNull ?: ""
 
-            val tree = getFreshTree(treeParser)
+            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
 
             val result = actionExecutor.setTextOnNode(elementId, text, tree)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
@@ -348,6 +352,7 @@ class ScrollToElementTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ToolHandler {
         override suspend fun execute(params: JsonObject?): JsonElement {
             val elementId =
@@ -359,7 +364,7 @@ class ScrollToElementTool
             }
 
             // Parse tree and find the element
-            var tree = getFreshTree(treeParser)
+            var tree = getFreshTree(treeParser, accessibilityServiceProvider)
             var node =
                 elementFinder.findNodeById(tree, elementId)
                     ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
@@ -390,7 +395,7 @@ class ScrollToElementTool
                 kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
 
                 // Re-parse and check visibility
-                tree = getFreshTree(treeParser)
+                tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 node = elementFinder.findNodeById(tree, elementId) ?: continue
 
                 if (node.visible) {
@@ -496,17 +501,14 @@ internal fun mapFindBy(by: String): FindBy? {
  * @throws McpToolException with -32001 if accessibility service is not available.
  * @throws McpToolException with -32001 if no root node is available.
  */
-internal fun getFreshTree(treeParser: AccessibilityTreeParser): AccessibilityNodeData {
-    val service =
-        McpAccessibilityService.instance
-            ?: throw McpToolException.PermissionDenied(
-                "Accessibility service is not enabled. Please enable it in Android Settings.",
-            )
-
+internal fun getFreshTree(
+    treeParser: AccessibilityTreeParser,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+): AccessibilityNodeData {
     val rootNode =
-        service.getRootNode()
+        accessibilityServiceProvider.getRootNode()
             ?: throw McpToolException.PermissionDenied(
-                "No active window available. Ensure an app is in the foreground.",
+                "Accessibility service is not enabled or no active window available.",
             )
 
     return try {
@@ -520,15 +522,18 @@ internal fun getFreshTree(treeParser: AccessibilityTreeParser): AccessibilityNod
 /**
  * Registers all element action tools with the [ToolRegistry].
  */
-fun registerElementActionTools(toolRegistry: ToolRegistry) {
-    val treeParser = AccessibilityTreeParser()
-    val elementFinder = ElementFinder()
-    val actionExecutor = ActionExecutor()
-    FindElementsTool(treeParser, elementFinder).register(toolRegistry)
-    ClickElementTool(treeParser, actionExecutor).register(toolRegistry)
-    LongClickElementTool(treeParser, actionExecutor).register(toolRegistry)
-    SetTextTool(treeParser, actionExecutor).register(toolRegistry)
-    ScrollToElementTool(treeParser, elementFinder, actionExecutor).register(toolRegistry)
+fun registerElementActionTools(
+    toolRegistry: ToolRegistry,
+    treeParser: AccessibilityTreeParser,
+    elementFinder: ElementFinder,
+    actionExecutor: ActionExecutor,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+) {
+    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(toolRegistry)
+    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
 }
 
 /**
