@@ -24,7 +24,6 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.security.KeyStore
@@ -190,17 +189,8 @@ class McpServer(
                         call.respond(response)
                     }
 
-                    get("/tools/list") {
-                        val idParam = call.request.queryParameters["id"]
-                        val requestId: kotlinx.serialization.json.JsonElement? =
-                            idParam?.let { id ->
-                                id.toLongOrNull()?.let { JsonPrimitive(it) } ?: JsonPrimitive(id)
-                            }
-                        val request =
-                            JsonRpcRequest(
-                                method = McpProtocolHandler.METHOD_TOOLS_LIST,
-                                id = requestId,
-                            )
+                    post("/tools/list") {
+                        val request = receiveJsonRpcRequest(call, "/tools/list") ?: return@post
                         val response = protocolHandler.handleRequest(request)
                         call.respond(response)
                     }
