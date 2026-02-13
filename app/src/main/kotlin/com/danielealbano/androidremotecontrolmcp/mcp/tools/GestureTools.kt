@@ -125,6 +125,7 @@ class CustomGestureTool
     constructor(
         private val actionExecutor: ActionExecutor,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val pathsElement =
                 arguments?.get("paths")

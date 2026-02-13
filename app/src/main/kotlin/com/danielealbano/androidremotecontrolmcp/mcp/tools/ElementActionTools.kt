@@ -39,6 +39,7 @@ class FindElementsTool
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
             val byStr =
@@ -270,6 +271,7 @@ class SetTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
                 arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
@@ -339,6 +341,7 @@ class ScrollToElementTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
                 arguments?.get("element_id")?.jsonPrimitive?.contentOrNull

@@ -49,10 +49,11 @@ class UtilityIntegrationTest {
             every { mockItem.text } returns "clipboard text"
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "get_clipboard",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "get_clipboard",
+                        arguments = emptyMap(),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
@@ -78,10 +79,11 @@ class UtilityIntegrationTest {
             } returns mockClipboardManager
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "set_clipboard",
-                    arguments = mapOf("text" to "new clipboard content"),
-                )
+                val result =
+                    client.callTool(
+                        name = "set_clipboard",
+                        arguments = mapOf("text" to "new clipboard content"),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }

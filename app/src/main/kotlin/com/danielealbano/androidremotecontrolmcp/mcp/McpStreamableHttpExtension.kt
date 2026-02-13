@@ -39,9 +39,7 @@ private const val MCP_SESSION_ID_HEADER = "mcp-session-id"
  *
  * @param block Factory that creates a [Server] instance. Called once per new session.
  */
-fun Application.mcpStreamableHttp(
-    block: () -> Server,
-) {
+fun Application.mcpStreamableHttp(block: () -> Server) {
     val transports = ConcurrentHashMap<String, StreamableHttpServerTransport>()
 
     routing {

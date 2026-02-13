@@ -30,10 +30,11 @@ class TouchActionIntegrationTest {
             coEvery { deps.actionExecutor.tap(500f, 800f) } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "tap",
-                    arguments = mapOf("x" to 500, "y" to 800),
-                )
+                val result =
+                    client.callTool(
+                        name = "tap",
+                        arguments = mapOf("x" to 500, "y" to 800),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }
@@ -43,10 +44,11 @@ class TouchActionIntegrationTest {
     fun `tap with missing x coordinate returns error`() =
         runTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
-                val result = client.callTool(
-                    name = "tap",
-                    arguments = mapOf("y" to 800),
-                )
+                val result =
+                    client.callTool(
+                        name = "tap",
+                        arguments = mapOf("y" to 800),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.isNotEmpty())
@@ -62,13 +64,17 @@ class TouchActionIntegrationTest {
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "swipe",
-                    arguments = mapOf(
-                        "x1" to 100, "y1" to 200,
-                        "x2" to 300, "y2" to 400,
-                    ),
-                )
+                val result =
+                    client.callTool(
+                        name = "swipe",
+                        arguments =
+                            mapOf(
+                                "x1" to 100,
+                                "y1" to 200,
+                                "x2" to 300,
+                                "y2" to 400,
+                            ),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text

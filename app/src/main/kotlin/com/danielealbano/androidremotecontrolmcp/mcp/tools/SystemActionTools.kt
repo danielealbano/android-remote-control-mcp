@@ -73,6 +73,7 @@ class PressBackHandler
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Back button press") {
                 actionExecutor.pressBack()
@@ -117,6 +118,7 @@ class PressHomeHandler
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Home button press") {
                 actionExecutor.pressHome()
@@ -161,6 +163,7 @@ class PressRecentsHandler
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Recents button press") {
                 actionExecutor.pressRecents()
@@ -205,6 +208,7 @@ class OpenNotificationsHandler
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Open notifications") {
                 actionExecutor.openNotifications()
@@ -249,6 +253,7 @@ class OpenQuickSettingsHandler
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
+        @Suppress("UnusedParameter")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             return executeSystemAction(accessibilityServiceProvider, "Open quick settings") {
                 actionExecutor.openQuickSettings()
@@ -293,7 +298,7 @@ class OpenQuickSettingsHandler
 class GetDeviceLogsHandler
     @Inject
     constructor() {
-        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        @Suppress("TooGenericExceptionCaught", "SwallowedException", "ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val lastLines = parseLastLines(arguments)
             val since = arguments?.get("since")?.jsonPrimitive?.contentOrNull
@@ -473,7 +478,10 @@ class GetDeviceLogsHandler
                                 }
                                 putJsonObject("since") {
                                     put("type", "string")
-                                    put("description", "ISO 8601 timestamp to filter logs from (e.g., 2024-01-15T10:30:00)")
+                                    put(
+                                        "description",
+                                        "ISO 8601 timestamp to filter logs from (e.g., 2024-01-15T10:30:00)",
+                                    )
                                 }
                                 putJsonObject("until") {
                                     put("type", "string")

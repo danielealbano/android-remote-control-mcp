@@ -55,10 +55,11 @@ class ScreenIntrospectionIntegrationTest {
             every { mockRootNode.recycle() } returns Unit
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "get_accessibility_tree",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "get_accessibility_tree",
+                        arguments = emptyMap(),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
@@ -85,10 +86,11 @@ class ScreenIntrospectionIntegrationTest {
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "capture_screenshot",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "capture_screenshot",
+                        arguments = emptyMap(),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
@@ -111,10 +113,11 @@ class ScreenIntrospectionIntegrationTest {
             } returns "MainActivity"
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "get_current_app",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "get_current_app",
+                        arguments = emptyMap(),
+                    )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
@@ -138,10 +141,11 @@ class ScreenIntrospectionIntegrationTest {
             every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns false
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "capture_screenshot",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "capture_screenshot",
+                        arguments = emptyMap(),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Screen capture not available"))

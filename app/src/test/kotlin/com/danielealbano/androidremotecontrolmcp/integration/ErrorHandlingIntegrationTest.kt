@@ -44,10 +44,11 @@ class ErrorHandlingIntegrationTest {
             every { deps.accessibilityServiceProvider.isReady() } returns false
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "press_back",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "press_back",
+                        arguments = emptyMap(),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Accessibility service not enabled"))
@@ -70,10 +71,11 @@ class ErrorHandlingIntegrationTest {
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "click_element",
-                    arguments = mapOf("element_id" to "nonexistent"),
-                )
+                val result =
+                    client.callTool(
+                        name = "click_element",
+                        arguments = mapOf("element_id" to "nonexistent"),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("nonexistent"))
@@ -96,10 +98,11 @@ class ErrorHandlingIntegrationTest {
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "click_element",
-                    arguments = mapOf("element_id" to "node_root"),
-                )
+                val result =
+                    client.callTool(
+                        name = "click_element",
+                        arguments = mapOf("element_id" to "node_root"),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("not clickable"))
@@ -110,10 +113,11 @@ class ErrorHandlingIntegrationTest {
     fun `invalid params returns error result`() =
         runTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
-                val result = client.callTool(
-                    name = "tap",
-                    arguments = mapOf("x" to "not_a_number", "y" to 100),
-                )
+                val result =
+                    client.callTool(
+                        name = "tap",
+                        arguments = mapOf("x" to "not_a_number", "y" to 100),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.isNotEmpty())
@@ -130,10 +134,11 @@ class ErrorHandlingIntegrationTest {
             } throws RuntimeException("Unexpected internal error")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(
-                    name = "press_back",
-                    arguments = emptyMap(),
-                )
+                val result =
+                    client.callTool(
+                        name = "press_back",
+                        arguments = emptyMap(),
+                    )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Unexpected internal error"))

@@ -122,17 +122,21 @@ object McpIntegrationTestHelper {
      * Creates an SDK [Server] with all tools registered using the given dependencies.
      */
     fun createSdkServer(deps: MockDependencies): Server {
-        val server = Server(
-            serverInfo = Implementation(
-                name = "android-remote-control-mcp",
-                version = "test",
-            ),
-            options = ServerOptions(
-                capabilities = ServerCapabilities(
-                    tools = ServerCapabilities.Tools(listChanged = false),
-                ),
-            ),
-        )
+        val server =
+            Server(
+                serverInfo =
+                    Implementation(
+                        name = "android-remote-control-mcp",
+                        version = "test",
+                    ),
+                options =
+                    ServerOptions(
+                        capabilities =
+                            ServerCapabilities(
+                                tools = ServerCapabilities.Tools(listChanged = false),
+                            ),
+                    ),
+            )
         registerAllTools(server, deps)
         return server
     }
@@ -161,24 +165,27 @@ object McpIntegrationTestHelper {
                 mcpStreamableHttp { sdkServer }
             }
 
-            val httpClient = createClient {
-                install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                    json(McpJson)
+            val httpClient =
+                createClient {
+                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                        json(McpJson)
+                    }
+                    install(io.ktor.client.plugins.sse.SSE)
                 }
-                install(io.ktor.client.plugins.sse.SSE)
-            }
 
-            val transport = StreamableHttpClientTransport(
-                client = httpClient,
-                url = "/mcp",
-                requestBuilder = {
-                    headers.append("Authorization", "Bearer $TEST_BEARER_TOKEN")
-                },
-            )
+            val transport =
+                StreamableHttpClientTransport(
+                    client = httpClient,
+                    url = "/mcp",
+                    requestBuilder = {
+                        headers.append("Authorization", "Bearer $TEST_BEARER_TOKEN")
+                    },
+                )
 
-            val mcpClient = Client(
-                clientInfo = Implementation(name = "test-client", version = "1.0.0"),
-            )
+            val mcpClient =
+                Client(
+                    clientInfo = Implementation(name = "test-client", version = "1.0.0"),
+                )
             mcpClient.connect(transport)
 
             try {
