@@ -30,14 +30,14 @@ Commits MUST be pushed regularly throughout the implementation. When all work is
 **So that** MCP tools can be tested with mock implementations on JVM without an Android emulator.
 
 ### Acceptance Criteria
-- [ ] `ActionExecutor` is an interface; the current implementation is renamed `ActionExecutorImpl`
-- [ ] `AccessibilityServiceProvider` interface exists and is used by all tools that previously accessed `McpAccessibilityService.instance` directly
-- [ ] `ScreenCaptureProvider` interface exists and is used by `CaptureScreenshotHandler`
-- [ ] All 3 interfaces have Hilt bindings in `AppModule.kt`
-- [ ] No tool file references `McpAccessibilityService.instance` or `McpServerService.instance` directly (only via injected interfaces)
-- [ ] All existing unit tests pass (with updated constructor signatures)
-- [ ] `./gradlew ktlintCheck detekt` passes with no warnings or errors
-- [ ] `./gradlew :app:test` passes with no failures
+- [x] `ActionExecutor` is an interface; the current implementation is renamed `ActionExecutorImpl`
+- [x] `AccessibilityServiceProvider` interface exists and is used by all tools that previously accessed `McpAccessibilityService.instance` directly
+- [x] `ScreenCaptureProvider` interface exists and is used by `CaptureScreenshotHandler`
+- [x] All 3 interfaces have Hilt bindings in `AppModule.kt`
+- [x] No tool file references `McpAccessibilityService.instance` or `McpServerService.instance` directly (only via injected interfaces)
+- [x] All existing unit tests pass (with updated constructor signatures)
+- [x] `./gradlew ktlintCheck detekt` passes with no warnings or errors
+- [x] `./gradlew :app:test` passes with no failures
 
 ---
 
@@ -46,10 +46,10 @@ Commits MUST be pushed regularly throughout the implementation. When all work is
 **Goal**: Extract an interface from the existing `ActionExecutor` class so tools depend on the interface (mockable) rather than the concrete class.
 
 **Acceptance Criteria**:
-- [ ] `ActionExecutor` interface exists in `services/accessibility/ActionExecutor.kt` with all 17 public method signatures
-- [ ] `ActionExecutorImpl` class exists in `services/accessibility/ActionExecutorImpl.kt` implementing the interface
-- [ ] `ActionExecutorImpl` retains all existing logic including `McpAccessibilityService.instance` access
-- [ ] No compilation errors
+- [x] `ActionExecutor` interface exists in `services/accessibility/ActionExecutor.kt` with all 17 public method signatures
+- [x] `ActionExecutorImpl` class exists in `services/accessibility/ActionExecutorImpl.kt` implementing the interface
+- [x] `ActionExecutorImpl` retains all existing logic including `McpAccessibilityService.instance` access
+- [x] No compilation errors
 
 #### Action 1.1.1: Create `ActionExecutor` interface
 
@@ -101,9 +101,9 @@ Move the entire current `ActionExecutor` class body into `ActionExecutorImpl`:
 **Goal**: Abstract the `McpAccessibilityService.instance` singleton access behind an injectable interface.
 
 **Acceptance Criteria**:
-- [ ] `AccessibilityServiceProvider` interface exists with methods matching what tools currently call on the singleton
-- [ ] `AccessibilityServiceProviderImpl` delegates to `McpAccessibilityService.instance`
-- [ ] No compilation errors
+- [x] `AccessibilityServiceProvider` interface exists with methods matching what tools currently call on the singleton
+- [x] `AccessibilityServiceProviderImpl` delegates to `McpAccessibilityService.instance`
+- [x] No compilation errors
 
 #### Action 1.2.1: Create `AccessibilityServiceProvider` interface
 
@@ -160,9 +160,9 @@ class AccessibilityServiceProviderImpl @Inject constructor() : AccessibilityServ
 **Goal**: Abstract the `McpServerService.instance?.getScreenCaptureService()` access behind an injectable interface.
 
 **Acceptance Criteria**:
-- [ ] `ScreenCaptureProvider` interface exists with `captureScreenshot()` method
-- [ ] `ScreenCaptureProviderImpl` delegates to `McpServerService.instance?.getScreenCaptureService()`
-- [ ] No compilation errors
+- [x] `ScreenCaptureProvider` interface exists with `captureScreenshot()` method
+- [x] `ScreenCaptureProviderImpl` delegates to `McpServerService.instance?.getScreenCaptureService()`
+- [x] No compilation errors
 
 #### Action 1.3.1: Create `ScreenCaptureProvider` interface
 
@@ -203,10 +203,10 @@ Verify the exact error-handling pattern currently used in `CaptureScreenshotHand
 **Goal**: Register the 3 new interface → implementation bindings in Hilt.
 
 **Acceptance Criteria**:
-- [ ] `AppModule.kt` binds `ActionExecutor` → `ActionExecutorImpl`
-- [ ] `AppModule.kt` binds `AccessibilityServiceProvider` → `AccessibilityServiceProviderImpl`
-- [ ] `AppModule.kt` binds `ScreenCaptureProvider` → `ScreenCaptureProviderImpl`
-- [ ] No compilation errors
+- [x] `AppModule.kt` binds `ActionExecutor` → `ActionExecutorImpl`
+- [x] `AppModule.kt` binds `AccessibilityServiceProvider` → `AccessibilityServiceProviderImpl`
+- [x] `AppModule.kt` binds `ScreenCaptureProvider` → `ScreenCaptureProviderImpl`
+- [x] No compilation errors
 
 #### Action 1.4.1: Add bindings to `AppModule.kt`
 
@@ -239,10 +239,10 @@ Add the necessary imports.
 **Goal**: Replace all direct `McpAccessibilityService.instance` and `McpServerService.instance` accesses in tool files with injected interface dependencies.
 
 **Acceptance Criteria**:
-- [ ] No tool file in `mcp/tools/` references `McpAccessibilityService.instance` directly
-- [ ] No tool file in `mcp/tools/` references `McpServerService.instance` directly
-- [ ] All tool handlers receive dependencies via constructor injection
-- [ ] No compilation errors
+- [x] No tool file in `mcp/tools/` references `McpAccessibilityService.instance` directly
+- [x] No tool file in `mcp/tools/` references `McpServerService.instance` directly
+- [x] All tool handlers receive dependencies via constructor injection
+- [x] No compilation errors
 
 #### Action 1.5.1: Update `ScreenIntrospectionTools.kt`
 
@@ -378,10 +378,10 @@ Replace `McpAccessibilityService.instance` (line 38) with `accessibilityServiceP
 **Goal**: The shared helper functions `getFreshTree()` and `findFocusedEditableNode()` currently access `McpAccessibilityService.instance` directly. They need to receive `AccessibilityServiceProvider` as a parameter instead.
 
 **Acceptance Criteria**:
-- [ ] `getFreshTree()` takes `AccessibilityServiceProvider` parameter instead of accessing singleton
-- [ ] `findFocusedEditableNode()` takes `AccessibilityServiceProvider` parameter instead of accessing singleton
-- [ ] All callers updated to pass the parameter
-- [ ] No compilation errors
+- [x] `getFreshTree()` takes `AccessibilityServiceProvider` parameter instead of accessing singleton
+- [x] `findFocusedEditableNode()` takes `AccessibilityServiceProvider` parameter instead of accessing singleton
+- [x] All callers updated to pass the parameter
+- [x] No compilation errors
 
 #### Action 1.6.1: Update `getFreshTree()` in `ElementActionTools.kt`
 
@@ -434,9 +434,9 @@ Update all callers in `TextInputTools.kt` (lines 60, 142, 249, 281, 311) — 5 c
 **Goal**: The registration functions and `McpServerService.startServer()` need to pass the new interface dependencies to tool constructors.
 
 **Acceptance Criteria**:
-- [ ] All 7 `registerXxxTools()` functions accept the required interfaces as parameters
-- [ ] `McpServerService.startServer()` passes the injected interfaces to registration functions
-- [ ] No compilation errors
+- [x] All 7 `registerXxxTools()` functions accept the required interfaces as parameters
+- [x] `McpServerService.startServer()` passes the injected interfaces to registration functions
+- [x] No compilation errors
 
 #### Action 1.7.1: Update `McpServerService.kt` tool registration
 
@@ -489,9 +489,9 @@ Files to update:
 **Goal**: Existing unit tests mock `ActionExecutor` as a class — they now need to mock the interface instead. Tests that mock `McpAccessibilityService.Companion` need to also/instead mock `AccessibilityServiceProvider`.
 
 **Acceptance Criteria**:
-- [ ] All 23 existing unit test files compile and pass
-- [ ] Tests that previously mocked `ActionExecutor` (class) now mock `ActionExecutor` (interface) — this should be transparent since MockK mocks interfaces the same way
-- [ ] Tests that previously mocked `McpAccessibilityService.Companion` may need updates if tool constructors changed (additional `AccessibilityServiceProvider` parameter)
+- [x] All 23 existing unit test files compile and pass
+- [x] Tests that previously mocked `ActionExecutor` (class) now mock `ActionExecutor` (interface) — this should be transparent since MockK mocks interfaces the same way
+- [x] Tests that previously mocked `McpAccessibilityService.Companion` may need updates if tool constructors changed (additional `AccessibilityServiceProvider` parameter)
 
 #### Action 1.8.1: Update tool test files
 
@@ -547,9 +547,9 @@ All tests must pass.
 ### Task 1.9: Run lint and verify
 
 **Acceptance Criteria**:
-- [ ] `./gradlew ktlintCheck` passes
-- [ ] `./gradlew detekt` passes
-- [ ] `./gradlew :app:test` passes (all unit tests)
+- [x] `./gradlew ktlintCheck` passes
+- [x] `./gradlew detekt` passes
+- [x] `./gradlew :app:test` passes (all unit tests)
 
 #### Action 1.9.1: Run ktlint, fix any formatting issues
 
@@ -579,14 +579,14 @@ All tests must pass.
 **So that** I can verify HTTP→auth→JSON-RPC→tool dispatch→response without needing a Docker emulator, while running fast in CI.
 
 ### Acceptance Criteria
-- [ ] Docker-based integration test infrastructure is fully removed (script, androidTest, CI job)
-- [ ] JVM-based integration tests exist in `app/src/test/kotlin/.../integration/`
-- [ ] Integration tests use Ktor `testApplication` to test the full MCP server pipeline
-- [ ] Integration tests cover: authentication, health, initialize, tools/list, tool execution (all categories), error handling
-- [ ] CI workflow runs integration tests as part of the unit test job
-- [ ] Makefile `test-integration` target updated to run JVM tests
-- [ ] `./gradlew ktlintCheck detekt` passes
-- [ ] `./gradlew :app:test` passes (unit + integration tests)
+- [x] Docker-based integration test infrastructure is fully removed (script, androidTest, CI job)
+- [x] JVM-based integration tests exist in `app/src/test/kotlin/.../integration/`
+- [x] Integration tests use Ktor `testApplication` to test the full MCP server pipeline
+- [x] Integration tests cover: authentication, health, initialize, tools/list, tool execution (all categories), error handling
+- [x] CI workflow runs integration tests as part of the unit test job
+- [x] Makefile `test-integration` target updated to run JVM tests
+- [x] `./gradlew ktlintCheck detekt` passes
+- [x] `./gradlew :app:test` passes (unit + integration tests)
 
 ---
 
@@ -595,12 +595,12 @@ All tests must pass.
 **Goal**: Remove all files and configuration related to the Docker-emulator-based integration tests.
 
 **Acceptance Criteria**:
-- [ ] `scripts/run-integration-tests.sh` deleted
-- [ ] `app/src/androidTest/kotlin/com/danielealbano/androidremotecontrolmcp/ui/MainActivityTest.kt` deleted
-- [ ] `app/src/androidTest/kotlin/com/danielealbano/androidremotecontrolmcp/HiltTestRunner.kt` deleted
-- [ ] `app/src/androidTest/` directory is empty (or deleted entirely)
-- [ ] Android instrumented test dependencies removed from `app/build.gradle.kts` (lines 165-172)
-- [ ] `testInstrumentationRunner` config removed from `app/build.gradle.kts` if it references `HiltTestRunner`
+- [x] `scripts/run-integration-tests.sh` deleted
+- [x] `app/src/androidTest/kotlin/com/danielealbano/androidremotecontrolmcp/ui/MainActivityTest.kt` deleted
+- [x] `app/src/androidTest/kotlin/com/danielealbano/androidremotecontrolmcp/HiltTestRunner.kt` deleted
+- [x] `app/src/androidTest/` directory is empty (or deleted entirely)
+- [x] Android instrumented test dependencies removed from `app/build.gradle.kts` (lines 165-172)
+- [x] `testInstrumentationRunner` config removed from `app/build.gradle.kts` if it references `HiltTestRunner`
 
 #### Action 2.1.1: Delete files
 
@@ -639,11 +639,11 @@ This references the `HiltTestRunner` class being deleted. Removing this line ent
 **Goal**: Remove the `test-integration` job and merge integration test execution into the `test-unit` job.
 
 **Acceptance Criteria**:
-- [ ] `test-integration` job removed from `.github/workflows/ci.yml`
-- [ ] `test-unit` job name updated to reflect it runs both unit and integration tests
-- [ ] `test-e2e` job's `needs` updated (was `needs: test-integration`, should now be `needs: test-unit`)
-- [ ] KVM enablement step removed (no longer needed for integration tests)
-- [ ] Upload artifact step for integration test results removed
+- [x] `test-integration` job removed from `.github/workflows/ci.yml`
+- [x] `test-unit` job name updated to reflect it runs both unit and integration tests
+- [x] `test-e2e` job's `needs` updated (was `needs: test-integration`, should now be `needs: test-unit`)
+- [x] KVM enablement step removed (no longer needed for integration tests)
+- [x] Upload artifact step for integration test results removed
 
 #### Action 2.2.1: Update `.github/workflows/ci.yml`
 
@@ -660,8 +660,8 @@ This references the `HiltTestRunner` class being deleted. Removing this line ent
 **Goal**: Update `test-integration` target to run JVM-based integration tests.
 
 **Acceptance Criteria**:
-- [ ] `test-integration` Makefile target runs JVM tests (not Docker script)
-- [ ] Help text updated
+- [x] `test-integration` Makefile target runs JVM tests (not Docker script)
+- [x] Help text updated
 
 #### Action 2.3.1: Update Makefile `test-integration` target
 
@@ -693,9 +693,9 @@ test-unit: ## Run unit tests (includes integration tests since both are JVM-base
 **Goal**: Set up the base infrastructure for JVM-based integration tests using Ktor `testApplication`.
 
 **Acceptance Criteria**:
-- [ ] Integration test base helper exists that configures a Ktor `testApplication` with: McpServer routing, BearerTokenAuth, mocked tool registry
-- [ ] Helper provides methods to send JSON-RPC requests and parse responses
-- [ ] Tests are in package `com.danielealbano.androidremotecontrolmcp.integration`
+- [x] Integration test base helper exists that configures a Ktor `testApplication` with: McpServer routing, BearerTokenAuth, mocked tool registry
+- [x] Helper provides methods to send JSON-RPC requests and parse responses
+- [x] Tests are in package `com.danielealbano.androidremotecontrolmcp.integration`
 
 #### Action 2.4.1: Create integration test helper
 
@@ -728,9 +728,9 @@ The exact routing structure from `McpServer.kt` (lines 163-215) must be replicat
 **Goal**: Test bearer token authentication through the full HTTP stack.
 
 **Acceptance Criteria**:
-- [ ] Tests verify: valid token → 200, invalid token → 401, missing token → 401, malformed header → 401
-- [ ] Tests verify health endpoint is accessible without authentication
-- [ ] All tests pass
+- [x] Tests verify: valid token → 200, invalid token → 401, missing token → 401, malformed header → 401
+- [x] Tests verify health endpoint is accessible without authentication
+- [x] All tests pass
 
 #### Action 2.5.1: Create authentication integration test
 
@@ -751,9 +751,9 @@ Tests:
 **Goal**: Test JSON-RPC protocol handling through the full HTTP stack.
 
 **Acceptance Criteria**:
-- [ ] Tests verify: initialize returns correct server info, tools/list returns all 29 tools with schemas
-- [ ] Tests verify JSON-RPC error handling: parse error, invalid request, method not found
-- [ ] All tests pass
+- [x] Tests verify: initialize returns correct server info, tools/list returns all 29 tools with schemas
+- [x] Tests verify JSON-RPC error handling: parse error, invalid request, method not found
+- [x] All tests pass
 
 #### Action 2.6.1: Create protocol integration test
 
@@ -774,10 +774,10 @@ Tests:
 **Goal**: Test tool dispatch and execution through the full HTTP stack with mocked Android services. Cover all 7 tool categories with representative tests.
 
 **Acceptance Criteria**:
-- [ ] At least 1-2 integration tests per tool category (7 categories, ~15 tests total)
-- [ ] Each test verifies: HTTP 200, correct JSON-RPC response structure, correct mock interaction
-- [ ] Parameter validation errors tested for at least 2 tools
-- [ ] All tests pass
+- [x] At least 1-2 integration tests per tool category (7 categories, ~15 tests total)
+- [x] Each test verifies: HTTP 200, correct JSON-RPC response structure, correct mock interaction
+- [x] Parameter validation errors tested for at least 2 tools
+- [x] All tests pass
 
 #### Action 2.7.1: Create touch action integration test
 
@@ -846,9 +846,9 @@ Tests:
 **Goal**: Test that MCP error codes propagate correctly through the full HTTP stack.
 
 **Acceptance Criteria**:
-- [ ] Each `McpToolException` subclass maps to the correct JSON-RPC error code in the HTTP response
-- [ ] Tests verify the complete error response structure (code, message)
-- [ ] All tests pass
+- [x] Each `McpToolException` subclass maps to the correct JSON-RPC error code in the HTTP response
+- [x] Tests verify the complete error response structure (code, message)
+- [x] All tests pass
 
 #### Action 2.8.1: Create error handling integration test
 
@@ -869,9 +869,9 @@ These tests should configure mock `ActionExecutor` to throw specific `McpToolExc
 ### Task 2.9: Run lint and all tests
 
 **Acceptance Criteria**:
-- [ ] `./gradlew ktlintCheck` passes
-- [ ] `./gradlew detekt` passes
-- [ ] `./gradlew :app:test` passes (all unit + integration tests)
+- [x] `./gradlew ktlintCheck` passes
+- [x] `./gradlew detekt` passes
+- [x] `./gradlew :app:test` passes (all unit + integration tests)
 
 #### Action 2.9.1: Run ktlint, fix any formatting issues
 
@@ -901,9 +901,9 @@ These tests should configure mock `ActionExecutor` to throw specific `McpToolExc
 **So that** the documentation is accurate and up to date.
 
 ### Acceptance Criteria
-- [ ] `docs/PROJECT.md` updated: integration test section reflects JVM-based approach (no Docker/emulator)
-- [ ] `docs/PROJECT.md` updated: testing pyramid described correctly (unit, integration JVM, E2E emulator)
-- [ ] No stale references to Docker-based integration tests in any documentation
+- [x] `docs/PROJECT.md` updated: integration test section reflects JVM-based approach (no Docker/emulator)
+- [x] `docs/PROJECT.md` updated: testing pyramid described correctly (unit, integration JVM, E2E emulator)
+- [x] No stale references to Docker-based integration tests in any documentation
 
 ---
 
@@ -912,9 +912,9 @@ These tests should configure mock `ActionExecutor` to throw specific `McpToolExc
 **Goal**: Update the project documentation to reflect the new integration test architecture.
 
 **Acceptance Criteria**:
-- [ ] Integration test section describes JVM-based approach with Ktor `testApplication`
-- [ ] References to Docker-emulator-based integration tests removed
-- [ ] Testing pyramid documented: unit tests, JVM integration tests, E2E tests (Docker emulator)
+- [x] Integration test section describes JVM-based approach with Ktor `testApplication`
+- [x] References to Docker-emulator-based integration tests removed
+- [x] Testing pyramid documented: unit tests, JVM integration tests, E2E tests (Docker emulator)
 
 #### Action 3.1.1: Update integration test documentation in PROJECT.md
 
@@ -929,16 +929,16 @@ Review and update all sections in `docs/PROJECT.md` that reference integration t
 **So that** nothing is missed, broken, or inconsistent.
 
 ### Acceptance Criteria
-- [ ] Every item in this plan has been implemented and checked off
-- [ ] Full build succeeds: `./gradlew build`
-- [ ] All linters pass: `./gradlew ktlintCheck detekt`
-- [ ] All unit + integration tests pass: `./gradlew :app:test`
-- [ ] No tool file references `McpAccessibilityService.instance` or `McpServerService.instance` directly
-- [ ] All 3 interfaces exist with correct Hilt bindings
-- [ ] Docker-based integration test infrastructure fully removed
-- [ ] CI workflow correct (no `test-integration` job, E2E `needs: test-unit`)
-- [ ] Makefile targets correct
-- [ ] Documentation up to date
+- [x] Every item in this plan has been implemented and checked off
+- [x] Full build succeeds: `./gradlew build`
+- [x] All linters pass: `./gradlew ktlintCheck detekt`
+- [x] All unit + integration tests pass: `./gradlew :app:test`
+- [x] No tool file references `McpAccessibilityService.instance` or `McpServerService.instance` directly
+- [x] All 3 interfaces exist with correct Hilt bindings
+- [x] Docker-based integration test infrastructure fully removed
+- [x] CI workflow correct (no `test-integration` job, E2E `needs: test-unit`)
+- [x] Makefile targets correct
+- [x] Documentation up to date
 
 ---
 
