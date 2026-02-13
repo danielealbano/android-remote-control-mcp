@@ -108,7 +108,7 @@ test-integration: ## Run integration tests (JVM-based, no emulator required)
 	$(GRADLE) :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"
 
 test-e2e: ## Run E2E tests (requires Docker)
-	$(GRADLE) :e2e-tests:test
+	$(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
 
 test: test-unit test-e2e ## Run all tests
 
