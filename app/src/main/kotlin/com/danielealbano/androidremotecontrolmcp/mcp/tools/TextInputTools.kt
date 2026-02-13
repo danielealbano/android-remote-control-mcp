@@ -7,11 +7,12 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import kotlinx.serialization.json.JsonElement
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -35,13 +36,13 @@ class InputTextTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val text =
-                params?.get("text")?.jsonPrimitive?.contentOrNull
+                arguments?.get("text")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
 
-            val elementId = params["element_id"]?.jsonPrimitive?.contentOrNull
+            val elementId = arguments["element_id"]?.jsonPrimitive?.contentOrNull
 
             if (elementId != null && elementId.isNotEmpty()) {
                 // Target specific element: click to focus, then set text
@@ -84,30 +85,29 @@ class InputTextTool
                 }
             }
 
-            return McpContentBuilder.textContent("Text input completed (${text.length} characters)")
+            return McpToolUtils.textResult("Text input completed (${text.length} characters)")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Type text into the focused input field or a specified element",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("text") {
-                                put("type", "string")
-                                put("description", "Text to type")
-                            }
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Optional: target element ID to focus and type into")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("text")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("text") {
+                                    put("type", "string")
+                                    put("description", "Text to type")
+                                }
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Optional: target element ID to focus and type into")
+                                }
+                            },
+                        required = listOf("text"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -127,9 +127,9 @@ class ClearTextTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val elementId = params?.get("element_id")?.jsonPrimitive?.contentOrNull
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val elementId = arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
 
             if (elementId != null && elementId.isNotEmpty()) {
                 // Clear specific element's text
@@ -167,26 +167,25 @@ class ClearTextTool
                 }
             }
 
-            return McpContentBuilder.textContent("Text cleared successfully")
+            return McpToolUtils.textResult("Text cleared successfully")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Clear text from the focused input field or a specified element",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Optional: target element ID to clear")
-                            }
-                        }
-                        put("required", buildJsonArray {})
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Optional: target element ID to clear")
+                                }
+                            },
+                        required = listOf(),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -211,10 +210,10 @@ class PressKeyTool
     constructor(
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val key =
-                params?.get("key")?.jsonPrimitive?.contentOrNull
+                arguments?.get("key")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'key'")
 
             val upperKey = key.uppercase()
@@ -244,7 +243,7 @@ class PressKeyTool
             }
 
             Log.d(TAG, "press_key: key=$upperKey succeeded")
-            return McpContentBuilder.textContent("Key '$upperKey' pressed successfully")
+            return McpToolUtils.textResult("Key '$upperKey' pressed successfully")
         }
 
         private fun pressEnter() {
@@ -335,34 +334,33 @@ class PressKeyTool
             }
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Press a specific key (ENTER, BACK, DEL, HOME, TAB, SPACE)",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("key") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        add(JsonPrimitive("ENTER"))
-                                        add(JsonPrimitive("BACK"))
-                                        add(JsonPrimitive("DEL"))
-                                        add(JsonPrimitive("HOME"))
-                                        add(JsonPrimitive("TAB"))
-                                        add(JsonPrimitive("SPACE"))
-                                    },
-                                )
-                                put("description", "Key to press")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("key")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("key") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("ENTER"))
+                                            add(JsonPrimitive("BACK"))
+                                            add(JsonPrimitive("DEL"))
+                                            add(JsonPrimitive("HOME"))
+                                            add(JsonPrimitive("TAB"))
+                                            add(JsonPrimitive("SPACE"))
+                                        },
+                                    )
+                                    put("description", "Key to press")
+                                }
+                            },
+                        required = listOf("key"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -373,17 +371,17 @@ class PressKeyTool
     }
 
 /**
- * Registers all text input tools with the [ToolRegistry].
+ * Registers all text input tools with the given [Server].
  */
 fun registerTextInputTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     treeParser: AccessibilityTreeParser,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
 ) {
-    InputTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    ClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    InputTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
+    ClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
+    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

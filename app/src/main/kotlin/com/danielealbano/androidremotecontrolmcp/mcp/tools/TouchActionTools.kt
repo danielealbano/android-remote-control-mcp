@@ -4,11 +4,12 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollAmount
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
-import kotlinx.serialization.json.JsonElement
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -28,19 +29,15 @@ import javax.inject.Inject
  *
  * **Input**: `{ "x": <number>, "y": <number> }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Tap executed at (x, y)" }] }`
- * **Errors**:
- *   - -32602 if parameters are missing or invalid (negative coordinates)
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if tap gesture execution failed
  */
 class TapTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val x = McpToolUtils.requireFloat(params, "x")
-            val y = McpToolUtils.requireFloat(params, "y")
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val x = McpToolUtils.requireFloat(arguments, "x")
+            val y = McpToolUtils.requireFloat(arguments, "y")
             McpToolUtils.validateNonNegative(x, "x")
             McpToolUtils.validateNonNegative(y, "y")
 
@@ -49,33 +46,26 @@ class TapTool
             return McpToolUtils.handleActionResult(result, "Tap executed at (${x.toInt()}, ${y.toInt()})")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Performs a single tap at the specified coordinates.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("x") {
-                                put("type", "number")
-                                put("description", "X coordinate")
-                            }
-                            putJsonObject("y") {
-                                put("type", "number")
-                                put("description", "Y coordinate")
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("x"))
-                                add(JsonPrimitive("y"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("x") {
+                                    put("type", "number")
+                                    put("description", "X coordinate")
+                                }
+                                putJsonObject("y") {
+                                    put("type", "number")
+                                    put("description", "Y coordinate")
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("x", "y"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -95,20 +85,16 @@ class TapTool
  *
  * **Input**: `{ "x": <number>, "y": <number>, "duration": <number> }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Long press executed at (x, y) for Nms" }] }`
- * **Errors**:
- *   - -32602 if parameters are missing or invalid
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if long press gesture execution failed
  */
 class LongPressTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val x = McpToolUtils.requireFloat(params, "x")
-            val y = McpToolUtils.requireFloat(params, "y")
-            val duration = McpToolUtils.optionalLong(params, "duration", DEFAULT_DURATION_MS)
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val x = McpToolUtils.requireFloat(arguments, "x")
+            val y = McpToolUtils.requireFloat(arguments, "y")
+            val duration = McpToolUtils.optionalLong(arguments, "duration", DEFAULT_DURATION_MS)
             McpToolUtils.validateNonNegative(x, "x")
             McpToolUtils.validateNonNegative(y, "y")
             McpToolUtils.validatePositiveRange(duration, "duration", McpToolUtils.MAX_DURATION_MS)
@@ -121,38 +107,31 @@ class LongPressTool
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Performs a long press at the specified coordinates.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("x") {
-                                put("type", "number")
-                                put("description", "X coordinate")
-                            }
-                            putJsonObject("y") {
-                                put("type", "number")
-                                put("description", "Y coordinate")
-                            }
-                            putJsonObject("duration") {
-                                put("type", "number")
-                                put("description", "Press duration in ms")
-                                put("default", DEFAULT_DURATION_MS)
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("x"))
-                                add(JsonPrimitive("y"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("x") {
+                                    put("type", "number")
+                                    put("description", "X coordinate")
+                                }
+                                putJsonObject("y") {
+                                    put("type", "number")
+                                    put("description", "Y coordinate")
+                                }
+                                putJsonObject("duration") {
+                                    put("type", "number")
+                                    put("description", "Press duration in ms")
+                                    put("default", DEFAULT_DURATION_MS)
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("x", "y"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -173,19 +152,15 @@ class LongPressTool
  *
  * **Input**: `{ "x": <number>, "y": <number> }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Double tap executed at (x, y)" }] }`
- * **Errors**:
- *   - -32602 if parameters are missing or invalid
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if double tap gesture execution failed
  */
 class DoubleTapTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val x = McpToolUtils.requireFloat(params, "x")
-            val y = McpToolUtils.requireFloat(params, "y")
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val x = McpToolUtils.requireFloat(arguments, "x")
+            val y = McpToolUtils.requireFloat(arguments, "y")
             McpToolUtils.validateNonNegative(x, "x")
             McpToolUtils.validateNonNegative(y, "y")
 
@@ -197,33 +172,26 @@ class DoubleTapTool
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Performs a double tap at the specified coordinates.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("x") {
-                                put("type", "number")
-                                put("description", "X coordinate")
-                            }
-                            putJsonObject("y") {
-                                put("type", "number")
-                                put("description", "Y coordinate")
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("x"))
-                                add(JsonPrimitive("y"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("x") {
+                                    put("type", "number")
+                                    put("description", "X coordinate")
+                                }
+                                putJsonObject("y") {
+                                    put("type", "number")
+                                    put("description", "Y coordinate")
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("x", "y"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -243,22 +211,18 @@ class DoubleTapTool
  *
  * **Input**: `{ "x1": <number>, "y1": <number>, "x2": <number>, "y2": <number>, "duration": <number> }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Swipe executed from (...) to (...) over Nms" }] }`
- * **Errors**:
- *   - -32602 if parameters are missing or invalid
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if swipe gesture execution failed
  */
 class SwipeTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val x1 = McpToolUtils.requireFloat(params, "x1")
-            val y1 = McpToolUtils.requireFloat(params, "y1")
-            val x2 = McpToolUtils.requireFloat(params, "x2")
-            val y2 = McpToolUtils.requireFloat(params, "y2")
-            val duration = McpToolUtils.optionalLong(params, "duration", DEFAULT_DURATION_MS)
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val x1 = McpToolUtils.requireFloat(arguments, "x1")
+            val y1 = McpToolUtils.requireFloat(arguments, "y1")
+            val x2 = McpToolUtils.requireFloat(arguments, "x2")
+            val y2 = McpToolUtils.requireFloat(arguments, "y2")
+            val duration = McpToolUtils.optionalLong(arguments, "duration", DEFAULT_DURATION_MS)
             McpToolUtils.validateNonNegative(x1, "x1")
             McpToolUtils.validateNonNegative(y1, "y1")
             McpToolUtils.validateNonNegative(x2, "x2")
@@ -274,48 +238,39 @@ class SwipeTool
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Performs a swipe gesture from one point to another.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("x1") {
-                                put("type", "number")
-                                put("description", "Start X coordinate")
-                            }
-                            putJsonObject("y1") {
-                                put("type", "number")
-                                put("description", "Start Y coordinate")
-                            }
-                            putJsonObject("x2") {
-                                put("type", "number")
-                                put("description", "End X coordinate")
-                            }
-                            putJsonObject("y2") {
-                                put("type", "number")
-                                put("description", "End Y coordinate")
-                            }
-                            putJsonObject("duration") {
-                                put("type", "number")
-                                put("description", "Swipe duration in ms")
-                                put("default", DEFAULT_DURATION_MS)
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("x1"))
-                                add(JsonPrimitive("y1"))
-                                add(JsonPrimitive("x2"))
-                                add(JsonPrimitive("y2"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("x1") {
+                                    put("type", "number")
+                                    put("description", "Start X coordinate")
+                                }
+                                putJsonObject("y1") {
+                                    put("type", "number")
+                                    put("description", "Start Y coordinate")
+                                }
+                                putJsonObject("x2") {
+                                    put("type", "number")
+                                    put("description", "End X coordinate")
+                                }
+                                putJsonObject("y2") {
+                                    put("type", "number")
+                                    put("description", "End Y coordinate")
+                                }
+                                putJsonObject("duration") {
+                                    put("type", "number")
+                                    put("description", "Swipe duration in ms")
+                                    put("default", DEFAULT_DURATION_MS)
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("x1", "y1", "x2", "y2"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -336,19 +291,15 @@ class SwipeTool
  *
  * **Input**: `{ "direction": "up"|"down"|"left"|"right", "amount": "small"|"medium"|"large" }`
  * **Output**: `{ "content": [{ "type": "text", "text": "Scroll down (medium) executed" }] }`
- * **Errors**:
- *   - -32602 if direction is invalid or amount is invalid
- *   - -32001 if accessibility service is not enabled
- *   - -32003 if scroll gesture execution failed
  */
 class ScrollTool
     @Inject
     constructor(
         private val actionExecutor: ActionExecutor,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
-            val directionStr = McpToolUtils.requireString(params, "direction")
-            val amountStr = McpToolUtils.optionalString(params, "amount", "medium")
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val directionStr = McpToolUtils.requireString(arguments, "direction")
+            val amountStr = McpToolUtils.optionalString(arguments, "amount", "medium")
 
             val direction =
                 when (directionStr.lowercase()) {
@@ -379,48 +330,42 @@ class ScrollTool
             )
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Scrolls in the specified direction.",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("direction") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        add(JsonPrimitive("up"))
-                                        add(JsonPrimitive("down"))
-                                        add(JsonPrimitive("left"))
-                                        add(JsonPrimitive("right"))
-                                    },
-                                )
-                            }
-                            putJsonObject("amount") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        add(JsonPrimitive("small"))
-                                        add(JsonPrimitive("medium"))
-                                        add(JsonPrimitive("large"))
-                                    },
-                                )
-                                put("default", "medium")
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("direction"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("direction") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("up"))
+                                            add(JsonPrimitive("down"))
+                                            add(JsonPrimitive("left"))
+                                            add(JsonPrimitive("right"))
+                                        },
+                                    )
+                                }
+                                putJsonObject("amount") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("small"))
+                                            add(JsonPrimitive("medium"))
+                                            add(JsonPrimitive("large"))
+                                        },
+                                    )
+                                    put("default", "medium")
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("direction"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -434,17 +379,15 @@ class ScrollTool
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Registers all touch action tools with the given [ToolRegistry].
- *
- * Called from [McpServerService.startServer] during server startup.
+ * Registers all touch action tools with the given [Server].
  */
 fun registerTouchActionTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     actionExecutor: ActionExecutor,
 ) {
-    TapTool(actionExecutor).register(toolRegistry)
-    LongPressTool(actionExecutor).register(toolRegistry)
-    DoubleTapTool(actionExecutor).register(toolRegistry)
-    SwipeTool(actionExecutor).register(toolRegistry)
-    ScrollTool(actionExecutor).register(toolRegistry)
+    TapTool(actionExecutor).register(server)
+    LongPressTool(actionExecutor).register(server)
+    DoubleTapTool(actionExecutor).register(server)
+    SwipeTool(actionExecutor).register(server)
+    ScrollTool(actionExecutor).register(server)
 }

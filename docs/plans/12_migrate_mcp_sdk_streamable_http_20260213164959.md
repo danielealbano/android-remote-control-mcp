@@ -369,7 +369,7 @@ Remove old imports:
 
 #### Action 4.1: Adapt `TouchActionTools.kt` (5 tools: tap, long_press, double_tap, swipe, scroll)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/TouchActionTools.kt`
 
@@ -427,7 +427,7 @@ fun registerTouchActionTools(server: Server, actionExecutor: ActionExecutor) {
 
 #### Action 4.2: Adapt `GestureTools.kt` (2 tools: pinch, custom_gesture)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/GestureTools.kt`
 
@@ -435,7 +435,7 @@ Same pattern as Action 4.1 for `PinchTool`, `CustomGestureTool`, and `registerGe
 
 #### Action 4.3: Adapt `ElementActionTools.kt` (5 tools: find_elements, click_element, long_click_element, set_text, scroll_to_element)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/ElementActionTools.kt`
 
@@ -443,7 +443,7 @@ Same pattern as Action 4.1 for all 5 tool classes and `registerElementActionTool
 
 #### Action 4.4: Adapt `ScreenIntrospectionTools.kt` (4 tools: get_accessibility_tree, capture_screenshot, get_current_app, get_screen_info)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/ScreenIntrospectionTools.kt`
 
@@ -467,7 +467,7 @@ Note: `width`/`height` are dropped from the response (standard `ImageContent` do
 
 #### Action 4.5: Adapt `SystemActionTools.kt` (6 tools: press_back, press_home, press_recents, open_notifications, open_quick_settings, get_device_logs)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/SystemActionTools.kt`
 
@@ -487,7 +487,7 @@ private suspend fun executeSystemAction(
 
 #### Action 4.6: Adapt `TextInputTools.kt` (3 tools: input_text, clear_text, press_key)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -495,7 +495,7 @@ Same pattern as Action 4.1 for all 3 tool classes (`InputTextTool`, `ClearTextTo
 
 #### Action 4.7: Adapt `UtilityTools.kt` (4 tools: get_clipboard, set_clipboard, wait_for_element, wait_for_idle)
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **File:** `app/src/main/kotlin/.../mcp/tools/UtilityTools.kt`
 
@@ -505,7 +505,7 @@ Also apply the `e.code` → `e is McpToolException.PermissionDenied` fix from Ac
 
 #### Action 4.8: Make `timeout` mandatory and return non-error on timeout for wait tools
 
-- [ ] **Completed**
+- [x] **Completed**
 
 **Files:** `app/src/main/kotlin/.../mcp/tools/UtilityTools.kt`
 

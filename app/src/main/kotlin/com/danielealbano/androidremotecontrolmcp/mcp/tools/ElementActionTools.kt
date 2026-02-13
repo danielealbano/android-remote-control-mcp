@@ -4,7 +4,6 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.mcp.ToolHandler
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -12,8 +11,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -37,22 +38,22 @@ class FindElementsTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
             val byStr =
-                params?.get("by")?.jsonPrimitive?.contentOrNull
+                arguments?.get("by")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'by'")
 
             val value =
-                params["value"]?.jsonPrimitive?.contentOrNull
+                arguments["value"]?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'value'")
 
             if (value.isEmpty()) {
                 throw McpToolException.InvalidParams("Parameter 'value' must be non-empty")
             }
 
-            val exactMatch = params["exact_match"]?.jsonPrimitive?.booleanOrNull ?: false
+            val exactMatch = arguments["exact_match"]?.jsonPrimitive?.booleanOrNull ?: false
 
             val findBy =
                 mapFindBy(byStr)
@@ -99,55 +100,48 @@ class FindElementsTool
                     )
                 }
 
-            return McpContentBuilder.textContent(Json.encodeToString(resultJson))
+            return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description =
                     "Find UI elements matching the specified criteria " +
                         "(text, content_desc, resource_id, class_name)",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("by") {
-                                put("type", "string")
-                                put(
-                                    "enum",
-                                    buildJsonArray {
-                                        add(JsonPrimitive("text"))
-                                        add(JsonPrimitive("content_desc"))
-                                        add(JsonPrimitive("resource_id"))
-                                        add(JsonPrimitive("class_name"))
-                                    },
-                                )
-                                put("description", "Search criteria type")
-                            }
-                            putJsonObject("value") {
-                                put("type", "string")
-                                put("description", "Search value")
-                            }
-                            putJsonObject("exact_match") {
-                                put("type", "boolean")
-                                put("default", false)
-                                put(
-                                    "description",
-                                    "If true, match exactly. If false, match contains (case-insensitive)",
-                                )
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("by"))
-                                add(JsonPrimitive("value"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("by") {
+                                    put("type", "string")
+                                    put(
+                                        "enum",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("text"))
+                                            add(JsonPrimitive("content_desc"))
+                                            add(JsonPrimitive("resource_id"))
+                                            add(JsonPrimitive("class_name"))
+                                        },
+                                    )
+                                    put("description", "Search criteria type")
+                                }
+                                putJsonObject("value") {
+                                    put("type", "string")
+                                    put("description", "Search value")
+                                }
+                                putJsonObject("exact_match") {
+                                    put("type", "boolean")
+                                    put("default", false)
+                                    put(
+                                        "description",
+                                        "If true, match exactly. If false, match contains (case-insensitive)",
+                                    )
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("by", "value"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -167,10 +161,10 @@ class ClickElementTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
-                params?.get("element_id")?.jsonPrimitive?.contentOrNull
+                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
 
             if (elementId.isEmpty()) {
@@ -183,26 +177,25 @@ class ClickElementTool
             result.onFailure { e -> mapNodeActionException(e, elementId) }
 
             Log.d(TAG, "click_element: elementId=$elementId succeeded")
-            return McpContentBuilder.textContent("Click performed on element '$elementId'")
+            return McpToolUtils.textResult("Click performed on element '$elementId'")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Click the specified accessibility node by element ID",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Node ID from find_elements")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("element_id")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Node ID from find_elements")
+                                }
+                            },
+                        required = listOf("element_id"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -222,10 +215,10 @@ class LongClickElementTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
-                params?.get("element_id")?.jsonPrimitive?.contentOrNull
+                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
 
             if (elementId.isEmpty()) {
@@ -238,26 +231,25 @@ class LongClickElementTool
             result.onFailure { e -> mapNodeActionException(e, elementId) }
 
             Log.d(TAG, "long_click_element: elementId=$elementId succeeded")
-            return McpContentBuilder.textContent("Long-click performed on element '$elementId'")
+            return McpToolUtils.textResult("Long-click performed on element '$elementId'")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Long-click the specified accessibility node by element ID",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Node ID from find_elements")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("element_id")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Node ID from find_elements")
+                                }
+                            },
+                        required = listOf("element_id"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -277,10 +269,10 @@ class SetTextTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
-                params?.get("element_id")?.jsonPrimitive?.contentOrNull
+                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
 
             if (elementId.isEmpty()) {
@@ -289,7 +281,7 @@ class SetTextTool
 
             // text is required but can be empty string (to clear field)
             val textElement =
-                params["text"]
+                arguments["text"]
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
             val textPrimitive =
                 textElement as? JsonPrimitive
@@ -302,36 +294,29 @@ class SetTextTool
             result.onFailure { e -> mapNodeActionException(e, elementId) }
 
             Log.d(TAG, "set_text: elementId=$elementId, textLength=${text.length} succeeded")
-            return McpContentBuilder.textContent("Text set on element '$elementId'")
+            return McpToolUtils.textResult("Text set on element '$elementId'")
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Set text on an editable accessibility node (empty string to clear)",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Node ID from find_elements")
-                            }
-                            putJsonObject("text") {
-                                put("type", "string")
-                                put("description", "Text to set (empty string to clear)")
-                            }
-                        }
-                        put(
-                            "required",
-                            buildJsonArray {
-                                add(JsonPrimitive("element_id"))
-                                add(JsonPrimitive("text"))
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Node ID from find_elements")
+                                }
+                                putJsonObject("text") {
+                                    put("type", "string")
+                                    put("description", "Text to set (empty string to clear)")
+                                }
                             },
-                        )
-                    },
-                handler = this,
-            )
+                        required = listOf("element_id", "text"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -353,10 +338,10 @@ class ScrollToElementTool
         private val elementFinder: ElementFinder,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) : ToolHandler {
-        override suspend fun execute(params: JsonObject?): JsonElement {
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
-                params?.get("element_id")?.jsonPrimitive?.contentOrNull
+                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
                     ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
 
             if (elementId.isEmpty()) {
@@ -372,7 +357,7 @@ class ScrollToElementTool
             // If already visible, return immediately
             if (node.visible) {
                 Log.d(TAG, "scroll_to_element: element '$elementId' already visible")
-                return McpContentBuilder.textContent("Element '$elementId' is already visible")
+                return McpToolUtils.textResult("Element '$elementId' is already visible")
             }
 
             // Find nearest scrollable ancestor
@@ -400,7 +385,7 @@ class ScrollToElementTool
 
                 if (node.visible) {
                     Log.d(TAG, "scroll_to_element: element '$elementId' became visible after $attempt scroll(s)")
-                    return McpContentBuilder.textContent("Scrolled to element '$elementId' ($attempt scroll(s))")
+                    return McpToolUtils.textResult("Scrolled to element '$elementId' ($attempt scroll(s))")
                 }
             }
 
@@ -449,23 +434,22 @@ class ScrollToElementTool
             return false
         }
 
-        fun register(toolRegistry: ToolRegistry) {
-            toolRegistry.register(
+        fun register(server: Server) {
+            server.addTool(
                 name = TOOL_NAME,
                 description = "Scroll to make the specified element visible",
                 inputSchema =
-                    buildJsonObject {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("element_id") {
-                                put("type", "string")
-                                put("description", "Node ID from find_elements")
-                            }
-                        }
-                        put("required", buildJsonArray { add(JsonPrimitive("element_id")) })
-                    },
-                handler = this,
-            )
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Node ID from find_elements")
+                                }
+                            },
+                        required = listOf("element_id"),
+                    ),
+            ) { request -> execute(request.arguments) }
         }
 
         companion object {
@@ -520,20 +504,20 @@ internal fun getFreshTree(
 }
 
 /**
- * Registers all element action tools with the [ToolRegistry].
+ * Registers all element action tools with the [Server].
  */
 fun registerElementActionTools(
-    toolRegistry: ToolRegistry,
+    server: Server,
     treeParser: AccessibilityTreeParser,
     elementFinder: ElementFinder,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
 ) {
-    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(toolRegistry)
-    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
-    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider).register(toolRegistry)
+    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
+    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
+    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
+    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
+    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider).register(server)
 }
 
 /**
