@@ -32,13 +32,11 @@ It focuses on **how** components interact at runtime rather than **what** they a
 |  |  |            McpServer (Ktor)                 |   |    |
 |  |  |  HTTP :8080 (HTTPS optional)                |   |    |
 |  |  |                                            |   |    |
-|  |  |  GET  /health           (unauthenticated)  |   |    |
-|  |  |  POST /mcp/v1/initialize (bearer token)    |   |    |
-|  |  |  GET  /mcp/v1/tools/list (bearer token)    |   |    |
-|  |  |  POST /mcp/v1/tools/call (bearer token)    |   |    |
+|  |  |  Streamable HTTP /mcp                      |   |    |
+|  |  |  (POST, DELETE; JSON-only, no SSE)         |   |    |
 |  |  |                                            |   |    |
-|  |  |  BearerTokenAuth -> McpProtocolHandler     |   |    |
-|  |  |                    -> ToolHandlers          |   |    |
+|  |  |  BearerTokenAuth (global) -> SDK Server    |   |    |
+|  |  |                    -> Server.addTool()      |   |    |
 |  |  +--------------------------------------------+   |    |
 |  |                                                    |    |
 |  +----------------------------------------------------+    |
@@ -70,7 +68,7 @@ It focuses on **how** components interact at runtime rather than **what** they a
      a. Calls `startForeground()` with notification (within 5 seconds)
      b. Reads `ServerConfig` from `SettingsRepository`
      c. Gets/creates SSL keystore from `CertificateManager` (only if HTTPS enabled)
-     d. Creates `McpServer` with config, keystore, and `McpProtocolHandler`
+     d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
      e. Starts Ktor server (HTTP by default, HTTPS if enabled)
      f. Updates `ServerStatus.Running` via companion-level StateFlow
 
@@ -117,7 +115,7 @@ It focuses on **how** components interact at runtime rather than **what** they a
 
 ### Thread Safety
 
-- `McpProtocolHandler.tools` registry: `ConcurrentHashMap` (lock-free reads)
+- SDK `Server` tool registry: thread-safe (managed by MCP SDK)
 - `McpAccessibilityService.instance`: `@Volatile` singleton
 - `McpServer.running`: `AtomicBoolean`
 - Accessibility node access: Must be on main thread (Android requirement)
@@ -129,32 +127,31 @@ It focuses on **how** components interact at runtime rather than **what** they a
 ```
 MCP Client
     |
-    | HTTP(S) POST /mcp/v1/tools/call
+    | HTTP(S) POST /mcp
     | Authorization: Bearer <token>
     | { "jsonrpc": "2.0", "id": 1, "method": "tools/call",
     |   "params": { "name": "tap", "arguments": { "x": 500, "y": 1000 } } }
     v
 Ktor Netty (IO threads)
     |
-    | ContentNegotiation: deserialize JSON -> JsonRpcRequest
     v
-BearerTokenAuth Plugin
+BearerTokenAuth Plugin (Application-level, global)
     |
     | Extract "Authorization: Bearer <token>" header
     | Constant-time compare with stored token
     | If invalid -> respond 401, stop pipeline
     v
-Route Handler (/mcp/v1/tools/call)
+McpStreamableHttp route handler (/mcp)
     |
-    | call.receive<JsonRpcRequest>()
+    | StreamableHttpServerTransport (JSON-only, no SSE)
     v
-McpProtocolHandler.handleRequest()
+SDK Server (MCP Kotlin SDK)
     |
     | Route by method ("tools/call")
     | Extract tool name ("tap") and arguments
-    | Look up ToolHandler from registry
+    | Look up registered tool (Server.addTool)
     v
-ToolHandler.execute(params)  [e.g., TouchActionTools]
+Tool lambda  [e.g., TapHandler.execute(params)]
     |
     | withContext(Dispatchers.Main) {
     |     McpAccessibilityService.instance?.dispatchGesture(...)
@@ -165,15 +162,15 @@ AccessibilityService (Main Thread)
     | Performs gesture on Android UI
     | Returns success/failure
     v
-ToolHandler returns JsonElement result
+Tool returns CallToolResult (TextContent or ImageContent)
     |
     v
-McpProtocolHandler wraps in JsonRpcResponse
+SDK Server wraps in JSON-RPC response
     |
     v
 Ktor Netty
     |
-    | ContentNegotiation: serialize JsonRpcResponse -> JSON
+    | Serialize JSON response via StreamableHttpServerTransport
     | Respond with HTTP 200
     v
 MCP Client receives response
@@ -192,7 +189,7 @@ MCP Client receives response
 
 ### Bearer Token (Authentication)
 
-- Every `/mcp/*` request requires `Authorization: Bearer <token>` header
+- Every request requires `Authorization: Bearer <token>` header (global Application-level plugin)
 - Token validated with constant-time comparison (prevents timing attacks)
 - Token auto-generated (UUID) on first launch, user can regenerate
 - Token stored in DataStore (app-private)
