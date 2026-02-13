@@ -1,13 +1,12 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.auth
 
 import android.util.Log
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.Hook
-import io.ktor.server.application.call
-import io.ktor.server.application.createRouteScopedPlugin
-import io.ktor.server.response.respond
+import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.response.respondText
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 
 /**
@@ -29,58 +28,63 @@ class BearerTokenAuthConfig {
 }
 
 /**
- * Ktor route-scoped plugin that validates Bearer token authentication.
+ * Ktor Application-level plugin that validates Bearer token authentication.
  *
- * Install this plugin on route groups that require authentication (e.g., `/mcp`).
- * Routes outside the installation scope (e.g., `/health`) are not affected.
+ * Install this plugin at the Application level to enforce authentication on
+ * all incoming requests.
  *
  * Uses [MessageDigest.isEqual] for constant-time token comparison to prevent
  * timing side-channel attacks.
  *
  * Usage:
  * ```kotlin
- * route("/mcp") {
- *     install(BearerTokenAuthPlugin) {
- *         expectedToken = "my-secret-token"
- *     }
- *     // ... protected routes
+ * install(BearerTokenAuthPlugin) {
+ *     expectedToken = "my-secret-token"
  * }
  * ```
  */
 val BearerTokenAuthPlugin =
-    createRouteScopedPlugin(
+    createApplicationPlugin(
         name = "BearerTokenAuth",
         createConfiguration = ::BearerTokenAuthConfig,
     ) {
         val expectedToken = pluginConfig.expectedToken
 
-        on(AuthenticationHook) { call ->
+        onCall { call ->
             val authHeader = call.request.headers["Authorization"]
 
             if (authHeader == null) {
                 val remoteAddr = call.request.local.remoteAddress
                 Log.w(TAG, "Authentication failed: missing Authorization header from $remoteAddr")
-                call.respond(
-                    HttpStatusCode.Unauthorized,
-                    AuthErrorResponse(
-                        error = "unauthorized",
-                        message = "Missing Authorization header. Expected: Bearer <token>",
+                call.respondText(
+                    Json.encodeToString(
+                        AuthErrorResponse.serializer(),
+                        AuthErrorResponse(
+                            error = "unauthorized",
+                            message = "Missing Authorization header. Expected: Bearer <token>",
+                        ),
                     ),
+                    ContentType.Application.Json,
+                    HttpStatusCode.Unauthorized,
                 )
-                return@on
+                return@onCall
             }
 
             if (!authHeader.startsWith(BEARER_PREFIX, ignoreCase = true)) {
                 val remoteAddr = call.request.local.remoteAddress
                 Log.w(TAG, "Authentication failed: malformed Authorization header from $remoteAddr")
-                call.respond(
-                    HttpStatusCode.Unauthorized,
-                    AuthErrorResponse(
-                        error = "unauthorized",
-                        message = "Malformed Authorization header. Expected: Bearer <token>",
+                call.respondText(
+                    Json.encodeToString(
+                        AuthErrorResponse.serializer(),
+                        AuthErrorResponse(
+                            error = "unauthorized",
+                            message = "Malformed Authorization header. Expected: Bearer <token>",
+                        ),
                     ),
+                    ContentType.Application.Json,
+                    HttpStatusCode.Unauthorized,
                 )
-                return@on
+                return@onCall
             }
 
             // Use substring instead of removePrefix to handle case-insensitive "Bearer " prefix
@@ -89,33 +93,21 @@ val BearerTokenAuthPlugin =
 
             if (!isValid) {
                 Log.w(TAG, "Authentication failed: invalid token from ${call.request.local.remoteAddress}")
-                call.respond(
-                    HttpStatusCode.Unauthorized,
-                    AuthErrorResponse(
-                        error = "unauthorized",
-                        message = "Invalid bearer token",
+                call.respondText(
+                    Json.encodeToString(
+                        AuthErrorResponse.serializer(),
+                        AuthErrorResponse(
+                            error = "unauthorized",
+                            message = "Invalid bearer token",
+                        ),
                     ),
+                    ContentType.Application.Json,
+                    HttpStatusCode.Unauthorized,
                 )
-                return@on
+                return@onCall
             }
         }
     }
-
-private object AuthenticationHook : Hook<suspend (io.ktor.server.application.ApplicationCall) -> Unit> {
-    override fun install(
-        pipeline: ApplicationCallPipeline,
-        handler: suspend (io.ktor.server.application.ApplicationCall) -> Unit,
-    ) {
-        pipeline.intercept(ApplicationCallPipeline.Plugins) {
-            handler(call)
-            // If the auth handler sent a response (e.g., 401), stop the pipeline
-            // to prevent route handlers from executing after authentication failure
-            if (call.response.status() != null) {
-                finish()
-            }
-        }
-    }
-}
 
 internal fun constantTimeEquals(
     expected: String,
