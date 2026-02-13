@@ -13,7 +13,11 @@ interface ScreenCaptureProvider {
         const val DEFAULT_QUALITY = 80
     }
 
-    suspend fun captureScreenshot(quality: Int = DEFAULT_QUALITY): Result<ScreenshotData>
+    suspend fun captureScreenshot(
+        quality: Int = DEFAULT_QUALITY,
+        maxWidth: Int? = null,
+        maxHeight: Int? = null,
+    ): Result<ScreenshotData>
 
     fun isScreenCaptureAvailable(): Boolean
 }
