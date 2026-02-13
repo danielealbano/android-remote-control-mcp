@@ -1,0 +1,3 @@
+[submodule "vendor/cloudflared"]
+	path = vendor/cloudflared
+	url = https://github.com/cloudflare/cloudflared.git
