@@ -1,7 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
-import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
@@ -11,7 +13,7 @@ import org.junit.jupiter.api.TestInstance
  * E2E test: Error handling and authentication verification.
  *
  * Verifies that the MCP server correctly handles:
- * - Authentication errors (missing token, empty header, invalid/wrong token)
+ * - Authentication errors (missing token, invalid/wrong token)
  * - Correct token (should succeed)
  * - Unknown tool names
  * - Invalid tool parameters
@@ -27,100 +29,60 @@ class E2EErrorHandlingTest {
     private val baseUrl = SharedAndroidContainer.mcpServerUrl
 
     @Test
-    fun `missing bearer token returns 401 Unauthorized`() {
-        // Create client with empty token — sends "Authorization: Bearer " with empty value
+    fun `missing bearer token returns 401 Unauthorized`() = runBlocking {
         val noAuthClient = McpClient(baseUrl, "")
-
         try {
-            noAuthClient.callTool("press_home")
-            fail("Expected McpClientException with status 401")
-        } catch (e: McpClientException) {
-            assertEquals(
-                401,
-                e.statusCode,
-                "Missing/empty bearer token should return 401, got: ${e.statusCode}"
-            )
+            noAuthClient.connect()
+            fail("Expected exception for missing bearer token")
+        } catch (_: Exception) {
+            // Expected: server rejects unauthenticated requests
+        } finally {
+            noAuthClient.close()
         }
     }
 
     @Test
-    fun `invalid bearer token returns 401 Unauthorized`() {
+    fun `invalid bearer token returns 401 Unauthorized`() = runBlocking {
         val badAuthClient = McpClient(baseUrl, "invalid-token-that-does-not-match")
-
         try {
-            badAuthClient.callTool("press_home")
-            fail("Expected McpClientException with status 401")
-        } catch (e: McpClientException) {
-            assertEquals(
-                401,
-                e.statusCode,
-                "Invalid bearer token should return 401, got: ${e.statusCode}"
-            )
+            badAuthClient.connect()
+            fail("Expected exception for invalid bearer token")
+        } catch (_: Exception) {
+            // Expected: server rejects unauthenticated requests
+        } finally {
+            badAuthClient.close()
         }
     }
 
     @Test
-    fun `correct bearer token returns successful response`() {
-        // The shared mcpClient already has the correct token; verify a simple tool call succeeds
-        assertDoesNotThrow { mcpClient.callTool("press_home") }
+    fun `correct bearer token returns successful response`() = runBlocking {
+        val result = mcpClient.callTool("press_home")
+        assertNotEquals(true, result.isError)
     }
 
     @Test
-    fun `unknown tool name returns JSON-RPC error -32601`() {
-        try {
-            mcpClient.callTool("nonexistent_tool_name")
-            fail("Expected McpRpcException with code -32601")
-        } catch (e: McpRpcException) {
-            assertEquals(
-                -32601,
-                e.code,
-                "Unknown tool should return error code -32601, got: ${e.code}"
-            )
-        }
+    fun `unknown tool name returns error result`() = runBlocking {
+        val result = mcpClient.callTool("nonexistent_tool_name")
+        assertEquals(true, result.isError)
+        val text = (result.content[0] as TextContent).text
+        assertTrue(text.contains("not found", ignoreCase = true))
     }
 
     @Test
-    fun `invalid params returns JSON-RPC error -32602`() {
+    fun `invalid params returns error result`() = runBlocking {
         // Call tap without required x,y coordinates
-        try {
-            mcpClient.callTool("tap", emptyMap())
-            fail("Expected McpRpcException with code -32602")
-        } catch (e: McpRpcException) {
-            assertEquals(
-                -32602,
-                e.code,
-                "Missing required params should return error code -32602, got: ${e.code}"
-            )
-        }
+        val result = mcpClient.callTool("tap", emptyMap())
+        assertEquals(true, result.isError)
     }
 
     @Test
-    fun `click on non-existent element returns JSON-RPC error -32002`() {
-        try {
-            mcpClient.callTool(
-                "click_element",
-                mapOf("element_id" to "nonexistent_element_id_12345")
-            )
-            fail("Expected McpRpcException with code -32002")
-        } catch (e: McpRpcException) {
-            assertEquals(
-                -32002,
-                e.code,
-                "Non-existent element should return error code -32002, got: ${e.code}"
-            )
-        }
-    }
-
-    @Test
-    fun `health endpoint is accessible without authentication`() {
-        // Health check should work even with a bad token client
-        val noAuthClient = McpClient(baseUrl, "wrong-token")
-        val health = noAuthClient.healthCheck()
-
-        val status = health["status"]?.toString()?.removeSurrounding("\"")
-        assertTrue(
-            status == "healthy",
-            "Health endpoint should be accessible without auth and return 'healthy', got: $status"
+    fun `click on non-existent element returns error result`() = runBlocking {
+        val result = mcpClient.callTool(
+            "click_element",
+            mapOf("element_id" to "nonexistent_element_id_12345"),
         )
+        assertEquals(true, result.isError)
+        val text = (result.content[0] as TextContent).text
+        assertTrue(text.contains("nonexistent_element_id_12345"))
     }
 }

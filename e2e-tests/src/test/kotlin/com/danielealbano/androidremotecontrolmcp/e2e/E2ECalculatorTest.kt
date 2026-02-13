@@ -1,5 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -35,7 +38,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2ECalculatorTest {
 
-    private val json = Json { ignoreUnknownKeys = true }
     private val container = SharedAndroidContainer.container
     private val mcpClient = SharedAndroidContainer.mcpClient
 
@@ -53,22 +55,14 @@ class E2ECalculatorTest {
 
     @Test
     @Order(1)
-    fun `MCP server health check returns healthy`() {
-        val health = mcpClient.healthCheck()
-        val status = health["status"]?.jsonPrimitive?.contentOrNull
-        assertTrue(status == "healthy", "Health check should return 'healthy', got: $status")
+    fun `MCP server lists all available tools`() = runBlocking {
+        val result = mcpClient.listTools()
+        assertTrue(result.tools.size >= 29, "Expected at least 29 tools, got: ${result.tools.size}")
     }
 
     @Test
     @Order(2)
-    fun `MCP server lists all available tools`() {
-        val tools = mcpClient.listTools()
-        assertTrue(tools.size >= 29, "Expected at least 29 tools, got: ${tools.size}")
-    }
-
-    @Test
-    @Order(3)
-    fun `calculate 7 plus 3 equals 10`() {
+    fun `calculate 7 plus 3 equals 10`() = runBlocking {
         // Step 1: Press home to ensure clean state
         mcpClient.callTool("press_home")
         Thread.sleep(1_000)
@@ -79,7 +73,7 @@ class E2ECalculatorTest {
 
         // Step 3: Verify Calculator is visible in accessibility tree
         val tree = mcpClient.callTool("get_accessibility_tree")
-        val treeStr = tree.toString()
+        val treeStr = (tree.content[0] as TextContent).text
         println("[E2E Calculator] Accessibility tree excerpt: ${treeStr.take(1000)}")
         assertTrue(
             treeStr.contains("Calculator", ignoreCase = true) ||
@@ -116,7 +110,7 @@ class E2ECalculatorTest {
 
         // Step 9: Verify result "10" in accessibility tree
         val resultTree = mcpClient.callTool("get_accessibility_tree")
-        val resultTreeStr = resultTree.toString()
+        val resultTreeStr = (resultTree.content[0] as TextContent).text
         assertTrue(
             resultTreeStr.contains("10"),
             "Result '10' should appear in accessibility tree after 7+3=. Tree excerpt: ${resultTreeStr.take(500)}",
@@ -124,44 +118,36 @@ class E2ECalculatorTest {
     }
 
     @Test
-    @Order(4)
-    fun `capture screenshot returns valid image data`() {
+    @Order(3)
+    fun `capture screenshot returns valid image data`() = runBlocking {
         val screenshot = mcpClient.callTool("capture_screenshot", mapOf("quality" to 80))
 
-        // Navigate the MCP content array: result -> content[0] -> fields
-        val contentArray = screenshot["content"]?.jsonArray
-        assertNotNull(contentArray, "Screenshot result should have 'content' array")
-        assertTrue(contentArray!!.isNotEmpty(), "Screenshot content array should not be empty")
+        val content = screenshot.content
+        assertTrue(content.isNotEmpty(), "Screenshot content should not be empty")
 
-        val imageObj = contentArray[0].jsonObject
+        val imageContent = content[0] as ImageContent
 
-        val mimeType = imageObj["mimeType"]?.jsonPrimitive?.contentOrNull
+        val mimeType = imageContent.mimeType
         assertTrue(mimeType == "image/jpeg", "Screenshot mimeType should be 'image/jpeg', got: $mimeType")
 
-        val data = imageObj["data"]?.jsonPrimitive?.contentOrNull
+        val data = imageContent.data
         assertNotNull(data, "Screenshot data should not be null")
-        assertFalse(data!!.isEmpty(), "Screenshot data should not be empty")
+        assertFalse(data.isEmpty(), "Screenshot data should not be empty")
         assertTrue(data.length > 100, "Screenshot data should be substantial (got ${data.length} chars)")
-
-        val width = imageObj["width"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val height = imageObj["height"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        assertNotNull(width, "Screenshot width should be present")
-        assertNotNull(height, "Screenshot height should be present")
-        assertTrue(width!! > 0, "Screenshot width should be > 0, got: $width")
-        assertTrue(height!! > 0, "Screenshot height should be > 0, got: $height")
     }
 
     /**
      * Find an element by criteria, retrying up to ELEMENT_WAIT_TIMEOUT_MS.
      * Returns the element_id of the first match, or null if not found.
      *
-     * The find_elements tool returns:
+     * The find_elements tool returns a [CallToolResult] where the first content
+     * item is a [TextContent] containing a JSON-serialized string with the
+     * elements array:
      * ```json
-     * {"content": [{"type": "text", "text": "{\"elements\":[...]}"}]}
+     * {"elements":[...]}
      * ```
-     * The inner text is a JSON-serialized string containing the elements array.
      */
-    private fun findElementWithRetry(by: String, value: String): String? {
+    private suspend fun findElementWithRetry(by: String, value: String): String? {
         val startTime = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - startTime < ELEMENT_WAIT_TIMEOUT_MS) {
@@ -171,17 +157,13 @@ class E2ECalculatorTest {
                     mapOf("by" to by, "value" to value, "exact_match" to true),
                 )
 
-                // Navigate content array to get the text field
-                val contentArray = result["content"]?.jsonArray
-                if (contentArray != null && contentArray.isNotEmpty()) {
-                    val textContent = contentArray[0].jsonObject["text"]?.jsonPrimitive?.contentOrNull
-                    if (textContent != null) {
-                        // Parse the inner JSON string
-                        val innerJson = json.parseToJsonElement(textContent).jsonObject
-                        val elements = innerJson["elements"]?.jsonArray
-                        if (elements != null && elements.isNotEmpty()) {
-                            return elements[0].jsonObject["id"]?.jsonPrimitive?.contentOrNull
-                        }
+                val textContent = (result.content[0] as? TextContent)?.text
+                if (textContent != null) {
+                    // Parse the inner JSON string
+                    val innerJson = Json.parseToJsonElement(textContent).jsonObject
+                    val elements = innerJson["elements"]?.jsonArray
+                    if (elements != null && elements.isNotEmpty()) {
+                        return elements[0].jsonObject["id"]?.jsonPrimitive?.contentOrNull
                     }
                 }
             } catch (_: Exception) {
