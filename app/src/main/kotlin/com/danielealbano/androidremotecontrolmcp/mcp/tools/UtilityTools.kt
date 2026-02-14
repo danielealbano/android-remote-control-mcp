@@ -344,10 +344,8 @@ class WaitForIdleTool
                 )
             }
 
-            @Suppress("UNNECESSARY_SAFE_CALL")
             val matchPercentage =
-                arguments
-                    ?.get("match_percentage")
+                arguments["match_percentage"]
                     ?.jsonPrimitive
                     ?.longOrNull
                     ?.toInt()
