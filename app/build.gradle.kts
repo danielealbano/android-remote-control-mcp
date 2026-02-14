@@ -18,7 +18,7 @@ val versionCodeProp = (project.findProperty("VERSION_CODE") as String?)?.toInt()
 
 android {
     namespace = "com.danielealbano.androidremotecontrolmcp"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.danielealbano.androidremotecontrolmcp"
@@ -154,9 +154,11 @@ dependencies {
     implementation(libs.accompanist.permissions)
 
     // Unit Testing
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -181,7 +183,9 @@ val extractNgrokNative by tasks.registering {
         }
     dependencies {
         ngrokNativeConfig(
-            libs.ngrok.java.native.android.arm64.get().toString() + ":linux-android-aarch_64",
+            libs.ngrok.java.native.android.arm64
+                .get()
+                .toString() + ":linux-android-aarch_64",
         )
     }
 
@@ -189,11 +193,12 @@ val extractNgrokNative by tasks.registering {
         val targetDir = file("src/main/jniLibs/arm64-v8a")
         targetDir.mkdirs()
         ngrokNativeConfig.files.forEach { jar ->
-            zipTree(jar).matching {
-                include("**/*.so")
-            }.forEach { soFile ->
-                soFile.copyTo(File(targetDir, soFile.name), overwrite = true)
-            }
+            zipTree(jar)
+                .matching {
+                    include("**/*.so")
+                }.forEach { soFile ->
+                    soFile.copyTo(File(targetDir, soFile.name), overwrite = true)
+                }
         }
     }
 }

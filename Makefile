@@ -1,4 +1,4 @@
-.PHONY: help check-deps build build-release clean \
+.PHONY: help check-deps check-deps-updates update-deps build build-release clean \
         test-unit test-integration test-e2e test coverage \
         lint lint-fix \
         install install-release uninstall grant-permissions start-server forward-port \
@@ -90,6 +90,12 @@ check-deps: ## Check for required development tools
 	else \
 		echo "All dependencies are present."; \
 	fi
+
+check-deps-updates: ## Check for outdated dependencies
+	$(GRADLE) dependencyUpdates --no-parallel
+
+update-deps: ## Update version catalog with latest stable versions (interactive)
+	$(GRADLE) versionCatalogUpdate --interactive
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Build

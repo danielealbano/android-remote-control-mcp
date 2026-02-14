@@ -242,13 +242,16 @@ private const val TUNNEL_CONNECT_TIMEOUT_MS = 60_000L
  * cannot be used.
  */
 class HostCloudflareBinaryResolver : CloudflaredBinaryResolver {
-    override fun resolve(): String? {
-        return try {
+    override fun resolve(): String? =
+        try {
             val result = ProcessBuilder("which", "cloudflared").start()
-            val path = result.inputStream.bufferedReader().readText().trim()
+            val path =
+                result.inputStream
+                    .bufferedReader()
+                    .readText()
+                    .trim()
             if (result.waitFor() == 0 && path.isNotEmpty()) path else null
         } catch (_: Exception) {
             null
         }
-    }
 }

@@ -471,15 +471,14 @@ class ScrollToElementTool
  * Maps a "by" string parameter to the [FindBy] enum.
  * Returns null if the string does not match any known value.
  */
-internal fun mapFindBy(by: String): FindBy? {
-    return when (by.lowercase()) {
+internal fun mapFindBy(by: String): FindBy? =
+    when (by.lowercase()) {
         "text" -> FindBy.TEXT
         "content_desc" -> FindBy.CONTENT_DESC
         "resource_id" -> FindBy.RESOURCE_ID
         "class_name" -> FindBy.CLASS_NAME
         else -> null
     }
-}
 
 /**
  * Gets a fresh accessibility tree by obtaining the root node from the

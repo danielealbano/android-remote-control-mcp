@@ -45,15 +45,14 @@ object McpIntegrationTestHelper {
     /**
      * Creates mocked service dependencies used by all tool handlers.
      */
-    fun createMockDependencies(): MockDependencies {
-        return MockDependencies(
+    fun createMockDependencies(): MockDependencies =
+        MockDependencies(
             actionExecutor = mockk(relaxed = true),
             accessibilityServiceProvider = mockk(relaxed = true),
             screenCaptureProvider = mockk(relaxed = true),
             treeParser = mockk(relaxed = true),
             elementFinder = mockk(relaxed = true),
         )
-    }
 
     /**
      * Registers all MCP tools with the given [Server] using mocked dependencies.

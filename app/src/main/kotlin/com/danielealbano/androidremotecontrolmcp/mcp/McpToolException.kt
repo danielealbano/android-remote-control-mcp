@@ -8,16 +8,30 @@ package com.danielealbano.androidremotecontrolmcp.mcp
  *
  * Each subclass classifies a specific failure mode.
  */
-sealed class McpToolException(message: String) : Exception(message) {
-    class InvalidParams(message: String) : McpToolException(message)
+sealed class McpToolException(
+    message: String,
+) : Exception(message) {
+    class InvalidParams(
+        message: String,
+    ) : McpToolException(message)
 
-    class InternalError(message: String) : McpToolException(message)
+    class InternalError(
+        message: String,
+    ) : McpToolException(message)
 
-    class PermissionDenied(message: String) : McpToolException(message)
+    class PermissionDenied(
+        message: String,
+    ) : McpToolException(message)
 
-    class ElementNotFound(message: String) : McpToolException(message)
+    class ElementNotFound(
+        message: String,
+    ) : McpToolException(message)
 
-    class ActionFailed(message: String) : McpToolException(message)
+    class ActionFailed(
+        message: String,
+    ) : McpToolException(message)
 
-    class Timeout(message: String) : McpToolException(message)
+    class Timeout(
+        message: String,
+    ) : McpToolException(message)
 }

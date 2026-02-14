@@ -16,9 +16,11 @@ kotlin {
 
 dependencies {
     // Testing framework
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 
     // Testcontainers
     testImplementation(libs.testcontainers)
