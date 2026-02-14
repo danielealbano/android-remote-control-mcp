@@ -14,6 +14,9 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -226,7 +229,10 @@ class ErrorHandlingIntegrationTest {
                         )
                     assertNotEquals(true, result.isError)
                     val text = (result.content[0] as TextContent).text
-                    assertTrue(text.contains("timed out"))
+                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("timed out") == true)
+                    assertTrue(parsed.containsKey("similarity"))
+                    assertTrue(parsed.containsKey("elapsedMs"))
                 }
             } finally {
                 unmockkStatic(SystemClock::class)
