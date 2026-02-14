@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * (handling both Int and Double JSON number types), validate parameter values,
  * and translate [Result] failures into appropriate [McpToolException] subtypes.
  */
+@Suppress("TooManyFunctions")
 internal object McpToolUtils {
     /**
      * Extracts a required numeric value from [params] as a [Float].
