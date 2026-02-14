@@ -9,6 +9,7 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBina
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterAll
@@ -117,6 +118,11 @@ class CloudflareTunnelIntegrationTest {
             assertTrue(connected.url.startsWith("https://"))
             assertTrue(connected.url.contains(".trycloudflare.com"))
             assertEquals(TunnelProviderType.CLOUDFLARE, connected.providerType)
+
+            // Wait for Cloudflare DNS to propagate the new subdomain record.
+            // Without this delay the first lookup may get NXDOMAIN, which the
+            // JVM negative-caches, causing all subsequent retries to fail too.
+            delay(DNS_PROPAGATION_DELAY_MS)
 
             // Make an HTTP GET request through the tunnel
             val tunnelUrl = connected.url
@@ -229,10 +235,13 @@ class CloudflareTunnelIntegrationTest {
 }
 
 /** Timeout for the entire test class (seconds). */
-private const val TUNNEL_TEST_TIMEOUT_SECONDS = 90L
+private const val TUNNEL_TEST_TIMEOUT_SECONDS = 120L
 
 /** Timeout waiting for the tunnel to connect (milliseconds). */
 private const val TUNNEL_CONNECT_TIMEOUT_MS = 60_000L
+
+/** Delay before first HTTP fetch to allow Cloudflare DNS propagation (milliseconds). */
+private const val DNS_PROPAGATION_DELAY_MS = 30_000L
 
 /**
  * Resolves the cloudflared binary from the host system's PATH.
