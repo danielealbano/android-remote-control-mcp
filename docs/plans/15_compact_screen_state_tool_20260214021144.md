@@ -755,9 +755,9 @@ fun registerUtilityTools(
 **As a** developer, **I want** the documentation to reflect the new tools **so that** the docs are accurate and up to date.
 
 ### Acceptance Criteria
-- [ ] `MCP_TOOLS.md` documents `get_screen_state` and `get_element_details`, removes old tool docs
-- [ ] `PROJECT.md` updated to reference new tools instead of old tools
-- [ ] KDoc comments in `ScreenInfo.kt` and `AccessibilityTreeParser.kt` updated
+- [x] `MCP_TOOLS.md` documents `get_screen_state` and `get_element_details`, removes old tool docs
+- [x] `PROJECT.md` updated to reference new tools instead of old tools
+- [x] KDoc comments in `ScreenInfo.kt` and `AccessibilityTreeParser.kt` updated
 
 ---
 

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * Represents the device screen dimensions, density, and orientation.
  *
  * Produced by [McpAccessibilityService.getScreenInfo] and returned
- * by the `get_screen_info` MCP tool.
+ * by the `get_screen_state` MCP tool.
  *
  * @property width Screen width in pixels.
  * @property height Screen height in pixels.

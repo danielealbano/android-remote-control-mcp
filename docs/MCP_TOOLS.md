@@ -30,13 +30,13 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 
 | Category | Tools | Plan |
 |----------|-------|------|
-| Screen Introspection | `get_accessibility_tree`, `capture_screenshot`, `get_current_app`, `get_screen_info` | 7 |
+| Screen Introspection | `get_screen_state` | 7, 15 |
 | System Actions | `press_back`, `press_home`, `press_recents`, `open_notifications`, `open_quick_settings`, `get_device_logs` | 7 |
 | Touch Actions | `tap`, `long_press`, `double_tap`, `swipe`, `scroll` | 8 |
 | Gestures | `pinch`, `custom_gesture` | 8 |
 | Element Actions | `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element` | 9 |
 | Text Input | `input_text`, `clear_text`, `press_key` | 9 |
-| Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle` | 9 |
+| Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle`, `get_element_details` | 9, 15 |
 
 ### Endpoint
 
@@ -132,33 +132,56 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ## 1. Screen Introspection Tools
 
-### `get_accessibility_tree`
+### `get_screen_state`
 
-Returns the full UI hierarchy of the current screen using accessibility services.
+Returns the consolidated current screen state: app metadata, screen dimensions, and a compact filtered flat TSV list of UI elements. Optionally includes a low-resolution screenshot.
+
+Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_current_app`, and `get_screen_info` tools.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
-  "properties": {},
+  "properties": {
+    "include_screenshot": {
+      "type": "boolean",
+      "description": "Include a low-resolution screenshot. Only request when the UI element list is not sufficient.",
+      "default": false
+    }
+  },
   "required": []
 }
 ```
 
-**Request Example**:
+**Request Example** (text only):
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "get_accessibility_tree",
+    "name": "get_screen_state",
     "arguments": {}
   }
 }
 ```
 
-**Response Example (Success)**:
+**Request Example** (with screenshot):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_screen_state",
+    "arguments": {
+      "include_screenshot": true
+    }
+  }
+}
+```
+
+**Response Example (text only)**:
 ```json
 {
   "jsonrpc": "2.0",
@@ -167,84 +190,24 @@ Returns the full UI hierarchy of the current screen using accessibility services
     "content": [
       {
         "type": "text",
-        "text": "{\"nodes\":[{\"id\":\"root_0\",\"className\":\"android.widget.FrameLayout\",\"text\":null,\"contentDescription\":null,\"resourceId\":null,\"bounds\":{\"left\":0,\"top\":0,\"right\":1080,\"bottom\":2400},\"clickable\":false,\"longClickable\":false,\"focusable\":false,\"scrollable\":false,\"editable\":false,\"enabled\":true,\"visible\":true,\"children\":[{\"id\":\"node_1\",\"className\":\"android.widget.TextView\",\"text\":\"Calculator\",\"bounds\":{\"left\":100,\"top\":50,\"right\":500,\"bottom\":120},\"visible\":true,\"enabled\":true,\"children\":[]}]}]}"
+        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tandroid.widget.TextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\te\nnode_2\tandroid.widget.Button\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tce"
       }
     ]
   }
 }
 ```
 
-**Error Cases**:
-- **Permission denied**: Accessibility service not enabled
-- **Action failed**: Failed to obtain root node
-
----
-
-### `capture_screenshot`
-
-Captures a screenshot of the current screen and returns it as base64-encoded JPEG.
-
-**Input Schema**:
-```json
-{
-  "type": "object",
-  "properties": {
-    "quality": {
-      "type": "integer",
-      "description": "JPEG quality (1-100)",
-      "default": 80
-    },
-    "width": {
-      "type": "integer",
-      "description": "Maximum width in pixels for proportional resizing (must be > 0)"
-    },
-    "height": {
-      "type": "integer",
-      "description": "Maximum height in pixels for proportional resizing (must be > 0)"
-    }
-  },
-  "required": []
-}
-```
-
-**Resizing behavior**: When `width` and/or `height` are specified, the screenshot is resized proportionally to fit within the bounding box while maintaining the original aspect ratio. If only one dimension is provided, the other is calculated automatically. If neither is provided, the screenshot is returned at full resolution.
-
-**Request Example** (default quality, full resolution):
+**Response Example (with screenshot)**:
 ```json
 {
   "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/call",
-  "params": {
-    "name": "capture_screenshot",
-    "arguments": {}
-  }
-}
-```
-
-**Request Example** (custom quality with resizing):
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/call",
-  "params": {
-    "name": "capture_screenshot",
-    "arguments": {
-      "quality": 50,
-      "width": 720
-    }
-  }
-}
-```
-
-**Response Example (Success)**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
+  "id": 1,
   "result": {
     "content": [
+      {
+        "type": "text",
+        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+      },
       {
         "type": "image",
         "data": "/9j/4AAQSkZJRgABAQ...<base64 JPEG data>",
@@ -255,121 +218,54 @@ Captures a screenshot of the current screen and returns it as base64-encoded JPE
 }
 ```
 
+#### Output Format
+
+The text output is a compact flat TSV (tab-separated values) format designed for token-efficient LLM consumption:
+
+1. **Note line**: `note:structural-only nodes are omitted from the tree`
+2. **App line**: `app:<package> activity:<activity>`
+3. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
+4. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+5. **Data rows**: One row per filtered node with tab-separated values
+
+#### Flags Reference
+
+The `flags` column uses single-character codes for interactive properties:
+
+| Flag | Meaning |
+|------|---------|
+| `c` | clickable |
+| `l` | longClickable |
+| `f` | focusable |
+| `s` | scrollable |
+| `d` | editable |
+| `e` | enabled |
+
+Only flags that are `true` are included. Example: `ce` means clickable + enabled.
+
+#### Node Filtering
+
+Nodes are **omitted** from the output when ALL of the following are true:
+- No `text`
+- No `contentDescription`
+- No `resourceId`
+- Not `clickable`, `longClickable`, `scrollable`, or `editable`
+
+This filters out structural-only container nodes (e.g., bare `FrameLayout`, `LinearLayout`) that have no semantic value for LLM tool callers.
+
+#### Text/Description Truncation
+
+Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `get_element_details` tool to retrieve full untruncated values by element ID.
+
+#### Screenshot
+
+When `include_screenshot` is `true`, a low-resolution JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). Only request the screenshot when the element list alone is not sufficient to understand the screen layout.
+
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- Screen capture not available (accessibility service not enabled)
-- Quality parameter out of range (must be 1-100)
-- Width or height must be positive integers
-- Screenshot capture failed
-
----
-
-### `get_current_app`
-
-Returns the package name and activity name of the currently focused app.
-
-**Input Schema**:
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
-**Request Example**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": {
-    "name": "get_current_app",
-    "arguments": {}
-  }
-}
-```
-
-**Response Example (Success)**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "{\"packageName\":\"com.android.calculator2\",\"activityName\":\".Calculator\"}"
-      }
-    ]
-  }
-}
-```
-
-**Response Example (No app focused)**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "{\"packageName\":\"unknown\",\"activityName\":\"unknown\"}"
-      }
-    ]
-  }
-}
-```
-
-**Error Cases**:
 - **Permission denied**: Accessibility service not enabled
-
----
-
-### `get_screen_info`
-
-Returns screen dimensions, orientation, and DPI.
-
-**Input Schema**:
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
-**Request Example**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 4,
-  "method": "tools/call",
-  "params": {
-    "name": "get_screen_info",
-    "arguments": {}
-  }
-}
-```
-
-**Response Example (Success)**:
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 4,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "{\"width\":1080,\"height\":2400,\"densityDpi\":420,\"orientation\":\"portrait\"}"
-      }
-    ]
-  }
-}
-```
-
-**Error Cases**:
-- **Permission denied**: Accessibility service not enabled
+- **Action failed**: Failed to obtain root accessibility node
+- **Permission denied**: Screen capture not available (when `include_screenshot` is true)
+- **Action failed**: Screenshot capture failed
 
 ---
 
@@ -1623,3 +1519,66 @@ curl -X POST http://localhost:8080/mcp \
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - Timeout out of range (1-30000) or missing
 - Accessibility service not enabled
+
+---
+
+### `get_element_details`
+
+Retrieves full untruncated text and contentDescription for one or more elements by their IDs. Use this tool when `get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of element IDs to look up (from get_screen_state output)"
+    }
+  },
+  "required": ["ids"]
+}
+```
+
+**Request Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_element_details",
+    "arguments": {
+      "ids": ["node_1", "node_2"]
+    }
+  }
+}
+```
+
+**Response Example (Success)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this element"
+      }
+    ]
+  }
+}
+```
+
+**Output Format**: TSV with three columns:
+- `id`: The element ID
+- `text`: Full untruncated text (or `-` if null/empty)
+- `desc`: Full untruncated contentDescription (or `-` if null/empty)
+
+If an element ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `ids` parameter, `ids` is not an array, array is empty, or contains non-string values
+- **Permission denied**: Accessibility service not enabled
