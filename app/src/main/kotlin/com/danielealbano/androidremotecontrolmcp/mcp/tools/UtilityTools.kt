@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.os.SystemClock
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
@@ -328,7 +327,13 @@ class WaitForIdleTool
     ) {
         private val treeFingerprint = TreeFingerprint()
 
-        @Suppress("CyclomaticComplexity", "NestedBlockDepth", "ThrowsCount", "InstanceOfCheckForException")
+        @Suppress(
+            "CyclomaticComplexity",
+            "NestedBlockDepth",
+            "ThrowsCount",
+            "InstanceOfCheckForException",
+            "LongMethod",
+        )
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val timeout =
                 arguments?.get("timeout")?.jsonPrimitive?.longOrNull
@@ -339,12 +344,18 @@ class WaitForIdleTool
                 )
             }
 
+            @Suppress("UNNECESSARY_SAFE_CALL")
             val matchPercentage =
-                arguments?.get("match_percentage")?.jsonPrimitive?.longOrNull?.toInt()
+                arguments
+                    ?.get("match_percentage")
+                    ?.jsonPrimitive
+                    ?.longOrNull
+                    ?.toInt()
                     ?: DEFAULT_MATCH_PERCENTAGE
             if (matchPercentage < 0 || matchPercentage > TreeFingerprint.FULL_MATCH_PERCENTAGE) {
                 throw McpToolException.InvalidParams(
-                    "match_percentage must be between 0 and ${TreeFingerprint.FULL_MATCH_PERCENTAGE}, got: $matchPercentage",
+                    "match_percentage must be between 0 and " +
+                        "${TreeFingerprint.FULL_MATCH_PERCENTAGE}, got: $matchPercentage",
                 )
             }
 
@@ -394,7 +405,11 @@ class WaitForIdleTool
             val elapsed = SystemClock.elapsedRealtime() - startTime
             val resultJson =
                 buildJsonObject {
-                    put("message", "Operation timed out after ${elapsed}ms waiting for UI idle. Retry if the operation is long-running.")
+                    put(
+                        "message",
+                        "Operation timed out after ${elapsed}ms waiting for UI idle." +
+                            " Retry if the operation is long-running.",
+                    )
                     put("elapsedMs", elapsed)
                     put("similarity", lastSimilarity)
                 }
@@ -415,7 +430,11 @@ class WaitForIdleTool
                                 }
                                 putJsonObject("match_percentage") {
                                     put("type", "integer")
-                                    put("description", "Similarity threshold percentage (0-100, default 100). 100 = exact match, lower values tolerate minor UI changes")
+                                    put(
+                                        "description",
+                                        "Similarity threshold percentage (0-100, default 100). " +
+                                            "100 = exact match, lower values tolerate minor UI changes",
+                                    )
                                     put("default", DEFAULT_MATCH_PERCENTAGE)
                                 }
                             },

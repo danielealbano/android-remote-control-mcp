@@ -19,7 +19,6 @@ import kotlin.math.abs
  * where `totalNodes = max(sum(a), sum(b))`, clamped to [0, 100].
  */
 class TreeFingerprint {
-
     /**
      * Generates a [FINGERPRINT_SIZE]-slot histogram fingerprint from the given
      * accessibility tree root node.
@@ -48,7 +47,10 @@ class TreeFingerprint {
      * @return similarity percentage as an integer in [0, 100]
      * @throws IllegalArgumentException if either array is not of size [FINGERPRINT_SIZE]
      */
-    fun compare(a: IntArray, b: IntArray): Int {
+    fun compare(
+        a: IntArray,
+        b: IntArray,
+    ): Int {
         require(a.size == FINGERPRINT_SIZE) {
             "Fingerprint 'a' must have size $FINGERPRINT_SIZE, got ${a.size}"
         }
@@ -64,11 +66,21 @@ class TreeFingerprint {
             diffSum += abs(a[i] - b[i])
         }
 
-        val similarity = (FULL_MATCH_PERCENTAGE.toFloat() - (diffSum.toFloat() * FULL_MATCH_PERCENTAGE.toFloat() / (2f * totalNodes.toFloat()))).toInt()
+        val similarity =
+            (
+                FULL_MATCH_PERCENTAGE.toFloat() -
+                    (
+                        diffSum.toFloat() * FULL_MATCH_PERCENTAGE.toFloat() /
+                            (2f * totalNodes.toFloat())
+                    )
+            ).toInt()
         return similarity.coerceIn(0, FULL_MATCH_PERCENTAGE)
     }
 
-    private fun populateFingerprint(node: AccessibilityNodeData, fingerprint: IntArray) {
+    private fun populateFingerprint(
+        node: AccessibilityNodeData,
+        fingerprint: IntArray,
+    ) {
         val hash = computeNodeHash(node)
         val index = (hash and INDEX_MASK) % FINGERPRINT_SIZE
         fingerprint[index]++
