@@ -917,19 +917,19 @@ fun registerUtilityTools(
 **As a** developer, **I want** to verify all changes are correct, consistent, and passing **so that** the implementation is complete and ready for review.
 
 ### Acceptance Criteria
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest`
-- [ ] All integration tests pass (included in above)
-- [ ] Lint passes: `make lint`
-- [ ] Build succeeds: `./gradlew build`
-- [ ] No TODOs, no commented-out dead code
-- [ ] All old handler classes fully removed (no orphaned code)
-- [ ] All old tool names fully removed from test expectations
-- [ ] Compact flat TSV output format matches the agreed design exactly
-- [ ] Node filtering works correctly (noise nodes excluded, children still walked)
-- [ ] Text/desc truncation at 100 chars verified in tests
-- [ ] `get_element_details` returns full untruncated values
-- [ ] Screenshot cap at 700px verified in tests
-- [ ] Documentation accurately reflects the implementation
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest`
+- [x] All integration tests pass (included in above)
+- [x] Lint passes: `make lint`
+- [x] Build succeeds: `./gradlew build`
+- [x] No TODOs, no commented-out dead code
+- [x] All old handler classes fully removed (no orphaned code)
+- [x] All old tool names fully removed from test expectations
+- [x] Compact flat TSV output format matches the agreed design exactly
+- [x] Node filtering works correctly (noise nodes excluded, children still walked)
+- [x] Text/desc truncation at 100 chars verified in tests
+- [x] `get_element_details` returns full untruncated values
+- [x] Screenshot cap at 700px verified in tests
+- [x] Documentation accurately reflects the implementation
 
 ---
 
