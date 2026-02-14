@@ -1484,7 +1484,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `wait_for_idle`
 
-Wait for the UI to become idle by detecting when the accessibility tree structure stops changing. Considers UI idle when two consecutive snapshots (500ms apart) produce the same structural hash.
+Wait for the UI to become idle by comparing accessibility tree fingerprints using similarity-based change detection. Generates a 256-slot histogram fingerprint of the tree structure and uses normalized difference to compute a similarity percentage. Considers UI idle when two consecutive snapshots (500ms apart) meet the `match_percentage` threshold.
 
 **Input Schema**:
 ```json
@@ -1494,6 +1494,11 @@ Wait for the UI to become idle by detecting when the accessibility tree structur
     "timeout": {
       "type": "integer",
       "description": "Timeout in milliseconds (1-30000). Required."
+    },
+    "match_percentage": {
+      "type": "integer",
+      "description": "Similarity threshold percentage (0-100, default 100). 100 = exact match, lower values tolerate minor UI changes",
+      "default": 100
     }
   },
   "required": ["timeout"]
@@ -1504,13 +1509,22 @@ Wait for the UI to become idle by detecting when the accessibility tree structur
 ```json
 {
   "message": "UI is idle",
-  "elapsedMs": 1500
+  "elapsedMs": 1500,
+  "similarity": 100
 }
 ```
 
-**Timeout behavior**: When the timeout expires without the UI becoming idle, a **non-error** `CallToolResult` is returned with an informational message. This is not a tool error — the caller should check the message content.
+**Timeout behavior**: When the timeout expires without the UI becoming idle, a **non-error** `CallToolResult` is returned with a JSON object containing the last computed similarity:
+```json
+{
+  "message": "Operation timed out after 3000ms waiting for UI idle. Retry if the operation is long-running.",
+  "elapsedMs": 3000,
+  "similarity": 85
+}
+```
+This is not a tool error — the caller should check the `message` field.
 
-**Example**:
+**Example** (exact match, default behavior):
 ```bash
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer <token>" \
@@ -1521,8 +1535,20 @@ curl -X POST http://localhost:8080/mcp \
   }'
 ```
 
+**Example** (tolerate minor UI changes):
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "wait_for_idle", "arguments": { "timeout": 5000, "match_percentage": 95 } }
+  }'
+```
+
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - Timeout out of range (1-30000) or missing
+- `match_percentage` out of range (0-100)
 - Accessibility service not enabled
 
 ---
