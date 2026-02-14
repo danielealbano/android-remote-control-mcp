@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -27,7 +28,7 @@ class AndroidCloudflareBinaryResolver
             return try {
                 extractAsset(assetName, targetFile)
                 targetFile.absolutePath
-            } catch (e: Exception) {
+            } catch (e: IOException) {
                 Log.e(TAG, "Failed to extract cloudflared binary from assets", e)
                 null
             }
@@ -37,23 +38,24 @@ class AndroidCloudflareBinaryResolver
             val availableAssets =
                 try {
                     context.assets.list("")?.toSet() ?: emptySet()
-                } catch (e: Exception) {
+                } catch (e: IOException) {
                     Log.e(TAG, "Failed to list assets", e)
-                    return null
+                    emptySet()
                 }
 
-            for (abi in Build.SUPPORTED_ABIS) {
-                val candidate = "$ASSET_PREFIX$abi"
-                if (candidate in availableAssets) {
-                    return candidate
+            val match =
+                Build.SUPPORTED_ABIS.firstOrNull { abi ->
+                    "$ASSET_PREFIX$abi" in availableAssets
                 }
+
+            if (match == null) {
+                Log.e(
+                    TAG,
+                    "No cloudflared asset found for ABIs: ${Build.SUPPORTED_ABIS.joinToString()}",
+                )
             }
 
-            Log.e(
-                TAG,
-                "No cloudflared asset found for ABIs: ${Build.SUPPORTED_ABIS.joinToString()}",
-            )
-            return null
+            return match?.let { "$ASSET_PREFIX$it" }
         }
 
         private fun extractAsset(
