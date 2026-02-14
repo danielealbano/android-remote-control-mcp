@@ -26,8 +26,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
@@ -318,9 +318,10 @@ class UtilityToolsTest {
 
                     // Return trees that differ slightly each time (1 node text changes out of 11 total)
                     var callCount = 0
-                    every { mockAccessibilityServiceProvider.getRootNode() } returns mockk {
-                        every { recycle() } returns Unit
-                    }
+                    every { mockAccessibilityServiceProvider.getRootNode() } returns
+                        mockk {
+                            every { recycle() } returns Unit
+                        }
                     every { mockTreeParser.parseTree(any()) } answers {
                         callCount++
                         clockMs += 600L
@@ -329,23 +330,25 @@ class UtilityToolsTest {
                             className = "android.widget.FrameLayout",
                             bounds = BoundsData(0, 0, 1080, 2400),
                             visible = true,
-                            children = (0 until 10).map { i ->
-                                AccessibilityNodeData(
-                                    id = "node_$i",
-                                    className = "android.widget.TextView",
-                                    text = if (i == 0) "changing_$callCount" else "stable_$i",
-                                    bounds = BoundsData(0, i * 100, 1080, (i + 1) * 100),
-                                    visible = true,
-                                )
-                            },
+                            children =
+                                (0 until 10).map { i ->
+                                    AccessibilityNodeData(
+                                        id = "node_$i",
+                                        className = "android.widget.TextView",
+                                        text = if (i == 0) "changing_$callCount" else "stable_$i",
+                                        bounds = BoundsData(0, i * 100, 1080, (i + 1) * 100),
+                                        visible = true,
+                                    )
+                                },
                         )
                     }
 
                     // With match_percentage=80, the minor change should still be considered idle
-                    val params = buildJsonObject {
-                        put("timeout", 10000)
-                        put("match_percentage", 80)
-                    }
+                    val params =
+                        buildJsonObject {
+                            put("timeout", 10000)
+                            put("match_percentage", 80)
+                        }
                     val result = tool.execute(params)
                     val text = extractTextContent(result)
                     val parsed = Json.parseToJsonElement(text).jsonObject
@@ -360,10 +363,11 @@ class UtilityToolsTest {
         @Test
         fun `throws error for match_percentage above 100`() =
             runTest {
-                val params = buildJsonObject {
-                    put("timeout", 5000)
-                    put("match_percentage", 101)
-                }
+                val params =
+                    buildJsonObject {
+                        put("timeout", 5000)
+                        put("match_percentage", 101)
+                    }
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
@@ -371,10 +375,11 @@ class UtilityToolsTest {
         @Test
         fun `throws error for negative match_percentage`() =
             runTest {
-                val params = buildJsonObject {
-                    put("timeout", 5000)
-                    put("match_percentage", -1)
-                }
+                val params =
+                    buildJsonObject {
+                        put("timeout", 5000)
+                        put("match_percentage", -1)
+                    }
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
@@ -389,9 +394,10 @@ class UtilityToolsTest {
 
                     // Return different trees each time to force timeout
                     var callCount = 0
-                    every { mockAccessibilityServiceProvider.getRootNode() } returns mockk {
-                        every { recycle() } returns Unit
-                    }
+                    every { mockAccessibilityServiceProvider.getRootNode() } returns
+                        mockk {
+                            every { recycle() } returns Unit
+                        }
                     every { mockTreeParser.parseTree(any()) } answers {
                         callCount++
                         clockMs += 600L
