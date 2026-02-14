@@ -14,6 +14,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -426,6 +427,110 @@ class WaitForIdleTool
     }
 
 /**
+ * MCP tool: get_element_details
+ *
+ * Retrieves full (untruncated) text and contentDescription for a list of element IDs.
+ * Use after get_screen_state when text or desc columns were truncated.
+ */
+class GetElementDetailsTool
+    @Inject
+    constructor(
+        private val treeParser: AccessibilityTreeParser,
+        private val elementFinder: ElementFinder,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+    ) {
+        @Suppress("ThrowsCount")
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            // 1. Parse "ids" parameter — required, JSON array of strings
+            val idsElement =
+                arguments?.get("ids")
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'ids'")
+            val idsArray =
+                (idsElement as? JsonArray)
+                    ?: throw McpToolException.InvalidParams("Parameter 'ids' must be an array of strings")
+            if (idsArray.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'ids' must not be empty")
+            }
+            val ids =
+                idsArray.map { element ->
+                    val primitive =
+                        (element as? JsonPrimitive)
+                            ?: throw McpToolException.InvalidParams("Each element in 'ids' must be a string")
+                    if (!primitive.isString) {
+                        throw McpToolException.InvalidParams("Each element in 'ids' must be a string")
+                    }
+                    primitive.content
+                }
+
+            // 2. Get fresh tree
+            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
+
+            // 3. Build TSV output
+            val sb = StringBuilder()
+            sb.append("id\ttext\tdesc\n")
+
+            for (id in ids) {
+                val node = elementFinder.findNodeById(tree, id)
+                if (node != null) {
+                    val text = sanitizeForTsv(node.text)
+                    val desc = sanitizeForTsv(node.contentDescription)
+                    sb.append("$id\t$text\t$desc\n")
+                } else {
+                    sb.append("$id\tnot_found\tnot_found\n")
+                }
+            }
+
+            Log.d(TAG, "get_element_details: ids=${ids.size}")
+
+            return McpToolUtils.textResult(sb.toString().trimEnd('\n'))
+        }
+
+        /**
+         * Sanitizes text for TSV: replaces tabs/newlines with spaces.
+         * Returns "-" if null or empty.
+         * Does NOT truncate — this tool returns full values.
+         */
+        private fun sanitizeForTsv(text: String?): String {
+            if (text.isNullOrEmpty()) return "-"
+            val sanitized =
+                text
+                    .replace('\t', ' ')
+                    .replace('\n', ' ')
+                    .replace('\r', ' ')
+                    .trim()
+            return if (sanitized.isEmpty()) "-" else sanitized
+        }
+
+        fun register(server: Server) {
+            server.addTool(
+                name = TOOL_NAME,
+                description =
+                    "Retrieve full untruncated text and description for elements by ID. " +
+                        "Use after get_screen_state when text or desc was truncated.",
+                inputSchema =
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("ids") {
+                                    put("type", "array")
+                                    putJsonObject("items") {
+                                        put("type", "string")
+                                    }
+                                    put("description", "List of element IDs to retrieve details for")
+                                }
+                            },
+                        required = listOf("ids"),
+                    ),
+            ) { request -> execute(request.arguments) }
+        }
+
+        companion object {
+            private const val TAG = "MCP:GetElementDetailsTool"
+            private const val TOOL_NAME = "get_element_details"
+        }
+    }
+
+/**
  * Registers all utility tools with the given [Server].
  */
 fun registerUtilityTools(
@@ -438,4 +543,5 @@ fun registerUtilityTools(
     SetClipboardTool(accessibilityServiceProvider).register(server)
     WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
     WaitForIdleTool(treeParser, accessibilityServiceProvider).register(server)
+    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
 }
