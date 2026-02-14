@@ -27,6 +27,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
@@ -292,6 +293,127 @@ class UtilityToolsTest {
                 val text = extractTextContent(result)
                 val parsed = Json.parseToJsonElement(text).jsonObject
                 assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
+                assertEquals(100, parsed["similarity"]?.jsonPrimitive?.int)
+            }
+
+        @Test
+        fun `match_percentage defaults to 100 when not provided`() =
+            runTest {
+                // Same tree each time -> idle at 100% similarity
+                val params = buildJsonObject { put("timeout", 5000) }
+
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertEquals(100, parsed["similarity"]?.jsonPrimitive?.int)
+            }
+
+        @Test
+        fun `detects idle with match_percentage below 100 when tree has minor changes`() =
+            runTest {
+                mockkStatic(SystemClock::class)
+                try {
+                    var clockMs = 0L
+                    every { SystemClock.elapsedRealtime() } answers { clockMs }
+
+                    // Return trees that differ slightly each time (1 node text changes out of 11 total)
+                    var callCount = 0
+                    every { mockAccessibilityServiceProvider.getRootNode() } returns mockk {
+                        every { recycle() } returns Unit
+                    }
+                    every { mockTreeParser.parseTree(any()) } answers {
+                        callCount++
+                        clockMs += 600L
+                        AccessibilityNodeData(
+                            id = "node_root",
+                            className = "android.widget.FrameLayout",
+                            bounds = BoundsData(0, 0, 1080, 2400),
+                            visible = true,
+                            children = (0 until 10).map { i ->
+                                AccessibilityNodeData(
+                                    id = "node_$i",
+                                    className = "android.widget.TextView",
+                                    text = if (i == 0) "changing_$callCount" else "stable_$i",
+                                    bounds = BoundsData(0, i * 100, 1080, (i + 1) * 100),
+                                    visible = true,
+                                )
+                            },
+                        )
+                    }
+
+                    // With match_percentage=80, the minor change should still be considered idle
+                    val params = buildJsonObject {
+                        put("timeout", 10000)
+                        put("match_percentage", 80)
+                    }
+                    val result = tool.execute(params)
+                    val text = extractTextContent(result)
+                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
+                    val similarity = parsed["similarity"]?.jsonPrimitive?.int ?: 0
+                    assertTrue(similarity in 80..100, "Expected similarity between 80 and 100, got $similarity")
+                } finally {
+                    unmockkStatic(SystemClock::class)
+                }
+            }
+
+        @Test
+        fun `throws error for match_percentage above 100`() =
+            runTest {
+                val params = buildJsonObject {
+                    put("timeout", 5000)
+                    put("match_percentage", 101)
+                }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws error for negative match_percentage`() =
+            runTest {
+                val params = buildJsonObject {
+                    put("timeout", 5000)
+                    put("match_percentage", -1)
+                }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `timeout response includes similarity field`() =
+            runTest {
+                mockkStatic(SystemClock::class)
+                try {
+                    var clockMs = 0L
+                    every { SystemClock.elapsedRealtime() } answers { clockMs }
+
+                    // Return different trees each time to force timeout
+                    var callCount = 0
+                    every { mockAccessibilityServiceProvider.getRootNode() } returns mockk {
+                        every { recycle() } returns Unit
+                    }
+                    every { mockTreeParser.parseTree(any()) } answers {
+                        callCount++
+                        clockMs += 600L
+                        AccessibilityNodeData(
+                            id = "node_root",
+                            className = "android.widget.FrameLayout",
+                            text = "changing_$callCount",
+                            bounds = BoundsData(0, 0, 1080, 2400),
+                            visible = true,
+                        )
+                    }
+
+                    val params = buildJsonObject { put("timeout", 1000) }
+                    val result = tool.execute(params)
+                    val text = extractTextContent(result)
+                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    assertTrue(parsed.containsKey("similarity"))
+                    assertTrue(parsed.containsKey("elapsedMs"))
+                    assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("timed out") == true)
+                } finally {
+                    unmockkStatic(SystemClock::class)
+                }
             }
 
         @Test
