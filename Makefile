@@ -294,7 +294,11 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	@echo "cloudflared compiled successfully for arm64-v8a and x86_64"
 
 check-so-alignment: ## Check 16KB page alignment of native .so libraries in debug APK
-	@APK="app/build/outputs/apk/debug/app-debug.apk"; \
+	@if ! command -v llvm-objdump >/dev/null 2>&1; then \
+		echo "ERROR: llvm-objdump not found. Install LLVM toolchain."; \
+		exit 1; \
+	fi; \
+	APK="app/build/outputs/apk/debug/app-debug.apk"; \
 	if [ ! -f "$$APK" ]; then \
 		echo "Debug APK not found. Run 'make build' first."; \
 		exit 1; \
@@ -306,6 +310,10 @@ check-so-alignment: ## Check 16KB page alignment of native .so libraries in debu
 		MIN_EXP=$$(llvm-objdump -p "$$so" 2>/dev/null | grep 'LOAD.*align' | sed 's/.*align 2\*\*//' | sort -n | head -1); \
 		NAME=$$(basename "$$so"); \
 		ABI=$$(basename $$(dirname "$$so")); \
+		if [ -z "$$MIN_EXP" ]; then \
+			echo "  [WARN] $$ABI/$$NAME — no LOAD segments found, skipping"; \
+			continue; \
+		fi; \
 		if [ "$$MIN_EXP" -ge 14 ] 2>/dev/null; then \
 			echo "  [OK]   $$ABI/$$NAME — 16KB aligned (2**$$MIN_EXP)"; \
 		else \
