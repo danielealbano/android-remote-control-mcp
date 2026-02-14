@@ -32,7 +32,6 @@ class TreeFingerprintTest {
     @Nested
     @DisplayName("generate")
     inner class GenerateTests {
-
         @Test
         fun `returns array of size FINGERPRINT_SIZE`() {
             // Arrange
@@ -118,7 +117,6 @@ class TreeFingerprintTest {
     @Nested
     @DisplayName("compare")
     inner class CompareTests {
-
         @Test
         fun `identical fingerprints return 100`() {
             // Arrange
@@ -148,18 +146,20 @@ class TreeFingerprintTest {
         @Test
         fun `completely different fingerprints return low similarity`() {
             // Arrange — build two trees with very different content
-            val tree1 = node(
-                className = "android.widget.FrameLayout",
-                text = "AAA",
-                bounds = BoundsData(0, 0, 100, 100),
-                children = List(10) { node(text = "item_$it") },
-            )
-            val tree2 = node(
-                className = "android.widget.LinearLayout",
-                text = "ZZZ",
-                bounds = BoundsData(500, 500, 1000, 1000),
-                children = List(10) { node(text = "other_${it + 100}") },
-            )
+            val tree1 =
+                node(
+                    className = "android.widget.FrameLayout",
+                    text = "AAA",
+                    bounds = BoundsData(0, 0, 100, 100),
+                    children = List(10) { node(text = "item_$it") },
+                )
+            val tree2 =
+                node(
+                    className = "android.widget.LinearLayout",
+                    text = "ZZZ",
+                    bounds = BoundsData(500, 500, 1000, 1000),
+                    children = List(10) { node(text = "other_${it + 100}") },
+                )
             val fp1 = fingerprint.generate(tree1)
             val fp2 = fingerprint.generate(tree2)
 
