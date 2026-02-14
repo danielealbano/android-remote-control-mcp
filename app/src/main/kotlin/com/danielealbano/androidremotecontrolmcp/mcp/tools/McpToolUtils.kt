@@ -254,6 +254,22 @@ internal object McpToolUtils {
         mimeType: String,
     ): CallToolResult = CallToolResult(content = listOf(ImageContent(data = data, mimeType = mimeType)))
 
+    /**
+     * Creates a [CallToolResult] containing a [TextContent] item followed by an [ImageContent] item.
+     */
+    fun textAndImageResult(
+        text: String,
+        imageData: String,
+        imageMimeType: String,
+    ): CallToolResult =
+        CallToolResult(
+            content =
+                listOf(
+                    TextContent(text = text),
+                    ImageContent(data = imageData, mimeType = imageMimeType),
+                ),
+        )
+
     /** Maximum duration in milliseconds for any gesture/action. */
     const val MAX_DURATION_MS = 60000L
 }
