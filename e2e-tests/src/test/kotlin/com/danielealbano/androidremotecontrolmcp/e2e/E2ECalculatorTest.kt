@@ -57,7 +57,7 @@ class E2ECalculatorTest {
     @Order(1)
     fun `MCP server lists all available tools`() = runBlocking {
         val result = mcpClient.listTools()
-        assertTrue(result.tools.size >= 29, "Expected at least 29 tools, got: ${result.tools.size}")
+        assertTrue(result.tools.size >= 27, "Expected at least 27 tools, got: ${result.tools.size}")
     }
 
     @Test
@@ -71,14 +71,14 @@ class E2ECalculatorTest {
         AndroidContainerSetup.launchCalculator(container)
         Thread.sleep(2_000)
 
-        // Step 3: Verify Calculator is visible in accessibility tree
-        val tree = mcpClient.callTool("get_accessibility_tree")
+        // Step 3: Verify Calculator is visible in screen state
+        val tree = mcpClient.callTool("get_screen_state")
         val treeStr = (tree.content[0] as TextContent).text
-        println("[E2E Calculator] Accessibility tree excerpt: ${treeStr.take(1000)}")
+        println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
         assertTrue(
             treeStr.contains("Calculator", ignoreCase = true) ||
                 treeStr.contains(CALCULATOR_PACKAGE, ignoreCase = true),
-            "Accessibility tree should contain Calculator app. Tree excerpt: ${treeStr.take(500)}",
+            "Screen state should contain Calculator app. Excerpt: ${treeStr.take(500)}",
         )
 
         // Step 4: Find and click "7" button
@@ -108,24 +108,34 @@ class E2ECalculatorTest {
         // Step 8: Wait for UI to settle
         mcpClient.callTool("wait_for_idle", mapOf("timeout" to 3000))
 
-        // Step 9: Verify result "10" in accessibility tree
-        val resultTree = mcpClient.callTool("get_accessibility_tree")
+        // Step 9: Verify result "10" in screen state
+        val resultTree = mcpClient.callTool("get_screen_state")
         val resultTreeStr = (resultTree.content[0] as TextContent).text
         assertTrue(
             resultTreeStr.contains("10"),
-            "Result '10' should appear in accessibility tree after 7+3=. Tree excerpt: ${resultTreeStr.take(500)}",
+            "Result '10' should appear in screen state after 7+3=. Excerpt: ${resultTreeStr.take(500)}",
         )
     }
 
     @Test
     @Order(3)
-    fun `capture screenshot returns valid image data`() = runBlocking {
-        val screenshot = mcpClient.callTool("capture_screenshot", mapOf("quality" to 80))
+    fun `get_screen_state with screenshot returns valid image data`() = runBlocking {
+        val result = mcpClient.callTool(
+            "get_screen_state",
+            mapOf("include_screenshot" to true),
+        )
 
-        val content = screenshot.content
-        assertTrue(content.isNotEmpty(), "Screenshot content should not be empty")
+        val content = result.content
+        assertTrue(
+            content.size >= 2,
+            "Result should have at least 2 content items (text + image), got: ${content.size}",
+        )
 
-        val imageContent = content[0] as ImageContent
+        // First item is TextContent with compact TSV
+        assertTrue(content[0] is TextContent, "First content item should be TextContent")
+
+        // Second item is ImageContent with JPEG data
+        val imageContent = content[1] as ImageContent
 
         val mimeType = imageContent.mimeType
         assertTrue(mimeType == "image/jpeg", "Screenshot mimeType should be 'image/jpeg', got: $mimeType")
