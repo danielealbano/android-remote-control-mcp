@@ -20,7 +20,7 @@ data class BoundsData(
  * Represents a parsed accessibility node with all relevant properties.
  *
  * This is a JSON-serializable representation of [AccessibilityNodeInfo],
- * used as the MCP protocol output for `get_accessibility_tree` and related tools.
+ * used by the `get_screen_state` MCP tool and element action tools.
  *
  * @property id Stable generated ID for this node, used by element action tools.
  * @property className The class name of the view (e.g., "android.widget.Button").
