@@ -58,5 +58,8 @@ lint-results*
 # Test results (keep in CI artifacts, not in repo)
 test-results/
 
-# Native binaries in jniLibs (build artifacts — cloudflared from make compile-cloudflared, ngrok from Gradle extractNgrokNative)
+# Native binaries in jniLibs (build artifacts — ngrok from Gradle extractNgrokNative)
 app/src/main/jniLibs/
+
+# Cloudflared binaries in assets (build artifacts from make compile-cloudflared)
+app/src/main/assets/cloudflared-*
