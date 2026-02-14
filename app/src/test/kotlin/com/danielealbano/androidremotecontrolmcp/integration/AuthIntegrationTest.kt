@@ -106,6 +106,6 @@ class AuthIntegrationTest {
         }
 
     companion object {
-        private const val EXPECTED_TOOL_COUNT = 29
+        private const val EXPECTED_TOOL_COUNT = 27
     }
 }

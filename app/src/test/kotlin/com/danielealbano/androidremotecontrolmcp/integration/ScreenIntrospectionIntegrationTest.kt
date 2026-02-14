@@ -6,19 +6,17 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -32,6 +30,27 @@ class ScreenIntrospectionIntegrationTest {
             className = "android.widget.FrameLayout",
             bounds = BoundsData(0, 0, 1080, 2400),
             visible = true,
+            enabled = true,
+            children =
+                listOf(
+                    AccessibilityNodeData(
+                        id = "node_btn",
+                        className = "android.widget.Button",
+                        text = "OK",
+                        bounds = BoundsData(100, 200, 300, 260),
+                        clickable = true,
+                        visible = true,
+                        enabled = true,
+                    ),
+                ),
+        )
+
+    private val sampleScreenInfo =
+        ScreenInfo(
+            width = 1080,
+            height = 2400,
+            densityDpi = 420,
+            orientation = "portrait",
         )
 
     @BeforeEach
@@ -44,111 +63,114 @@ class ScreenIntrospectionIntegrationTest {
         McpIntegrationTestHelper.unmockAndroidLog()
     }
 
+    private fun MockDependencies.setupReadyService() {
+        val mockRootNode = mockk<AccessibilityNodeInfo>()
+        every { accessibilityServiceProvider.isReady() } returns true
+        every { accessibilityServiceProvider.getRootNode() } returns mockRootNode
+        every { treeParser.parseTree(mockRootNode) } returns sampleTree
+        every { accessibilityServiceProvider.getCurrentPackageName() } returns "com.example.app"
+        every { accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
+        every { accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
+        every { mockRootNode.recycle() } returns Unit
+    }
+
     @Test
-    fun `get_accessibility_tree returns parsed tree from mocked service`() =
+    fun `get_screen_state returns compact flat TSV with metadata`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            deps.setupReadyService()
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_accessibility_tree",
+                        name = "get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
-                assertTrue(result.content.isNotEmpty())
+                assertEquals(1, result.content.size)
 
                 val textContent = (result.content[0] as TextContent).text
-                val parsed = Json.parseToJsonElement(textContent).jsonObject
-                assertNotNull(parsed["nodes"])
+                assertTrue(textContent.contains("note:structural-only nodes are omitted from the tree"))
+                assertTrue(textContent.contains("app:com.example.app activity:.MainActivity"))
+                assertTrue(textContent.contains("screen:1080x2400 density:420 orientation:portrait"))
+                assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
+                assertTrue(textContent.contains("node_btn"))
             }
         }
 
     @Test
-    fun `capture_screenshot returns base64 image from mocked service`() =
+    fun `get_screen_state with include_screenshot returns text and image`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
             every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
             coEvery {
-                deps.screenCaptureProvider.captureScreenshot(any())
+                deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
             } returns
                 Result.success(
                     ScreenshotData(
                         data = "dGVzdA==",
-                        width = 1080,
-                        height = 2400,
+                        width = 700,
+                        height = 500,
                     ),
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "capture_screenshot",
-                        arguments = emptyMap(),
+                        name = "get_screen_state",
+                        arguments = mapOf("include_screenshot" to true),
                     )
                 assertNotEquals(true, result.isError)
-                assertTrue(result.content.isNotEmpty())
+                assertEquals(2, result.content.size)
 
-                val imageContent = result.content[0] as ImageContent
+                val textContent = (result.content[0] as TextContent).text
+                assertTrue(textContent.contains("note:"))
+                assertTrue(textContent.contains("app:"))
+
+                val imageContent = result.content[1] as ImageContent
                 assertEquals("image/jpeg", imageContent.mimeType)
                 assertEquals("dGVzdA==", imageContent.data)
             }
         }
 
     @Test
-    fun `get_current_app returns package and activity from mocked service`() =
+    fun `get_screen_state without screenshot does not call captureScreenshot`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every {
-                deps.accessibilityServiceProvider.getCurrentPackageName()
-            } returns "com.example.app"
-            every {
-                deps.accessibilityServiceProvider.getCurrentActivityName()
-            } returns "MainActivity"
+            deps.setupReadyService()
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_current_app",
+                        name = "get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
-                assertTrue(result.content.isNotEmpty())
+                assertEquals(1, result.content.size)
+                assertTrue(result.content[0] is TextContent)
 
-                val textContent = (result.content[0] as TextContent).text
-                val parsed = Json.parseToJsonElement(textContent).jsonObject
-                assertEquals(
-                    "com.example.app",
-                    parsed["packageName"]?.jsonPrimitive?.content,
-                )
-                assertEquals(
-                    "MainActivity",
-                    parsed["activityName"]?.jsonPrimitive?.content,
-                )
+                coVerify(exactly = 0) {
+                    deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
+                }
             }
         }
 
     @Test
-    fun `capture_screenshot when permission denied returns error`() =
+    fun `get_screen_state when permission denied returns error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns false
+            every { deps.accessibilityServiceProvider.isReady() } returns false
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "capture_screenshot",
+                        name = "get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("Screen capture not available"))
+                assertTrue(text.contains("Accessibility service not enabled"))
             }
         }
 }

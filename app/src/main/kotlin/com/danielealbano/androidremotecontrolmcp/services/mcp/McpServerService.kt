@@ -233,7 +233,13 @@ class McpServerService : Service() {
     }
 
     private fun registerAllTools(server: Server) {
-        registerScreenIntrospectionTools(server, treeParser, accessibilityServiceProvider, screenCaptureProvider, compactTreeFormatter)
+        registerScreenIntrospectionTools(
+            server,
+            treeParser,
+            accessibilityServiceProvider,
+            screenCaptureProvider,
+            compactTreeFormatter,
+        )
         registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider)
         registerTouchActionTools(server, actionExecutor)
         registerGestureTools(server, actionExecutor)

@@ -116,18 +116,18 @@ class CompactTreeFormatter
          * 4. Truncates to [MAX_TEXT_LENGTH] characters with [TRUNCATION_SUFFIX] if exceeded.
          */
         internal fun sanitizeText(text: String?): String {
-            if (text.isNullOrEmpty()) return NULL_VALUE
             val sanitized =
                 text
-                    .replace('\t', ' ')
-                    .replace('\n', ' ')
-                    .replace('\r', ' ')
-                    .trim()
-            if (sanitized.isEmpty()) return NULL_VALUE
-            return if (sanitized.length > MAX_TEXT_LENGTH) {
-                sanitized.substring(0, MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
-            } else {
-                sanitized
+                    ?.replace('\t', ' ')
+                    ?.replace('\n', ' ')
+                    ?.replace('\r', ' ')
+                    ?.trim()
+                    ?.ifEmpty { null }
+            return when {
+                sanitized == null -> NULL_VALUE
+                sanitized.length > MAX_TEXT_LENGTH ->
+                    sanitized.substring(0, MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
+                else -> sanitized
             }
         }
 
