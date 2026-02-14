@@ -186,20 +186,17 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 27 tools across 7 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
-### 1. Screen Introspection Tools (4 tools)
+### 1. Screen Introspection Tools (1 tool)
 
 | Tool | Description | Parameters | Output |
 |------|-------------|------------|--------|
-| `get_accessibility_tree` | Returns full UI hierarchy of current screen | None | JSON accessibility tree with node IDs, text, bounds, class names, etc. |
-| `capture_screenshot` | Captures screenshot as base64-encoded JPEG | `quality` (int, 1-100, default 80, optional), `width` (int, optional), `height` (int, optional) | `ImageContent` with base64 JPEG data and mimeType. Optional `width`/`height` params resize proportionally (fit bounding box, maintain aspect ratio). |
-| `get_current_app` | Returns package and activity of focused app | None | packageName, activityName |
-| `get_screen_info` | Returns screen dimensions, DPI, orientation | None | width, height, densityDpi, orientation |
+| `get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI elements | `include_screenshot` (boolean, optional, default false) | `TextContent` with compact TSV (text/desc truncated to 100 chars). Optionally includes `ImageContent` with low-resolution JPEG screenshot (700px max). |
 
 **Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
-**Note**: `get_accessibility_tree` returns full tree depth. Future optimization planned for configurable depth limiting.
+**Note**: `get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `get_element_details` to retrieve full values.
 
 ### 2. Touch Action Tools (5 tools)
 
@@ -251,7 +248,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | `pinch` | Pinch-to-zoom gesture | `center_x` (number), `center_y` (number), `scale` (number: >1 zoom in, <1 zoom out) | `duration` (number, ms, default 300) |
 | `custom_gesture` | Multi-touch gesture from path points | `paths` (array of arrays of {x, y, time} objects) | — |
 
-### 7. Utility Tools (4 tools)
+### 7. Utility Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
@@ -259,6 +256,7 @@ The MCP server exposes 29 tools across 7 categories. For full JSON-RPC schemas, 
 | `set_clipboard` | Set clipboard content | `text` (string) | — |
 | `wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
 | `wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
+| `get_element_details` | Get full untruncated text/desc by element IDs | `ids` (array of strings) | — |
 
 **Timeout behavior**: Both `wait_for_element` and `wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
