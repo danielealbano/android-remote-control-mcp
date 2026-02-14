@@ -12,6 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.ktor.serialization.kotlinx.json.json
@@ -66,6 +67,7 @@ object McpIntegrationTestHelper {
             deps.treeParser,
             deps.accessibilityServiceProvider,
             deps.screenCaptureProvider,
+            CompactTreeFormatter(),
         )
         registerSystemActionTools(
             server,

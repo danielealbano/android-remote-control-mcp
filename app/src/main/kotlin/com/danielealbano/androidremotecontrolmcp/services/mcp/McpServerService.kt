@@ -25,6 +25,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
@@ -78,6 +79,8 @@ class McpServerService : Service() {
     @Inject lateinit var treeParser: AccessibilityTreeParser
 
     @Inject lateinit var elementFinder: ElementFinder
+
+    @Inject lateinit var compactTreeFormatter: CompactTreeFormatter
 
     @Inject lateinit var tunnelManager: TunnelManager
 
@@ -230,7 +233,7 @@ class McpServerService : Service() {
     }
 
     private fun registerAllTools(server: Server) {
-        registerScreenIntrospectionTools(server, treeParser, accessibilityServiceProvider, screenCaptureProvider)
+        registerScreenIntrospectionTools(server, treeParser, accessibilityServiceProvider, screenCaptureProvider, compactTreeFormatter)
         registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider)
         registerTouchActionTools(server, actionExecutor)
         registerGestureTools(server, actionExecutor)

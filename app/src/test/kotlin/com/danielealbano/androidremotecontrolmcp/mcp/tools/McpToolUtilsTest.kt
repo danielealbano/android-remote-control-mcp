@@ -374,4 +374,24 @@ class McpToolUtilsTest {
             assertEquals("image/jpeg", imageContent.mimeType)
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // textAndImageResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("textAndImageResult")
+    inner class TextAndImageResultTests {
+        @Test
+        @DisplayName("returns CallToolResult with TextContent and ImageContent")
+        fun returnsCallToolResultWithTextAndImageContent() {
+            val result = McpToolUtils.textAndImageResult("hello", "base64data", "image/jpeg")
+            assertEquals(2, result.content.size)
+            val text = result.content[0] as TextContent
+            val image = result.content[1] as ImageContent
+            assertEquals("hello", text.text)
+            assertEquals("base64data", image.data)
+            assertEquals("image/jpeg", image.mimeType)
+        }
+    }
 }
