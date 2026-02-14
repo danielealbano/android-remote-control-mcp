@@ -849,9 +849,9 @@ fun registerUtilityTools(
 **As a** developer, **I want** E2E tests to use `get_screen_state` **so that** end-to-end validation covers the new tool.
 
 ### Acceptance Criteria
-- [ ] `E2EScreenshotTest` updated to use `get_screen_state` with `include_screenshot=true`
-- [ ] `E2ECalculatorTest` updated to use `get_screen_state` instead of old tools
-- [ ] E2E tests compile (runtime execution is Docker-dependent)
+- [x] `E2EScreenshotTest` updated to use `get_screen_state` with `include_screenshot=true`
+- [x] `E2ECalculatorTest` updated to use `get_screen_state` instead of old tools
+- [x] E2E tests compile (runtime execution is Docker-dependent)
 
 ---
 
