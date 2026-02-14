@@ -540,12 +540,12 @@ The `AccessibilityNodeData` import (line 8) is no longer needed in this file sin
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/TreeFingerprintTest.kt` (NEW)
 
 #### Acceptance Criteria
-- [ ] All test cases pass
-- [ ] Covers: identical trees, completely different trees, single-node change, empty children, deep trees
-- [ ] Covers: `compare()` with mismatched array sizes
-- [ ] Covers: `compare()` with two empty fingerprints (both all-zeros)
-- [ ] Covers: `generate()` produces array of size 256
-- [ ] Covers: same tree always produces same fingerprint (deterministic)
+- [x] All test cases pass
+- [x] Covers: identical trees, completely different trees, single-node change, empty children, deep trees
+- [x] Covers: `compare()` with mismatched array sizes
+- [x] Covers: `compare()` with two empty fingerprints (both all-zeros)
+- [x] Covers: `generate()` produces array of size 256
+- [x] Covers: same tree always produces same fingerprint (deterministic)
 - [ ] No lint warnings/errors
 
 #### Action 3.1: Create `TreeFingerprintTest.kt`
@@ -815,14 +815,14 @@ class TreeFingerprintTest {
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/UtilityToolsTest.kt`
 
 #### Acceptance Criteria
-- [ ] Existing `detects idle when tree does not change` test updated to verify `similarity` in response
-- [ ] New test: `match_percentage defaults to 100 when not provided`
-- [ ] New test: `detects idle with match_percentage below 100 when tree has minor changes`
-- [ ] New test: `throws error for match_percentage above 100`
-- [ ] New test: `throws error for negative match_percentage`
-- [ ] New test: `timeout response includes similarity field`
-- [ ] All tests pass
-- [ ] No lint warnings/errors
+- [x] Existing `detects idle when tree does not change` test updated to verify `similarity` in response
+- [x] New test: `match_percentage defaults to 100 when not provided`
+- [x] New test: `detects idle with match_percentage below 100 when tree has minor changes`
+- [x] New test: `throws error for match_percentage above 100`
+- [x] New test: `throws error for negative match_percentage`
+- [x] New test: `timeout response includes similarity field`
+- [x] All tests pass
+- [x] No lint warnings/errors
 
 #### Action 4.1: Update existing `detects idle when tree does not change` test
 
@@ -996,11 +996,11 @@ fun `timeout response includes similarity field`() =
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/ErrorHandlingIntegrationTest.kt`
 
 #### Acceptance Criteria
-- [ ] Test updated to parse JSON response instead of plain string
-- [ ] Asserts `similarity` field is present in timeout response
-- [ ] Asserts `message` field contains "timed out"
-- [ ] Test passes
-- [ ] No lint warnings/errors
+- [x] Test updated to parse JSON response instead of plain string
+- [x] Asserts `similarity` field is present in timeout response
+- [x] Asserts `message` field contains "timed out"
+- [x] Test passes
+- [x] No lint warnings/errors
 
 #### Action 5.1: Update `wait_for_idle timeout returns informational non-error result` test
 
@@ -1082,11 +1082,11 @@ import kotlinx.serialization.json.jsonPrimitive
 **File**: `docs/MCP_TOOLS.md`
 
 #### Acceptance Criteria
-- [ ] `wait_for_idle` input schema updated with `match_percentage` parameter
-- [ ] Description updated to mention similarity-based comparison
-- [ ] Response examples updated to include `similarity` field
-- [ ] Timeout behavior section updated
-- [ ] No Markdown formatting issues
+- [x] `wait_for_idle` input schema updated with `match_percentage` parameter
+- [x] Description updated to mention similarity-based comparison
+- [x] Response examples updated to include `similarity` field
+- [x] Timeout behavior section updated
+- [x] No Markdown formatting issues
 
 #### Action 6.1: Update `wait_for_idle` section (lines 1584-1626)
 
@@ -1170,9 +1170,9 @@ curl -X POST http://localhost:8080/mcp \
 **Goal**: Verify all code passes quality gates.
 
 #### Acceptance Criteria
-- [ ] `./gradlew ktlintCheck` passes with no warnings/errors
-- [ ] `./gradlew detekt` passes with no warnings/errors
-- [ ] `./gradlew build` succeeds with no warnings/errors
+- [x] `./gradlew ktlintCheck` passes with no warnings/errors
+- [x] `./gradlew detekt` passes with no warnings/errors
+- [x] `./gradlew build` succeeds with no warnings/errors (except pre-existing NgrokTunnelIntegrationTest — no agent slots)
 
 #### Action 7.1: Run ktlintCheck
 ```bash
@@ -1199,31 +1199,31 @@ Fix any issues found.
 **Goal**: Re-read all changed files and verify correctness, consistency, and alignment with what was discussed.
 
 #### Acceptance Criteria
-- [ ] `TreeFingerprint.kt` — `generate()` uses `className`, `text`, `bounds`, `children.size` (the 4 agreed properties)
-- [ ] `TreeFingerprint.kt` — `generate()` uses `hashCode()` → `% 256` to map to buckets
-- [ ] `TreeFingerprint.kt` — `compare()` uses normalized difference formula with float arithmetic: `(100f - (diffSum.toFloat() * 100f / (2f * totalNodes.toFloat()))).toInt()`
-- [ ] `TreeFingerprint.kt` — `compare()` does NOT use cosine similarity
-- [ ] `TreeFingerprint.kt` — fingerprint size is 256
-- [ ] `TreeFingerprint.kt` — `compare()` returns integer 0-100
-- [ ] `TreeFingerprint.kt` — two empty fingerprints return 100
-- [ ] `WaitForIdleTool` — `match_percentage` is integer, 0-100, default 100
-- [ ] `WaitForIdleTool` — 2 consecutive checks meeting threshold required (not 1)
-- [ ] `WaitForIdleTool` — `computeTreeHash` fully removed
-- [ ] `WaitForIdleTool` — `HASH_SEED` and `HASH_MULTIPLIER` removed from companion object
-- [ ] `WaitForIdleTool` — success response includes `similarity` (integer)
-- [ ] `WaitForIdleTool` — timeout response includes `similarity` (integer, last computed value)
-- [ ] `WaitForIdleTool` — timeout response is now JSON (not plain string)
-- [ ] `WaitForIdleTool` — tool description updated
-- [ ] `WaitForIdleTool` — inputSchema includes `match_percentage` with `default: 100`
-- [ ] `WaitForIdleTool` — `match_percentage` is NOT in `required` list
-- [ ] `TreeFingerprintTest.kt` — covers identical trees, different trees, single-node change, empty fingerprints, mismatched sizes, symmetry, deep trees
-- [ ] `UtilityToolsTest.kt` — existing test updated for `similarity` field
-- [ ] `UtilityToolsTest.kt` — new tests for `match_percentage` validation
-- [ ] `UtilityToolsTest.kt` — timeout response test verifies JSON with `similarity`
-- [ ] `ErrorHandlingIntegrationTest.kt` — updated to parse JSON timeout response
-- [ ] `MCP_TOOLS.md` — `wait_for_idle` section fully updated
-- [ ] No references to cosine similarity anywhere in code
-- [ ] No TODOs, no commented-out code, no dead code
-- [ ] All tests pass
-- [ ] All linting passes
-- [ ] Build succeeds
+- [x] `TreeFingerprint.kt` — `generate()` uses `className`, `text`, `bounds`, `children.size` (the 4 agreed properties)
+- [x] `TreeFingerprint.kt` — `generate()` uses `hashCode()` → `% 256` to map to buckets
+- [x] `TreeFingerprint.kt` — `compare()` uses normalized difference formula with float arithmetic: `(100f - (diffSum.toFloat() * 100f / (2f * totalNodes.toFloat()))).toInt()`
+- [x] `TreeFingerprint.kt` — `compare()` does NOT use cosine similarity
+- [x] `TreeFingerprint.kt` — fingerprint size is 256
+- [x] `TreeFingerprint.kt` — `compare()` returns integer 0-100
+- [x] `TreeFingerprint.kt` — two empty fingerprints return 100
+- [x] `WaitForIdleTool` — `match_percentage` is integer, 0-100, default 100
+- [x] `WaitForIdleTool` — 2 consecutive checks meeting threshold required (not 1)
+- [x] `WaitForIdleTool` — `computeTreeHash` fully removed
+- [x] `WaitForIdleTool` — `HASH_SEED` and `HASH_MULTIPLIER` removed from companion object
+- [x] `WaitForIdleTool` — success response includes `similarity` (integer)
+- [x] `WaitForIdleTool` — timeout response includes `similarity` (integer, last computed value)
+- [x] `WaitForIdleTool` — timeout response is now JSON (not plain string)
+- [x] `WaitForIdleTool` — tool description updated
+- [x] `WaitForIdleTool` — inputSchema includes `match_percentage` with `default: 100`
+- [x] `WaitForIdleTool` — `match_percentage` is NOT in `required` list
+- [x] `TreeFingerprintTest.kt` — covers identical trees, different trees, single-node change, empty fingerprints, mismatched sizes, symmetry, deep trees
+- [x] `UtilityToolsTest.kt` — existing test updated for `similarity` field
+- [x] `UtilityToolsTest.kt` — new tests for `match_percentage` validation
+- [x] `UtilityToolsTest.kt` — timeout response test verifies JSON with `similarity`
+- [x] `ErrorHandlingIntegrationTest.kt` — updated to parse JSON timeout response
+- [x] `MCP_TOOLS.md` — `wait_for_idle` section fully updated
+- [x] No references to cosine similarity anywhere in code
+- [x] No TODOs, no commented-out code, no dead code
+- [x] All tests pass (except pre-existing NgrokTunnelIntegrationTest — no agent slots)
+- [x] All linting passes
+- [x] Build succeeds (except pre-existing NgrokTunnelIntegrationTest)
