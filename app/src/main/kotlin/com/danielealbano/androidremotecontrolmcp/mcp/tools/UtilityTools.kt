@@ -314,9 +314,11 @@ class WaitForElementTool
 /**
  * MCP tool: wait_for_idle
  *
- * Waits for the UI to become idle by detecting when the accessibility tree
- * structure stops changing. Considers UI idle when two consecutive snapshots
- * (separated by [IDLE_CHECK_INTERVAL_MS]) produce the same structural hash.
+ * Waits for the UI to become idle by comparing accessibility tree fingerprints
+ * across consecutive snapshots. Uses a 256-slot histogram fingerprint and
+ * normalized difference to compute a similarity percentage. Considers UI idle
+ * when two consecutive snapshots (separated by [IDLE_CHECK_INTERVAL_MS]) meet
+ * the [DEFAULT_MATCH_PERCENTAGE] threshold (or the caller-provided `match_percentage`).
  */
 class WaitForIdleTool
     @Inject
@@ -324,7 +326,9 @@ class WaitForIdleTool
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
-        @Suppress("NestedBlockDepth", "ThrowsCount", "InstanceOfCheckForException")
+        private val treeFingerprint = TreeFingerprint()
+
+        @Suppress("CyclomaticComplexity", "NestedBlockDepth", "ThrowsCount", "InstanceOfCheckForException")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val timeout =
                 arguments?.get("timeout")?.jsonPrimitive?.longOrNull
@@ -335,70 +339,72 @@ class WaitForIdleTool
                 )
             }
 
+            val matchPercentage =
+                arguments?.get("match_percentage")?.jsonPrimitive?.longOrNull?.toInt()
+                    ?: DEFAULT_MATCH_PERCENTAGE
+            if (matchPercentage < 0 || matchPercentage > TreeFingerprint.FULL_MATCH_PERCENTAGE) {
+                throw McpToolException.InvalidParams(
+                    "match_percentage must be between 0 and ${TreeFingerprint.FULL_MATCH_PERCENTAGE}, got: $matchPercentage",
+                )
+            }
+
             val startTime = SystemClock.elapsedRealtime()
-            var previousHash: Int? = null
+            var previousFingerprint: IntArray? = null
             var consecutiveIdleChecks = 0
+            var lastSimilarity = 0
 
             while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
                     val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val currentHash = computeTreeHash(tree)
+                    val currentFingerprint = treeFingerprint.generate(tree)
 
-                    if (previousHash != null && currentHash == previousHash) {
-                        consecutiveIdleChecks++
-                        if (consecutiveIdleChecks >= REQUIRED_IDLE_CHECKS) {
-                            val elapsed = SystemClock.elapsedRealtime() - startTime
-                            Log.d(TAG, "wait_for_idle: UI idle after ${elapsed}ms")
-                            val resultJson =
-                                buildJsonObject {
-                                    put("message", "UI is idle")
-                                    put("elapsedMs", elapsed)
-                                }
-                            return McpToolUtils.textResult(Json.encodeToString(resultJson))
+                    if (previousFingerprint != null) {
+                        val similarity = treeFingerprint.compare(previousFingerprint, currentFingerprint)
+                        lastSimilarity = similarity
+
+                        if (similarity >= matchPercentage) {
+                            consecutiveIdleChecks++
+                            if (consecutiveIdleChecks >= REQUIRED_IDLE_CHECKS) {
+                                val elapsed = SystemClock.elapsedRealtime() - startTime
+                                Log.d(TAG, "wait_for_idle: UI idle after ${elapsed}ms (similarity=$similarity%)")
+                                val resultJson =
+                                    buildJsonObject {
+                                        put("message", "UI is idle")
+                                        put("elapsedMs", elapsed)
+                                        put("similarity", similarity)
+                                    }
+                                return McpToolUtils.textResult(Json.encodeToString(resultJson))
+                            }
+                        } else {
+                            consecutiveIdleChecks = 0
                         }
-                    } else {
-                        consecutiveIdleChecks = 0
                     }
 
-                    previousHash = currentHash
+                    previousFingerprint = currentFingerprint
                 } catch (e: McpToolException) {
                     if (e is McpToolException.PermissionDenied) throw e
                     // Tree parse failures during transitions — reset idle counter
                     consecutiveIdleChecks = 0
-                    previousHash = null
+                    previousFingerprint = null
                 }
 
                 delay(IDLE_CHECK_INTERVAL_MS)
             }
 
-            return McpToolUtils.textResult(
-                "Operation timed out after ${timeout}ms waiting for UI idle. " +
-                    "Retry if the operation is long-running.",
-            )
-        }
-
-        /**
-         * Computes a structural hash of the accessibility tree for change detection.
-         *
-         * Uses a recursive hash incorporating each node's class name, text, bounds,
-         * and child count. This is fast and sufficient for detecting structural changes.
-         */
-        private fun computeTreeHash(node: AccessibilityNodeData): Int {
-            var hash = HASH_SEED
-            hash = HASH_MULTIPLIER * hash + (node.className?.hashCode() ?: 0)
-            hash = HASH_MULTIPLIER * hash + (node.text?.hashCode() ?: 0)
-            hash = HASH_MULTIPLIER * hash + node.bounds.hashCode()
-            hash = HASH_MULTIPLIER * hash + node.children.size
-            for (child in node.children) {
-                hash = HASH_MULTIPLIER * hash + computeTreeHash(child)
-            }
-            return hash
+            val elapsed = SystemClock.elapsedRealtime() - startTime
+            val resultJson =
+                buildJsonObject {
+                    put("message", "Operation timed out after ${elapsed}ms waiting for UI idle. Retry if the operation is long-running.")
+                    put("elapsedMs", elapsed)
+                    put("similarity", lastSimilarity)
+                }
+            return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
         fun register(server: Server) {
             server.addTool(
                 name = TOOL_NAME,
-                description = "Wait for the UI to become idle (no changes detected)",
+                description = "Wait for the UI to become idle (similarity-based change detection)",
                 inputSchema =
                     ToolSchema(
                         properties =
@@ -406,6 +412,11 @@ class WaitForIdleTool
                                 putJsonObject("timeout") {
                                     put("type", "integer")
                                     put("description", "Timeout in milliseconds (1-30000)")
+                                }
+                                putJsonObject("match_percentage") {
+                                    put("type", "integer")
+                                    put("description", "Similarity threshold percentage (0-100, default 100). 100 = exact match, lower values tolerate minor UI changes")
+                                    put("default", DEFAULT_MATCH_PERCENTAGE)
                                 }
                             },
                         required = listOf("timeout"),
@@ -418,10 +429,9 @@ class WaitForIdleTool
             private const val TOOL_NAME = "wait_for_idle"
             private const val IDLE_CHECK_INTERVAL_MS = 500L
             private const val MAX_TIMEOUT_MS = 30000L
-            private const val HASH_SEED = 17
-            private const val HASH_MULTIPLIER = 31
+            private const val DEFAULT_MATCH_PERCENTAGE = 100
 
-            /** Number of consecutive identical tree hashes required to consider UI idle. */
+            /** Number of consecutive checks meeting the similarity threshold required to consider UI idle. */
             private const val REQUIRED_IDLE_CHECKS = 2
         }
     }
