@@ -190,7 +190,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tandroid.widget.TextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\te\nnode_2\tandroid.widget.Button\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tce"
+        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\tvn\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tvcn"
       }
     ]
   }
@@ -230,18 +230,23 @@ The text output is a compact flat TSV (tab-separated values) format designed for
 
 #### Flags Reference
 
-The `flags` column uses single-character codes for interactive properties:
+The `flags` column uses single-character codes for node properties:
 
 | Flag | Meaning |
 |------|---------|
+| `v` | visible |
 | `c` | clickable |
 | `l` | longClickable |
 | `f` | focusable |
 | `s` | scrollable |
-| `d` | editable |
-| `e` | enabled |
+| `e` | editable |
+| `n` | enabled |
 
-Only flags that are `true` are included. Example: `ce` means clickable + enabled.
+Only flags that are `true` are included. Example: `vcn` means visible + clickable + enabled.
+
+#### Class Name Simplification
+
+The `class` column shows the simple class name, stripped of the package prefix (e.g., `android.widget.Button` → `Button`). Returns `-` if null or empty.
 
 #### Node Filtering
 

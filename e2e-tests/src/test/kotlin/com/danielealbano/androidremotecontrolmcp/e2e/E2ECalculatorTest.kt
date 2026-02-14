@@ -23,8 +23,8 @@ import org.junit.jupiter.api.TestMethodOrder
  * This test verifies the entire MCP stack by:
  * 1. Using the shared Docker Android emulator (via [SharedAndroidContainer])
  * 2. Using MCP tools to interact with the Simple Calculator app
- * 3. Verifying the calculation result via accessibility tree
- * 4. Capturing a screenshot and verifying it contains data
+ * 3. Verifying the calculation result via get_screen_state compact TSV output
+ * 4. Verifying get_screen_state with include_screenshot returns valid image data
  *
  * Uses [SharedAndroidContainer] singleton to share the Docker container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
