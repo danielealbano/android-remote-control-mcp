@@ -5,7 +5,7 @@
         setup-emulator start-emulator stop-emulator \
         logs logs-clear \
         version-bump-patch version-bump-minor version-bump-major \
-        compile-cloudflared \
+        compile-cloudflared check-so-alignment \
         all ci
 
 # Variables
@@ -278,7 +278,7 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
 		CC=$$(find $$ANDROID_HOME/ndk -name "aarch64-linux-android*-clang" | sort -V | tail -1) \
-		go build -a -installsuffix cgo -ldflags="-s -w" \
+		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
 		-o $(CURDIR)/$(JNILIBS_DIR)/arm64-v8a/libcloudflared.so \
 		./cmd/cloudflared
 	@echo ""
@@ -287,11 +287,41 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
 		CC=$$(find $$ANDROID_HOME/ndk -name "x86_64-linux-android*-clang" | sort -V | tail -1) \
-		go build -a -installsuffix cgo -ldflags="-s -w" \
+		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
 		-o $(CURDIR)/$(JNILIBS_DIR)/x86_64/libcloudflared.so \
 		./cmd/cloudflared
 	@echo ""
 	@echo "cloudflared compiled successfully for arm64-v8a and x86_64"
+
+check-so-alignment: ## Check 16KB page alignment of native .so libraries in debug APK
+	@APK="app/build/outputs/apk/debug/app-debug.apk"; \
+	if [ ! -f "$$APK" ]; then \
+		echo "Debug APK not found. Run 'make build' first."; \
+		exit 1; \
+	fi; \
+	TMPDIR=$$(mktemp -d); \
+	unzip -q -o "$$APK" "lib/*" -d "$$TMPDIR" 2>/dev/null; \
+	FAIL=0; \
+	for so in $$(find "$$TMPDIR/lib" -name "*.so" 2>/dev/null); do \
+		MIN_EXP=$$(llvm-objdump -p "$$so" 2>/dev/null | grep 'LOAD.*align' | sed 's/.*align 2\*\*//' | sort -n | head -1); \
+		NAME=$$(basename "$$so"); \
+		ABI=$$(basename $$(dirname "$$so")); \
+		if [ "$$MIN_EXP" -ge 14 ] 2>/dev/null; then \
+			echo "  [OK]   $$ABI/$$NAME — 16KB aligned (2**$$MIN_EXP)"; \
+		else \
+			echo "  [FAIL] $$ABI/$$NAME — not 16KB aligned (2**$$MIN_EXP)"; \
+			FAIL=1; \
+		fi; \
+	done; \
+	rm -rf "$$TMPDIR"; \
+	if [ $$FAIL -eq 1 ]; then \
+		echo ""; \
+		echo "Some .so files are not 16KB aligned."; \
+		exit 1; \
+	else \
+		echo ""; \
+		echo "All .so files are 16KB aligned."; \
+	fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # All-in-One
