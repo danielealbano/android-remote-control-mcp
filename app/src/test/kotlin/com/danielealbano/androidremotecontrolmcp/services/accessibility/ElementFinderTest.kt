@@ -35,8 +35,8 @@ class ElementFinderTest {
         enabled: Boolean = true,
         visible: Boolean = true,
         children: List<AccessibilityNodeData> = emptyList(),
-    ): AccessibilityNodeData {
-        return AccessibilityNodeData(
+    ): AccessibilityNodeData =
+        AccessibilityNodeData(
             id = id,
             className = className,
             text = text,
@@ -51,10 +51,9 @@ class ElementFinderTest {
             visible = visible,
             children = children,
         )
-    }
 
-    private fun buildSampleTree(): AccessibilityNodeData {
-        return createNode(
+    private fun buildSampleTree(): AccessibilityNodeData =
+        createNode(
             id = "node_root",
             className = "android.widget.FrameLayout",
             children =
@@ -92,7 +91,6 @@ class ElementFinderTest {
                     ),
                 ),
         )
-    }
 
     @Nested
     @DisplayName("findElements by TEXT")

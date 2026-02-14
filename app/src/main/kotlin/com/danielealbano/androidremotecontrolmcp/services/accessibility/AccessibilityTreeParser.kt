@@ -75,15 +75,14 @@ class AccessibilityTreeParser
          * @param rootNode The root [AccessibilityNodeInfo] to parse.
          * @return The parsed tree as [AccessibilityNodeData].
          */
-        fun parseTree(rootNode: AccessibilityNodeInfo): AccessibilityNodeData {
-            return parseNode(
+        fun parseTree(rootNode: AccessibilityNodeInfo): AccessibilityNodeData =
+            parseNode(
                 node = rootNode,
                 depth = 0,
                 index = 0,
                 parentId = ROOT_PARENT_ID,
                 recycleNode = false,
             )
-        }
 
         /**
          * Parses a single [AccessibilityNodeInfo] and recursively parses its children.
@@ -169,9 +168,7 @@ class AccessibilityTreeParser
         /**
          * Checks whether [node] is visible to the user.
          */
-        fun isNodeVisible(node: AccessibilityNodeInfo): Boolean {
-            return node.isVisibleToUser
-        }
+        fun isNodeVisible(node: AccessibilityNodeInfo): Boolean = node.isVisibleToUser
 
         /**
          * Generates a stable, deterministic node ID based on the node's properties.

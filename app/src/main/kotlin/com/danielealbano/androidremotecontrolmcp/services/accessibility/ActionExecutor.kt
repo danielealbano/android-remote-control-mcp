@@ -29,7 +29,9 @@ enum class ScrollDirection {
  * Amount for scroll gestures, mapping to screen percentages.
  */
 @Suppress("MagicNumber")
-enum class ScrollAmount(val screenPercentage: Float) {
+enum class ScrollAmount(
+    val screenPercentage: Float,
+) {
     /** 25% of screen dimension. */
     SMALL(0.25f),
 

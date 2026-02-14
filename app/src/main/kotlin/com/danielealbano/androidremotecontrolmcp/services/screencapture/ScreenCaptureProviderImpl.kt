@@ -23,9 +23,13 @@ class ScreenCaptureProviderImpl
         private val screenshotEncoder: ScreenshotEncoder,
     ) : ScreenCaptureProvider {
         private sealed class ServiceValidation {
-            data class Valid(val service: McpAccessibilityService) : ServiceValidation()
+            data class Valid(
+                val service: McpAccessibilityService,
+            ) : ServiceValidation()
 
-            data class Invalid(val error: McpToolException) : ServiceValidation()
+            data class Invalid(
+                val error: McpToolException,
+            ) : ServiceValidation()
         }
 
         @SuppressLint("NewApi") // API 30 guard in validateService()

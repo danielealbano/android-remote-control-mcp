@@ -5,7 +5,9 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  *
  * @property address The IP address string to bind to.
  */
-enum class BindingAddress(val address: String) {
+enum class BindingAddress(
+    val address: String,
+) {
     /** Bind to localhost only. Requires ADB port forwarding for access. */
     LOCALHOST("127.0.0.1"),
 

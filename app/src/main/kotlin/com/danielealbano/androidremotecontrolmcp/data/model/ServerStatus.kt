@@ -34,5 +34,7 @@ sealed class ServerStatus {
      *
      * @property message A human-readable description of the error.
      */
-    data class Error(val message: String) : ServerStatus()
+    data class Error(
+        val message: String,
+    ) : ServerStatus()
 }
