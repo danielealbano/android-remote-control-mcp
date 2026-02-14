@@ -45,18 +45,18 @@ Additionally, add a new `get_element_details` helper tool that returns full (unt
 **As a** MCP server operator, **I want** the accessibility tree to be output in a compact flat TSV format **so that** LLM token consumption is dramatically reduced.
 
 ### Acceptance Criteria
-- [ ] `CompactTreeFormatter` class exists and converts `AccessibilityNodeData` + metadata into the agreed compact format
-- [ ] Noise nodes are filtered out; their children are still walked
-- [ ] Class names are stripped to simple name
-- [ ] Tabs and newlines in text/contentDescription are replaced with spaces
-- [ ] Null/empty text/desc/resourceId fields render as `-`
-- [ ] Text and desc truncated to 100 chars with `...truncated` suffix when exceeded
-- [ ] Flags column uses the agreed single-char encoding
-- [ ] No depth column — flat output
-- [ ] Note line is included as first line
-- [ ] Unit tests pass for `CompactTreeFormatter`
-- [ ] `./gradlew ktlintCheck` passes
-- [ ] `./gradlew detekt` passes
+- [x] `CompactTreeFormatter` class exists and converts `AccessibilityNodeData` + metadata into the agreed compact format
+- [x] Noise nodes are filtered out; their children are still walked
+- [x] Class names are stripped to simple name
+- [x] Tabs and newlines in text/contentDescription are replaced with spaces
+- [x] Null/empty text/desc/resourceId fields render as `-`
+- [x] Text and desc truncated to 100 chars with `...truncated` suffix when exceeded
+- [x] Flags column uses the agreed single-char encoding
+- [x] No depth column — flat output
+- [x] Note line is included as first line
+- [x] Unit tests pass for `CompactTreeFormatter`
+- [x] `./gradlew ktlintCheck` passes
+- [x] `./gradlew detekt` passes
 
 ---
 
@@ -224,16 +224,16 @@ class CompactTreeFormatter @Inject constructor() {
 **As a** MCP client (LLM), **I want** a single `get_screen_state` tool that returns all screen information in one call **so that** I can understand the screen with fewer round-trips and lower token usage.
 
 ### Acceptance Criteria
-- [ ] `get_screen_state` tool is registered and returns compact flat TSV + metadata
-- [ ] `include_screenshot` param works: when `true`, response contains both `TextContent` and `ImageContent`
-- [ ] Screenshot is capped at 700px longest side
-- [ ] Old tools (`get_accessibility_tree`, `capture_screenshot`, `get_current_app`, `get_screen_info`) are removed
-- [ ] `registerScreenIntrospectionTools` updated to only register `get_screen_state`
-- [ ] `McpToolUtils` has a new helper for mixed content results
-- [ ] Unit tests pass for `GetScreenStateHandler`
-- [ ] Old unit tests removed
-- [ ] `./gradlew ktlintCheck` passes
-- [ ] `./gradlew detekt` passes
+- [x] `get_screen_state` tool is registered and returns compact flat TSV + metadata
+- [x] `include_screenshot` param works: when `true`, response contains both `TextContent` and `ImageContent`
+- [x] Screenshot is capped at 700px longest side
+- [x] Old tools (`get_accessibility_tree`, `capture_screenshot`, `get_current_app`, `get_screen_info`) are removed
+- [x] `registerScreenIntrospectionTools` updated to only register `get_screen_state`
+- [x] `McpToolUtils` has a new helper for mixed content results
+- [x] Unit tests pass for `GetScreenStateHandler`
+- [x] Old unit tests removed
+- [x] `./gradlew ktlintCheck` passes
+- [x] `./gradlew detekt` passes
 
 ---
 
@@ -489,15 +489,15 @@ inner class TextAndImageResultTests {
 **As a** MCP client (LLM), **I want** a `get_element_details` tool that returns full untruncated text and description for given element IDs **so that** I can lazily fetch long content only when needed.
 
 ### Acceptance Criteria
-- [ ] `GetElementDetailsTool` class exists and is registered in UtilityTools
-- [ ] Tool accepts a list of element IDs (JSON array of strings)
-- [ ] Returns TSV with columns: `id`, `text`, `desc`
-- [ ] Text and desc are NOT truncated (full values)
-- [ ] Null/empty text/desc → `-`
-- [ ] Returns error row `<id>\tnot_found\tnot_found` for IDs not in tree
-- [ ] Unit tests pass
-- [ ] `./gradlew ktlintCheck` passes
-- [ ] `./gradlew detekt` passes
+- [x] `GetElementDetailsTool` class exists and is registered in UtilityTools
+- [x] Tool accepts a list of element IDs (JSON array of strings)
+- [x] Returns TSV with columns: `id`, `text`, `desc`
+- [x] Text and desc are NOT truncated (full values)
+- [x] Null/empty text/desc → `-`
+- [x] Returns error row `<id>\tnot_found\tnot_found` for IDs not in tree
+- [x] Unit tests pass
+- [x] `./gradlew ktlintCheck` passes
+- [x] `./gradlew detekt` passes
 
 ---
 
