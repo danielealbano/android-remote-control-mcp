@@ -305,7 +305,8 @@ class McpServerService : Service() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
 
-        return NotificationCompat.Builder(this, McpApplication.MCP_SERVER_CHANNEL_ID)
+        return NotificationCompat
+            .Builder(this, McpApplication.MCP_SERVER_CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_mcp_server_title))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)

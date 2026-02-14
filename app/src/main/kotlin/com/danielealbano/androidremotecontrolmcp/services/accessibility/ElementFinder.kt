@@ -148,8 +148,8 @@ class ElementFinder
             }
         }
 
-        private fun toElementInfo(node: AccessibilityNodeData): ElementInfo {
-            return ElementInfo(
+        private fun toElementInfo(node: AccessibilityNodeData): ElementInfo =
+            ElementInfo(
                 id = node.id,
                 text = node.text,
                 contentDescription = node.contentDescription,
@@ -162,5 +162,4 @@ class ElementFinder
                 editable = node.editable,
                 enabled = node.enabled,
             )
-        }
     }

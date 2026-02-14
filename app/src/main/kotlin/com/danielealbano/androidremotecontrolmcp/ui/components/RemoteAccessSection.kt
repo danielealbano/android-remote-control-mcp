@@ -144,8 +144,7 @@ private fun TunnelProviderSelector(
                             onClick = { onSelect(provider) },
                             role = Role.RadioButton,
                             enabled = enabled,
-                        )
-                        .padding(vertical = 4.dp),
+                        ).padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(

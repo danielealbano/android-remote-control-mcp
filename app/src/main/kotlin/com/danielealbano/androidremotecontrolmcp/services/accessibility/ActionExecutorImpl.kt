@@ -235,7 +235,8 @@ class ActionExecutorImpl
                 )
 
             val gesture =
-                GestureDescription.Builder()
+                GestureDescription
+                    .Builder()
                     .addStroke(firstTapStroke)
                     .addStroke(secondTapStroke)
                     .build()
@@ -356,52 +357,47 @@ class ActionExecutorImpl
         /**
          * Presses the Back button.
          */
-        override suspend fun pressBack(): Result<Unit> {
-            return performGlobalAction(
+        override suspend fun pressBack(): Result<Unit> =
+            performGlobalAction(
                 android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK,
                 "pressBack",
             )
-        }
 
         /**
          * Presses the Home button.
          */
-        override suspend fun pressHome(): Result<Unit> {
-            return performGlobalAction(
+        override suspend fun pressHome(): Result<Unit> =
+            performGlobalAction(
                 android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME,
                 "pressHome",
             )
-        }
 
         /**
          * Opens the Recents screen.
          */
-        override suspend fun pressRecents(): Result<Unit> {
-            return performGlobalAction(
+        override suspend fun pressRecents(): Result<Unit> =
+            performGlobalAction(
                 android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS,
                 "pressRecents",
             )
-        }
 
         /**
          * Opens the notification shade.
          */
-        override suspend fun openNotifications(): Result<Unit> {
-            return performGlobalAction(
+        override suspend fun openNotifications(): Result<Unit> =
+            performGlobalAction(
                 android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS,
                 "openNotifications",
             )
-        }
 
         /**
          * Opens the quick settings panel.
          */
-        override suspend fun openQuickSettings(): Result<Unit> {
-            return performGlobalAction(
+        override suspend fun openQuickSettings(): Result<Unit> =
+            performGlobalAction(
                 android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS,
                 "openQuickSettings",
             )
-        }
 
         // ─────────────────────────────────────────────────────────────────────────
         // Advanced Gestures
@@ -446,7 +442,8 @@ class ActionExecutorImpl
             val stroke2 = GestureDescription.StrokeDescription(finger2Path, 0L, duration)
 
             val gesture =
-                GestureDescription.Builder()
+                GestureDescription
+                    .Builder()
                     .addStroke(stroke1)
                     .addStroke(stroke2)
                     .build()
@@ -535,9 +532,7 @@ class ActionExecutorImpl
             rootNode: AccessibilityNodeInfo,
             nodeId: String,
             tree: AccessibilityNodeData,
-        ): AccessibilityNodeInfo? {
-            return walkAndMatch(rootNode, tree, nodeId, recycleOnMismatch = false)
-        }
+        ): AccessibilityNodeInfo? = walkAndMatch(rootNode, tree, nodeId, recycleOnMismatch = false)
 
         // ─────────────────────────────────────────────────────────────────────────
         // Internal Helpers
@@ -622,7 +617,8 @@ class ActionExecutorImpl
                     )
 
             val gesture =
-                GestureDescription.Builder()
+                GestureDescription
+                    .Builder()
                     .addStroke(stroke)
                     .build()
 

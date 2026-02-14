@@ -74,11 +74,10 @@ class PressBackHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
         @Suppress("UnusedParameter")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            return executeSystemAction(accessibilityServiceProvider, "Back button press") {
+        suspend fun execute(arguments: JsonObject?): CallToolResult =
+            executeSystemAction(accessibilityServiceProvider, "Back button press") {
                 actionExecutor.pressBack()
             }
-        }
 
         fun register(server: Server) {
             server.addTool(
@@ -119,11 +118,10 @@ class PressHomeHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
         @Suppress("UnusedParameter")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            return executeSystemAction(accessibilityServiceProvider, "Home button press") {
+        suspend fun execute(arguments: JsonObject?): CallToolResult =
+            executeSystemAction(accessibilityServiceProvider, "Home button press") {
                 actionExecutor.pressHome()
             }
-        }
 
         fun register(server: Server) {
             server.addTool(
@@ -164,11 +162,10 @@ class PressRecentsHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
         @Suppress("UnusedParameter")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            return executeSystemAction(accessibilityServiceProvider, "Recents button press") {
+        suspend fun execute(arguments: JsonObject?): CallToolResult =
+            executeSystemAction(accessibilityServiceProvider, "Recents button press") {
                 actionExecutor.pressRecents()
             }
-        }
 
         fun register(server: Server) {
             server.addTool(
@@ -209,11 +206,10 @@ class OpenNotificationsHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
         @Suppress("UnusedParameter")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            return executeSystemAction(accessibilityServiceProvider, "Open notifications") {
+        suspend fun execute(arguments: JsonObject?): CallToolResult =
+            executeSystemAction(accessibilityServiceProvider, "Open notifications") {
                 actionExecutor.openNotifications()
             }
-        }
 
         fun register(server: Server) {
             server.addTool(
@@ -254,11 +250,10 @@ class OpenQuickSettingsHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
         @Suppress("UnusedParameter")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            return executeSystemAction(accessibilityServiceProvider, "Open quick settings") {
+        suspend fun execute(arguments: JsonObject?): CallToolResult =
+            executeSystemAction(accessibilityServiceProvider, "Open quick settings") {
                 actionExecutor.openQuickSettings()
             }
-        }
 
         fun register(server: Server) {
             server.addTool(
@@ -406,16 +401,19 @@ class GetDeviceLogsHandler
          * @return The PID, or null if the package is not running or pidof fails.
          */
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
-        private fun resolvePid(packageName: String): Int? {
-            return try {
+        private fun resolvePid(packageName: String): Int? =
+            try {
                 val process = Runtime.getRuntime().exec(arrayOf("pidof", "-s", packageName))
-                val output = process.inputStream.bufferedReader().readText().trim()
+                val output =
+                    process.inputStream
+                        .bufferedReader()
+                        .readText()
+                        .trim()
                 process.waitFor()
                 output.toIntOrNull()
             } catch (e: Exception) {
                 null
             }
-        }
 
         /**
          * Filters logcat lines to only include those with timestamps at or before [until].

@@ -105,10 +105,12 @@ class CertificateManagerTest {
 
         // Certificate should expire roughly 1 year from now
         val expectedExpiry =
-            Calendar.getInstance().apply {
-                time = beforeGeneration
-                add(Calendar.YEAR, 1)
-            }.time
+            Calendar
+                .getInstance()
+                .apply {
+                    time = beforeGeneration
+                    add(Calendar.YEAR, 1)
+                }.time
         // Allow 1 minute tolerance for test execution time
         val toleranceMs = 60_000L
         assertTrue(

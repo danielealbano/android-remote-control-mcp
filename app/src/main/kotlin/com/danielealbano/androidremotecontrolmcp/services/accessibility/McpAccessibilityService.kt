@@ -107,39 +107,29 @@ class McpAccessibilityService : AccessibilityService() {
      * Returns the root [AccessibilityNodeInfo] of the currently active window,
      * or null if no window is available.
      */
-    fun getRootNode(): AccessibilityNodeInfo? {
-        return rootInActiveWindow
-    }
+    fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow
 
     /**
      * Returns the package name of the currently focused application,
      * or null if unknown.
      */
-    fun getCurrentPackageName(): String? {
-        return currentPackageName
-    }
+    fun getCurrentPackageName(): String? = currentPackageName
 
     /**
      * Returns the class name (activity name) of the currently focused window,
      * or null if unknown.
      */
-    fun getCurrentActivityName(): String? {
-        return currentActivityName
-    }
+    fun getCurrentActivityName(): String? = currentActivityName
 
     /**
      * Returns true if the service is connected and has an active root node available.
      */
-    fun isReady(): Boolean {
-        return instance != null && rootInActiveWindow != null
-    }
+    fun isReady(): Boolean = instance != null && rootInActiveWindow != null
 
     /**
      * Returns the [CoroutineScope] for this service, or null if not connected.
      */
-    fun getServiceScope(): CoroutineScope? {
-        return serviceScope
-    }
+    fun getServiceScope(): CoroutineScope? = serviceScope
 
     /**
      * Returns the current screen dimensions, density, and orientation.
@@ -202,8 +192,8 @@ class McpAccessibilityService : AccessibilityService() {
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? {
-        return withTimeoutOrNull(timeoutMs) {
+    suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
+        withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val executor = Executor { it.run() }
                 val callback =
@@ -231,14 +221,11 @@ class McpAccessibilityService : AccessibilityService() {
                 takeScreenshot(Display.DEFAULT_DISPLAY, executor, callback)
             }
         }
-    }
 
     /**
      * Returns true if screenshot capability is available (Android 11+).
      */
-    fun canTakeScreenshot(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-    }
+    fun canTakeScreenshot(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
     companion object {
         private const val TAG = "MCP:AccessibilityService"

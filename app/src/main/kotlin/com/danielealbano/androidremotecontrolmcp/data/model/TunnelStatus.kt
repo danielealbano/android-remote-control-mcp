@@ -29,5 +29,7 @@ sealed class TunnelStatus {
      *
      * @property message A human-readable error description.
      */
-    data class Error(val message: String) : TunnelStatus()
+    data class Error(
+        val message: String,
+    ) : TunnelStatus()
 }
