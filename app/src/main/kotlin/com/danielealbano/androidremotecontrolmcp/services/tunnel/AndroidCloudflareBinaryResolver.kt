@@ -21,6 +21,9 @@ class AndroidCloudflareBinaryResolver
     constructor(
         @ApplicationContext private val context: Context,
     ) : CloudflaredBinaryResolver {
+        @Suppress("SENSELESS_NULL_IN_WHEN")
+        internal var supportedAbis: Array<String> = Build.SUPPORTED_ABIS ?: emptyArray()
+
         override fun resolve(): String? {
             val assetName = resolveAssetName() ?: return null
             val targetFile = File(context.filesDir, EXTRACTED_BINARY_NAME)
@@ -44,14 +47,14 @@ class AndroidCloudflareBinaryResolver
                 }
 
             val match =
-                Build.SUPPORTED_ABIS.firstOrNull { abi ->
+                supportedAbis.firstOrNull { abi ->
                     "$ASSET_PREFIX$abi" in availableAssets
                 }
 
             if (match == null) {
                 Log.e(
                     TAG,
-                    "No cloudflared asset found for ABIs: ${Build.SUPPORTED_ABIS.joinToString()}",
+                    "No cloudflared asset found for ABIs: ${supportedAbis.joinToString()}",
                 )
             }
 
