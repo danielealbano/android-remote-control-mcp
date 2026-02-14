@@ -57,6 +57,11 @@ val BearerTokenAuthPlugin =
         val expectedToken = pluginConfig.expectedToken
 
         application.intercept(ApplicationCallPipeline.Plugins) {
+            // Skip authentication when no bearer token is configured
+            if (expectedToken.isEmpty()) {
+                return@intercept
+            }
+
             val call = context
             val authHeader = call.request.headers["Authorization"]
 

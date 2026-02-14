@@ -36,6 +36,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -83,6 +84,7 @@ class McpServerService : Service() {
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
     private var mcpServer: McpServer? = null
+    private var tunnelObserverJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -185,38 +187,39 @@ class McpServerService : Service() {
             }
 
             // Observe tunnel status for logging
-            coroutineScope.launch {
-                tunnelManager.tunnelStatus.collect { status ->
-                    when (status) {
-                        is TunnelStatus.Connected -> {
-                            Log.i(TAG, "Tunnel connected: ${status.url} (provider: ${status.providerType})")
-                            emitLogEntry(
-                                ServerLogEntry(
-                                    timestamp = System.currentTimeMillis(),
-                                    type = ServerLogEntry.Type.TUNNEL,
-                                    message = "Tunnel connected: ${status.url}",
-                                ),
-                            )
-                        }
-                        is TunnelStatus.Error -> {
-                            Log.w(TAG, "Tunnel error: ${status.message}")
-                            emitLogEntry(
-                                ServerLogEntry(
-                                    timestamp = System.currentTimeMillis(),
-                                    type = ServerLogEntry.Type.TUNNEL,
-                                    message = "Tunnel error: ${status.message}",
-                                ),
-                            )
-                        }
-                        is TunnelStatus.Connecting -> {
-                            Log.i(TAG, "Tunnel connecting...")
-                        }
-                        is TunnelStatus.Disconnected -> {
-                            // No-op for initial state; logged at stop time
+            tunnelObserverJob =
+                coroutineScope.launch {
+                    tunnelManager.tunnelStatus.collect { status ->
+                        when (status) {
+                            is TunnelStatus.Connected -> {
+                                Log.i(TAG, "Tunnel connected: ${status.url} (provider: ${status.providerType})")
+                                emitLogEntry(
+                                    ServerLogEntry(
+                                        timestamp = System.currentTimeMillis(),
+                                        type = ServerLogEntry.Type.TUNNEL,
+                                        message = "Tunnel connected: ${status.url}",
+                                    ),
+                                )
+                            }
+                            is TunnelStatus.Error -> {
+                                Log.w(TAG, "Tunnel error: ${status.message}")
+                                emitLogEntry(
+                                    ServerLogEntry(
+                                        timestamp = System.currentTimeMillis(),
+                                        type = ServerLogEntry.Type.TUNNEL,
+                                        message = "Tunnel error: ${status.message}",
+                                    ),
+                                )
+                            }
+                            is TunnelStatus.Connecting -> {
+                                Log.i(TAG, "Tunnel connecting...")
+                            }
+                            is TunnelStatus.Disconnected -> {
+                                // No-op for initial state; logged at stop time
+                            }
                         }
                     }
                 }
-            }
 
             Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
         } catch (e: Exception) {
@@ -239,6 +242,10 @@ class McpServerService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "McpServerService destroying")
         updateStatus(ServerStatus.Stopping)
+
+        // Cancel tunnel status observer before stopping the tunnel
+        tunnelObserverJob?.cancel()
+        tunnelObserverJob = null
 
         // Stop tunnel first (with ANR-safe timeout)
         @Suppress("TooGenericExceptionCaught")
