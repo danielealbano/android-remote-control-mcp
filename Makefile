@@ -109,13 +109,13 @@ clean: ## Clean build artifacts
 # ─────────────────────────────────────────────────────────────────────────────
 
 test-unit: ## Run unit tests (includes integration tests since both are JVM-based)
-	$(GRADLE) :app:test
+	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) $(GRADLE) :app:test
 
 test-integration: ## Run integration tests (JVM-based, no emulator required)
-	$(GRADLE) :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"
+	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) $(GRADLE) :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"
 
 test-e2e: ## Run E2E tests (requires Docker)
-	$(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
+	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) $(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
 
 test: test-unit test-e2e ## Run all tests
 

@@ -166,6 +166,9 @@ dependencies {
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
+
+    // ngrok native library for JVM integration tests (linux-x86_64)
+    testRuntimeOnly("com.ngrok:ngrok-java-native:${libs.versions.ngrok.java.get()}:linux-x86_64")
 }
 
 // Extract ngrok-java native library for Android arm64

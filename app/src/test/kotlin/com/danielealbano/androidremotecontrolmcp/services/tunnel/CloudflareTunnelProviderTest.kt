@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("CloudflareTunnelProvider")
@@ -44,29 +46,25 @@ class CloudflareTunnelProviderTest {
         @Test
         fun `start when already running throws IllegalStateException`() =
             runTest {
-                every { mockBinaryResolver.resolve() } returns "/nonexistent/path"
-                val provider = createProvider()
+                val tempScript = File.createTempFile("fake-cloudflared", ".sh")
+                try {
+                    tempScript.writeText("#!/bin/sh\nsleep 60\n")
+                    tempScript.setExecutable(true)
+                    every { mockBinaryResolver.resolve() } returns tempScript.absolutePath
 
-                // First start will fail because /nonexistent/path doesn't exist,
-                // but we need to test the "already running" check. We mock a scenario
-                // where the binary exists but the process starts successfully.
-                // Since we can't easily mock ProcessBuilder, we test the regex and
-                // binary-not-found paths, and verify the state machine behavior.
+                    val provider = createProvider()
+                    provider.start(8080, ServerConfig())
 
-                // For this test, we verify that after a successful-looking start
-                // (with error status set because path is non-existent), a second
-                // start attempt on an actually running provider throws.
-                // This is inherently hard to test without a real process,
-                // so we test the guard in a simulated way.
+                    val ex =
+                        assertThrows<IllegalStateException> {
+                            provider.start(8080, ServerConfig())
+                        }
+                    assertEquals("Tunnel is already running", ex.message)
 
-                // The error case doesn't set process != null, so calling start again
-                // should not throw (it's not "already running" since the process failed).
-                // This test validates the path where the binary IS found but execution fails.
-                provider.start(8080, ServerConfig())
-
-                // The provider should be in error state (file not found by OS)
-                // but process should be null, so another start should work (not throw)
-                // because the previous attempt didn't leave a running process.
+                    provider.stop()
+                } finally {
+                    tempScript.delete()
+                }
             }
     }
 
