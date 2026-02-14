@@ -22,6 +22,7 @@ keystore.properties
 # Environment / Secrets
 .env
 .env.*
+!.env.example
 .secrets
 
 # OS files

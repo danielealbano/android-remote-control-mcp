@@ -253,10 +253,11 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - Keep validation aligned with MCP tool schemas (defined in PROJECT.md).
 
 ### Authorization
-- **Bearer token authentication**: Enforce on every MCP request.
-- Implemented as Ktor middleware (`BearerTokenAuth`).
-- Return `401 Unauthorized` for missing/invalid token.
-- Never bypass authentication for MCP endpoints. The health check endpoint (`/health`) is the only unauthenticated endpoint.
+- **Bearer token authentication**: Enforced on every MCP request when a token is configured.
+- Implemented as Ktor application plugin (`BearerTokenAuthPlugin`).
+- When `expectedToken` is empty, authentication is skipped entirely (no token required).
+- Return `401 Unauthorized` for missing/invalid token when a token is configured.
+- The health check endpoint (`/health`) is always unauthenticated.
 
 ### Permission handling
 - **Accessibility permission**: Check `isAccessibilityServiceEnabled()` before accessibility operations.
@@ -427,6 +428,13 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 **Running E2E tests**:
 - `make test-e2e` (starts Docker Android container, installs APK, runs tests, tears down).
 - E2E tests are slow (container startup, emulator boot); run selectively.
+
+### Environment variables for tests
+- Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables.
+- Environment variables are stored in `.env` (gitignored). See `.env.example` for required variables.
+- **When running tests via Makefile** (`make test-unit`, `make test-integration`, `make test`): `.env` is sourced automatically if it exists.
+- **When running tests manually** via `./gradlew`: source `.env` first: `set -a && source .env && set +a && ./gradlew :app:test`
+- To run a single integration test: `set -a && source .env && set +a && ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.NgrokTunnelIntegrationTest"`
 
 ### Fix broken tests rule
 - If you encounter failing tests unrelated to your changes:

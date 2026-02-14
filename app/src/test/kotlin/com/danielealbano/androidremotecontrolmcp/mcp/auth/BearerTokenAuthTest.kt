@@ -174,6 +174,22 @@ class BearerTokenAuthTest {
         }
 
     @Test
+    fun `plugin skips authentication when token is empty`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) { expectedToken = "" }
+                routing {
+                    get("/protected/resource") { call.respondText("OK") }
+                }
+            }
+
+            val response = client.get("/protected/resource")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("OK", response.bodyAsText())
+        }
+
+    @Test
     fun `plugin allows request with valid token`() =
         testApplication {
             application {
