@@ -59,6 +59,8 @@ jobs:
           cloudflared --version
 
       - name: Run unit tests with coverage
+        env:
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: ./gradlew :app:test jacocoTestReport jacocoTestCoverageVerification
 
       - name: Upload unit test results
