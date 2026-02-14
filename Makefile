@@ -263,7 +263,7 @@ version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
 # ─────────────────────────────────────────────────────────────────────────────
 
 CLOUDFLARED_SRC_DIR := vendor/cloudflared
-JNILIBS_DIR := app/src/main/jniLibs
+CLOUDFLARED_ASSETS_DIR := app/src/main/assets
 
 compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + Android NDK)
 	@if [ ! -f "$(CLOUDFLARED_SRC_DIR)/cmd/cloudflared/main.go" ]; then \
@@ -274,21 +274,20 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	@echo "Compiling cloudflared from submodule ($(CLOUDFLARED_SRC_DIR))..."
 	@echo ""
 	@echo "Compiling cloudflared for arm64-v8a..."
-	mkdir -p $(JNILIBS_DIR)/arm64-v8a
+	mkdir -p $(CLOUDFLARED_ASSETS_DIR)
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
 		CC=$$(find $$ANDROID_HOME/ndk -name "aarch64-linux-android*-clang" | sort -V | tail -1) \
 		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
-		-o $(CURDIR)/$(JNILIBS_DIR)/arm64-v8a/libcloudflared.so \
+		-o $(CURDIR)/$(CLOUDFLARED_ASSETS_DIR)/cloudflared-arm64-v8a \
 		./cmd/cloudflared
 	@echo ""
 	@echo "Compiling cloudflared for x86_64..."
-	mkdir -p $(JNILIBS_DIR)/x86_64
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
 		CC=$$(find $$ANDROID_HOME/ndk -name "x86_64-linux-android*-clang" | sort -V | tail -1) \
 		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
-		-o $(CURDIR)/$(JNILIBS_DIR)/x86_64/libcloudflared.so \
+		-o $(CURDIR)/$(CLOUDFLARED_ASSETS_DIR)/cloudflared-x86_64 \
 		./cmd/cloudflared
 	@echo ""
 	@echo "cloudflared compiled successfully for arm64-v8a and x86_64"
