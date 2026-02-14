@@ -19,6 +19,7 @@ class CompactTreeFormatterTest {
             orientation = "portrait",
         )
 
+    @Suppress("LongParameterList")
     private fun makeNode(
         id: String = "node_test",
         className: String? = null,

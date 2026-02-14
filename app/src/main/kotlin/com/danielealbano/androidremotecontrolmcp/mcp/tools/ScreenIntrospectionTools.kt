@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
