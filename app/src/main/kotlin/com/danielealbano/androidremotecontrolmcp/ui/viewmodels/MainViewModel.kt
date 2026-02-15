@@ -94,6 +94,12 @@ class MainViewModel
         private val _downloadTimeoutError = MutableStateFlow<String?>(null)
         val downloadTimeoutError: StateFlow<String?> = _downloadTimeoutError.asStateFlow()
 
+        private val _deviceSlugInput = MutableStateFlow("")
+        val deviceSlugInput: StateFlow<String> = _deviceSlugInput.asStateFlow()
+
+        private val _deviceSlugError = MutableStateFlow<String?>(null)
+        val deviceSlugError: StateFlow<String?> = _deviceSlugError.asStateFlow()
+
         private val _pendingAuthorizationLocationId = MutableStateFlow<String?>(null)
         val pendingAuthorizationLocationId: StateFlow<String?> = _pendingAuthorizationLocationId.asStateFlow()
 
@@ -107,6 +113,7 @@ class MainViewModel
                     _ngrokDomainInput.value = config.ngrokDomain
                     _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
                     _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
+                    _deviceSlugInput.value = config.deviceSlug
                 }
             }
 
@@ -386,6 +393,21 @@ class MainViewModel
         fun updateAllowUnverifiedHttpsCerts(enabled: Boolean) {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateAllowUnverifiedHttpsCerts(enabled)
+            }
+        }
+
+        fun updateDeviceSlug(slug: String) {
+            _deviceSlugInput.value = slug
+
+            val result = settingsRepository.validateDeviceSlug(slug)
+            if (result.isFailure) {
+                _deviceSlugError.value = result.exceptionOrNull()?.message
+                return
+            }
+
+            _deviceSlugError.value = null
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateDeviceSlug(slug)
             }
         }
 
