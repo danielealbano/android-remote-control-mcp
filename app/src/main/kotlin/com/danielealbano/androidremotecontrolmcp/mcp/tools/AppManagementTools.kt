@@ -215,7 +215,7 @@ class CloseAppHandler
                 description =
                     "Kills a background application process. This only works for apps " +
                         "that are in the background. For foreground apps that are hung or " +
-                        "unresponsive, first use the 'press_home' tool to send the app to the " +
+                        "unresponsive, first use the '${toolNamePrefix}press_home' tool to send the app to the " +
                         "background, wait briefly, then call this tool. Note: some system " +
                         "processes may restart automatically after being killed.",
                 inputSchema =
