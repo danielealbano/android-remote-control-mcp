@@ -326,7 +326,7 @@ NDK_ROOT := $(shell \
 		APP_DIR=$$(ls -d "/opt/homebrew/Caskroom/android-ndk/$$NDK_VER/"*.app 2>/dev/null | head -1); \
 		echo "$$APP_DIR/Contents/NDK"; \
 	fi)
-NDK_BIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(shell uname -s | tr A-Z a-z)-$(shell uname -m | sed 's/arm64/x86_64/')/bin
+NDK_BIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(shell uname -s | tr A-Z a-z)-$(shell uname -m | sed 's/aarch64/x86_64/; s/arm64/x86_64/')/bin
 
 compile-ngrok-native: ## Build ngrok-java native library from source (requires Rust + Android NDK + Maven)
 	@if [ ! -f "$(NGROK_NATIVE_DIR)/Cargo.toml" ]; then \

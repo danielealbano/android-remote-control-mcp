@@ -180,6 +180,7 @@ val ngrokNativeDir: String =
     listOf(
         "../vendor/ngrok-java/ngrok-java-native/target/release",
         "../vendor/ngrok-java/ngrok-java-native/target/aarch64-apple-darwin/release",
+        "../vendor/ngrok-java/ngrok-java-native/target/x86_64-apple-darwin/release",
         "../vendor/ngrok-java/ngrok-java-native/target/x86_64-unknown-linux-gnu/release",
     ).firstOrNull { file(it).exists() } ?: "../vendor/ngrok-java/ngrok-java-native/target/release"
 
