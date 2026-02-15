@@ -8,10 +8,11 @@ import javax.inject.Inject
  *
  * Output format:
  * - Line 1: `note:structural-only nodes are omitted from the tree`
- * - Line 2: `app:<package> activity:<activity>`
- * - Line 3: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
- * - Line 4: TSV header: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
- * - Lines 5+: one TSV row per kept node (flat, no depth)
+ * - Line 2: `note:certain elements are custom and will not be properly reported, ...`
+ * - Line 3: `app:<package> activity:<activity>`
+ * - Line 4: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
+ * - Line 5: TSV header: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+ * - Lines 6+: one TSV row per kept node (flat, no depth)
  *
  * Nodes are filtered: a node is KEPT if ANY of:
  * - has non-null, non-empty text
@@ -42,19 +43,22 @@ class CompactTreeFormatter
             // Line 1: note
             sb.appendLine(NOTE_LINE)
 
-            // Line 2: app metadata
+            // Line 2: note about custom elements
+            sb.appendLine(NOTE_LINE_CUSTOM_ELEMENTS)
+
+            // Line 3: app metadata
             sb.appendLine("app:$packageName activity:$activityName")
 
-            // Line 3: screen info
+            // Line 4: screen info
             sb.appendLine(
                 "screen:${screenInfo.width}x${screenInfo.height} " +
                     "density:${screenInfo.densityDpi} orientation:${screenInfo.orientation}",
             )
 
-            // Line 4: header
+            // Line 5: header
             sb.appendLine(HEADER)
 
-            // Lines 5+: walk tree and append kept nodes
+            // Lines 6+: walk tree and append kept nodes
             walkNode(sb, tree)
 
             return sb.toString().trimEnd('\n')
@@ -171,6 +175,10 @@ class CompactTreeFormatter
             const val MAX_TEXT_LENGTH = 100
             const val TRUNCATION_SUFFIX = "...truncated"
             const val NOTE_LINE = "note:structural-only nodes are omitted from the tree"
+            const val NOTE_LINE_CUSTOM_ELEMENTS =
+                "note:certain elements are custom and will not be properly reported, " +
+                    "if needed or if tools are not working as expected set " +
+                    "include_screenshot=true to see the screen and take what you see into account"
             const val HEADER =
                 "id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
                     "desc${COLUMN_SEPARATOR}res_id${COLUMN_SEPARATOR}bounds${COLUMN_SEPARATOR}flags"

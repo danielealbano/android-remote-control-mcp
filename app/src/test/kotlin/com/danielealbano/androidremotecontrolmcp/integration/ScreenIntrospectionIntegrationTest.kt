@@ -91,6 +91,7 @@ class ScreenIntrospectionIntegrationTest {
 
                 val textContent = (result.content[0] as TextContent).text
                 assertTrue(textContent.contains("note:structural-only nodes are omitted from the tree"))
+                assertTrue(textContent.contains("note:certain elements are custom and will not be properly reported"))
                 assertTrue(textContent.contains("app:com.example.app activity:.MainActivity"))
                 assertTrue(textContent.contains("screen:1080x2400 density:420 orientation:portrait"))
                 assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
