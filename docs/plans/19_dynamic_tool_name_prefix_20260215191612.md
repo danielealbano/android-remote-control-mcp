@@ -1568,8 +1568,8 @@ import org.junit.jupiter.api.Assertions.assertNotEquals
 **So that** users and contributors understand the naming convention.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] `MCP_TOOLS.md` documents the prefix convention and includes prefixed tool names
-- [ ] `PROJECT.md` documents the `deviceSlug` setting with defaults and validation rules
+- [x] `MCP_TOOLS.md` documents the prefix convention and includes prefixed tool names
+- [x] `PROJECT.md` documents the `deviceSlug` setting with defaults and validation rules
 
 ---
 

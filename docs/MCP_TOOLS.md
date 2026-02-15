@@ -32,15 +32,29 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 
 | Category | Tools | Plan |
 |----------|-------|------|
-| Screen Introspection | `get_screen_state` | 7, 15 |
-| System Actions | `press_back`, `press_home`, `press_recents`, `open_notifications`, `open_quick_settings`, `get_device_logs` | 7 |
-| Touch Actions | `tap`, `long_press`, `double_tap`, `swipe`, `scroll` | 8 |
-| Gestures | `pinch`, `custom_gesture` | 8 |
-| Element Actions | `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element` | 9 |
-| Text Input | `input_text`, `clear_text`, `press_key` | 9 |
-| Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle`, `get_element_details` | 9, 15 |
-| File Operations | `list_storage_locations`, `list_files`, `read_file`, `write_file`, `append_file`, `file_replace`, `download_from_url`, `delete_file` | - |
-| App Management | `open_app`, `list_apps`, `close_app` | - |
+| Screen Introspection | `android_get_screen_state` | 7, 15 |
+| System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | 7 |
+| Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
+| Gestures | `android_pinch`, `android_custom_gesture` | 8 |
+| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_set_text`, `android_scroll_to_element` | 9 |
+| Text Input | `android_input_text`, `android_clear_text`, `android_press_key` | 9 |
+| Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | 9, 15 |
+| File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
+| App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
+
+### Tool Naming Convention
+
+All MCP tool names are prefixed with `android_` by default. When a **device slug** is configured in the app settings (e.g., `pixel7`), the prefix becomes `android_<slug>_`.
+
+| Device Slug | Tool Name Example |
+|-------------|-------------------|
+| _(empty)_ | `android_tap`, `android_find_elements`, `android_get_screen_state` |
+| `pixel7` | `android_pixel7_tap`, `android_pixel7_find_elements`, `android_pixel7_get_screen_state` |
+| `work_phone` | `android_work_phone_tap`, `android_work_phone_find_elements`, `android_work_phone_get_screen_state` |
+
+The device slug is configured in the app's **Configuration** section. Valid slugs contain only letters (a-z, A-Z), digits (0-9), and underscores. Maximum length is 20 characters. An empty slug is valid and results in the default `android_` prefix.
+
+> **Note**: All tool names in this document use the default `android_` prefix (no device slug). When a slug is configured, replace `android_` with `android_<slug>_` in all tool names.
 
 ### Endpoint
 
@@ -136,7 +150,7 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ## 1. Screen Introspection Tools
 
-### `get_screen_state`
+### `android_get_screen_state`
 
 Returns the consolidated current screen state: app metadata, screen dimensions, and a compact filtered flat TSV list of UI elements. Optionally includes a low-resolution screenshot.
 
@@ -164,7 +178,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "get_screen_state",
+    "name": "android_get_screen_state",
     "arguments": {}
   }
 }
@@ -177,7 +191,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "get_screen_state",
+    "name": "android_get_screen_state",
     "arguments": {
       "include_screenshot": true
     }
@@ -265,7 +279,7 @@ This filters out structural-only container nodes (e.g., bare `FrameLayout`, `Lin
 
 #### Text/Description Truncation
 
-Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `get_element_details` tool to retrieve full untruncated values by element ID.
+Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `android_get_element_details` tool to retrieve full untruncated values by element ID.
 
 #### Screenshot
 
@@ -281,7 +295,7 @@ When `include_screenshot` is `true`, a low-resolution JPEG screenshot (max 700px
 
 ## 2. System Action Tools
 
-### `press_back`
+### `android_press_back`
 
 Presses the back button (global accessibility action).
 
@@ -301,7 +315,7 @@ Presses the back button (global accessibility action).
   "id": 5,
   "method": "tools/call",
   "params": {
-    "name": "press_back",
+    "name": "android_press_back",
     "arguments": {}
   }
 }
@@ -329,7 +343,7 @@ Presses the back button (global accessibility action).
 
 ---
 
-### `press_home`
+### `android_press_home`
 
 Navigates to the home screen.
 
@@ -349,7 +363,7 @@ Navigates to the home screen.
   "id": 6,
   "method": "tools/call",
   "params": {
-    "name": "press_home",
+    "name": "android_press_home",
     "arguments": {}
   }
 }
@@ -377,7 +391,7 @@ Navigates to the home screen.
 
 ---
 
-### `press_recents`
+### `android_press_recents`
 
 Opens the recent apps screen.
 
@@ -397,7 +411,7 @@ Opens the recent apps screen.
   "id": 7,
   "method": "tools/call",
   "params": {
-    "name": "press_recents",
+    "name": "android_press_recents",
     "arguments": {}
   }
 }
@@ -425,7 +439,7 @@ Opens the recent apps screen.
 
 ---
 
-### `open_notifications`
+### `android_open_notifications`
 
 Pulls down the notification shade.
 
@@ -445,7 +459,7 @@ Pulls down the notification shade.
   "id": 8,
   "method": "tools/call",
   "params": {
-    "name": "open_notifications",
+    "name": "android_open_notifications",
     "arguments": {}
   }
 }
@@ -473,7 +487,7 @@ Pulls down the notification shade.
 
 ---
 
-### `open_quick_settings`
+### `android_open_quick_settings`
 
 Opens the quick settings panel.
 
@@ -493,7 +507,7 @@ Opens the quick settings panel.
   "id": 9,
   "method": "tools/call",
   "params": {
-    "name": "open_quick_settings",
+    "name": "android_open_quick_settings",
     "arguments": {}
   }
 }
@@ -521,7 +535,7 @@ Opens the quick settings panel.
 
 ---
 
-### `get_device_logs`
+### `android_get_device_logs`
 
 Retrieves device logcat logs filtered by time range, tag, level, or package name.
 
@@ -569,7 +583,7 @@ Retrieves device logcat logs filtered by time range, tag, level, or package name
   "id": 10,
   "method": "tools/call",
   "params": {
-    "name": "get_device_logs",
+    "name": "android_get_device_logs",
     "arguments": {}
   }
 }
@@ -582,7 +596,7 @@ Retrieves device logcat logs filtered by time range, tag, level, or package name
   "id": 10,
   "method": "tools/call",
   "params": {
-    "name": "get_device_logs",
+    "name": "android_get_device_logs",
     "arguments": {
       "last_lines": 50,
       "tag": "MCP:ServerService",
@@ -619,7 +633,7 @@ Retrieves device logcat logs filtered by time range, tag, level, or package name
 Coordinate-based touch interactions. All coordinates are in screen pixels (absolute).
 Coordinate values must be >= 0. Duration values must be between 1 and 60000 milliseconds.
 
-### `tap`
+### `android_tap`
 
 Performs a single tap at the specified coordinates.
 
@@ -636,7 +650,7 @@ Performs a single tap at the specified coordinates.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "tap",
+    "name": "android_tap",
     "arguments": {
       "x": 500,
       "y": 1000
@@ -668,7 +682,7 @@ Performs a single tap at the specified coordinates.
 
 ---
 
-### `long_press`
+### `android_long_press`
 
 Performs a long press at the specified coordinates.
 
@@ -686,7 +700,7 @@ Performs a long press at the specified coordinates.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "long_press",
+    "name": "android_long_press",
     "arguments": {
       "x": 500,
       "y": 1000,
@@ -719,7 +733,7 @@ Performs a long press at the specified coordinates.
 
 ---
 
-### `double_tap`
+### `android_double_tap`
 
 Performs a double tap at the specified coordinates.
 
@@ -736,7 +750,7 @@ Performs a double tap at the specified coordinates.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "double_tap",
+    "name": "android_double_tap",
     "arguments": {
       "x": 500,
       "y": 1000
@@ -768,7 +782,7 @@ Performs a double tap at the specified coordinates.
 
 ---
 
-### `swipe`
+### `android_swipe`
 
 Performs a swipe gesture from one point to another.
 
@@ -788,7 +802,7 @@ Performs a swipe gesture from one point to another.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "swipe",
+    "name": "android_swipe",
     "arguments": {
       "x1": 500,
       "y1": 1500,
@@ -823,7 +837,7 @@ Performs a swipe gesture from one point to another.
 
 ---
 
-### `scroll`
+### `android_scroll`
 
 Scrolls the screen in the specified direction. Calculates scroll distance as a percentage of screen dimension based on the amount parameter.
 
@@ -840,7 +854,7 @@ Scrolls the screen in the specified direction. Calculates scroll distance as a p
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "scroll",
+    "name": "android_scroll",
     "arguments": {
       "direction": "down",
       "amount": "large"
@@ -876,7 +890,7 @@ Scrolls the screen in the specified direction. Calculates scroll distance as a p
 
 Advanced multi-touch gesture tools for zoom and custom gesture sequences.
 
-### `pinch`
+### `android_pinch`
 
 Performs a pinch-to-zoom gesture centered at the specified coordinates.
 
@@ -895,7 +909,7 @@ Performs a pinch-to-zoom gesture centered at the specified coordinates.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "pinch",
+    "name": "android_pinch",
     "arguments": {
       "center_x": 540,
       "center_y": 1200,
@@ -928,7 +942,7 @@ Performs a pinch-to-zoom gesture centered at the specified coordinates.
 
 ---
 
-### `custom_gesture`
+### `android_custom_gesture`
 
 Executes a custom multi-touch gesture defined by path points. Each path represents one finger's movement. Multiple paths enable multi-finger gestures.
 
@@ -958,7 +972,7 @@ Each path is an array of point objects:
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "custom_gesture",
+    "name": "android_custom_gesture",
     "arguments": {
       "paths": [
         [
@@ -979,7 +993,7 @@ Each path is an array of point objects:
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "custom_gesture",
+    "name": "android_custom_gesture",
     "arguments": {
       "paths": [
         [
@@ -1021,7 +1035,7 @@ Each path is an array of point objects:
 
 ## 5. Element Action Tools
 
-### `find_elements`
+### `android_find_elements`
 
 Find UI elements matching the specified criteria in the accessibility tree.
 
@@ -1077,7 +1091,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "find_elements", "arguments": { "by": "text", "value": "Submit" } }
+    "params": { "name": "android_find_elements", "arguments": { "by": "text", "value": "Submit" } }
   }'
 ```
 
@@ -1087,7 +1101,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `click_element`
+### `android_click_element`
 
 Click the specified accessibility node by element ID.
 
@@ -1111,7 +1125,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "click_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_click_element", "arguments": { "element_id": "node_abc123" } }
   }'
 ```
 
@@ -1123,7 +1137,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `long_click_element`
+### `android_long_click_element`
 
 Long-click the specified accessibility node by element ID.
 
@@ -1147,7 +1161,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "long_click_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_long_click_element", "arguments": { "element_id": "node_abc123" } }
   }'
 ```
 
@@ -1159,7 +1173,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `set_text`
+### `android_set_text`
 
 Set text on an editable accessibility node. Empty string clears the field.
 
@@ -1184,7 +1198,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "set_text", "arguments": { "element_id": "node_abc123", "text": "Hello World" } }
+    "params": { "name": "android_set_text", "arguments": { "element_id": "node_abc123", "text": "Hello World" } }
   }'
 ```
 
@@ -1196,7 +1210,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `scroll_to_element`
+### `android_scroll_to_element`
 
 Scroll to make the specified element visible by scrolling its nearest scrollable ancestor.
 
@@ -1220,7 +1234,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "scroll_to_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_scroll_to_element", "arguments": { "element_id": "node_abc123" } }
   }'
 ```
 
@@ -1234,7 +1248,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ## 6. Text Input Tools
 
-### `input_text`
+### `android_input_text`
 
 Type text into the focused input field or a specified element. When `element_id` is provided, the tool clicks the element to focus it before setting text.
 
@@ -1259,7 +1273,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "input_text", "arguments": { "text": "Hello World" } }
+    "params": { "name": "android_input_text", "arguments": { "text": "Hello World" } }
   }'
 ```
 
@@ -1271,7 +1285,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `clear_text`
+### `android_clear_text`
 
 Clear text from the focused input field or a specified element.
 
@@ -1295,7 +1309,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "clear_text", "arguments": {} }
+    "params": { "name": "android_clear_text", "arguments": {} }
   }'
 ```
 
@@ -1306,7 +1320,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `press_key`
+### `android_press_key`
 
 Press a specific key. Supported keys: ENTER, BACK, DEL, HOME, TAB, SPACE.
 
@@ -1340,7 +1354,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "press_key", "arguments": { "key": "ENTER" } }
+    "params": { "name": "android_press_key", "arguments": { "key": "ENTER" } }
   }'
 ```
 
@@ -1354,7 +1368,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ## 7. Utility Tools
 
-### `get_clipboard`
+### `android_get_clipboard`
 
 Get the current clipboard text content. Accessibility services are exempt from Android 10+ background clipboard restrictions.
 
@@ -1380,7 +1394,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "get_clipboard", "arguments": {} }
+    "params": { "name": "android_get_clipboard", "arguments": {} }
   }'
 ```
 
@@ -1390,7 +1404,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `set_clipboard`
+### `android_set_clipboard`
 
 Set the clipboard content to the specified text.
 
@@ -1414,7 +1428,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "set_clipboard", "arguments": { "text": "Hello from MCP" } }
+    "params": { "name": "android_set_clipboard", "arguments": { "text": "Hello from MCP" } }
   }'
 ```
 
@@ -1425,7 +1439,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `wait_for_element`
+### `android_wait_for_element`
 
 Wait until an element matching the specified criteria appears in the accessibility tree, polling every 500ms.
 
@@ -1477,7 +1491,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "wait_for_element", "arguments": { "by": "text", "value": "10", "timeout": 5000 } }
+    "params": { "name": "android_wait_for_element", "arguments": { "by": "text", "value": "10", "timeout": 5000 } }
   }'
 ```
 
@@ -1487,7 +1501,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `wait_for_idle`
+### `android_wait_for_idle`
 
 Wait for the UI to become idle by comparing accessibility tree fingerprints using similarity-based change detection. Generates a 256-slot histogram fingerprint of the tree structure and uses normalized difference to compute a similarity percentage. Considers UI idle when two consecutive snapshots (500ms apart) meet the `match_percentage` threshold.
 
@@ -1536,7 +1550,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "wait_for_idle", "arguments": { "timeout": 3000 } }
+    "params": { "name": "android_wait_for_idle", "arguments": { "timeout": 3000 } }
   }'
 ```
 
@@ -1547,7 +1561,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "wait_for_idle", "arguments": { "timeout": 5000, "match_percentage": 95 } }
+    "params": { "name": "android_wait_for_idle", "arguments": { "timeout": 5000, "match_percentage": 95 } }
   }'
 ```
 
@@ -1558,9 +1572,9 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `get_element_details`
+### `android_get_element_details`
 
-Retrieves full untruncated text and contentDescription for one or more elements by their IDs. Use this tool when `get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more elements by their IDs. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1584,7 +1598,7 @@ Retrieves full untruncated text and contentDescription for one or more elements 
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "get_element_details",
+    "name": "android_get_element_details",
     "arguments": {
       "ids": ["node_1", "node_2"]
     }
@@ -1625,7 +1639,7 @@ If an element ID is not found in the current accessibility tree, the row shows `
 
 File operations on authorized storage locations. Storage locations must be authorized in the app settings before file operations can be performed. Text file operations are subject to a configurable file size limit. All file paths are relative to the storage location root.
 
-### `list_storage_locations`
+### `android_list_storage_locations`
 
 Lists available storage locations on the device with their authorization status. Locations must be authorized in the app settings before file operations can be performed on them.
 
@@ -1645,7 +1659,7 @@ Lists available storage locations on the device with their authorization status.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "list_storage_locations",
+    "name": "android_list_storage_locations",
     "arguments": {}
   }
 }
@@ -1672,14 +1686,14 @@ Lists available storage locations on the device with their authorization status.
 
 ---
 
-### `list_files`
+### `android_list_files`
 
 Lists files and directories in a storage location. Results are sorted directories-first, then alphabetically. Supports pagination via `offset` and `limit` parameters.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | No | `""` | Relative path within the storage location |
 | `offset` | integer | No | 0 | Pagination offset (0-based) |
 | `limit` | integer | No | 200 | Maximum number of entries to return (max 200) |
@@ -1691,7 +1705,7 @@ Lists files and directories in a storage location. Results are sorted directorie
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "list_files",
+    "name": "android_list_files",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "",
@@ -1728,14 +1742,14 @@ Lists files and directories in a storage location. Results are sorted directorie
 
 ---
 
-### `read_file`
+### `android_read_file`
 
 Reads a text file with line-based pagination. Returns content with line numbers.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Relative path to the file within the storage location |
 | `offset` | integer | No | 1 | Starting line number (1-based) |
 | `limit` | integer | No | 200 | Maximum number of lines to return (max 200) |
@@ -1747,7 +1761,7 @@ Reads a text file with line-based pagination. Returns content with line numbers.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "read_file",
+    "name": "android_read_file",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "readme.txt",
@@ -1785,14 +1799,14 @@ Reads a text file with line-based pagination. Returns content with line numbers.
 
 ---
 
-### `write_file`
+### `android_write_file`
 
 Writes text content to a file. Creates the file if it doesn't exist, creates parent directories automatically, overwrites existing content. Empty content creates an empty file.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Relative path to the file within the storage location |
 | `content` | string | Yes | - | Text content to write (empty string creates an empty file) |
 
@@ -1803,7 +1817,7 @@ Writes text content to a file. Creates the file if it doesn't exist, creates par
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "write_file",
+    "name": "android_write_file",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "notes/todo.txt",
@@ -1839,14 +1853,14 @@ Writes text content to a file. Creates the file if it doesn't exist, creates par
 
 ---
 
-### `append_file`
+### `android_append_file`
 
-Appends text content to an existing file. If the storage provider does not support append mode, an error with a hint to use `write_file` is returned.
+Appends text content to an existing file. If the storage provider does not support append mode, an error with a hint to use `android_write_file` is returned.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Relative path to the file within the storage location |
 | `content` | string | Yes | - | Text content to append |
 
@@ -1857,7 +1871,7 @@ Appends text content to an existing file. If the storage provider does not suppo
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "append_file",
+    "name": "android_append_file",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "notes/todo.txt",
@@ -1884,7 +1898,7 @@ Appends text content to an existing file. If the storage provider does not suppo
 ```
 
 **Notes**:
-- Not all storage providers (e.g., virtual providers like Google Drive) support append mode. When unsupported, the error message includes a hint to use `read_file` + `write_file` as a workaround.
+- Not all storage providers (e.g., virtual providers like Google Drive) support append mode. When unsupported, the error message includes a hint to use `android_read_file` + `android_write_file` as a workaround.
 - Subject to configured file size limit (combined existing + appended content).
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
@@ -1893,14 +1907,14 @@ Appends text content to an existing file. If the storage provider does not suppo
 
 ---
 
-### `file_replace`
+### `android_file_replace`
 
 Performs literal string replacement in a text file. Uses advisory file locking when supported by the storage provider.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Relative path to the file within the storage location |
 | `old_string` | string | Yes | - | The literal string to search for |
 | `new_string` | string | Yes | - | The replacement string |
@@ -1913,7 +1927,7 @@ Performs literal string replacement in a text file. Uses advisory file locking w
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "file_replace",
+    "name": "android_file_replace",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "notes/todo.txt",
@@ -1952,14 +1966,14 @@ Performs literal string replacement in a text file. Uses advisory file locking w
 
 ---
 
-### `download_from_url`
+### `android_download_from_url`
 
 Downloads a file from a URL and saves it to an authorized storage location.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Destination path within the storage location |
 | `url` | string | Yes | - | URL to download from (HTTP or HTTPS) |
 
@@ -1970,7 +1984,7 @@ Downloads a file from a URL and saves it to an authorized storage location.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "download_from_url",
+    "name": "android_download_from_url",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "images/photo.jpg",
@@ -2008,14 +2022,14 @@ Downloads a file from a URL and saves it to an authorized storage location.
 
 ---
 
-### `delete_file`
+### `android_delete_file`
 
 Deletes a single file from an authorized storage location. Cannot delete directories.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
 | `path` | string | Yes | - | Relative path to the file within the storage location |
 
 **Example Request**:
@@ -2025,7 +2039,7 @@ Deletes a single file from an authorized storage location. Cannot delete directo
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "delete_file",
+    "name": "android_delete_file",
     "arguments": {
       "location_id": "com.android.providers.downloads.documents/downloads",
       "path": "notes/old-todo.txt"
@@ -2060,7 +2074,7 @@ Deletes a single file from an authorized storage location. Cannot delete directo
 
 Tools for managing installed applications: launching, listing, and closing apps.
 
-### `open_app`
+### `android_open_app`
 
 Opens (launches) an application by its package ID. The app must be installed and have a launchable activity.
 
@@ -2076,7 +2090,7 @@ Opens (launches) an application by its package ID. The app must be installed and
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "open_app",
+    "name": "android_open_app",
     "arguments": {
       "package_id": "com.android.calculator2"
     }
@@ -2106,7 +2120,7 @@ Opens (launches) an application by its package ID. The app must be installed and
 
 ---
 
-### `list_apps`
+### `android_list_apps`
 
 Lists installed applications. Can filter by type (all, user-installed, system) and by name substring.
 
@@ -2123,7 +2137,7 @@ Lists installed applications. Can filter by type (all, user-installed, system) a
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "list_apps",
+    "name": "android_list_apps",
     "arguments": {
       "filter": "user",
       "name_query": "calc"
@@ -2159,7 +2173,7 @@ Lists installed applications. Can filter by type (all, user-installed, system) a
 
 ---
 
-### `close_app`
+### `android_close_app`
 
 Kills a background application process.
 
@@ -2175,7 +2189,7 @@ Kills a background application process.
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "close_app",
+    "name": "android_close_app",
     "arguments": {
       "package_id": "com.example.app"
     }
@@ -2200,7 +2214,7 @@ Kills a background application process.
 ```
 
 **Important Limitations**:
-- This only works for apps that are currently in the **background**. For foreground apps, use `press_home` first to send the app to the background, wait briefly (e.g., using `wait_for_idle`), then call `close_app`.
+- This only works for apps that are currently in the **background**. For foreground apps, use `android_press_home` first to send the app to the background, wait briefly (e.g., using `android_wait_for_idle`), then call `android_close_app`.
 - System processes may restart automatically after being killed.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
