@@ -79,8 +79,9 @@ fun HomeScreen(
             contract = ActivityResultContracts.OpenDocumentTree(),
         ) { uri ->
             if (uri != null) {
-                // Permission is taken inside StorageLocationProviderImpl.authorizeLocation()
-                // — do NOT call takePersistableUriPermission here to avoid a double call.
+                // Do NOT call takePersistableUriPermission here — it is handled
+                // inside StorageLocationProviderImpl.authorizeLocation() to keep
+                // permission management centralized in a single place.
                 viewModel.onLocationAuthorized(uri)
             } else {
                 viewModel.onLocationAuthorizationCancelled()
