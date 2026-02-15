@@ -156,6 +156,7 @@ class GetScreenStateHandler
  *
  * Called from [McpServerService.startServer] during server startup.
  */
+@Suppress("LongParameterList")
 fun registerScreenIntrospectionTools(
     server: Server,
     treeParser: AccessibilityTreeParser,

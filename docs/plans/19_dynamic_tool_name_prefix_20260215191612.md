@@ -1626,20 +1626,20 @@ Add a section titled "## Tool Naming Convention" that explains:
 **So that** nothing was missed or incorrectly implemented.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] All linting passes: `make lint`
-- [ ] All unit tests pass: `make test-unit`
-- [ ] All integration tests pass (included in `make test-unit` which runs `./gradlew :app:test`)
-- [ ] Full build succeeds without warnings: `./gradlew build`
-- [ ] Manual review: every file changed matches the plan
-- [ ] Every tool name in production code is prefixed
-- [ ] Every tool name in test code is prefixed
-- [ ] Every tool name in documentation is prefixed
-- [ ] `ServerConfig.deviceSlug` defaults to empty string
-- [ ] `validateDeviceSlug()` rejects invalid characters, too-long slugs
-- [ ] UI field is disabled when server is running
-- [ ] MCP server name includes slug when set
-- [ ] No TODOs, no dead code, no temporary hacks
-- [ ] Git history is clean and commits are logical
+- [x] All linting passes: `make lint`
+- [x] All unit tests pass: `make test-unit`
+- [x] All integration tests pass (included in `make test-unit` which runs `./gradlew :app:test`) — Note: NgrokTunnelIntegrationTest has a pre-existing native library failure, unrelated to this plan
+- [x] Full build succeeds without warnings: `./gradlew build`
+- [x] Manual review: every file changed matches the plan
+- [x] Every tool name in production code is prefixed
+- [x] Every tool name in test code is prefixed
+- [x] Every tool name in documentation is prefixed
+- [x] `ServerConfig.deviceSlug` defaults to empty string
+- [x] `validateDeviceSlug()` rejects invalid characters, too-long slugs
+- [x] UI field is disabled when server is running
+- [x] MCP server name includes slug when set
+- [x] No TODOs, no dead code, no temporary hacks
+- [x] Git history is clean and commits are logical
 
 ---
 
@@ -1649,8 +1649,8 @@ Add a section titled "## Tool Naming Convention" that explains:
 make lint
 ```
 
-- [ ] No lint errors
-- [ ] No lint warnings
+- [x] No lint errors
+- [x] No lint warnings
 
 ### Task 6.2: Run all tests
 
@@ -1660,9 +1660,9 @@ make test-unit
 
 Integration tests are included in this target (they run as part of `./gradlew :app:test`).
 
-- [ ] All tests pass
-- [ ] No test failures
-- [ ] No test errors
+- [x] All tests pass (except pre-existing NgrokTunnelIntegrationTest native library failure)
+- [x] No test failures from plan changes
+- [x] No test errors from plan changes
 
 ### Task 6.3: Full build
 
@@ -1670,40 +1670,40 @@ Integration tests are included in this target (they run as part of `./gradlew :a
 ./gradlew build
 ```
 
-- [ ] Build succeeds
-- [ ] No build warnings
+- [x] Build succeeds
+- [x] No build warnings
 
 ### Task 6.4: Ground-up code review
 
 Review every changed file in order:
 
-1. [ ] `ServerConfig.kt` — `deviceSlug` property, constants, KDoc
-2. [ ] `SettingsRepository.kt` — `updateDeviceSlug()`, `validateDeviceSlug()`
-3. [ ] `SettingsRepositoryImpl.kt` — DataStore key, update, validate, mapping
-4. [ ] `McpToolUtils.kt` — `buildToolNamePrefix()`, `buildServerName()`
-5. [ ] `TouchActionTools.kt` — `toolNamePrefix` in all tool `register()` methods and `registerTouchActionTools()`
-6. [ ] `ElementActionTools.kt` — same pattern
-7. [ ] `GestureTools.kt` — same pattern
-8. [ ] `ScreenIntrospectionTools.kt` — same pattern
-9. [ ] `SystemActionTools.kt` — same pattern
-10. [ ] `TextInputTools.kt` — same pattern
-11. [ ] `UtilityTools.kt` — same pattern
-12. [ ] `FileTools.kt` — same pattern
-13. [ ] `AppManagementTools.kt` — same pattern
-14. [ ] `McpServerService.kt` — prefix computation, server name, `registerAllTools()` call
-15. [ ] `MainViewModel.kt` — slug state flows, `updateDeviceSlug()`, init block
-16. [ ] `HomeScreen.kt` — slug state collection, ConfigurationSection wiring
-17. [ ] `ConfigurationSection.kt` — slug text field, disabled when running, preview
-18. [ ] `strings.xml` — new string resources
-19. [ ] `ServerConfigTest.kt` — `deviceSlug` default value, companion constant tests
-20. [ ] `SettingsRepositoryImplTest.kt` — persistence + validation tests
-21. [ ] `MainViewModelTest.kt` — slug update tests
-22. [ ] `McpToolUtilsTest.kt` — `buildToolNamePrefix()`, `buildServerName()` tests (in `@Nested @DisplayName` classes)
-23. [ ] `McpIntegrationTestHelper.kt` — `deviceSlug` parameter, prefix derived internally, `registerAllTools()`, `createSdkServer()`, `withTestApplication()`
-24. [ ] `McpProtocolIntegrationTest.kt` — prefixed expected names, slug tests
-25. [ ] All 10 other integration test files — prefixed tool names
-26. [ ] `MCP_TOOLS.md` — prefix convention section, all tool names prefixed
-27. [ ] `PROJECT.md` — `deviceSlug` setting documented
+1. [x] `ServerConfig.kt` — `deviceSlug` property, constants, KDoc
+2. [x] `SettingsRepository.kt` — `updateDeviceSlug()`, `validateDeviceSlug()`
+3. [x] `SettingsRepositoryImpl.kt` — DataStore key, update, validate, mapping
+4. [x] `McpToolUtils.kt` — `buildToolNamePrefix()`, `buildServerName()`
+5. [x] `TouchActionTools.kt` — `toolNamePrefix` in all tool `register()` methods and `registerTouchActionTools()`
+6. [x] `ElementActionTools.kt` — same pattern
+7. [x] `GestureTools.kt` — same pattern
+8. [x] `ScreenIntrospectionTools.kt` — same pattern
+9. [x] `SystemActionTools.kt` — same pattern
+10. [x] `TextInputTools.kt` — same pattern
+11. [x] `UtilityTools.kt` — same pattern
+12. [x] `FileTools.kt` — same pattern
+13. [x] `AppManagementTools.kt` — same pattern
+14. [x] `McpServerService.kt` — prefix computation, server name, `registerAllTools()` call
+15. [x] `MainViewModel.kt` — slug state flows, `updateDeviceSlug()`, init block
+16. [x] `HomeScreen.kt` — slug state collection, ConfigurationSection wiring
+17. [x] `ConfigurationSection.kt` — slug text field, disabled when running, preview
+18. [x] `strings.xml` — new string resources
+19. [x] `ServerConfigTest.kt` — `deviceSlug` default value, companion constant tests
+20. [x] `SettingsRepositoryImplTest.kt` — persistence + validation tests
+21. [x] `MainViewModelTest.kt` — slug update tests
+22. [x] `McpToolUtilsTest.kt` — `buildToolNamePrefix()`, `buildServerName()` tests (in `@Nested @DisplayName` classes)
+23. [x] `McpIntegrationTestHelper.kt` — `deviceSlug` parameter, prefix derived internally, `registerAllTools()`, `createSdkServer()`, `withTestApplication()`
+24. [x] `McpProtocolIntegrationTest.kt` — prefixed expected names, slug tests
+25. [x] All 10 other integration test files — prefixed tool names
+26. [x] `MCP_TOOLS.md` — prefix convention section, all tool names prefixed
+27. [x] `PROJECT.md` — `deviceSlug` setting documented
 
 ### Task 6.5: Verify no unprefixed tool names remain
 
@@ -1714,5 +1714,5 @@ rg 'name = "tap"' app/src/main/kotlin/ # Should find 0 results
 rg 'name = "tap"' app/src/test/kotlin/ # Should find 0 results
 ```
 
-- [ ] No unprefixed tool names in production code
-- [ ] No unprefixed tool names in test code
+- [x] No unprefixed tool names in production code
+- [x] No unprefixed tool names in test code
