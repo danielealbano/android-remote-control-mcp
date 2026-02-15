@@ -195,7 +195,7 @@ class NgrokTunnelIntegrationTest {
         private const val FETCH_READ_TIMEOUT_MS = 10_000
         private const val FETCH_RETRY_DELAY_MS = 2_000L
         private const val HTTP_OK = 200
-        private val RETRYABLE_HTTP_CODES = listOf(502, 503)
+        private val RETRYABLE_HTTP_CODES = listOf(404, 502, 503)
 
         @JvmStatic
         @BeforeAll
