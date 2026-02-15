@@ -190,7 +190,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\tvn\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tvcn"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\tvn\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tvcn"
       }
     ]
   }
@@ -206,7 +206,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
       },
       {
         "type": "image",
@@ -223,10 +223,11 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
 The text output is a compact flat TSV (tab-separated values) format designed for token-efficient LLM consumption:
 
 1. **Note line**: `note:structural-only nodes are omitted from the tree`
-2. **App line**: `app:<package> activity:<activity>`
-3. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
-4. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
-5. **Data rows**: One row per filtered node with tab-separated values
+2. **Note line**: `note:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account`
+3. **App line**: `app:<package> activity:<activity>`
+4. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
+5. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+6. **Data rows**: One row per filtered node with tab-separated values
 
 #### Flags Reference
 

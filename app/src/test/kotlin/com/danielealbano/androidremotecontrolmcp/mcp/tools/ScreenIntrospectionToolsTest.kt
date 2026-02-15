@@ -83,6 +83,9 @@ class ScreenIntrospectionToolsTest {
 
     private val sampleCompactOutput =
         "note:structural-only nodes are omitted from the tree\n" +
+            "note:certain elements are custom and will not be properly reported, " +
+            "if needed or if tools are not working as expected set " +
+            "include_screenshot=true to see the screen and take what you see into account\n" +
             "app:com.example activity:.Main\n" +
             "screen:1080x2400 density:420 orientation:portrait\n" +
             "id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
