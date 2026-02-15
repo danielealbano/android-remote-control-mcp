@@ -23,9 +23,6 @@ mcp-kotlin-sdk = "0.8.3"
 # SLF4J (routes SDK logs to android.util.Log)
 slf4j-android = "1.7.36"
 
-# Tunnel providers
-ngrok-java = "1.1.1"
-
 # Certificate generation
 bouncy-castle = "1.83"
 
@@ -100,10 +97,6 @@ ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host", ver
 # Certificate generation (Bouncy Castle for self-signed cert with SAN support)
 bouncy-castle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncy-castle" }
 bouncy-castle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncy-castle" }
-
-# ngrok tunnel (in-process, JNI-based)
-ngrok-java = { group = "com.ngrok", name = "ngrok-java", version.ref = "ngrok-java" }
-ngrok-java-native-android-arm64 = { group = "com.ngrok", name = "ngrok-java-native", version.ref = "ngrok-java" }
 
 # MCP SDK
 mcp-kotlin-sdk-server = { group = "io.modelcontextprotocol", name = "kotlin-sdk-server", version.ref = "mcp-kotlin-sdk" }
