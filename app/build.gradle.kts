@@ -137,7 +137,10 @@ dependencies {
     implementation(libs.bouncy.castle.prov)
 
     // ngrok tunnel (in-process, JNI-based) — built from source via vendor/ngrok-java submodule
+    // ngrok-java: API module (interfaces, builders, Session)
     implementation(files("../vendor/ngrok-java/ngrok-java/target/ngrok-java-1.1.1.jar"))
+    // ngrok-java-native: implementation classes (NativeSession, Runtime, etc.)
+    implementation(files("../vendor/ngrok-java/ngrok-java-native/target/ngrok-java-native-classes.jar"))
 
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk.server)
@@ -173,16 +176,12 @@ dependencies {
     testImplementation(libs.ktor.sse)
 }
 
-// Resolve ngrok-java host native library directory for JVM tests.
-// On macOS the dylib lives under aarch64-apple-darwin or x86_64-apple-darwin;
-// on Linux the .so lives under x86_64-unknown-linux-gnu or the default release dir.
-val ngrokNativeDir: String =
-    listOf(
-        "../vendor/ngrok-java/ngrok-java-native/target/release",
-        "../vendor/ngrok-java/ngrok-java-native/target/aarch64-apple-darwin/release",
-        "../vendor/ngrok-java/ngrok-java-native/target/x86_64-apple-darwin/release",
-        "../vendor/ngrok-java/ngrok-java-native/target/x86_64-unknown-linux-gnu/release",
-    ).firstOrNull { file(it).exists() } ?: "../vendor/ngrok-java/ngrok-java-native/target/release"
+dependencies {
+    // ngrok-java host native library packaged as JAR for classpath-based loading.
+    // Runtime.load() uses Class.getResourceAsStream() to extract the .so/.dylib,
+    // so the native library must be inside a JAR on the classpath (not a loose directory).
+    testRuntimeOnly(files("../vendor/ngrok-java/ngrok-java-native/target/ngrok-java-native-host.jar"))
+}
 
 tasks.withType<Test> {
     useJUnitPlatform()
@@ -198,8 +197,6 @@ tasks.withType<Test> {
         "--add-opens",
         "java.base/java.time=ALL-UNNAMED",
     )
-    // ngrok-java host native library for JVM integration tests (built from source)
-    systemProperty("java.library.path", file(ngrokNativeDir).absolutePath)
 }
 
 jacoco {
