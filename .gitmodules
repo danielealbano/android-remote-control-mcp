@@ -1,3 +1,6 @@
 [submodule "vendor/cloudflared"]
 	path = vendor/cloudflared
 	url = https://github.com/cloudflare/cloudflared.git
+[submodule "vendor/ngrok-java"]
+	path = vendor/ngrok-java
+	url = https://github.com/danielealbano/ngrok-java.git
