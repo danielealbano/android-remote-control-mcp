@@ -523,6 +523,7 @@ internal fun getFreshTree(
 /**
  * Registers all element action tools with the [Server].
  */
+@Suppress("LongParameterList")
 fun registerElementActionTools(
     server: Server,
     treeParser: AccessibilityTreeParser,
