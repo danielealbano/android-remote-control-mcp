@@ -212,6 +212,8 @@ tasks.named("preBuild") {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // MockK uses byte-buddy/reflection internally; JDK 17 strong encapsulation
+    // blocks access to these packages from unnamed modules, causing test failures.
     jvmArgs(
         "--add-opens",
         "java.base/java.lang=ALL-UNNAMED",
