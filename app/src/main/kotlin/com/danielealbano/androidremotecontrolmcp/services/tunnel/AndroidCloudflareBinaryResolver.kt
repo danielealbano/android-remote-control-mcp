@@ -17,7 +17,7 @@ import javax.inject.Inject
 class AndroidCloudflareBinaryResolver
     @Inject
     constructor(
-        @ApplicationContext private val context: Context,
+        @param:ApplicationContext private val context: Context,
     ) : CloudflaredBinaryResolver {
         override fun resolve(): String? {
             val nativeLibDir = context.applicationInfo.nativeLibraryDir
