@@ -143,7 +143,10 @@ interface SettingsRepository {
      * @param locationId The storage location identifier ("{authority}/{rootId}").
      * @param treeUri The granted document tree URI string.
      */
-    suspend fun addAuthorizedLocation(locationId: String, treeUri: String)
+    suspend fun addAuthorizedLocation(
+        locationId: String,
+        treeUri: String,
+    )
 
     /**
      * Removes an authorized storage location.

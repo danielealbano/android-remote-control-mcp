@@ -28,7 +28,10 @@ interface StorageLocationProvider {
      * @param locationId The storage location identifier ("{authority}/{rootId}").
      * @param treeUri The granted document tree URI from ACTION_OPEN_DOCUMENT_TREE.
      */
-    suspend fun authorizeLocation(locationId: String, treeUri: Uri)
+    suspend fun authorizeLocation(
+        locationId: String,
+        treeUri: Uri,
+    )
 
     /**
      * Removes authorization for a location.

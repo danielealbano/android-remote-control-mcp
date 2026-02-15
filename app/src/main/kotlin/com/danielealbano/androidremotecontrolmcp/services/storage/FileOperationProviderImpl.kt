@@ -4,11 +4,9 @@ package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
-import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,7 +15,6 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
-import java.nio.channels.Channels
 import java.nio.channels.FileChannel
 import javax.inject.Inject
 import javax.net.ssl.HostnameVerifier
@@ -32,7 +29,7 @@ import javax.net.ssl.X509TrustManager
  * All file operations work through [android.content.ContentResolver] and
  * [DocumentFile] for SAF compatibility with both local and virtual storage providers.
  */
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
 class FileOperationProviderImpl
     @Inject
     constructor(
@@ -50,10 +47,11 @@ class FileOperationProviderImpl
             offset: Int,
             limit: Int,
         ): FileListResult {
-            val directory = resolveDocumentFile(locationId, path)
-                ?: throw McpToolException.ActionFailed(
-                    "Directory not found: $path in location '$locationId'",
-                )
+            val directory =
+                resolveDocumentFile(locationId, path)
+                    ?: throw McpToolException.ActionFailed(
+                        "Directory not found: $path in location '$locationId'",
+                    )
 
             if (!directory.isDirectory) {
                 throw McpToolException.ActionFailed(
@@ -65,23 +63,25 @@ class FileOperationProviderImpl
             val totalCount = children.size
             val cappedLimit = limit.coerceAtMost(FileOperationProvider.MAX_LIST_ENTRIES)
 
-            val paginatedChildren = children
-                .sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name })
-                .drop(offset)
-                .take(cappedLimit)
+            val paginatedChildren =
+                children
+                    .sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name })
+                    .drop(offset)
+                    .take(cappedLimit)
 
-            val files = paginatedChildren.map { child ->
-                val childName = child.name ?: "unknown"
-                val relativePath = if (path.isEmpty()) childName else "$path/$childName"
-                FileInfo(
-                    name = childName,
-                    path = "$locationId/$relativePath",
-                    isDirectory = child.isDirectory,
-                    size = if (child.isFile) child.length() else 0L,
-                    lastModified = child.lastModified().takeIf { it > 0L },
-                    mimeType = child.type,
-                )
-            }
+            val files =
+                paginatedChildren.map { child ->
+                    val childName = child.name ?: "unknown"
+                    val relativePath = if (path.isEmpty()) childName else "$path/$childName"
+                    FileInfo(
+                        name = childName,
+                        path = "$locationId/$relativePath",
+                        isDirectory = child.isDirectory,
+                        size = if (child.isFile) child.length() else 0L,
+                        lastModified = child.lastModified().takeIf { it > 0L },
+                        mimeType = child.type,
+                    )
+                }
 
             val hasMore = offset + cappedLimit < totalCount
             return FileListResult(files = files, totalCount = totalCount, hasMore = hasMore)
@@ -91,16 +91,18 @@ class FileOperationProviderImpl
         // readFile
         // ─────────────────────────────────────────────────────────────────────
 
+        @Suppress("NestedBlockDepth")
         override suspend fun readFile(
             locationId: String,
             path: String,
             offset: Int,
             limit: Int,
         ): FileReadResult {
-            val documentFile = resolveDocumentFile(locationId, path)
-                ?: throw McpToolException.ActionFailed(
-                    "File not found: $path in location '$locationId'",
-                )
+            val documentFile =
+                resolveDocumentFile(locationId, path)
+                    ?: throw McpToolException.ActionFailed(
+                        "File not found: $path in location '$locationId'",
+                    )
 
             if (!documentFile.isFile) {
                 throw McpToolException.ActionFailed(
@@ -187,10 +189,11 @@ class FileOperationProviderImpl
             content: String,
         ) {
             val config = settingsRepository.getServerConfig()
-            val documentFile = resolveDocumentFile(locationId, path)
-                ?: throw McpToolException.ActionFailed(
-                    "File not found: $path in location '$locationId'",
-                )
+            val documentFile =
+                resolveDocumentFile(locationId, path)
+                    ?: throw McpToolException.ActionFailed(
+                        "File not found: $path in location '$locationId'",
+                    )
 
             if (!documentFile.isFile) {
                 throw McpToolException.ActionFailed(
@@ -248,10 +251,11 @@ class FileOperationProviderImpl
             newString: String,
             replaceAll: Boolean,
         ): FileReplaceResult {
-            val documentFile = resolveDocumentFile(locationId, path)
-                ?: throw McpToolException.ActionFailed(
-                    "File not found: $path in location '$locationId'",
-                )
+            val documentFile =
+                resolveDocumentFile(locationId, path)
+                    ?: throw McpToolException.ActionFailed(
+                        "File not found: $path in location '$locationId'",
+                    )
 
             if (!documentFile.isFile) {
                 throw McpToolException.ActionFailed(
@@ -262,11 +266,12 @@ class FileOperationProviderImpl
             checkFileSize(documentFile)
 
             // Read the full content
-            val originalContent = context.contentResolver.openInputStream(documentFile.uri)?.use { inputStream ->
-                inputStream.bufferedReader(Charsets.UTF_8).readText()
-            } ?: throw McpToolException.ActionFailed(
-                "Failed to open file for reading: $path in location '$locationId'",
-            )
+            val originalContent =
+                context.contentResolver.openInputStream(documentFile.uri)?.use { inputStream ->
+                    inputStream.bufferedReader(Charsets.UTF_8).readText()
+                } ?: throw McpToolException.ActionFailed(
+                    "Failed to open file for reading: $path in location '$locationId'",
+                )
 
             // Count occurrences and perform replacement
             val occurrences = countOccurrences(originalContent, oldString)
@@ -274,11 +279,12 @@ class FileOperationProviderImpl
                 return FileReplaceResult(replacementCount = 0)
             }
 
-            val modifiedContent = if (replaceAll) {
-                originalContent.replace(oldString, newString)
-            } else {
-                originalContent.replaceFirst(oldString, newString)
-            }
+            val modifiedContent =
+                if (replaceAll) {
+                    originalContent.replace(oldString, newString)
+                } else {
+                    originalContent.replaceFirst(oldString, newString)
+                }
 
             val replacementCount = if (replaceAll) occurrences else 1
 
@@ -293,7 +299,7 @@ class FileOperationProviderImpl
         // downloadFromUrl
         // ─────────────────────────────────────────────────────────────────────
 
-        @Suppress("LongMethod", "CyclomaticComplexMethod", "ThrowsCount")
+        @Suppress("LongMethod", "CyclomaticComplexMethod", "ThrowsCount", "NestedBlockDepth")
         override suspend fun downloadFromUrl(
             locationId: String,
             path: String,
@@ -302,12 +308,8 @@ class FileOperationProviderImpl
             checkAuthorization(locationId)
             val config = settingsRepository.getServerConfig()
 
-            // Validate URL
-            val parsedUrl = try {
-                URL(url)
-            } catch (e: MalformedURLException) {
-                throw McpToolException.ActionFailed("Invalid URL: $url")
-            }
+            // Validate URL and open connection
+            val (parsedUrl, rawConnection) = openUrlConnection(url)
 
             // Check HTTP permission
             if (parsedUrl.protocol == "http" && !config.allowHttpDownloads) {
@@ -328,7 +330,7 @@ class FileOperationProviderImpl
             var connection: HttpURLConnection? = null
 
             try {
-                connection = parsedUrl.openConnection() as HttpURLConnection
+                connection = rawConnection
                 connection.connectTimeout = timeoutMs
                 connection.readTimeout = timeoutMs
                 connection.instanceFollowRedirects = true
@@ -404,10 +406,11 @@ class FileOperationProviderImpl
             locationId: String,
             path: String,
         ) {
-            val documentFile = resolveDocumentFile(locationId, path)
-                ?: throw McpToolException.ActionFailed(
-                    "File not found: $path in location '$locationId'",
-                )
+            val documentFile =
+                resolveDocumentFile(locationId, path)
+                    ?: throw McpToolException.ActionFailed(
+                        "File not found: $path in location '$locationId'",
+                    )
 
             if (documentFile.isDirectory) {
                 throw McpToolException.ActionFailed(
@@ -449,21 +452,24 @@ class FileOperationProviderImpl
          * @return The resolved [DocumentFile], or null if not found.
          * @throws McpToolException.PermissionDenied if the location is not authorized.
          */
+        @Suppress("ReturnCount")
         private suspend fun resolveDocumentFile(
             locationId: String,
             path: String,
         ): DocumentFile? {
             checkAuthorization(locationId)
 
-            val treeUri = storageLocationProvider.getTreeUriForLocation(locationId)
-                ?: throw McpToolException.ActionFailed(
-                    "Could not retrieve tree URI for location '$locationId'",
-                )
+            val treeUri =
+                storageLocationProvider.getTreeUriForLocation(locationId)
+                    ?: throw McpToolException.ActionFailed(
+                        "Could not retrieve tree URI for location '$locationId'",
+                    )
 
-            val rootDocument = DocumentFile.fromTreeUri(context, treeUri)
-                ?: throw McpToolException.ActionFailed(
-                    "Could not create DocumentFile from tree URI for location '$locationId'",
-                )
+            val rootDocument =
+                DocumentFile.fromTreeUri(context, treeUri)
+                    ?: throw McpToolException.ActionFailed(
+                        "Could not create DocumentFile from tree URI for location '$locationId'",
+                    )
 
             if (path.isEmpty()) {
                 return rootDocument
@@ -487,19 +493,22 @@ class FileOperationProviderImpl
          *
          * @return The [DocumentFile] for the target file.
          */
+        @Suppress("ThrowsCount")
         private suspend fun ensureParentDirectoriesAndCreateFile(
             locationId: String,
             path: String,
         ): DocumentFile {
-            val treeUri = storageLocationProvider.getTreeUriForLocation(locationId)
-                ?: throw McpToolException.ActionFailed(
-                    "Could not retrieve tree URI for location '$locationId'",
-                )
+            val treeUri =
+                storageLocationProvider.getTreeUriForLocation(locationId)
+                    ?: throw McpToolException.ActionFailed(
+                        "Could not retrieve tree URI for location '$locationId'",
+                    )
 
-            val rootDocument = DocumentFile.fromTreeUri(context, treeUri)
-                ?: throw McpToolException.ActionFailed(
-                    "Could not create DocumentFile from tree URI for location '$locationId'",
-                )
+            val rootDocument =
+                DocumentFile.fromTreeUri(context, treeUri)
+                    ?: throw McpToolException.ActionFailed(
+                        "Could not create DocumentFile from tree URI for location '$locationId'",
+                    )
 
             val segments = path.split("/").filter { it.isNotEmpty() }
             if (segments.isEmpty()) {
@@ -513,14 +522,15 @@ class FileOperationProviderImpl
             var current: DocumentFile = rootDocument
             for (dirName in parentSegments) {
                 val existing = current.findFile(dirName)
-                current = if (existing != null && existing.isDirectory) {
-                    existing
-                } else {
-                    current.createDirectory(dirName)
-                        ?: throw McpToolException.ActionFailed(
-                            "Failed to create directory '$dirName' in path '$path'",
-                        )
-                }
+                current =
+                    if (existing != null && existing.isDirectory) {
+                        existing
+                    } else {
+                        current.createDirectory(dirName)
+                            ?: throw McpToolException.ActionFailed(
+                                "Failed to create directory '$dirName' in path '$path'",
+                            )
+                    }
             }
 
             // Find or create the file
@@ -548,7 +558,7 @@ class FileOperationProviderImpl
 
             if (fileSize > limitBytes) {
                 throw McpToolException.ActionFailed(
-                    "File size (${fileSize} bytes) exceeds the configured limit of " +
+                    "File size ($fileSize bytes) exceeds the configured limit of " +
                         "${config.fileSizeLimitMb} MB.",
                 )
             }
@@ -577,6 +587,7 @@ class FileOperationProviderImpl
          * Writes content to a file URI, attempting advisory file lock for local providers.
          * Falls back to a plain write if locking is unsupported by the provider.
          */
+        @Suppress("NestedBlockDepth")
         private fun writeWithOptionalLock(
             uri: Uri,
             content: String,
@@ -586,11 +597,13 @@ class FileOperationProviderImpl
             // Try to use FileDescriptor-based locking
             try {
                 context.contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
-                    val fileChannel = FileChannel.open(
-                        java.nio.file.Paths.get("/proc/self/fd/${pfd.fd}"),
-                        java.nio.file.StandardOpenOption.WRITE,
-                        java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
-                    )
+                    val fileChannel =
+                        FileChannel.open(
+                            java.nio.file.Paths
+                                .get("/proc/self/fd/${pfd.fd}"),
+                            java.nio.file.StandardOpenOption.WRITE,
+                            java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                        )
                     fileChannel.use { channel ->
                         var lock: java.nio.channels.FileLock? = null
                         try {
@@ -619,6 +632,20 @@ class FileOperationProviderImpl
         }
 
         /**
+         * Parses a URL string and opens an [HttpURLConnection].
+         * Extracted for testability (constructor mocking of [URL] is not supported on JDK 17).
+         */
+        internal fun openUrlConnection(urlString: String): Pair<URL, HttpURLConnection> {
+            val parsedUrl =
+                try {
+                    URL(urlString)
+                } catch (e: MalformedURLException) {
+                    throw McpToolException.ActionFailed("Invalid URL: $urlString")
+                }
+            return parsedUrl to (parsedUrl.openConnection() as HttpURLConnection)
+        }
+
+        /**
          * Configures permissive SSL settings on an HTTPS connection
          * (accepts all certificates and hostnames).
          */
@@ -626,13 +653,13 @@ class FileOperationProviderImpl
             val trustAllManager =
                 @Suppress("CustomX509TrustManager")
                 object : X509TrustManager {
-                    @Suppress("TrustAllX509TrustManager")
+                    @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
                     override fun checkClientTrusted(
                         chain: Array<java.security.cert.X509Certificate>,
                         authType: String,
                     ) { }
 
-                    @Suppress("TrustAllX509TrustManager")
+                    @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
                     override fun checkServerTrusted(
                         chain: Array<java.security.cert.X509Certificate>,
                         authType: String,
@@ -666,43 +693,44 @@ class FileOperationProviderImpl
             /**
              * Common file extension to MIME type mapping.
              */
-            private val EXTENSION_TO_MIME = mapOf(
-                "txt" to "text/plain",
-                "html" to "text/html",
-                "htm" to "text/html",
-                "css" to "text/css",
-                "csv" to "text/csv",
-                "xml" to "text/xml",
-                "json" to "application/json",
-                "js" to "application/javascript",
-                "pdf" to "application/pdf",
-                "zip" to "application/zip",
-                "gz" to "application/gzip",
-                "tar" to "application/x-tar",
-                "jpg" to "image/jpeg",
-                "jpeg" to "image/jpeg",
-                "png" to "image/png",
-                "gif" to "image/gif",
-                "webp" to "image/webp",
-                "svg" to "image/svg+xml",
-                "mp3" to "audio/mpeg",
-                "wav" to "audio/wav",
-                "mp4" to "video/mp4",
-                "webm" to "video/webm",
-                "apk" to "application/vnd.android.package-archive",
-                "md" to "text/markdown",
-                "kt" to "text/x-kotlin",
-                "java" to "text/x-java",
-                "py" to "text/x-python",
-                "sh" to "application/x-sh",
-                "yaml" to "text/yaml",
-                "yml" to "text/yaml",
-                "toml" to "text/toml",
-                "ini" to "text/plain",
-                "cfg" to "text/plain",
-                "conf" to "text/plain",
-                "log" to "text/plain",
-                "properties" to "text/plain",
-            )
+            private val EXTENSION_TO_MIME =
+                mapOf(
+                    "txt" to "text/plain",
+                    "html" to "text/html",
+                    "htm" to "text/html",
+                    "css" to "text/css",
+                    "csv" to "text/csv",
+                    "xml" to "text/xml",
+                    "json" to "application/json",
+                    "js" to "application/javascript",
+                    "pdf" to "application/pdf",
+                    "zip" to "application/zip",
+                    "gz" to "application/gzip",
+                    "tar" to "application/x-tar",
+                    "jpg" to "image/jpeg",
+                    "jpeg" to "image/jpeg",
+                    "png" to "image/png",
+                    "gif" to "image/gif",
+                    "webp" to "image/webp",
+                    "svg" to "image/svg+xml",
+                    "mp3" to "audio/mpeg",
+                    "wav" to "audio/wav",
+                    "mp4" to "video/mp4",
+                    "webm" to "video/webm",
+                    "apk" to "application/vnd.android.package-archive",
+                    "md" to "text/markdown",
+                    "kt" to "text/x-kotlin",
+                    "java" to "text/x-java",
+                    "py" to "text/x-python",
+                    "sh" to "application/x-sh",
+                    "yaml" to "text/yaml",
+                    "yml" to "text/yaml",
+                    "toml" to "text/toml",
+                    "ini" to "text/plain",
+                    "cfg" to "text/plain",
+                    "conf" to "text/plain",
+                    "log" to "text/plain",
+                    "properties" to "text/plain",
+                )
         }
     }
