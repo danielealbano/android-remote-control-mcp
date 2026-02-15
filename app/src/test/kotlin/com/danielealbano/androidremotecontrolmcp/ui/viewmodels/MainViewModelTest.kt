@@ -631,7 +631,11 @@ class MainViewModelTest {
     fun `updateDeviceSlug with invalid slug sets error and does not save`() =
         runTest {
             every { settingsRepository.validateDeviceSlug("work-phone") } returns
-                Result.failure(IllegalArgumentException("Device slug can only contain letters, digits, and underscores"))
+                Result.failure(
+                    IllegalArgumentException(
+                        "Device slug can only contain letters, digits, and underscores",
+                    ),
+                )
 
             viewModel.updateDeviceSlug("work-phone")
             advanceUntilIdle()

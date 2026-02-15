@@ -142,7 +142,8 @@ class McpServerService : Service() {
             val toolNamePrefix = McpToolUtils.buildToolNamePrefix(config.deviceSlug)
             Log.i(
                 TAG,
-                "Starting MCP server with config: port=${config.port}, binding=${config.bindingAddress.address}, toolNamePrefix=$toolNamePrefix",
+                "Starting MCP server with config: port=${config.port}, " +
+                    "binding=${config.bindingAddress.address}, toolNamePrefix=$toolNamePrefix",
             )
 
             // Only get/create SSL keystore when HTTPS is enabled

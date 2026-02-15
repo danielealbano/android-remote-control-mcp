@@ -22,7 +22,8 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
  * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
  * @property downloadTimeoutSeconds Download timeout in seconds.
- * @property deviceSlug Optional device identifier slug for tool name prefix (letters, digits, underscores; max 20 chars).
+ * @property deviceSlug Optional device identifier slug for tool name prefix
+ *   (letters, digits, underscores; max 20 chars).
  */
 data class ServerConfig(
     val port: Int = DEFAULT_PORT,
