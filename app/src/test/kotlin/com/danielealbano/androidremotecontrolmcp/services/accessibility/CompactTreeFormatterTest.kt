@@ -65,7 +65,16 @@ class CompactTreeFormatterTest {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("note:structural-only nodes are omitted from the tree", lines[0])
+            assertEquals(CompactTreeFormatter.NOTE_LINE, lines[0])
+        }
+
+        @Test
+        @DisplayName("produces custom elements note as second line")
+        fun producesCustomElementsNoteAsSecondLine() {
+            val tree = makeNode(text = "hello")
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val lines = output.lines()
+            assertEquals(CompactTreeFormatter.NOTE_LINE_CUSTOM_ELEMENTS, lines[1])
         }
 
         @Test
@@ -74,8 +83,8 @@ class CompactTreeFormatterTest {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example.app", ".MainActivity", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("app:com.example.app activity:.MainActivity", lines[1])
-            assertEquals("screen:1080x2400 density:420 orientation:portrait", lines[2])
+            assertEquals("app:com.example.app activity:.MainActivity", lines[2])
+            assertEquals("screen:1080x2400 density:420 orientation:portrait", lines[3])
         }
 
         @Test
@@ -84,7 +93,7 @@ class CompactTreeFormatterTest {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[3])
+            assertEquals("id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[4])
         }
 
         @Test
@@ -103,8 +112,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Data rows start at line 4 (0-indexed)
-            assertEquals("node_btn\tButton\tOK\t-\tbtn_ok\t100,200,300,260\tvcn", lines[4])
+            // Data rows start at line 5 (0-indexed)
+            assertEquals("node_btn\tButton\tOK\t-\tbtn_ok\t100,200,300,260\tvcn", lines[5])
         }
 
         @Test
@@ -118,8 +127,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only note + metadata + header = 4 lines, no data rows
-            assertEquals(4, lines.size)
+            // Only notes + metadata + header = 5 lines, no data rows
+            assertEquals(5, lines.size)
         }
 
         @Test
@@ -143,8 +152,8 @@ class CompactTreeFormatterTest {
             val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
             // Parent is filtered, child appears
-            assertEquals(5, lines.size)
-            assertTrue(lines[4].startsWith("node_child\t"))
+            assertEquals(6, lines.size)
+            assertTrue(lines[5].startsWith("node_child\t"))
         }
 
         @Test
@@ -160,11 +169,11 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals(5, lines.size)
+            assertEquals(6, lines.size)
             // No 'v' flag since not visible
-            assertTrue(lines[4].contains("node_hidden"))
-            assertTrue(lines[4].endsWith("n"))
-            assertFalse(lines[4].endsWith("vn"))
+            assertTrue(lines[5].contains("node_hidden"))
+            assertTrue(lines[5].endsWith("n"))
+            assertFalse(lines[5].endsWith("vn"))
         }
 
         @Test
@@ -184,8 +193,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only note + metadata + header = 4 lines
-            assertEquals(4, lines.size)
+            // Only notes + metadata + header = 5 lines
+            assertEquals(5, lines.size)
         }
 
         @Test
@@ -199,7 +208,7 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertTrue(lines[4].contains("10,20,300,400"))
+            assertTrue(lines[5].contains("10,20,300,400"))
         }
     }
 
