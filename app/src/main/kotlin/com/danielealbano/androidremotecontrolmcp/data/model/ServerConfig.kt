@@ -22,6 +22,7 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
  * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
  * @property downloadTimeoutSeconds Download timeout in seconds.
+ * @property deviceSlug Optional device identifier slug for tool name prefix (letters, digits, underscores; max 20 chars).
  */
 data class ServerConfig(
     val port: Int = DEFAULT_PORT,
@@ -39,6 +40,7 @@ data class ServerConfig(
     val allowHttpDownloads: Boolean = false,
     val allowUnverifiedHttpsCerts: Boolean = false,
     val downloadTimeoutSeconds: Int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
+    val deviceSlug: String = "",
 ) {
     companion object {
         /** Default server port. */
@@ -70,5 +72,11 @@ data class ServerConfig(
 
         /** Maximum download timeout in seconds. */
         const val MAX_DOWNLOAD_TIMEOUT_SECONDS = 300
+
+        /** Maximum length for device slug. */
+        const val MAX_DEVICE_SLUG_LENGTH = 20
+
+        /** Pattern for valid device slug characters (letters, digits, underscores). */
+        val DEVICE_SLUG_PATTERN = Regex("^[a-zA-Z0-9_]*$")
     }
 }

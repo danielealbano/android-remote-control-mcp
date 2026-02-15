@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.data.model
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -77,6 +78,12 @@ class ServerConfigTest {
             val config = ServerConfig()
             assertEquals("", config.ngrokDomain)
         }
+
+        @Test
+        fun `default deviceSlug is empty`() {
+            val config = ServerConfig()
+            assertEquals("", config.deviceSlug)
+        }
     }
 
     @Nested
@@ -122,6 +129,26 @@ class ServerConfigTest {
         @Test
         fun `DEFAULT_CERTIFICATE_HOSTNAME is android-mcp local`() {
             assertEquals("android-mcp.local", ServerConfig.DEFAULT_CERTIFICATE_HOSTNAME)
+        }
+
+        @Test
+        fun `MAX_DEVICE_SLUG_LENGTH is 20`() {
+            assertEquals(20, ServerConfig.MAX_DEVICE_SLUG_LENGTH)
+        }
+
+        @Test
+        fun `DEVICE_SLUG_PATTERN matches valid slugs`() {
+            assertTrue(ServerConfig.DEVICE_SLUG_PATTERN.matches("pixel7"))
+            assertTrue(ServerConfig.DEVICE_SLUG_PATTERN.matches("work_phone"))
+            assertTrue(ServerConfig.DEVICE_SLUG_PATTERN.matches(""))
+            assertTrue(ServerConfig.DEVICE_SLUG_PATTERN.matches("ABC_123"))
+        }
+
+        @Test
+        fun `DEVICE_SLUG_PATTERN rejects invalid slugs`() {
+            assertFalse(ServerConfig.DEVICE_SLUG_PATTERN.matches("work-phone"))
+            assertFalse(ServerConfig.DEVICE_SLUG_PATTERN.matches("has space"))
+            assertFalse(ServerConfig.DEVICE_SLUG_PATTERN.matches("phone@1"))
         }
     }
 

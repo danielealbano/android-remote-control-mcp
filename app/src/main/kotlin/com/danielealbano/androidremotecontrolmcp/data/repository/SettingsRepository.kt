@@ -123,6 +123,13 @@ interface SettingsRepository {
     suspend fun updateDownloadTimeout(seconds: Int)
 
     /**
+     * Updates the device slug used for tool name prefix.
+     *
+     * @param slug The new device slug. Must pass [validateDeviceSlug] first.
+     */
+    suspend fun updateDeviceSlug(slug: String)
+
+    /**
      * Validates a download timeout value.
      *
      * This is a pure validation function with no I/O; it is intentionally
@@ -131,6 +138,19 @@ interface SettingsRepository {
      * @return [Result.success] with the validated timeout, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateDownloadTimeout(seconds: Int): Result<Int>
+
+    /**
+     * Validates a device slug string.
+     *
+     * Valid slugs contain only letters (a-z, A-Z), digits (0-9), and underscores.
+     * Maximum length is [ServerConfig.MAX_DEVICE_SLUG_LENGTH] characters. Empty is valid.
+     *
+     * This is a pure validation function with no I/O; it is intentionally
+     * non-suspending so callers are not forced into a coroutine context.
+     *
+     * @return [Result.success] with the validated slug, or [Result.failure] with an [IllegalArgumentException].
+     */
+    fun validateDeviceSlug(slug: String): Result<String>
 
     /**
      * Returns the map of authorized storage location IDs to their tree URI strings.
