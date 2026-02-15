@@ -13,6 +13,12 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.util.UUID
 import javax.inject.Inject
 
@@ -114,6 +120,81 @@ class SettingsRepositoryImpl
             dataStore.edit { prefs -> prefs[NGROK_DOMAIN_KEY] = domain }
         }
 
+        override suspend fun updateFileSizeLimit(limitMb: Int) {
+            dataStore.edit { prefs ->
+                prefs[FILE_SIZE_LIMIT_KEY] = limitMb
+            }
+        }
+
+        override fun validateFileSizeLimit(limitMb: Int): Result<Int> =
+            if (limitMb in ServerConfig.MIN_FILE_SIZE_LIMIT_MB..ServerConfig.MAX_FILE_SIZE_LIMIT_MB) {
+                Result.success(limitMb)
+            } else {
+                Result.failure(
+                    IllegalArgumentException(
+                        "File size limit must be between ${ServerConfig.MIN_FILE_SIZE_LIMIT_MB} and " +
+                            "${ServerConfig.MAX_FILE_SIZE_LIMIT_MB} MB",
+                    ),
+                )
+            }
+
+        override suspend fun updateAllowHttpDownloads(enabled: Boolean) {
+            dataStore.edit { prefs ->
+                prefs[ALLOW_HTTP_DOWNLOADS_KEY] = enabled
+            }
+        }
+
+        override suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean) {
+            dataStore.edit { prefs ->
+                prefs[ALLOW_UNVERIFIED_HTTPS_KEY] = enabled
+            }
+        }
+
+        override suspend fun updateDownloadTimeout(seconds: Int) {
+            dataStore.edit { prefs ->
+                prefs[DOWNLOAD_TIMEOUT_KEY] = seconds
+            }
+        }
+
+        override fun validateDownloadTimeout(seconds: Int): Result<Int> =
+            if (seconds in ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS..ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS) {
+                Result.success(seconds)
+            } else {
+                Result.failure(
+                    IllegalArgumentException(
+                        "Download timeout must be between ${ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS} and " +
+                            "${ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS} seconds",
+                    ),
+                )
+            }
+
+        override suspend fun getAuthorizedLocations(): Map<String, String> {
+            val prefs = dataStore.data.first()
+            val jsonString = prefs[AUTHORIZED_LOCATIONS_KEY] ?: return emptyMap()
+            return parseAuthorizedLocationsJson(jsonString)
+        }
+
+        override suspend fun addAuthorizedLocation(
+            locationId: String,
+            treeUri: String,
+        ) {
+            dataStore.edit { prefs ->
+                val existing = parseAuthorizedLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY])
+                val updated = existing.toMutableMap()
+                updated[locationId] = treeUri
+                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeAuthorizedLocationsJson(updated)
+            }
+        }
+
+        override suspend fun removeAuthorizedLocation(locationId: String) {
+            dataStore.edit { prefs ->
+                val existing = parseAuthorizedLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY])
+                val updated = existing.toMutableMap()
+                updated.remove(locationId)
+                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeAuthorizedLocationsJson(updated)
+            }
+        }
+
         override fun validatePort(port: Int): Result<Int> =
             if (port in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
                 Result.success(port)
@@ -176,6 +257,11 @@ class SettingsRepositoryImpl
                         ?: TunnelProviderType.CLOUDFLARE,
                 ngrokAuthtoken = prefs[NGROK_AUTHTOKEN_KEY] ?: "",
                 ngrokDomain = prefs[NGROK_DOMAIN_KEY] ?: "",
+                fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
+                allowHttpDownloads = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false,
+                allowUnverifiedHttpsCerts = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false,
+                downloadTimeoutSeconds = prefs[DOWNLOAD_TIMEOUT_KEY]
+                    ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
             )
         }
 
@@ -183,6 +269,25 @@ class SettingsRepositoryImpl
          * Generates a random UUID string for use as a bearer token.
          */
         private fun generateTokenString(): String = UUID.randomUUID().toString()
+
+        @Suppress("SwallowedException")
+        private fun parseAuthorizedLocationsJson(json: String?): Map<String, String> {
+            if (json == null) return emptyMap()
+            return try {
+                val jsonObject = Json.parseToJsonElement(json).jsonObject
+                jsonObject.mapValues { it.value.jsonPrimitive.content }
+            } catch (_: Exception) {
+                emptyMap()
+            }
+        }
+
+        private fun serializeAuthorizedLocationsJson(map: Map<String, String>): String =
+            Json.encodeToString(
+                JsonObject.serializer(),
+                buildJsonObject {
+                    map.forEach { (key, value) -> put(key, value) }
+                },
+            )
 
         companion object {
             private val PORT_KEY = intPreferencesKey("port")
@@ -196,6 +301,11 @@ class SettingsRepositoryImpl
             private val TUNNEL_PROVIDER_KEY = stringPreferencesKey("tunnel_provider")
             private val NGROK_AUTHTOKEN_KEY = stringPreferencesKey("ngrok_authtoken")
             private val NGROK_DOMAIN_KEY = stringPreferencesKey("ngrok_domain")
+            private val FILE_SIZE_LIMIT_KEY = intPreferencesKey("file_size_limit_mb")
+            private val ALLOW_HTTP_DOWNLOADS_KEY = booleanPreferencesKey("allow_http_downloads")
+            private val ALLOW_UNVERIFIED_HTTPS_KEY = booleanPreferencesKey("allow_unverified_https_certs")
+            private val DOWNLOAD_TIMEOUT_KEY = intPreferencesKey("download_timeout_seconds")
+            private val AUTHORIZED_LOCATIONS_KEY = stringPreferencesKey("authorized_storage_locations")
 
             /**
              * Regex pattern for valid hostnames.
