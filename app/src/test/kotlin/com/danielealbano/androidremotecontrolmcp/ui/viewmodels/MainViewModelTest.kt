@@ -1,14 +1,18 @@
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
+import android.net.Uri
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -32,6 +36,7 @@ class MainViewModelTest {
     private val testDispatcher: TestDispatcher = StandardTestDispatcher()
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var tunnelManager: TunnelManager
+    private lateinit var storageLocationProvider: StorageLocationProvider
     private lateinit var configFlow: MutableStateFlow<ServerConfig>
     private lateinit var tunnelStatusFlow: MutableStateFlow<TunnelStatus>
     private lateinit var viewModel: MainViewModel
@@ -61,7 +66,9 @@ class MainViewModelTest {
         tunnelManager = mockk(relaxed = true)
         every { tunnelManager.tunnelStatus } returns tunnelStatusFlow
 
-        viewModel = MainViewModel(settingsRepository, tunnelManager, testDispatcher)
+        storageLocationProvider = mockk(relaxed = true)
+
+        viewModel = MainViewModel(settingsRepository, tunnelManager, storageLocationProvider, testDispatcher)
     }
 
     @AfterEach
@@ -410,5 +417,185 @@ class MainViewModelTest {
 
             assertEquals("my-authtoken", viewModel.ngrokAuthtokenInput.value)
             assertEquals("my.ngrok.app", viewModel.ngrokDomainInput.value)
+        }
+
+    // ─── Storage Location Tests ─────────────────────────────────────────
+
+    @Test
+    fun `refreshStorageLocations updates storageLocations state`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "auth/root1",
+                        name = "Downloads",
+                        providerName = "Provider",
+                        authority = "auth",
+                        rootId = "root1",
+                        rootDocumentId = "doc1",
+                        treeUri = null,
+                        isAuthorized = false,
+                        availableBytes = null,
+                        iconUri = null,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAvailableLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            assertEquals(1, viewModel.storageLocations.value.size)
+            assertEquals("auth/root1", viewModel.storageLocations.value[0].id)
+        }
+
+    @Test
+    fun `requestLocationAuthorization sets pendingAuthorizationLocationId`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.requestLocationAuthorization("auth/root1")
+
+            assertEquals("auth/root1", viewModel.pendingAuthorizationLocationId.value)
+        }
+
+    @Test
+    fun `onLocationAuthorized calls authorizeLocation and refreshes`() =
+        runTest {
+            advanceUntilIdle()
+
+            val mockUri = mockk<Uri>()
+            viewModel.requestLocationAuthorization("auth/root1")
+            viewModel.onLocationAuthorized(mockUri)
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.authorizeLocation("auth/root1", mockUri) }
+            assertNull(viewModel.pendingAuthorizationLocationId.value)
+        }
+
+    @Test
+    fun `onLocationAuthorizationCancelled clears pendingAuthorizationLocationId`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.requestLocationAuthorization("auth/root1")
+            assertEquals("auth/root1", viewModel.pendingAuthorizationLocationId.value)
+
+            viewModel.onLocationAuthorizationCancelled()
+
+            assertNull(viewModel.pendingAuthorizationLocationId.value)
+        }
+
+    @Test
+    fun `deauthorizeLocation calls deauthorizeLocation and refreshes`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.deauthorizeLocation("auth/root1")
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.deauthorizeLocation("auth/root1") }
+        }
+
+    @Test
+    fun `updateFileSizeLimit validates and persists valid value`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateFileSizeLimit(100) } returns Result.success(100)
+
+            viewModel.updateFileSizeLimit("100")
+            advanceUntilIdle()
+
+            assertEquals("100", viewModel.fileSizeLimitInput.value)
+            assertNull(viewModel.fileSizeLimitError.value)
+            coVerify { settingsRepository.updateFileSizeLimit(100) }
+        }
+
+    @Test
+    fun `updateFileSizeLimit sets error for invalid value`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateFileSizeLimit(0) } returns
+                Result.failure(IllegalArgumentException("File size limit must be between 1 and 500 MB"))
+
+            viewModel.updateFileSizeLimit("0")
+            advanceUntilIdle()
+
+            assertEquals("0", viewModel.fileSizeLimitInput.value)
+            assertEquals("File size limit must be between 1 and 500 MB", viewModel.fileSizeLimitError.value)
+            coVerify(exactly = 0) { settingsRepository.updateFileSizeLimit(any()) }
+        }
+
+    @Test
+    fun `updateFileSizeLimit sets error for blank input`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateFileSizeLimit("")
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.fileSizeLimitInput.value)
+            assertEquals("File size limit is required", viewModel.fileSizeLimitError.value)
+        }
+
+    @Test
+    fun `updateFileSizeLimit sets error for non-numeric input`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateFileSizeLimit("abc")
+            advanceUntilIdle()
+
+            assertEquals("abc", viewModel.fileSizeLimitInput.value)
+            assertEquals("Must be a number", viewModel.fileSizeLimitError.value)
+        }
+
+    @Test
+    fun `updateDownloadTimeout validates and persists valid value`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateDownloadTimeout(120) } returns Result.success(120)
+
+            viewModel.updateDownloadTimeout("120")
+            advanceUntilIdle()
+
+            assertEquals("120", viewModel.downloadTimeoutInput.value)
+            assertNull(viewModel.downloadTimeoutError.value)
+            coVerify { settingsRepository.updateDownloadTimeout(120) }
+        }
+
+    @Test
+    fun `updateDownloadTimeout sets error for invalid value`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateDownloadTimeout(5) } returns
+                Result.failure(IllegalArgumentException("Download timeout must be between 10 and 300 seconds"))
+
+            viewModel.updateDownloadTimeout("5")
+            advanceUntilIdle()
+
+            assertEquals("5", viewModel.downloadTimeoutInput.value)
+            assertEquals(
+                "Download timeout must be between 10 and 300 seconds",
+                viewModel.downloadTimeoutError.value,
+            )
+            coVerify(exactly = 0) { settingsRepository.updateDownloadTimeout(any()) }
+        }
+
+    @Test
+    fun `updateDownloadTimeout sets error for blank input`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateDownloadTimeout("")
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.downloadTimeoutInput.value)
+            assertEquals("Download timeout is required", viewModel.downloadTimeoutError.value)
         }
 }
