@@ -118,7 +118,7 @@ class GetScreenStateHandler
                 description =
                     "Returns the current screen state: app info, screen dimensions, " +
                         "and a compact UI element list (text/desc truncated to 100 chars, use " +
-                        "get_element_details to retrieve full values). Optionally includes a " +
+                        "${toolNamePrefix}get_element_details to retrieve full values). Optionally includes a " +
                         "low-resolution screenshot (only request the screenshot when the element " +
                         "list alone is not sufficient to understand the screen layout).",
                 inputSchema =
