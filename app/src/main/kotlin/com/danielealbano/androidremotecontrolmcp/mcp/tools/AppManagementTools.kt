@@ -46,9 +46,12 @@ class OpenAppHandler
             return McpToolUtils.textResult("Application '$packageId' launched successfully.")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Opens (launches) an application by its package ID. " +
                         "The app must be installed and have a launchable activity.",
@@ -128,9 +131,12 @@ class ListAppsHandler
             return McpToolUtils.textResult(Json.encodeToString(jsonResult))
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Lists installed applications on the device. " +
                         "Can filter by type (user, system, all) and by name substring.",
@@ -200,9 +206,12 @@ class CloseAppHandler
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Kills a background application process. This only works for apps " +
                         "that are in the background. For foreground apps that are hung or " +
@@ -239,8 +248,9 @@ class CloseAppHandler
 fun registerAppManagementTools(
     server: Server,
     appManager: AppManager,
+    toolNamePrefix: String,
 ) {
-    OpenAppHandler(appManager).register(server)
-    ListAppsHandler(appManager).register(server)
-    CloseAppHandler(appManager).register(server)
+    OpenAppHandler(appManager).register(server, toolNamePrefix)
+    ListAppsHandler(appManager).register(server, toolNamePrefix)
+    CloseAppHandler(appManager).register(server, toolNamePrefix)
 }

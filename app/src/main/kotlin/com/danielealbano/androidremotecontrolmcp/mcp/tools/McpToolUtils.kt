@@ -339,4 +339,42 @@ internal object McpToolUtils {
 
     /** Maximum duration in milliseconds for any gesture/action. */
     const val MAX_DURATION_MS = 60000L
+
+    /** Base prefix for all MCP tool names. */
+    private const val TOOL_NAME_BASE_PREFIX = "android"
+
+    /**
+     * Builds the tool name prefix string from the device slug.
+     *
+     * - Empty slug: `"android_"`
+     * - Non-empty slug: `"android_<slug>_"` (e.g., `"android_pixel7_"`)
+     *
+     * The returned prefix is intended to be concatenated with the tool's base name
+     * (e.g., `"${prefix}tap"` → `"android_tap"` or `"android_pixel7_tap"`).
+     *
+     * @param deviceSlug The optional device slug (empty string means no slug).
+     * @return The prefix string ending with `_`.
+     */
+    fun buildToolNamePrefix(deviceSlug: String): String =
+        if (deviceSlug.isEmpty()) {
+            "${TOOL_NAME_BASE_PREFIX}_"
+        } else {
+            "${TOOL_NAME_BASE_PREFIX}_${deviceSlug}_"
+        }
+
+    /**
+     * Builds the MCP server implementation name, optionally including the device slug.
+     *
+     * - Empty slug: `"android-remote-control-mcp"`
+     * - Non-empty slug: `"android-remote-control-mcp-<slug>"` (e.g., `"android-remote-control-mcp-pixel7"`)
+     *
+     * @param deviceSlug The optional device slug (empty string means no slug).
+     * @return The server implementation name.
+     */
+    fun buildServerName(deviceSlug: String): String =
+        if (deviceSlug.isEmpty()) {
+            "android-remote-control-mcp"
+        } else {
+            "android-remote-control-mcp-$deviceSlug"
+        }
 }

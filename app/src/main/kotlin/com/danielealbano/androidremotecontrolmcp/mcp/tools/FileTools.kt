@@ -68,9 +68,12 @@ class ListStorageLocationsHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Lists available storage locations on the device with their authorization status. " +
                         "Locations must be authorized in the app settings before file operations " +
@@ -158,9 +161,12 @@ class ListFilesHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Lists files and directories in a storage location. The location must be authorized. " +
                         "Returns name, path, type, size, last_modified, and mime_type for each entry.",
@@ -258,9 +264,12 @@ class ReadFileHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Reads a text file from an authorized storage location with line-based pagination. " +
                         "Returns content with line numbers. Maximum ${FileOperationProvider.MAX_READ_LINES} " +
@@ -340,9 +349,12 @@ class WriteFileHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Writes text content to a file in an authorized storage location. Creates the file if it " +
                         "doesn't exist. Creates parent directories automatically. Overwrites existing content. " +
@@ -412,9 +424,12 @@ class AppendFileHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Appends text content to an existing file in an authorized storage location. If the " +
                         "storage provider does not support append mode, an error is returned with a hint " +
@@ -487,9 +502,12 @@ class FileReplaceHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Performs literal string replacement in a text file in an authorized storage location. " +
                         "Reads the file, performs replacement, and writes back. Uses advisory file locking " +
@@ -573,9 +591,12 @@ class DownloadFromUrlHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Downloads a file from a URL and saves it to an authorized storage location. Creates " +
                         "the file and parent directories if they don't exist. Overwrites existing content. " +
@@ -645,9 +666,12 @@ class DeleteFileHandler
                 )
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Deletes a single file from an authorized storage location. Cannot delete directories.",
                 inputSchema =
                     ToolSchema(
@@ -685,13 +709,14 @@ fun registerFileTools(
     server: Server,
     storageLocationProvider: StorageLocationProvider,
     fileOperationProvider: FileOperationProvider,
+    toolNamePrefix: String,
 ) {
-    ListStorageLocationsHandler(storageLocationProvider).register(server)
-    ListFilesHandler(fileOperationProvider).register(server)
-    ReadFileHandler(fileOperationProvider).register(server)
-    WriteFileHandler(fileOperationProvider).register(server)
-    AppendFileHandler(fileOperationProvider).register(server)
-    FileReplaceHandler(fileOperationProvider).register(server)
-    DownloadFromUrlHandler(fileOperationProvider).register(server)
-    DeleteFileHandler(fileOperationProvider).register(server)
+    ListStorageLocationsHandler(storageLocationProvider).register(server, toolNamePrefix)
+    ListFilesHandler(fileOperationProvider).register(server, toolNamePrefix)
+    ReadFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    WriteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    AppendFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    FileReplaceHandler(fileOperationProvider).register(server, toolNamePrefix)
+    DownloadFromUrlHandler(fileOperationProvider).register(server, toolNamePrefix)
+    DeleteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
 }
