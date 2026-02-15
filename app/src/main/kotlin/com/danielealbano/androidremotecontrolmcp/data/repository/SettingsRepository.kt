@@ -99,4 +99,56 @@ interface SettingsRepository {
 
     /** Updates the ngrok domain (optional, empty string means auto-assigned). */
     suspend fun updateNgrokDomain(domain: String)
+
+    /** Updates the file size limit for file operations (in MB). */
+    suspend fun updateFileSizeLimit(limitMb: Int)
+
+    /**
+     * Validates a file size limit value.
+     *
+     * This is a pure validation function with no I/O; it is intentionally
+     * non-suspending so callers are not forced into a coroutine context.
+     *
+     * @return [Result.success] with the validated limit, or [Result.failure] with an [IllegalArgumentException].
+     */
+    fun validateFileSizeLimit(limitMb: Int): Result<Int>
+
+    /** Updates whether HTTP (non-HTTPS) downloads are allowed. */
+    suspend fun updateAllowHttpDownloads(enabled: Boolean)
+
+    /** Updates whether unverified HTTPS certificates are accepted for downloads. */
+    suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean)
+
+    /** Updates the download timeout in seconds. */
+    suspend fun updateDownloadTimeout(seconds: Int)
+
+    /**
+     * Validates a download timeout value.
+     *
+     * This is a pure validation function with no I/O; it is intentionally
+     * non-suspending so callers are not forced into a coroutine context.
+     *
+     * @return [Result.success] with the validated timeout, or [Result.failure] with an [IllegalArgumentException].
+     */
+    fun validateDownloadTimeout(seconds: Int): Result<Int>
+
+    /**
+     * Returns the map of authorized storage location IDs to their tree URI strings.
+     */
+    suspend fun getAuthorizedLocations(): Map<String, String>
+
+    /**
+     * Adds an authorized storage location with its tree URI.
+     *
+     * @param locationId The storage location identifier ("{authority}/{rootId}").
+     * @param treeUri The granted document tree URI string.
+     */
+    suspend fun addAuthorizedLocation(locationId: String, treeUri: String)
+
+    /**
+     * Removes an authorized storage location.
+     *
+     * @param locationId The storage location identifier.
+     */
+    suspend fun removeAuthorizedLocation(locationId: String)
 }

@@ -18,6 +18,10 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property tunnelProvider The tunnel provider type (Cloudflare or ngrok).
  * @property ngrokAuthtoken The ngrok authtoken (required when using ngrok).
  * @property ngrokDomain The ngrok domain (optional, empty means auto-assigned).
+ * @property fileSizeLimitMb File size limit for file operations (in MB).
+ * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
+ * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
+ * @property downloadTimeoutSeconds Download timeout in seconds.
  */
 data class ServerConfig(
     val port: Int = DEFAULT_PORT,
@@ -31,6 +35,10 @@ data class ServerConfig(
     val tunnelProvider: TunnelProviderType = TunnelProviderType.CLOUDFLARE,
     val ngrokAuthtoken: String = "",
     val ngrokDomain: String = "",
+    val fileSizeLimitMb: Int = DEFAULT_FILE_SIZE_LIMIT_MB,
+    val allowHttpDownloads: Boolean = false,
+    val allowUnverifiedHttpsCerts: Boolean = false,
+    val downloadTimeoutSeconds: Int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
 ) {
     companion object {
         /** Default server port. */
@@ -44,5 +52,23 @@ data class ServerConfig(
 
         /** Default hostname for auto-generated certificates. */
         const val DEFAULT_CERTIFICATE_HOSTNAME = "android-mcp.local"
+
+        /** Default file size limit in megabytes. */
+        const val DEFAULT_FILE_SIZE_LIMIT_MB = 50
+
+        /** Minimum file size limit in megabytes. */
+        const val MIN_FILE_SIZE_LIMIT_MB = 1
+
+        /** Maximum file size limit in megabytes. */
+        const val MAX_FILE_SIZE_LIMIT_MB = 500
+
+        /** Default download timeout in seconds. */
+        const val DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 60
+
+        /** Minimum download timeout in seconds. */
+        const val MIN_DOWNLOAD_TIMEOUT_SECONDS = 10
+
+        /** Maximum download timeout in seconds. */
+        const val MAX_DOWNLOAD_TIMEOUT_SECONDS = 300
     }
 }
