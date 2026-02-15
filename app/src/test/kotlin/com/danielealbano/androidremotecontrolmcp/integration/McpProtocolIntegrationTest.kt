@@ -30,7 +30,7 @@ class McpProtocolIntegrationTest {
                 // If connect() succeeds, the initialize handshake completed
                 assertNotNull(client.serverCapabilities)
                 assertNotNull(client.serverVersion)
-                assertEquals("android-remote-control-mcp", client.serverVersion?.name)
+                assertEquals("android-remote-control-mcp", client.serverVersion?.name) // No slug in default tests
             }
         }
 

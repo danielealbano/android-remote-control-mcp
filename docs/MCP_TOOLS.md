@@ -12,17 +12,18 @@ This document provides a comprehensive reference for all MCP tools available in 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Common Patterns](#common-patterns)
-3. [Error Codes](#error-codes)
-4. [Screen Introspection Tools](#1-screen-introspection-tools)
-5. [System Action Tools](#2-system-action-tools)
-6. [Touch Action Tools](#3-touch-action-tools)
-7. [Gesture Tools](#4-gesture-tools)
-8. [Element Action Tools](#5-element-action-tools)
-9. [Text Input Tools](#6-text-input-tools)
-10. [Utility Tools](#7-utility-tools)
-11. [File Tools](#8-file-tools)
-12. [App Management Tools](#9-app-management-tools)
+2. [Tool Naming Convention](#tool-naming-convention)
+3. [Common Patterns](#common-patterns)
+4. [Error Codes](#error-codes)
+5. [Screen Introspection Tools](#1-screen-introspection-tools)
+6. [System Action Tools](#2-system-action-tools)
+7. [Touch Action Tools](#3-touch-action-tools)
+8. [Gesture Tools](#4-gesture-tools)
+9. [Element Action Tools](#5-element-action-tools)
+10. [Text Input Tools](#6-text-input-tools)
+11. [Utility Tools](#7-utility-tools)
+12. [File Tools](#8-file-tools)
+13. [App Management Tools](#9-app-management-tools)
 
 ---
 
@@ -42,7 +43,7 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
 
-### Tool Naming Convention
+## Tool Naming Convention
 
 All MCP tool names are prefixed with `android_` by default. When a **device slug** is configured in the app settings (e.g., `pixel7`), the prefix becomes `android_<slug>_`.
 

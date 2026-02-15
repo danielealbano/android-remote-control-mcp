@@ -197,7 +197,7 @@ class ClickElementTool
                             buildJsonObject {
                                 putJsonObject("element_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
                                 }
                             },
                         required = listOf("element_id"),
@@ -254,7 +254,7 @@ class LongClickElementTool
                             buildJsonObject {
                                 putJsonObject("element_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
                                 }
                             },
                         required = listOf("element_id"),
@@ -321,7 +321,7 @@ class SetTextTool
                             buildJsonObject {
                                 putJsonObject("element_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
                                 }
                                 putJsonObject("text") {
                                     put("type", "string")
@@ -462,7 +462,7 @@ class ScrollToElementTool
                             buildJsonObject {
                                 putJsonObject("element_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
                                 }
                             },
                         required = listOf("element_id"),
