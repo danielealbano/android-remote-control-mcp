@@ -2,7 +2,9 @@ package com.danielealbano.androidremotecontrolmcp.integration
 
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
@@ -14,7 +16,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -53,6 +58,9 @@ object McpIntegrationTestHelper {
             screenCaptureProvider = mockk(relaxed = true),
             treeParser = mockk(relaxed = true),
             elementFinder = mockk(relaxed = true),
+            storageLocationProvider = mockk(relaxed = true),
+            fileOperationProvider = mockk(relaxed = true),
+            appManager = mockk(relaxed = true),
         )
 
     /**
@@ -95,6 +103,8 @@ object McpIntegrationTestHelper {
             deps.elementFinder,
             deps.accessibilityServiceProvider,
         )
+        registerFileTools(server, deps.storageLocationProvider, deps.fileOperationProvider)
+        registerAppManagementTools(server, deps.appManager)
     }
 
     /**
@@ -232,4 +242,7 @@ data class MockDependencies(
     val screenCaptureProvider: ScreenCaptureProvider,
     val treeParser: AccessibilityTreeParser,
     val elementFinder: ElementFinder,
+    val storageLocationProvider: StorageLocationProvider,
+    val fileOperationProvider: FileOperationProvider,
+    val appManager: AppManager,
 )
