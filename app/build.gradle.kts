@@ -122,6 +122,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // DocumentFile (SAF)
+    implementation(libs.androidx.documentfile)
+
     // Ktor Server
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
@@ -209,6 +212,16 @@ tasks.named("preBuild") {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    jvmArgs(
+        "--add-opens",
+        "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens",
+        "java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens",
+        "java.base/java.util=ALL-UNNAMED",
+        "--add-opens",
+        "java.base/java.time=ALL-UNNAMED",
+    )
 }
 
 jacoco {
