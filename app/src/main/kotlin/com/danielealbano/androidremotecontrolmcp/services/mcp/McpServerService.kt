@@ -15,7 +15,9 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
@@ -27,7 +29,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -83,6 +88,12 @@ class McpServerService : Service() {
     @Inject lateinit var compactTreeFormatter: CompactTreeFormatter
 
     @Inject lateinit var tunnelManager: TunnelManager
+
+    @Inject lateinit var storageLocationProvider: StorageLocationProvider
+
+    @Inject lateinit var fileOperationProvider: FileOperationProvider
+
+    @Inject lateinit var appManager: AppManager
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -246,6 +257,8 @@ class McpServerService : Service() {
         registerElementActionTools(server, treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
         registerTextInputTools(server, treeParser, actionExecutor, accessibilityServiceProvider)
         registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider)
+        registerFileTools(server, storageLocationProvider, fileOperationProvider)
+        registerAppManagementTools(server, appManager)
     }
 
     override fun onDestroy() {

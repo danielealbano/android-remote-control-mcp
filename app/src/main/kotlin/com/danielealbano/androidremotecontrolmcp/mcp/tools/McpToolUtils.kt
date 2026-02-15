@@ -175,6 +175,7 @@ internal object McpToolUtils {
      *
      * @throws McpToolException.InvalidParams if the parameter is present but not a boolean.
      */
+    @Suppress("ThrowsCount")
     fun optionalBoolean(
         params: JsonObject?,
         name: String,
