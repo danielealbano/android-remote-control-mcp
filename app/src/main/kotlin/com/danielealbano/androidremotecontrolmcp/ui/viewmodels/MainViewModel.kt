@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,12 +16,14 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +40,7 @@ class MainViewModel
     constructor(
         private val settingsRepository: SettingsRepository,
         private val tunnelManager: TunnelManager,
+        private val storageLocationProvider: StorageLocationProvider,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _serverConfig = MutableStateFlow(ServerConfig())
@@ -74,6 +79,24 @@ class MainViewModel
         private val _ngrokDomainInput = MutableStateFlow("")
         val ngrokDomainInput: StateFlow<String> = _ngrokDomainInput.asStateFlow()
 
+        private val _storageLocations = MutableStateFlow<List<StorageLocation>>(emptyList())
+        val storageLocations: StateFlow<List<StorageLocation>> = _storageLocations.asStateFlow()
+
+        private val _fileSizeLimitInput = MutableStateFlow("")
+        val fileSizeLimitInput: StateFlow<String> = _fileSizeLimitInput.asStateFlow()
+
+        private val _fileSizeLimitError = MutableStateFlow<String?>(null)
+        val fileSizeLimitError: StateFlow<String?> = _fileSizeLimitError.asStateFlow()
+
+        private val _downloadTimeoutInput = MutableStateFlow("")
+        val downloadTimeoutInput: StateFlow<String> = _downloadTimeoutInput.asStateFlow()
+
+        private val _downloadTimeoutError = MutableStateFlow<String?>(null)
+        val downloadTimeoutError: StateFlow<String?> = _downloadTimeoutError.asStateFlow()
+
+        private val _pendingAuthorizationLocationId = MutableStateFlow<String?>(null)
+        val pendingAuthorizationLocationId: StateFlow<String?> = _pendingAuthorizationLocationId.asStateFlow()
+
         init {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.serverConfig.collect { config ->
@@ -82,6 +105,8 @@ class MainViewModel
                     _hostnameInput.value = config.certificateHostname
                     _ngrokAuthtokenInput.value = config.ngrokAuthtoken
                     _ngrokDomainInput.value = config.ngrokDomain
+                    _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
+                    _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
                 }
             }
 
@@ -220,6 +245,7 @@ class MainViewModel
                 )
             _isNotificationPermissionGranted.value =
                 PermissionUtils.isNotificationPermissionGranted(context)
+            refreshStorageLocations()
         }
 
         fun updateTunnelEnabled(enabled: Boolean) {
@@ -245,6 +271,128 @@ class MainViewModel
             _ngrokDomainInput.value = domain
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateNgrokDomain(domain)
+            }
+        }
+
+        fun refreshStorageLocations() {
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    _storageLocations.value = storageLocationProvider.getAvailableLocations()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to refresh storage locations", e)
+                }
+            }
+        }
+
+        fun requestLocationAuthorization(locationId: String) {
+            _pendingAuthorizationLocationId.value = locationId
+        }
+
+        fun onLocationAuthorized(treeUri: Uri) {
+            val locationId = _pendingAuthorizationLocationId.value
+            _pendingAuthorizationLocationId.value = null
+            if (locationId == null) {
+                Log.w(TAG, "onLocationAuthorized called but no pending location ID")
+                return
+            }
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    storageLocationProvider.authorizeLocation(locationId, treeUri)
+                    refreshStorageLocations()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to authorize location $locationId", e)
+                }
+            }
+        }
+
+        fun onLocationAuthorizationCancelled() {
+            _pendingAuthorizationLocationId.value = null
+        }
+
+        fun deauthorizeLocation(locationId: String) {
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    storageLocationProvider.deauthorizeLocation(locationId)
+                    refreshStorageLocations()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to deauthorize location $locationId", e)
+                }
+            }
+        }
+
+        @Suppress("ReturnCount")
+        fun updateFileSizeLimit(limitString: String) {
+            _fileSizeLimitInput.value = limitString
+
+            if (limitString.isBlank()) {
+                _fileSizeLimitError.value = "File size limit is required"
+                return
+            }
+
+            val limit = limitString.toIntOrNull()
+            if (limit == null) {
+                _fileSizeLimitError.value = "Must be a number"
+                return
+            }
+
+            val result = settingsRepository.validateFileSizeLimit(limit)
+            if (result.isFailure) {
+                _fileSizeLimitError.value = result.exceptionOrNull()?.message
+                return
+            }
+
+            _fileSizeLimitError.value = null
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateFileSizeLimit(limit)
+            }
+        }
+
+        @Suppress("ReturnCount")
+        fun updateDownloadTimeout(timeoutString: String) {
+            _downloadTimeoutInput.value = timeoutString
+
+            if (timeoutString.isBlank()) {
+                _downloadTimeoutError.value = "Download timeout is required"
+                return
+            }
+
+            val timeout = timeoutString.toIntOrNull()
+            if (timeout == null) {
+                _downloadTimeoutError.value = "Must be a number"
+                return
+            }
+
+            val result = settingsRepository.validateDownloadTimeout(timeout)
+            if (result.isFailure) {
+                _downloadTimeoutError.value = result.exceptionOrNull()?.message
+                return
+            }
+
+            _downloadTimeoutError.value = null
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateDownloadTimeout(timeout)
+            }
+        }
+
+        fun updateAllowHttpDownloads(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateAllowHttpDownloads(enabled)
+            }
+        }
+
+        fun updateAllowUnverifiedHttpsCerts(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateAllowUnverifiedHttpsCerts(enabled)
+            }
+        }
+
+        fun getInitialPickerUri(locationId: String): Uri? {
+            val location = _storageLocations.value.find { it.id == locationId } ?: return null
+            return try {
+                DocumentsContract.buildDocumentUri(location.authority, location.rootDocumentId)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to build picker URI for $locationId", e)
+                null
             }
         }
 

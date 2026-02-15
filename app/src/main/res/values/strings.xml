@@ -86,4 +86,20 @@
     <string name="connection_info_token">Token</string>
     <string name="connection_info_copy_all">Copy All</string>
     <string name="connection_info_share">Share</string>
+
+    <!-- Storage Locations -->
+    <string name="storage_locations_title">Storage Locations</string>
+    <string name="storage_locations_description">Authorize storage locations for file operations via MCP tools. Each location requires confirmation through the system file picker.</string>
+    <string name="storage_location_authorize">Authorize</string>
+    <string name="storage_location_authorized">Authorized</string>
+    <string name="storage_location_provider_label">Provider: %1$s</string>
+    <string name="storage_location_no_locations">No storage locations found on this device</string>
+    <string name="storage_file_size_limit_label">File Size Limit (MB)</string>
+    <string name="storage_file_size_limit_error">Must be between %1$d and %2$d MB</string>
+    <string name="storage_download_timeout_label">Download Timeout (seconds)</string>
+    <string name="storage_download_timeout_error">Must be between %1$d and %2$d seconds</string>
+    <string name="storage_allow_http_downloads_label">Allow HTTP Downloads</string>
+    <string name="storage_allow_http_downloads_description">Allow downloading files from unencrypted HTTP URLs (less secure)</string>
+    <string name="storage_allow_unverified_https_label">Allow Unverified HTTPS</string>
+    <string name="storage_allow_unverified_https_description">Accept unverified HTTPS certificates for downloads (less secure)</string>
 </resources>
