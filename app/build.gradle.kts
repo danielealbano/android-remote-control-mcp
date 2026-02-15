@@ -171,7 +171,6 @@ dependencies {
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
-
 }
 
 // Resolve ngrok-java host native library directory for JVM tests.
