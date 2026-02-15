@@ -9,6 +9,7 @@
         all ci
 
 # Variables
+ANDROID_HOME ?= $(HOME)/Android/Sdk
 GRADLE := ./gradlew
 ADB := adb
 APP_ID := com.danielealbano.androidremotecontrolmcp
@@ -39,12 +40,10 @@ check-deps: ## Check for required development tools
 	@echo "Checking required tools..."
 	@echo ""
 	@MISSING=0; \
-	if [ -z "$$ANDROID_HOME" ]; then \
-		echo "  [MISSING] ANDROID_HOME is not set"; \
-		echo "           Install Android SDK and set: export ANDROID_HOME=~/Android/Sdk"; \
-		MISSING=1; \
-	else \
-		echo "  [OK] ANDROID_HOME = $$ANDROID_HOME"; \
+	echo "  [OK] ANDROID_HOME = $(ANDROID_HOME)"; \
+	if [ ! -d "$(ANDROID_HOME)" ]; then \
+		echo "  [WARN] ANDROID_HOME directory does not exist: $(ANDROID_HOME)"; \
+		echo "         Install Android SDK or set: export ANDROID_HOME=/path/to/sdk"; \
 	fi; \
 	if command -v java >/dev/null 2>&1; then \
 		JAVA_VER=$$(java -version 2>&1 | head -1 | awk -F'"' '{print $$2}'); \
@@ -81,7 +80,9 @@ check-deps: ## Check for required development tools
 		GO_VER=$$(go version); \
 		echo "  [OK] $$GO_VER"; \
 	else \
-		echo "  [INFO] Go not found (only needed for compile-cloudflared target)"; \
+		echo "  [MISSING] Go (required for compiling cloudflared)"; \
+		echo "           Install: https://go.dev/dl/"; \
+		MISSING=1; \
 	fi; \
 	echo ""; \
 	if [ $$MISSING -eq 1 ]; then \
@@ -101,10 +102,10 @@ update-deps: ## Update version catalog with latest stable versions (interactive)
 # Build
 # ─────────────────────────────────────────────────────────────────────────────
 
-build: ## Build debug APK
+build: compile-cloudflared ## Build debug APK
 	$(GRADLE) assembleDebug
 
-build-release: ## Build release APK
+build-release: compile-cloudflared ## Build release APK
 	$(GRADLE) assembleRelease
 
 clean: ## Clean build artifacts
@@ -277,7 +278,7 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	mkdir -p $(CLOUDFLARED_JNILIBS_DIR)/arm64-v8a
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
-		CC=$$(find $$ANDROID_HOME/ndk -name "aarch64-linux-android*-clang" | sort -V | tail -1) \
+		CC=$$(find $(ANDROID_HOME)/ndk -name "aarch64-linux-android*-clang" | sort -V | tail -1) \
 		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
 		-o $(CURDIR)/$(CLOUDFLARED_JNILIBS_DIR)/arm64-v8a/libcloudflared.so \
 		./cmd/cloudflared
@@ -286,7 +287,7 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	mkdir -p $(CLOUDFLARED_JNILIBS_DIR)/x86_64
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
-		CC=$$(find $$ANDROID_HOME/ndk -name "x86_64-linux-android*-clang" | sort -V | tail -1) \
+		CC=$$(find $(ANDROID_HOME)/ndk -name "x86_64-linux-android*-clang" | sort -V | tail -1) \
 		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
 		-o $(CURDIR)/$(CLOUDFLARED_JNILIBS_DIR)/x86_64/libcloudflared.so \
 		./cmd/cloudflared
