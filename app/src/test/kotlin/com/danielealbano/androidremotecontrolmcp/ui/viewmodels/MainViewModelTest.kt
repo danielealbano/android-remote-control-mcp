@@ -598,4 +598,73 @@ class MainViewModelTest {
             assertEquals("", viewModel.downloadTimeoutInput.value)
             assertEquals("Download timeout is required", viewModel.downloadTimeoutError.value)
         }
+
+    // ─── Device Slug Tests ──────────────────────────────────────────────
+
+    @Test
+    fun `updateDeviceSlug with valid slug clears error and saves`() =
+        runTest {
+            every { settingsRepository.validateDeviceSlug("pixel7") } returns Result.success("pixel7")
+
+            viewModel.updateDeviceSlug("pixel7")
+            advanceUntilIdle()
+
+            assertEquals("pixel7", viewModel.deviceSlugInput.value)
+            assertNull(viewModel.deviceSlugError.value)
+            coVerify { settingsRepository.updateDeviceSlug("pixel7") }
+        }
+
+    @Test
+    fun `updateDeviceSlug with empty slug clears error and saves`() =
+        runTest {
+            every { settingsRepository.validateDeviceSlug("") } returns Result.success("")
+
+            viewModel.updateDeviceSlug("")
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.deviceSlugInput.value)
+            assertNull(viewModel.deviceSlugError.value)
+            coVerify { settingsRepository.updateDeviceSlug("") }
+        }
+
+    @Test
+    fun `updateDeviceSlug with invalid slug sets error and does not save`() =
+        runTest {
+            every { settingsRepository.validateDeviceSlug("work-phone") } returns
+                Result.failure(IllegalArgumentException("Device slug can only contain letters, digits, and underscores"))
+
+            viewModel.updateDeviceSlug("work-phone")
+            advanceUntilIdle()
+
+            assertEquals("work-phone", viewModel.deviceSlugInput.value)
+            assertEquals(
+                "Device slug can only contain letters, digits, and underscores",
+                viewModel.deviceSlugError.value,
+            )
+            coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
+        }
+
+    @Test
+    fun `updateDeviceSlug with too long slug sets error and does not save`() =
+        runTest {
+            val longSlug = "a".repeat(21)
+            every { settingsRepository.validateDeviceSlug(longSlug) } returns
+                Result.failure(IllegalArgumentException("Device slug must be at most 20 characters"))
+
+            viewModel.updateDeviceSlug(longSlug)
+            advanceUntilIdle()
+
+            assertEquals(longSlug, viewModel.deviceSlugInput.value)
+            assertEquals("Device slug must be at most 20 characters", viewModel.deviceSlugError.value)
+            coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
+        }
+
+    @Test
+    fun `initial state loads deviceSlug from repository`() =
+        runTest {
+            configFlow.value = configFlow.value.copy(deviceSlug = "test_device")
+            advanceUntilIdle()
+
+            assertEquals("test_device", viewModel.deviceSlugInput.value)
+        }
 }

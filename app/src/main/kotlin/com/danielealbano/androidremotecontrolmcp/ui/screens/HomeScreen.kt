@@ -58,6 +58,8 @@ fun HomeScreen(
     val portError by viewModel.portError.collectAsStateWithLifecycle()
     val hostnameInput by viewModel.hostnameInput.collectAsStateWithLifecycle()
     val hostnameError by viewModel.hostnameError.collectAsStateWithLifecycle()
+    val deviceSlugInput by viewModel.deviceSlugInput.collectAsStateWithLifecycle()
+    val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
@@ -134,6 +136,8 @@ fun HomeScreen(
                 bindingAddress = serverConfig.bindingAddress,
                 portInput = portInput,
                 portError = portError,
+                deviceSlugInput = deviceSlugInput,
+                deviceSlugError = deviceSlugError,
                 bearerToken = serverConfig.bearerToken,
                 autoStartEnabled = serverConfig.autoStartOnBoot,
                 httpsEnabled = serverConfig.httpsEnabled,
@@ -143,6 +147,7 @@ fun HomeScreen(
                 isServerRunning = isServerRunning,
                 onBindingAddressChange = viewModel::updateBindingAddress,
                 onPortChange = viewModel::updatePort,
+                onDeviceSlugChange = viewModel::updateDeviceSlug,
                 onRegenerateToken = viewModel::generateNewBearerToken,
                 onCopyToken = { viewModel.copyToClipboard(context, serverConfig.bearerToken) },
                 onAutoStartChange = viewModel::updateAutoStartOnBoot,

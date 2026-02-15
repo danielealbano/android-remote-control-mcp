@@ -468,14 +468,14 @@ The MCP server name (`Implementation.name`) also includes the slug when set:
 **So that** models can distinguish this server's tools from other MCP servers.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] `McpToolUtils.buildToolNamePrefix()` correctly constructs prefix strings (`"android_"` or `"android_<slug>_"`)
-- [ ] `McpToolUtils.buildServerName()` correctly constructs server names
-- [ ] All 9 `register*Tools()` functions accept a `toolNamePrefix: String` parameter
-- [ ] All individual tool `register()` methods accept a `toolNamePrefix: String` parameter and use it
-- [ ] `McpServerService.registerAllTools()` computes the prefix from `config.deviceSlug` and passes it
-- [ ] MCP server name includes the slug when set
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtilsTest"`
-- [ ] Lint passes on changed files
+- [x] `McpToolUtils.buildToolNamePrefix()` correctly constructs prefix strings (`"android_"` or `"android_<slug>_"`)
+- [x] `McpToolUtils.buildServerName()` correctly constructs server names
+- [x] All 9 `register*Tools()` functions accept a `toolNamePrefix: String` parameter
+- [x] All individual tool `register()` methods accept a `toolNamePrefix: String` parameter and use it
+- [x] `McpServerService.registerAllTools()` computes the prefix from `config.deviceSlug` and passes it
+- [x] MCP server name includes the slug when set
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtilsTest"`
+- [x] Lint passes on changed files
 
 ---
 
