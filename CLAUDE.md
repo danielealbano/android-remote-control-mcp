@@ -56,6 +56,8 @@ When asked to do an investigation, verification or review a plan:
 When you review a plan:
 - You MUST ALWAYS double check it from a Performance, Security and QA point of view and discuss with the user any relevant finding
 - the user is aware that the lines offset can change if something is implemented before the plan is implemented
+- You MUST spawn `plan-user-story-reviewer` subagents in parallel — one per user story — to verify structure, ordering, completeness, and acceptance criteria. Each subagent focuses on its assigned user story and reports back.
+- You MUST ALSO spawn `plan-performance-reviewer`, `plan-security-reviewer`, and `plan-qa-reviewer` subagents in parallel to audit the entire plan from their respective angles.
 
 When asked to make a plan:
 - You MUST always create a document in docs/plans/
@@ -68,12 +70,18 @@ When asked to make a plan:
 -- the action is code change in patch / diff style, an explanation of what needs to be changed and some context
 -- The tasks and actions MUST be in a sequential execution order, tasks or actions MUST NOT DEPEND on items AFTER them in the execution plan
 - You MUST ALWAYS create plans that follow an ordered sequence where previous items MUST NOT DEPEND on items afterwards!
-- Once you finish to write the plan you MUST ALWAYS re-read it and double check it from a Performance, Security and QA point of view and discuss with the user any relevant finding
+- Once you finish to write the plan you MUST ALWAYS re-read it and spawn `plan-performance-reviewer`, `plan-security-reviewer`, and `plan-qa-reviewer` subagents in parallel to audit the plan. Discuss any finding with the user before proceeding.
 - Only run the full tests at the end of the user story, for the tasks if possible run targeted tests
 - When implementing the plan you MUST follow it to the letter unless something is unclear or incorrect, in which case you MUST ask to the user how to proceed!
 - You MUST NEVER digress or improvise when implementing a plan, you MUST follow it to the letter
 
 When implementing a plan (git workflow):
+- You MUST ALWAYS use the `plan-user-story-implementator` subagent to implement a task.
+- If tasks of a user story can be implemented in parallel (no cross files impacted) then you MUST start them in parallel; When you start them in parallel you MUST run the tests ONLY after they finish all, the subagents MUST run the linter on the changed files though.
+- After ALL tasks of a user story are implemented, you MUST spawn the `plan-user-story-implementation-reviewer` subagent to verify the implementation matches the plan.
+  - If the reviewer reports ANY issues (no matter how small or seemingly irrelevant), you MUST re-run the `plan-user-story-implementator` subagent with the reviewer's findings to fix ALL reported issues.
+  - After fixes, re-run the `plan-user-story-implementation-reviewer` to verify again. Repeat until clean.
+  - If an issue CANNOT be resolved (e.g., the plan itself is wrong or contradictory), or if you or the subagent believe the current implementation is better than what the plan specifies, you MUST CLEARLY communicate this back to the user with a full explanation — do NOT proceed silently, ignore it, or unilaterally decide to keep your version. The user makes the final call.
 - You MUST ALWAYS create a feature branch from the latest `main` before starting implementation:
   1. `git checkout main && git pull origin main`
   2. `git checkout -b feat/<plan-description>` (following the naming convention in TOOLS.md)
@@ -85,9 +93,71 @@ When implementing a plan (git workflow):
   3. Request Copilot as a reviewer: `gh pr edit <PR#> --add-reviewer copilot`
 - You MUST report the PR URL to the user when done
 
+When performing ad-hoc code changes (outside of plan workflows):
+- After completing the code changes, you SHOULD spawn `qa-reviewer`, `performance-reviewer`, and `security-reviewer` subagents in parallel to audit the changes.
+- Address any findings before considering the work done.
+
 ---
 
-## 2) Safety & Permissions (Terminal + Code Integrity + Android)
+## 2) Available Subagents
+
+This project uses specialized subagents (defined in `.claude/agents/`) to enforce quality, security, and plan compliance. All subagents use **Claude Opus 4.6** (`model: opus`).
+
+### Code Review Subagents
+
+These subagents review **actual code changes** (via `git diff`) and are used after code is implemented — both during plan execution and for ad-hoc changes.
+
+| Subagent | Description | Tools | When to Use |
+|---|---|---|---|
+| `qa-reviewer` | Reviews code quality, test coverage, edge cases, Definition of Done compliance | Read-only | After code changes (plan or ad-hoc) |
+| `performance-reviewer` | Reviews threading, coroutines, memory management, Compose efficiency, resource handling | Read-only | After code changes (plan or ad-hoc) |
+| `security-reviewer` | Reviews authentication, permissions, input validation, data protection, network security | Read-only | After code changes (plan or ad-hoc) |
+
+### Plan Review Subagents
+
+These subagents review **plan documents** (proposed code changes in diff/patch style) and are used before implementation begins.
+
+| Subagent | Description | Tools | When to Use |
+|---|---|---|---|
+| `plan-user-story-reviewer` | Reviews plan structure, sequential ordering, acceptance criteria, technical correctness | Read-only | When reviewing a plan — one instance per user story, in parallel |
+| `plan-qa-reviewer` | Reviews planned code changes for test coverage adequacy, edge cases, quality gates | Read-only | When reviewing or writing a plan — on the entire plan |
+| `plan-performance-reviewer` | Reviews planned code changes for threading, concurrency, memory, resource efficiency | Read-only | When reviewing or writing a plan — on the entire plan |
+| `plan-security-reviewer` | Reviews planned code changes for auth, permissions, input validation, data exposure | Read-only | When reviewing or writing a plan — on the entire plan |
+
+### Plan Implementation Subagents
+
+These subagents are used during plan execution — implementing tasks and verifying the implementation matches the plan.
+
+| Subagent | Description | Tools | When to Use |
+|---|---|---|---|
+| `plan-user-story-implementator` | Implements tasks from an approved plan — follows the plan to the letter, no improvisation | All tools | When implementing a plan task |
+| `plan-user-story-implementation-reviewer` | Verifies implemented code matches the plan exactly — action-by-action comparison | Read-only | After a user story is implemented, before proceeding to the next |
+
+### Subagent Workflow Summary
+
+**When writing a plan:**
+1. Write the plan document
+2. Spawn `plan-performance-reviewer`, `plan-security-reviewer`, `plan-qa-reviewer` in parallel on the plan
+3. Discuss findings with user before proceeding
+
+**When reviewing a plan:**
+1. Spawn `plan-user-story-reviewer` in parallel (one per user story)
+2. Spawn `plan-performance-reviewer`, `plan-security-reviewer`, `plan-qa-reviewer` in parallel on the entire plan
+3. Discuss all findings with user
+
+**When implementing a plan:**
+1. Use `plan-user-story-implementator` for each task
+2. After all tasks of a user story are done, run `plan-user-story-implementation-reviewer`
+3. If issues found → re-run `plan-user-story-implementator` with fixes → re-review → repeat until clean
+4. If issue cannot be resolved, or if you believe the implementation is better than the plan → escalate to user immediately with full explanation. The user decides.
+
+**After ad-hoc code changes:**
+1. Spawn `qa-reviewer`, `performance-reviewer`, `security-reviewer` in parallel
+2. Address findings before considering work done
+
+---
+
+## 3) Safety & Permissions (Terminal + Code Integrity + Android)
 
 ### Terminal safety - ABSOLUTE RULES
 - YOU MUST NOT try to use `sudo`, no `su`, no root commands.
@@ -107,7 +177,7 @@ When implementing a plan (git workflow):
 
 ---
 
-## 3) Definition of Done (Quality Gates)
+## 4) Definition of Done (Quality Gates)
 
 A change is DONE only if all are true:
 
@@ -135,7 +205,7 @@ When running potentially long commands:
 
 ---
 
-## 4) Architecture Rules
+## 5) Architecture Rules
 
 ### SOLID
 - Apply SOLID principles consistently.
@@ -187,7 +257,7 @@ You MUST:
 
 ---
 
-## 5) Data Storage Rules (DataStore for Settings)
+## 6) Data Storage Rules (DataStore for Settings)
 
 This project uses **DataStore** (not Room database) for persisting settings. There is no complex relational data.
 
@@ -222,7 +292,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 
 ---
 
-## 6) Backend Rules (Kotlin + Android + Ktor)
+## 7) Backend Rules (Kotlin + Android + Ktor)
 
 ### Structure and responsibilities
 - **MainActivity** is thin:
@@ -274,7 +344,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 
 ---
 
-## 7) Frontend Rules (Jetpack Compose + Material Design 3)
+## 8) Frontend Rules (Jetpack Compose + Material Design 3)
 
 ### UI/UX baseline
 - Build modern, stylish, cool, responsive UI using Material Design 3.
@@ -325,7 +395,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 
 ---
 
-## 8) Testing Rules (Kotlin + Android + JUnit 5 + MockK)
+## 9) Testing Rules (Kotlin + Android + JUnit 5 + MockK)
 
 All references to "tests" in this document mean automated tests (unit tests, integration tests, and end-to-end tests) that run during development and for CI/CD pipelines. Tests and linting should always pass.
 
@@ -451,7 +521,7 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 
 ---
 
-## 9) Android Development Environment
+## 10) Android Development Environment
 
 Local development requires Android SDK, emulator/device, and standard Android development tools.
 
@@ -496,7 +566,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 
 ---
 
-## 10) Deployment Rules (Android APK Building)
+## 11) Deployment Rules (Android APK Building)
 
 ### APK building
 - **Debug APK**: Build with `make build` or `./gradlew assembleDebug`.
