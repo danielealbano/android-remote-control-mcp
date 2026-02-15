@@ -65,9 +65,12 @@ class PinchTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Performs a pinch-to-zoom gesture.",
                 inputSchema =
                     ToolSchema(
@@ -310,9 +313,12 @@ class CustomGestureTool
             return longVal
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Executes a custom multi-touch gesture defined by path points.",
                 inputSchema =
                     ToolSchema(
@@ -372,7 +378,8 @@ class CustomGestureTool
 fun registerGestureTools(
     server: Server,
     actionExecutor: ActionExecutor,
+    toolNamePrefix: String,
 ) {
-    PinchTool(actionExecutor).register(server)
-    CustomGestureTool(actionExecutor).register(server)
+    PinchTool(actionExecutor).register(server, toolNamePrefix)
+    CustomGestureTool(actionExecutor).register(server, toolNamePrefix)
 }

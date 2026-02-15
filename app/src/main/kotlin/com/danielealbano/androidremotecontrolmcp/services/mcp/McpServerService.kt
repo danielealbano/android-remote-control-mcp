@@ -15,6 +15,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -138,9 +139,10 @@ class McpServerService : Service() {
             updateStatus(ServerStatus.Starting)
 
             val config = settingsRepository.serverConfig.first()
+            val toolNamePrefix = McpToolUtils.buildToolNamePrefix(config.deviceSlug)
             Log.i(
                 TAG,
-                "Starting MCP server with config: port=${config.port}, binding=${config.bindingAddress.address}",
+                "Starting MCP server with config: port=${config.port}, binding=${config.bindingAddress.address}, toolNamePrefix=$toolNamePrefix",
             )
 
             // Only get/create SSL keystore when HTTPS is enabled
@@ -162,7 +164,7 @@ class McpServerService : Service() {
                 Server(
                     serverInfo =
                         Implementation(
-                            name = "android-remote-control-mcp",
+                            name = McpToolUtils.buildServerName(config.deviceSlug),
                             version = com.danielealbano.androidremotecontrolmcp.BuildConfig.VERSION_NAME,
                         ),
                     options =
@@ -173,7 +175,7 @@ class McpServerService : Service() {
                                 ),
                         ),
                 )
-            registerAllTools(sdkServer)
+            registerAllTools(sdkServer, toolNamePrefix)
 
             // Create and start the Ktor server
             mcpServer =
@@ -243,22 +245,33 @@ class McpServerService : Service() {
         }
     }
 
-    private fun registerAllTools(server: Server) {
+    private fun registerAllTools(
+        server: Server,
+        toolNamePrefix: String,
+    ) {
         registerScreenIntrospectionTools(
             server,
             treeParser,
             accessibilityServiceProvider,
             screenCaptureProvider,
             compactTreeFormatter,
+            toolNamePrefix,
         )
-        registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider)
-        registerTouchActionTools(server, actionExecutor)
-        registerGestureTools(server, actionExecutor)
-        registerElementActionTools(server, treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
-        registerTextInputTools(server, treeParser, actionExecutor, accessibilityServiceProvider)
-        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider)
-        registerFileTools(server, storageLocationProvider, fileOperationProvider)
-        registerAppManagementTools(server, appManager)
+        registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
+        registerTouchActionTools(server, actionExecutor, toolNamePrefix)
+        registerGestureTools(server, actionExecutor, toolNamePrefix)
+        registerElementActionTools(
+            server,
+            treeParser,
+            elementFinder,
+            actionExecutor,
+            accessibilityServiceProvider,
+            toolNamePrefix,
+        )
+        registerTextInputTools(server, treeParser, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
+        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, toolNamePrefix)
+        registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
+        registerAppManagementTools(server, appManager, toolNamePrefix)
     }
 
     override fun onDestroy() {

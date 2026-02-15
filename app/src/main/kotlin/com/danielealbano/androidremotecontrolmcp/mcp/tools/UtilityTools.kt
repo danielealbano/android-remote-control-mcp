@@ -79,9 +79,12 @@ class GetClipboardTool
             }
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Get the current clipboard text content",
                 inputSchema =
                     ToolSchema(
@@ -145,9 +148,12 @@ class SetClipboardTool
             }
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Set the clipboard content to the specified text",
                 inputSchema =
                     ToolSchema(
@@ -267,9 +273,12 @@ class WaitForElementTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Wait until an element matching criteria appears (with timeout)",
                 inputSchema =
                     ToolSchema(
@@ -414,9 +423,12 @@ class WaitForIdleTool
             return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Wait for the UI to become idle (similarity-based change detection)",
                 inputSchema =
                     ToolSchema(
@@ -528,9 +540,12 @@ class GetElementDetailsTool
             return if (sanitized.isEmpty()) "-" else sanitized
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Retrieve full untruncated text and description for elements by ID. " +
                         "Use after get_screen_state when text or desc was truncated.",
@@ -565,10 +580,11 @@ fun registerUtilityTools(
     treeParser: AccessibilityTreeParser,
     elementFinder: ElementFinder,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    toolNamePrefix: String,
 ) {
-    GetClipboardTool(accessibilityServiceProvider).register(server)
-    SetClipboardTool(accessibilityServiceProvider).register(server)
-    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
-    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(server)
-    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
+    GetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
+    SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
+    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
+    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(server, toolNamePrefix)
+    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
 }

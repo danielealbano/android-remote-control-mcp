@@ -89,9 +89,12 @@ class InputTextTool
             return McpToolUtils.textResult("Text input completed (${text.length} characters)")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Type text into the focused input field or a specified element",
                 inputSchema =
                     ToolSchema(
@@ -171,9 +174,12 @@ class ClearTextTool
             return McpToolUtils.textResult("Text cleared successfully")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Clear text from the focused input field or a specified element",
                 inputSchema =
                     ToolSchema(
@@ -336,9 +342,12 @@ class PressKeyTool
             }
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Press a specific key (ENTER, BACK, DEL, HOME, TAB, SPACE)",
                 inputSchema =
                     ToolSchema(
@@ -380,10 +389,11 @@ fun registerTextInputTools(
     treeParser: AccessibilityTreeParser,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    toolNamePrefix: String,
 ) {
-    InputTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
-    ClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
-    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server)
+    InputTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    ClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -79,9 +79,12 @@ class PressBackHandler
                 actionExecutor.pressBack()
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Presses the back button (global accessibility action).",
                 inputSchema =
                     ToolSchema(
@@ -123,9 +126,12 @@ class PressHomeHandler
                 actionExecutor.pressHome()
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Navigates to the home screen.",
                 inputSchema =
                     ToolSchema(
@@ -167,9 +173,12 @@ class PressRecentsHandler
                 actionExecutor.pressRecents()
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Opens the recent apps screen.",
                 inputSchema =
                     ToolSchema(
@@ -211,9 +220,12 @@ class OpenNotificationsHandler
                 actionExecutor.openNotifications()
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Pulls down the notification shade.",
                 inputSchema =
                     ToolSchema(
@@ -255,9 +267,12 @@ class OpenQuickSettingsHandler
                 actionExecutor.openQuickSettings()
             }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Opens the quick settings panel.",
                 inputSchema =
                     ToolSchema(
@@ -461,9 +476,12 @@ class GetDeviceLogsHandler
             }
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Retrieves device logcat logs filtered by time range, tag, level, or package name.",
                 inputSchema =
                     ToolSchema(
@@ -535,11 +553,12 @@ fun registerSystemActionTools(
     server: Server,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    toolNamePrefix: String,
 ) {
-    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(server)
-    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(server)
-    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(server)
-    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(server)
-    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(server)
-    GetDeviceLogsHandler().register(server)
+    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    GetDeviceLogsHandler().register(server, toolNamePrefix)
 }

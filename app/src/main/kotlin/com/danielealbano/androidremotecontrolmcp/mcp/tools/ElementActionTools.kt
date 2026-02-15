@@ -104,9 +104,12 @@ class FindElementsTool
             return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Find UI elements matching the specified criteria " +
                         "(text, content_desc, resource_id, class_name)",
@@ -181,9 +184,12 @@ class ClickElementTool
             return McpToolUtils.textResult("Click performed on element '$elementId'")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Click the specified accessibility node by element ID",
                 inputSchema =
                     ToolSchema(
@@ -235,9 +241,12 @@ class LongClickElementTool
             return McpToolUtils.textResult("Long-click performed on element '$elementId'")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Long-click the specified accessibility node by element ID",
                 inputSchema =
                     ToolSchema(
@@ -299,9 +308,12 @@ class SetTextTool
             return McpToolUtils.textResult("Text set on element '$elementId'")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Set text on an editable accessibility node (empty string to clear)",
                 inputSchema =
                     ToolSchema(
@@ -437,9 +449,12 @@ class ScrollToElementTool
             return false
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Scroll to make the specified element visible",
                 inputSchema =
                     ToolSchema(
@@ -514,12 +529,14 @@ fun registerElementActionTools(
     elementFinder: ElementFinder,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    toolNamePrefix: String,
 ) {
-    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server)
-    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
-    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
-    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server)
-    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider).register(server)
+    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
+    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
+        .register(server, toolNamePrefix)
 }
 
 /**

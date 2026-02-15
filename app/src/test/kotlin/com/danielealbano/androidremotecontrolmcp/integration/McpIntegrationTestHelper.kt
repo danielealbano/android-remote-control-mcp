@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.integration
 
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -69,42 +70,49 @@ object McpIntegrationTestHelper {
     fun registerAllTools(
         server: Server,
         deps: MockDependencies,
+        deviceSlug: String = "",
     ) {
+        val toolNamePrefix = McpToolUtils.buildToolNamePrefix(deviceSlug)
         registerScreenIntrospectionTools(
             server,
             deps.treeParser,
             deps.accessibilityServiceProvider,
             deps.screenCaptureProvider,
             CompactTreeFormatter(),
+            toolNamePrefix,
         )
         registerSystemActionTools(
             server,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
+            toolNamePrefix,
         )
-        registerTouchActionTools(server, deps.actionExecutor)
-        registerGestureTools(server, deps.actionExecutor)
+        registerTouchActionTools(server, deps.actionExecutor, toolNamePrefix)
+        registerGestureTools(server, deps.actionExecutor, toolNamePrefix)
         registerElementActionTools(
             server,
             deps.treeParser,
             deps.elementFinder,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
+            toolNamePrefix,
         )
         registerTextInputTools(
             server,
             deps.treeParser,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
+            toolNamePrefix,
         )
         registerUtilityTools(
             server,
             deps.treeParser,
             deps.elementFinder,
             deps.accessibilityServiceProvider,
+            toolNamePrefix,
         )
-        registerFileTools(server, deps.storageLocationProvider, deps.fileOperationProvider)
-        registerAppManagementTools(server, deps.appManager)
+        registerFileTools(server, deps.storageLocationProvider, deps.fileOperationProvider, toolNamePrefix)
+        registerAppManagementTools(server, deps.appManager, toolNamePrefix)
     }
 
     /**
@@ -132,12 +140,15 @@ object McpIntegrationTestHelper {
     /**
      * Creates an SDK [Server] with all tools registered using the given dependencies.
      */
-    fun createSdkServer(deps: MockDependencies): Server {
+    fun createSdkServer(
+        deps: MockDependencies,
+        deviceSlug: String = "",
+    ): Server {
         val server =
             Server(
                 serverInfo =
                     Implementation(
-                        name = "android-remote-control-mcp",
+                        name = McpToolUtils.buildServerName(deviceSlug),
                         version = "test",
                     ),
                 options =
@@ -148,7 +159,7 @@ object McpIntegrationTestHelper {
                             ),
                     ),
             )
-        registerAllTools(server, deps)
+        registerAllTools(server, deps, deviceSlug)
         return server
     }
 
@@ -165,9 +176,10 @@ object McpIntegrationTestHelper {
      */
     suspend fun withTestApplication(
         deps: MockDependencies = createMockDependencies(),
+        deviceSlug: String = "",
         testBlock: suspend (client: Client, deps: MockDependencies) -> Unit,
     ) {
-        val sdkServer = createSdkServer(deps)
+        val sdkServer = createSdkServer(deps, deviceSlug)
 
         testApplication {
             application {
@@ -217,9 +229,10 @@ object McpIntegrationTestHelper {
      */
     suspend fun withRawTestApplication(
         deps: MockDependencies = createMockDependencies(),
+        deviceSlug: String = "",
         testBlock: suspend io.ktor.server.testing.ApplicationTestBuilder.(MockDependencies) -> Unit,
     ) {
-        val sdkServer = createSdkServer(deps)
+        val sdkServer = createSdkServer(deps, deviceSlug)
 
         testApplication {
             application {

@@ -46,9 +46,12 @@ class TapTool
             return McpToolUtils.handleActionResult(result, "Tap executed at (${x.toInt()}, ${y.toInt()})")
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Performs a single tap at the specified coordinates.",
                 inputSchema =
                     ToolSchema(
@@ -107,9 +110,12 @@ class LongPressTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Performs a long press at the specified coordinates.",
                 inputSchema =
                     ToolSchema(
@@ -172,9 +178,12 @@ class DoubleTapTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Performs a double tap at the specified coordinates.",
                 inputSchema =
                     ToolSchema(
@@ -238,9 +247,12 @@ class SwipeTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Performs a swipe gesture from one point to another.",
                 inputSchema =
                     ToolSchema(
@@ -330,9 +342,12 @@ class ScrollTool
             )
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description = "Scrolls in the specified direction.",
                 inputSchema =
                     ToolSchema(
@@ -384,10 +399,11 @@ class ScrollTool
 fun registerTouchActionTools(
     server: Server,
     actionExecutor: ActionExecutor,
+    toolNamePrefix: String,
 ) {
-    TapTool(actionExecutor).register(server)
-    LongPressTool(actionExecutor).register(server)
-    DoubleTapTool(actionExecutor).register(server)
-    SwipeTool(actionExecutor).register(server)
-    ScrollTool(actionExecutor).register(server)
+    TapTool(actionExecutor).register(server, toolNamePrefix)
+    LongPressTool(actionExecutor).register(server, toolNamePrefix)
+    DoubleTapTool(actionExecutor).register(server, toolNamePrefix)
+    SwipeTool(actionExecutor).register(server, toolNamePrefix)
+    ScrollTool(actionExecutor).register(server, toolNamePrefix)
 }

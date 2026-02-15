@@ -85,12 +85,12 @@ The MCP server name (`Implementation.name`) also includes the slug when set:
 **So that** it can be used to construct dynamic tool name prefixes.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] `ServerConfig.deviceSlug` exists with default `""`, max length `20`, and regex validation constant
-- [ ] `ServerConfigTest` has tests for `deviceSlug` default value and new companion constants
-- [ ] `SettingsRepository` has `updateDeviceSlug(slug: String)` and `validateDeviceSlug(slug: String): Result<String>`
-- [ ] `SettingsRepositoryImpl` persists slug via DataStore and maps it in `mapPreferencesToServerConfig()`
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.data.*"`
-- [ ] Lint passes on changed files
+- [x] `ServerConfig.deviceSlug` exists with default `""`, max length `20`, and regex validation constant
+- [x] `ServerConfigTest` has tests for `deviceSlug` default value and new companion constants
+- [x] `SettingsRepository` has `updateDeviceSlug(slug: String)` and `validateDeviceSlug(slug: String): Result<String>`
+- [x] `SettingsRepositoryImpl` persists slug via DataStore and maps it in `mapPreferencesToServerConfig()`
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.data.*"`
+- [x] Lint passes on changed files
 
 ---
 
