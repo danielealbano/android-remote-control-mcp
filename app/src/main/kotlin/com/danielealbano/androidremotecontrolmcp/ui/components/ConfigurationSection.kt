@@ -58,6 +58,8 @@ fun ConfigurationSection(
     bindingAddress: BindingAddress,
     portInput: String,
     portError: String?,
+    deviceSlugInput: String,
+    deviceSlugError: String?,
     bearerToken: String,
     autoStartEnabled: Boolean,
     httpsEnabled: Boolean,
@@ -67,6 +69,7 @@ fun ConfigurationSection(
     isServerRunning: Boolean,
     onBindingAddressChange: (BindingAddress) -> Unit,
     onPortChange: (String) -> Unit,
+    onDeviceSlugChange: (String) -> Unit,
     onRegenerateToken: () -> Unit,
     onCopyToken: () -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
@@ -131,6 +134,21 @@ fun ConfigurationSection(
                 isError = portError != null,
                 supportingText = portError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                enabled = !isServerRunning,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Device Slug Input
+            OutlinedTextField(
+                value = deviceSlugInput,
+                onValueChange = onDeviceSlugChange,
+                label = { Text(stringResource(R.string.config_device_slug_label)) },
+                placeholder = { Text(stringResource(R.string.config_device_slug_hint)) },
+                isError = deviceSlugError != null,
+                supportingText = deviceSlugError?.let { { Text(it) } },
                 singleLine = true,
                 enabled = !isServerRunning,
                 modifier = Modifier.fillMaxWidth(),
@@ -390,6 +408,8 @@ private fun ConfigurationSectionPreview() {
             bindingAddress = BindingAddress.LOCALHOST,
             portInput = "8080",
             portError = null,
+            deviceSlugInput = "",
+            deviceSlugError = null,
             bearerToken = "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             autoStartEnabled = false,
             httpsEnabled = false,
@@ -399,6 +419,7 @@ private fun ConfigurationSectionPreview() {
             isServerRunning = false,
             onBindingAddressChange = {},
             onPortChange = {},
+            onDeviceSlugChange = {},
             onRegenerateToken = {},
             onCopyToken = {},
             onAutoStartChange = {},

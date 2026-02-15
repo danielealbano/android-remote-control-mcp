@@ -29,6 +29,8 @@
     <string name="config_binding_localhost">Localhost (127.0.0.1)</string>
     <string name="config_binding_network">Network (0.0.0.0)</string>
     <string name="config_port_label">Port</string>
+    <string name="config_device_slug_label">Device Slug (optional)</string>
+    <string name="config_device_slug_hint">e.g., pixel7, work_phone</string>
     <string name="config_bearer_token_label">Bearer Token</string>
     <string name="config_token_show">Show token</string>
     <string name="config_token_hide">Hide token</string>
