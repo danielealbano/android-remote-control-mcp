@@ -274,6 +274,7 @@ class MainViewModel
             }
         }
 
+        @Suppress("TooGenericExceptionCaught")
         fun refreshStorageLocations() {
             viewModelScope.launch(ioDispatcher) {
                 try {
@@ -288,6 +289,7 @@ class MainViewModel
             _pendingAuthorizationLocationId.value = locationId
         }
 
+        @Suppress("TooGenericExceptionCaught")
         fun onLocationAuthorized(treeUri: Uri) {
             val locationId = _pendingAuthorizationLocationId.value
             _pendingAuthorizationLocationId.value = null
@@ -309,6 +311,7 @@ class MainViewModel
             _pendingAuthorizationLocationId.value = null
         }
 
+        @Suppress("TooGenericExceptionCaught")
         fun deauthorizeLocation(locationId: String) {
             viewModelScope.launch(ioDispatcher) {
                 try {
@@ -386,6 +389,7 @@ class MainViewModel
             }
         }
 
+        @Suppress("TooGenericExceptionCaught")
         fun getInitialPickerUri(locationId: String): Uri? {
             val location = _storageLocations.value.find { it.id == locationId } ?: return null
             return try {

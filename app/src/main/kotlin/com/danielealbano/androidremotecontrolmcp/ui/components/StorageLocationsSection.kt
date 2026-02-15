@@ -36,6 +36,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMc
 private val AuthorizedColor = Color(0xFF4CAF50)
 private val UnauthorizedColor = Color(0xFFF44336)
 
+@Suppress("LongMethod")
 @Composable
 fun StorageLocationsSection(
     storageLocations: List<StorageLocation>,
@@ -226,6 +227,7 @@ private fun StorageLocationRow(
     }
 }
 
+@Suppress("UnusedPrivateMember")
 @Preview(showBackground = true)
 @Composable
 private fun StorageLocationsSectionPreview() {

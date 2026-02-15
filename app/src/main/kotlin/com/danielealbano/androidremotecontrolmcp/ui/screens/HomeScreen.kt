@@ -3,7 +3,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -75,17 +74,18 @@ fun HomeScreen(
         serverStatus is ServerStatus.Running ||
             serverStatus is ServerStatus.Starting
 
-    val documentTreeLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri != null) {
-            // Permission is taken inside StorageLocationProviderImpl.authorizeLocation()
-            // — do NOT call takePersistableUriPermission here to avoid a double call.
-            viewModel.onLocationAuthorized(uri)
-        } else {
-            viewModel.onLocationAuthorizationCancelled()
+    val documentTreeLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree(),
+        ) { uri ->
+            if (uri != null) {
+                // Permission is taken inside StorageLocationProviderImpl.authorizeLocation()
+                // — do NOT call takePersistableUriPermission here to avoid a double call.
+                viewModel.onLocationAuthorized(uri)
+            } else {
+                viewModel.onLocationAuthorizationCancelled()
+            }
         }
-    }
 
     DisposableEffect(lifecycleOwner) {
         val observer =

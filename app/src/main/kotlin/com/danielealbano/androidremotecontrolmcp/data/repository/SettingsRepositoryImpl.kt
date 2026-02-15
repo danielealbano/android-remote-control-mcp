@@ -260,8 +260,9 @@ class SettingsRepositoryImpl
                 fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
                 allowHttpDownloads = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false,
                 allowUnverifiedHttpsCerts = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false,
-                downloadTimeoutSeconds = prefs[DOWNLOAD_TIMEOUT_KEY]
-                    ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
+                downloadTimeoutSeconds =
+                    prefs[DOWNLOAD_TIMEOUT_KEY]
+                        ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
             )
         }
 
