@@ -433,7 +433,7 @@ class AppendFileHandler
                 description =
                     "Appends text content to an existing file in an authorized storage location. If the " +
                         "storage provider does not support append mode, an error is returned with a hint " +
-                        "to use write_file instead.",
+                        "to use ${toolNamePrefix}write_file instead.",
                 inputSchema =
                     ToolSchema(
                         properties =

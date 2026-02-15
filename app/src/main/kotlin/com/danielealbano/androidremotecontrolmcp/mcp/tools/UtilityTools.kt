@@ -548,7 +548,7 @@ class GetElementDetailsTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Retrieve full untruncated text and description for elements by ID. " +
-                        "Use after get_screen_state when text or desc was truncated.",
+                        "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(
                         properties =
