@@ -21,12 +21,14 @@ This document provides a comprehensive reference for all MCP tools available in 
 8. [Element Action Tools](#5-element-action-tools)
 9. [Text Input Tools](#6-text-input-tools)
 10. [Utility Tools](#7-utility-tools)
+11. [File Tools](#8-file-tools)
+12. [App Management Tools](#9-app-management-tools)
 
 ---
 
 ## Overview
 
-The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized into 7 categories:
+The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized into 9 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -37,6 +39,8 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 | Element Actions | `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element` | 9 |
 | Text Input | `input_text`, `clear_text`, `press_key` | 9 |
 | Utilities | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle`, `get_element_details` | 9, 15 |
+| File Operations | `list_storage_locations`, `list_files`, `read_file`, `write_file`, `append_file`, `file_replace`, `download_from_url`, `delete_file` | - |
+| App Management | `open_app`, `list_apps`, `close_app` | - |
 
 ### Endpoint
 
@@ -1614,3 +1618,591 @@ If an element ID is not found in the current accessibility tree, the row shows `
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `ids` parameter, `ids` is not an array, array is empty, or contains non-string values
 - **Permission denied**: Accessibility service not enabled
+
+---
+
+## 8. File Tools
+
+File operations on authorized storage locations. Storage locations must be authorized in the app settings before file operations can be performed. Text file operations are subject to a configurable file size limit. All file paths are relative to the storage location root.
+
+### `list_storage_locations`
+
+Lists available storage locations on the device with their authorization status. Locations must be authorized in the app settings before file operations can be performed on them.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {},
+  "required": []
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "list_storage_locations",
+    "arguments": {}
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"id\":\"com.android.providers.downloads.documents/downloads\",\"name\":\"Downloads\",\"provider\":\"Downloads\",\"authorized\":true,\"available_bytes\":52428800000}]"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Action failed**: Failed to query storage locations
+
+---
+
+### `list_files`
+
+Lists files and directories in a storage location. Results are sorted directories-first, then alphabetically. Supports pagination via `offset` and `limit` parameters.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | No | `""` | Relative path within the storage location |
+| `offset` | integer | No | 0 | Pagination offset (0-based) |
+| `limit` | integer | No | 200 | Maximum number of entries to return (max 200) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "list_files",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "",
+      "offset": 0,
+      "limit": 200
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"files\":[{\"name\":\"Documents\",\"path\":\"loc/Documents\",\"is_directory\":true,\"size\":0,\"last_modified\":null,\"mime_type\":null},{\"name\":\"readme.txt\",\"path\":\"loc/readme.txt\",\"is_directory\":false,\"size\":1024,\"last_modified\":1700000000000,\"mime_type\":\"text/plain\"}],\"total_count\":2,\"has_more\":false}"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Returns `total_count` (total number of entries in the directory) and `has_more` (whether more entries exist beyond the current page) for pagination.
+- Directories are listed before files, both sorted alphabetically.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id`, invalid `offset` or `limit`
+- **Action failed**: Storage location not authorized or not found, path not found
+
+---
+
+### `read_file`
+
+Reads a text file with line-based pagination. Returns content with line numbers.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `offset` | integer | No | 1 | Starting line number (1-based) |
+| `limit` | integer | No | 200 | Maximum number of lines to return (max 200) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "read_file",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "readme.txt",
+      "offset": 1,
+      "limit": 200
+    }
+  }
+}
+```
+
+**Example Response** (partial file):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "1| First line of the file\n2| Second line of the file\n--- More lines available. Use offset=3 to continue reading. Total lines: 100 ---"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Subject to configured file size limit.
+- When more lines exist beyond the returned range, a hint is appended: `"--- More lines available. Use offset=N to continue reading. Total lines: T ---"`
+- Line numbers are 1-based and formatted as `N| line content`.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id` or `path`, invalid `offset` or `limit`
+- **Action failed**: Storage location not authorized, file not found, file exceeds size limit, file is not a text file
+
+---
+
+### `write_file`
+
+Writes text content to a file. Creates the file if it doesn't exist, creates parent directories automatically, overwrites existing content. Empty content creates an empty file.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `content` | string | Yes | - | Text content to write (empty string creates an empty file) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "write_file",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "notes/todo.txt",
+      "content": "Buy groceries\nWalk the dog"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "File written successfully: notes/todo.txt"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Subject to configured file size limit.
+- Parent directories are created automatically if they don't exist.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id`, `path`, or `content`
+- **Action failed**: Storage location not authorized, content exceeds file size limit, write operation failed
+
+---
+
+### `append_file`
+
+Appends text content to an existing file. If the storage provider does not support append mode, an error with a hint to use `write_file` is returned.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `content` | string | Yes | - | Text content to append |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "append_file",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "notes/todo.txt",
+      "content": "\nFeed the cat"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Content appended successfully to: notes/todo.txt"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Not all storage providers (e.g., virtual providers like Google Drive) support append mode. When unsupported, the error message includes a hint to use `read_file` + `write_file` as a workaround.
+- Subject to configured file size limit (combined existing + appended content).
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id`, `path`, or `content`
+- **Action failed**: Storage location not authorized, file not found, append mode not supported by provider, content exceeds file size limit
+
+---
+
+### `file_replace`
+
+Performs literal string replacement in a text file. Uses advisory file locking when supported by the storage provider.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `old_string` | string | Yes | - | The literal string to search for |
+| `new_string` | string | Yes | - | The replacement string |
+| `replace_all` | boolean | No | `false` | If `true`, replaces all occurrences; if `false`, replaces only the first |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "file_replace",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "notes/todo.txt",
+      "old_string": "Buy groceries",
+      "new_string": "Buy organic groceries",
+      "replace_all": false
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Replaced 1 occurrence(s) in: notes/todo.txt"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Literal matching only (no regex support).
+- Subject to configured file size limit.
+- Uses advisory file locking when supported by the underlying storage provider to avoid concurrent modification issues.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id`, `path`, `old_string`, or `new_string`; `old_string` is empty
+- **Action failed**: Storage location not authorized, file not found, `old_string` not found in file, file exceeds size limit
+
+---
+
+### `download_from_url`
+
+Downloads a file from a URL and saves it to an authorized storage location.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Destination path within the storage location |
+| `url` | string | Yes | - | URL to download from (HTTP or HTTPS) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "download_from_url",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "images/photo.jpg",
+      "url": "https://example.com/photo.jpg"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "File downloaded successfully: images/photo.jpg"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- Subject to file size limit, download timeout, and HTTP/HTTPS security settings configured in the app.
+- HTTP downloads (non-HTTPS) must be explicitly allowed in app settings.
+- Unverified HTTPS certificates must be explicitly allowed in app settings.
+- Parent directories are created automatically if they don't exist.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id`, `path`, or `url`; invalid URL format
+- **Action failed**: Storage location not authorized, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed
+
+---
+
+### `delete_file`
+
+Deletes a single file from an authorized storage location. Cannot delete directories.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `location_id` | string | Yes | - | Storage location ID from `list_storage_locations` |
+| `path` | string | Yes | - | Relative path to the file within the storage location |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "delete_file",
+    "arguments": {
+      "location_id": "com.android.providers.downloads.documents/downloads",
+      "path": "notes/old-todo.txt"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "File deleted successfully: notes/old-todo.txt"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `location_id` or `path`
+- **Action failed**: Storage location not authorized, file not found, target is a directory (not a file), delete operation failed
+
+---
+
+## 9. App Management Tools
+
+Tools for managing installed applications: launching, listing, and closing apps.
+
+### `open_app`
+
+Opens (launches) an application by its package ID. The app must be installed and have a launchable activity.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `package_id` | string | Yes | - | The package ID of the app to launch (e.g., `com.example.app`) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "open_app",
+    "arguments": {
+      "package_id": "com.android.calculator2"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "App opened successfully: com.android.calculator2"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `package_id`
+- **Action failed**: App not installed, app has no launchable activity, launch failed
+
+---
+
+### `list_apps`
+
+Lists installed applications. Can filter by type (all, user-installed, system) and by name substring.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `filter` | string | No | `"all"` | Filter by app type: `"all"`, `"user"`, or `"system"` |
+| `name_query` | string | No | - | Filter by app name substring (case-insensitive) |
+
+**Example Request** (list user apps matching "calc"):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "list_apps",
+    "arguments": {
+      "filter": "user",
+      "name_query": "calc"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"package_id\":\"com.example.app\",\"name\":\"Example App\",\"version_name\":\"1.2.3\",\"version_code\":42,\"is_system\":false}]"
+      }
+    ]
+  }
+}
+```
+
+**Notes**:
+- The `filter` parameter accepts `"all"` (default, all installed apps), `"user"` (user-installed apps only), or `"system"` (system apps only).
+- The `name_query` parameter performs a case-insensitive substring match on the app's display name.
+- Both filters can be combined.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Invalid `filter` value (not one of `all`, `user`, `system`)
+- **Action failed**: Failed to query installed applications
+
+---
+
+### `close_app`
+
+Kills a background application process.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `package_id` | string | Yes | - | The package ID of the app to close (e.g., `com.example.app`) |
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "close_app",
+    "arguments": {
+      "package_id": "com.example.app"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "App closed successfully: com.example.app"
+      }
+    ]
+  }
+}
+```
+
+**Important Limitations**:
+- This only works for apps that are currently in the **background**. For foreground apps, use `press_home` first to send the app to the background, wait briefly (e.g., using `wait_for_idle`), then call `close_app`.
+- System processes may restart automatically after being killed.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `package_id`
+- **Action failed**: App not installed, failed to kill process

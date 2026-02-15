@@ -129,18 +129,20 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `McpApplication.kt` — Application class (Hilt setup)
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`
+  - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`
+  - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
   - `ui/screens/` — `HomeScreen.kt`
-  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`
+  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
-  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`
+  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
@@ -186,7 +188,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 27 tools across 7 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 ### 1. Screen Introspection Tools (1 tool)
 
@@ -260,6 +262,37 @@ The MCP server exposes 27 tools across 7 categories. For full JSON-RPC schemas, 
 
 **Timeout behavior**: Both `wait_for_element` and `wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
+### 8. File Tools (8 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `list_storage_locations` | List available storage locations with authorization status | — | — |
+| `list_files` | List files/directories in an authorized storage location | `location_id` (string) | `path` (string, default ""), `offset` (int, default 0), `limit` (int, default 200, max 200) |
+| `read_file` | Read text file with line-based pagination | `location_id` (string), `path` (string) | `offset` (int, 1-based line number, default 1), `limit` (int, default 200, max 200) |
+| `write_file` | Write/create text file (creates parents, overwrites) | `location_id` (string), `path` (string), `content` (string) | — |
+| `append_file` | Append to text file (tries native "wa" mode) | `location_id` (string), `path` (string), `content` (string) | — |
+| `file_replace` | Literal string replacement in text file | `location_id` (string), `path` (string), `old_string` (string), `new_string` (string) | `replace_all` (boolean, default false) |
+| `download_from_url` | Download file from URL to authorized storage | `location_id` (string), `path` (string), `url` (string) | — |
+| `delete_file` | Delete a single file (not directories) | `location_id` (string), `path` (string) | — |
+
+**Virtual path system**: All file tools use virtual paths: `{location_id}/{relative_path}` where `location_id` is `{authority}/{rootId}`. The location must be authorized by the user via the UI before file operations can be performed.
+
+**File size limit**: All file operations are subject to the configurable file size limit (default 50 MB, range 1-500 MB). Stored in `ServerConfig.fileSizeLimitMb`.
+
+**Encoding**: All text operations use UTF-8.
+
+**Errors**: Returns `CallToolResult(isError = true)` if location not authorized, file not found, file exceeds size limit, or operation fails. `append_file` returns a hint to use `write_file` if the storage provider does not support append mode. `download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
+
+### 9. App Management Tools (3 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `open_app` | Launch an application by package ID | `package_id` (string) | — |
+| `list_apps` | List installed applications with filtering | — | `filter` (string: all/user/system, default "all"), `name_query` (string) |
+| `close_app` | Kill a background application process | `package_id` (string) | — |
+
+**Errors**: `open_app` returns `CallToolResult(isError = true)` if the app is not installed or has no launchable activity. `close_app` only affects background processes — for foreground apps, use `press_home` first to send the app to the background. `list_apps` requires the `QUERY_ALL_PACKAGES` permission. `close_app` requires the `KILL_BACKGROUND_PROCESSES` permission.
+
 ---
 
 ## Android-Specific Conventions
@@ -283,7 +316,26 @@ The MCP server exposes 27 tools across 7 categories. For full JSON-RPC schemas, 
 
 - **Accessibility**: User must enable manually in Settings (provide deep link). Also provides screenshot capture via `takeScreenshot()` API (Android 11+)
 - **Internet**: Declared in manifest, granted automatically
+- **QUERY_ALL_PACKAGES**: Required for listing all installed applications via `PackageManager`. Declared in manifest, granted automatically
+- **KILL_BACKGROUND_PROCESSES**: Required for killing background app processes via `ActivityManager.killBackgroundProcesses()`. Declared in manifest, granted automatically
 - Always check permission state before operations; return `CallToolResult(isError = true)` if permission missing
+
+### Storage Access Framework (SAF) Authorization
+
+The application uses Android's Storage Access Framework (SAF) for unified, secure access to both physical and virtual storage (device storage, SD cards, Google Drive, Dropbox, etc.).
+
+**Discovery**: Storage locations are discovered by querying all installed document providers for their roots via `ContentResolver.query()` on `DocumentsContract.Root`.
+
+**Authorization flow**:
+1. The UI displays a "Storage Locations" section listing all discovered locations with toggle switches
+2. When the user enables a toggle, the app launches the system file picker via `ACTION_OPEN_DOCUMENT_TREE` with a hint URI pointing to the selected root
+3. The user confirms the location in the system picker (mandatory Android security requirement — apps cannot self-grant storage access)
+4. The granted tree URI is persisted via `ContentResolver.takePersistableUriPermission()` (read + write)
+5. The URI string is stored in DataStore (via `SettingsRepository`) for restoration across app restarts
+
+**Virtual path system**: All file operations use virtual paths in the format `{location_id}/{relative_path}`, where `location_id` is `{authority}/{rootId}` (e.g., `com.android.externalstorage.documents/primary`). This provides a stable, cross-session identifier for each storage root.
+
+**Deauthorization**: When the user disables a toggle, the persistent URI permission is released via `ContentResolver.releasePersistableUriPermission()` and removed from DataStore.
 
 ### Background Restrictions & Memory Management
 
@@ -353,7 +405,7 @@ The MCP server exposes 27 tools across 7 categories. For full JSON-RPC schemas, 
 
 ### Screen Structure
 
-HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
+HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS, file size limit, download settings), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), StorageLocationsSection (discovered SAF storage roots with authorization toggle switches), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
 
 ### Accessibility (UI)
 
@@ -381,8 +433,8 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### Integration Tests
 
 - **Framework**: Ktor `testApplication`, JUnit 5, MockK
-- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 7 tool categories, error code propagation
-- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
+- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 9 tool categories, error code propagation
+- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
 - **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; uses SDK `Client` + `StreamableHttpClientTransport` for type-safe MCP communication
 - **Run**: `make test-integration` or `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
 - **Note**: JVM-based, no emulator or device required. Runs as part of `make test-unit` since both are under `app/src/test/`
@@ -493,7 +545,7 @@ Tunnel architecture:
 
 ### Permission Security
 
-Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, Accessibility Service (user-granted via Settings). Display clear explanations before requesting.
+Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
 
 ### Code Security
 
@@ -516,6 +568,10 @@ Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMP
 - **Tunnel Provider**: Cloudflare (no account required)
 - **ngrok Authtoken**: Empty (required when using ngrok)
 - **ngrok Domain**: Empty (auto-assigned when empty)
+- **File Size Limit**: 50 MB (range 1-500 MB, configurable via UI, applies to all file operations)
+- **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
+- **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)
+- **Download Timeout**: 60 seconds (range 10-300 seconds, configurable via UI)
 
 ### MCP Defaults
 
@@ -607,7 +663,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 29 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 38 tools
 
 ---
 
