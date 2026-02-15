@@ -314,6 +314,7 @@ NGROK_SRC_DIR := vendor/ngrok-java
 NGROK_NATIVE_DIR := $(NGROK_SRC_DIR)/ngrok-java-native
 NGROK_JNILIBS_DIR := app/src/main/jniLibs
 NGROK_JAVA_JAR := $(NGROK_SRC_DIR)/ngrok-java/target/ngrok-java-1.1.1.jar
+NGROK_NATIVE_CLASSES_JAR := $(NGROK_NATIVE_DIR)/target/ngrok-java-native-classes.jar
 NGROK_HOST_NATIVE_DIR := $(NGROK_NATIVE_DIR)/target/aarch64-apple-darwin/release
 JAVA_HOME_17 ?= $(or $(JAVA_HOME),/opt/homebrew/opt/openjdk@17)
 
@@ -363,24 +364,30 @@ compile-ngrok-native: ## Build ngrok-java native library from source (requires R
 		JAVA_17_HOME=$(JAVA_HOME_17) \
 		mvn package -pl ngrok-java -DskipTests --global-toolchains toolchains.xml -q
 	@echo ""
-	@echo "Step 3: Building native library for arm64-v8a (aarch64-linux-android)..."
+	@echo "Step 3: Packaging ngrok-java-native Java classes into JAR..."
+	cd $(NGROK_NATIVE_DIR)/target/classes && jar cf ../ngrok-java-native-classes.jar com/
+	@echo ""
+	@echo "Step 4: Building native library for arm64-v8a (aarch64-linux-android)..."
 	cd $(NGROK_NATIVE_DIR) && \
 		CC_aarch64_linux_android="$(NDK_BIN)/aarch64-linux-android21-clang" \
 		AR_aarch64_linux_android="$(NDK_BIN)/llvm-ar" \
 		CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$(NDK_BIN)/aarch64-linux-android21-clang" \
 		cargo build --release --target aarch64-linux-android
 	@echo ""
-	@echo "Step 4: Building native library for x86_64 (x86_64-linux-android)..."
+	@echo "Step 5: Building native library for x86_64 (x86_64-linux-android)..."
 	cd $(NGROK_NATIVE_DIR) && \
 		CC_x86_64_linux_android="$(NDK_BIN)/x86_64-linux-android21-clang" \
 		AR_x86_64_linux_android="$(NDK_BIN)/llvm-ar" \
 		CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$(NDK_BIN)/x86_64-linux-android21-clang" \
 		cargo build --release --target x86_64-linux-android
 	@echo ""
-	@echo "Step 5: Building native library for host (JVM tests)..."
+	@echo "Step 6: Building native library for host (JVM tests)..."
 	cd $(NGROK_NATIVE_DIR) && cargo build --release
 	@echo ""
-	@echo "Step 6: Copying .so files to jniLibs..."
+	@echo "Step 7: Packaging host native library into JAR (for classpath loading)..."
+	cd $(NGROK_NATIVE_DIR)/target/release && jar cf ../ngrok-java-native-host.jar $$(ls libngrok_java.so libngrok_java.dylib 2>/dev/null)
+	@echo ""
+	@echo "Step 8: Copying .so files to jniLibs..."
 	mkdir -p $(NGROK_JNILIBS_DIR)/arm64-v8a $(NGROK_JNILIBS_DIR)/x86_64
 	cp $(NGROK_NATIVE_DIR)/target/aarch64-linux-android/release/libngrok_java.so $(NGROK_JNILIBS_DIR)/arm64-v8a/
 	cp $(NGROK_NATIVE_DIR)/target/x86_64-linux-android/release/libngrok_java.so $(NGROK_JNILIBS_DIR)/x86_64/
