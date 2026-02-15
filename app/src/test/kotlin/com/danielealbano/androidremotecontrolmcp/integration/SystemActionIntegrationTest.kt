@@ -31,7 +31,7 @@ class SystemActionIntegrationTest {
             coEvery { deps.actionExecutor.pressHome() } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(name = "press_home", arguments = emptyMap())
+                val result = client.callTool(name = "android_press_home", arguments = emptyMap())
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
             }
@@ -45,7 +45,7 @@ class SystemActionIntegrationTest {
             coEvery { deps.actionExecutor.pressBack() } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(name = "press_back", arguments = emptyMap())
+                val result = client.callTool(name = "android_press_back", arguments = emptyMap())
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text

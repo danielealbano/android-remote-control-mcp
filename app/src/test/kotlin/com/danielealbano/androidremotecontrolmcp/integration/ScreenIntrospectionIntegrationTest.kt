@@ -83,7 +83,7 @@ class ScreenIntrospectionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_screen_state",
+                        name = "android_get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
@@ -119,7 +119,7 @@ class ScreenIntrospectionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_screen_state",
+                        name = "android_get_screen_state",
                         arguments = mapOf("include_screenshot" to true),
                     )
                 assertNotEquals(true, result.isError)
@@ -144,7 +144,7 @@ class ScreenIntrospectionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_screen_state",
+                        name = "android_get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
@@ -166,7 +166,7 @@ class ScreenIntrospectionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_screen_state",
+                        name = "android_get_screen_state",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)

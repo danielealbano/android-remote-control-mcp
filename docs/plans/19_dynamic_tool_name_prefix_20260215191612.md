@@ -868,13 +868,13 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 **So that** my MCP tools have a unique prefix identifying my device.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] Device slug text field appears in `ConfigurationSection`, between port and bearer token
-- [ ] Text field is disabled when server is running
-- [ ] Validation errors display below the field (invalid chars, too long)
-- [ ] Valid input is persisted to DataStore via SettingsRepository
-- [ ] ViewModel handles input, validation, and persistence
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModelTest"`
-- [ ] Lint passes on changed files
+- [x] Device slug text field appears in `ConfigurationSection`, between port and bearer token
+- [x] Text field is disabled when server is running
+- [x] Validation errors display below the field (invalid chars, too long)
+- [x] Valid input is persisted to DataStore via SettingsRepository
+- [x] ViewModel handles input, validation, and persistence
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModelTest"`
+- [x] Lint passes on changed files
 
 ---
 
@@ -1176,12 +1176,12 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 **So that** tests verify the correct tool name format.
 
 ### Acceptance Criteria / Definition of Done
-- [ ] `McpIntegrationTestHelper` accepts `deviceSlug` and derives the prefix internally via `McpToolUtils.buildToolNamePrefix()`
-- [ ] `McpProtocolIntegrationTest` uses prefixed expected tool names
-- [ ] All integration tests use prefixed tool names in `client.callTool(name = ...)` calls
-- [ ] At least one dedicated test verifies slug-based tool names work
-- [ ] All integration tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
-- [ ] Lint passes on changed files
+- [x] `McpIntegrationTestHelper` accepts `deviceSlug` and derives the prefix internally via `McpToolUtils.buildToolNamePrefix()`
+- [x] `McpProtocolIntegrationTest` uses prefixed expected tool names
+- [x] All integration tests use prefixed tool names in `client.callTool(name = ...)` calls
+- [x] At least one dedicated test verifies slug-based tool names work
+- [x] All integration tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
+- [x] Lint passes on changed files
 
 ---
 

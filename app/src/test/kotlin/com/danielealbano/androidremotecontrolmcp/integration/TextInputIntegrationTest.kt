@@ -71,7 +71,7 @@ class TextInputIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "input_text",
+                        name = "android_input_text",
                         arguments = mapOf("text" to "Hello World", "element_id" to "node_edit"),
                     )
                 assertNotEquals(true, result.isError)
@@ -85,7 +85,7 @@ class TextInputIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "input_text",
+                        name = "android_input_text",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)

@@ -34,7 +34,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "open_app",
+                        name = "android_open_app",
                         arguments = mapOf("package_id" to "com.test.app"),
                     )
                 assertNotEquals(true, result.isError)
@@ -54,7 +54,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "open_app",
+                        name = "android_open_app",
                         arguments = mapOf("package_id" to "com.unknown"),
                     )
                 assertEquals(true, result.isError)
@@ -69,7 +69,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "open_app",
+                        name = "android_open_app",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)
@@ -105,7 +105,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_apps",
+                        name = "android_list_apps",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
@@ -134,7 +134,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_apps",
+                        name = "android_list_apps",
                         arguments = mapOf("filter" to "user"),
                     )
                 assertNotEquals(true, result.isError)
@@ -160,7 +160,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_apps",
+                        name = "android_list_apps",
                         arguments = mapOf("filter" to "system"),
                     )
                 assertNotEquals(true, result.isError)
@@ -186,7 +186,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_apps",
+                        name = "android_list_apps",
                         arguments = mapOf("name_query" to "calc"),
                     )
                 assertNotEquals(true, result.isError)
@@ -201,7 +201,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_apps",
+                        name = "android_list_apps",
                         arguments = mapOf("filter" to "invalid"),
                     )
                 assertEquals(true, result.isError)
@@ -219,7 +219,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "close_app",
+                        name = "android_close_app",
                         arguments = mapOf("package_id" to "com.test.app"),
                     )
                 assertNotEquals(true, result.isError)
@@ -234,7 +234,7 @@ class AppManagementToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "close_app",
+                        name = "android_close_app",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)
