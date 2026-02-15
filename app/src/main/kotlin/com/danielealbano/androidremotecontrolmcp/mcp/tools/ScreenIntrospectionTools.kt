@@ -109,9 +109,12 @@ class GetScreenStateHandler
             return McpToolUtils.textResult(compactOutput)
         }
 
-        fun register(server: Server) {
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
             server.addTool(
-                name = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Returns the current screen state: app info, screen dimensions, " +
                         "and a compact UI element list (text/desc truncated to 100 chars, use " +
@@ -159,7 +162,8 @@ fun registerScreenIntrospectionTools(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     screenCaptureProvider: ScreenCaptureProvider,
     compactTreeFormatter: CompactTreeFormatter,
+    toolNamePrefix: String,
 ) {
     GetScreenStateHandler(treeParser, accessibilityServiceProvider, screenCaptureProvider, compactTreeFormatter)
-        .register(server)
+        .register(server, toolNamePrefix)
 }
