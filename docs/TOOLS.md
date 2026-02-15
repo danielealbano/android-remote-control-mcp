@@ -260,6 +260,64 @@ gh repo view
 git remote -v
 ```
 
+### PR Reviewers
+
+```bash
+# Add Copilot as reviewer
+gh pr edit <number> --add-reviewer copilot
+```
+
+### PR Review Comments
+
+```bash
+# List review comments on a PR
+gh api repos/<owner>/<repo>/pulls/<number>/comments
+
+# Reply to a review comment (use in_reply_to with the comment's databaseId)
+gh api repos/<owner>/<repo>/pulls/<number>/comments \
+  -f body="Your reply text here." \
+  -F in_reply_to=<comment-id>
+```
+
+### Resolving Review Conversations
+
+Resolving review threads requires GraphQL. First, get the thread IDs:
+
+```bash
+# Get review thread IDs and their resolved status
+gh api graphql -f query='
+query {
+  repository(owner: "<owner>", name: "<repo>") {
+    pullRequest(number: <number>) {
+      reviewThreads(first: 50) {
+        nodes {
+          id
+          isResolved
+          comments(first: 1) {
+            nodes {
+              body
+              databaseId
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+Then resolve each thread by its `id`:
+
+```bash
+# Resolve a review thread
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: {threadId: "<thread-id>"}) {
+    thread { isResolved }
+  }
+}'
+```
+
 ### Issue Management (if needed)
 
 ```bash
@@ -369,6 +427,9 @@ gh act --secret-file .secrets
 | Push (first time) | `git push -u origin feat/<desc>` |
 | Push (subsequent) | `git push` |
 | Create PR | `gh pr create --base main --title "..." --body "..."` |
+| Add Copilot reviewer | `gh pr edit <n> --add-reviewer copilot` |
+| Reply to PR comment | `gh api repos/.../pulls/<n>/comments -f body="..." -F in_reply_to=<id>` |
+| Resolve PR thread | `gh api graphql -f query='mutation { resolveReviewThread(...) }'` |
 | Validate CI | `gh act --validate` |
 | Dry-run CI | `gh act -n` |
 | Run CI job | `gh act -j <job-id>` |
