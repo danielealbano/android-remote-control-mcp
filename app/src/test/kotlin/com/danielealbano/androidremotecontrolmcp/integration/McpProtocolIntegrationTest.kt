@@ -1,8 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import io.mockk.coEvery
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -33,7 +35,7 @@ class McpProtocolIntegrationTest {
         }
 
     @Test
-    fun `listTools returns all 27 registered tools`() =
+    fun `listTools returns all 38 registered tools`() =
         runTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result = client.listTools()
@@ -79,45 +81,111 @@ class McpProtocolIntegrationTest {
             }
         }
 
+    @Test
+    fun `listTools with device slug includes slug in tool names`() =
+        runTest {
+            McpIntegrationTestHelper.withTestApplication(
+                deviceSlug = "pixel7",
+            ) { client, _ ->
+                val result = client.listTools()
+                result.tools.forEach { tool ->
+                    assertTrue(
+                        tool.name.startsWith("android_pixel7_"),
+                        "Tool '${tool.name}' should start with 'android_pixel7_'",
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun `server name includes device slug when set`() =
+        runTest {
+            McpIntegrationTestHelper.withTestApplication(
+                deviceSlug = "pixel7",
+            ) { client, _ ->
+                assertEquals("android-remote-control-mcp-pixel7", client.serverVersion?.name)
+            }
+        }
+
+    @Test
+    fun `server name without slug uses default`() =
+        runTest {
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                assertEquals("android-remote-control-mcp", client.serverVersion?.name)
+            }
+        }
+
+    @Test
+    fun `tool with slug can be called successfully`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.actionExecutor.tap(any(), any()) } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(
+                deps = deps,
+                deviceSlug = "pixel7",
+            ) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_pixel7_tap",
+                        arguments = mapOf("x" to 100, "y" to 200),
+                    )
+                assertNotEquals(true, result.isError)
+            }
+        }
+
     companion object {
         private const val EXPECTED_TOOL_COUNT = 38
 
         private val EXPECTED_TOOL_NAMES =
             setOf(
                 // Touch actions
-                "tap",
-                "long_press",
-                "double_tap",
-                "swipe",
-                "scroll",
+                "android_tap",
+                "android_long_press",
+                "android_double_tap",
+                "android_swipe",
+                "android_scroll",
                 // Gestures
-                "pinch",
-                "custom_gesture",
+                "android_pinch",
+                "android_custom_gesture",
                 // Element actions
-                "find_elements",
-                "click_element",
-                "long_click_element",
-                "set_text",
-                "scroll_to_element",
+                "android_find_elements",
+                "android_click_element",
+                "android_long_click_element",
+                "android_set_text",
+                "android_scroll_to_element",
                 // Screen introspection
-                "get_screen_state",
+                "android_get_screen_state",
                 // System actions
-                "press_back",
-                "press_home",
-                "press_recents",
-                "open_notifications",
-                "open_quick_settings",
-                "get_device_logs",
+                "android_press_back",
+                "android_press_home",
+                "android_press_recents",
+                "android_open_notifications",
+                "android_open_quick_settings",
+                "android_get_device_logs",
                 // Text input
-                "input_text",
-                "clear_text",
-                "press_key",
+                "android_input_text",
+                "android_clear_text",
+                "android_press_key",
                 // Utility
-                "get_clipboard",
-                "set_clipboard",
-                "wait_for_element",
-                "wait_for_idle",
-                "get_element_details",
+                "android_get_clipboard",
+                "android_set_clipboard",
+                "android_wait_for_element",
+                "android_wait_for_idle",
+                "android_get_element_details",
+                // File tools
+                "android_list_storage_locations",
+                "android_list_files",
+                "android_read_file",
+                "android_write_file",
+                "android_append_file",
+                "android_file_replace",
+                "android_download_from_url",
+                "android_delete_file",
+                // App management
+                "android_open_app",
+                "android_list_apps",
+                "android_close_app",
             )
     }
 }

@@ -54,7 +54,7 @@ class FileToolsIntegrationTest {
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
-                val result = client.callTool(name = "list_storage_locations", arguments = emptyMap())
+                val result = client.callTool(name = "android_list_storage_locations", arguments = emptyMap())
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text
@@ -90,7 +90,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_files",
+                        name = "android_list_files",
                         arguments = mapOf("location_id" to "loc1"),
                     )
                 assertNotEquals(true, result.isError)
@@ -110,7 +110,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_files",
+                        name = "android_list_files",
                         arguments = mapOf("location_id" to "loc1"),
                     )
                 assertEquals(true, result.isError)
@@ -133,7 +133,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "list_files",
+                        name = "android_list_files",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -168,7 +168,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "read_file",
+                        name = "android_read_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -198,7 +198,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "read_file",
+                        name = "android_read_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -229,7 +229,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "read_file",
+                        name = "android_read_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -253,7 +253,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "read_file",
+                        name = "android_read_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -279,7 +279,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "write_file",
+                        name = "android_write_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -302,7 +302,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "write_file",
+                        name = "android_write_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -329,7 +329,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "append_file",
+                        name = "android_append_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -353,7 +353,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "append_file",
+                        name = "android_append_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -382,7 +382,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "file_replace",
+                        name = "android_file_replace",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -408,7 +408,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "file_replace",
+                        name = "android_file_replace",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -435,7 +435,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "file_replace",
+                        name = "android_file_replace",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -465,7 +465,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "download_from_url",
+                        name = "android_download_from_url",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -490,7 +490,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "download_from_url",
+                        name = "android_download_from_url",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -515,7 +515,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "download_from_url",
+                        name = "android_download_from_url",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -540,7 +540,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "download_from_url",
+                        name = "android_download_from_url",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -565,7 +565,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "download_from_url",
+                        name = "android_download_from_url",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -592,7 +592,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "delete_file",
+                        name = "android_delete_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",
@@ -615,7 +615,7 @@ class FileToolsIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "delete_file",
+                        name = "android_delete_file",
                         arguments =
                             mapOf(
                                 "location_id" to "loc1",

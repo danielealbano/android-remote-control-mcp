@@ -51,7 +51,7 @@ class UtilityIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "get_clipboard",
+                        name = "android_get_clipboard",
                         arguments = emptyMap(),
                     )
                 assertNotEquals(true, result.isError)
@@ -81,7 +81,7 @@ class UtilityIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "set_clipboard",
+                        name = "android_set_clipboard",
                         arguments = mapOf("text" to "new clipboard content"),
                     )
                 assertNotEquals(true, result.isError)
