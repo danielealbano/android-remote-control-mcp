@@ -78,9 +78,9 @@ jobs:
           cd vendor/ngrok-java
           mvn compile -pl ngrok-java-native --also-make --global-toolchains toolchains.xml -q
           mvn package -pl ngrok-java -DskipTests --global-toolchains toolchains.xml -q
-          cd ngrok-java-native/target/classes && jar cf ../ngrok-java-native-classes.jar com/
-          cd ../../ngrok-java-native && cargo build --release
-          cd target/release && jar cf ../ngrok-java-native-host.jar $(ls libngrok_java.so libngrok_java.dylib 2>/dev/null)
+          (cd ngrok-java-native/target/classes && jar cf ../ngrok-java-native-classes.jar com/)
+          (cd ngrok-java-native && cargo build --release)
+          (cd ngrok-java-native/target/release && jar cf ../ngrok-java-native-host.jar $(ls libngrok_java.so libngrok_java.dylib 2>/dev/null))
         env:
           JAVA_11_HOME: ${{ env.JAVA_HOME }}
           JAVA_17_HOME: ${{ env.JAVA_HOME }}
