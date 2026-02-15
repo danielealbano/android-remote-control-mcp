@@ -38,15 +38,13 @@ class AppManagerImpl
                         AppFilter.USER -> (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0
                         AppFilter.SYSTEM -> (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                     }
-                }
-                .filter { appInfo ->
+                }.filter { appInfo ->
                     if (nameQuery != null) {
                         pm.getApplicationLabel(appInfo).toString().contains(nameQuery, ignoreCase = true)
                     } else {
                         true
                     }
-                }
-                .map { appInfo ->
+                }.map { appInfo ->
                     val name = pm.getApplicationLabel(appInfo).toString()
                     val (versionName, versionCode) =
                         try {
@@ -62,8 +60,7 @@ class AppManagerImpl
                         versionCode = versionCode,
                         isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
                     )
-                }
-                .sortedBy { it.name.lowercase() }
+                }.sortedBy { it.name.lowercase() }
                 .toList()
         }
 
