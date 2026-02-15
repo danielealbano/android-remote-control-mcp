@@ -5,7 +5,7 @@
         setup-emulator start-emulator stop-emulator \
         logs logs-clear \
         version-bump-patch version-bump-minor version-bump-major \
-        compile-cloudflared check-so-alignment \
+        compile-cloudflared compile-ngrok-native check-so-alignment \
         all ci
 
 # Variables
@@ -84,6 +84,22 @@ check-deps: ## Check for required development tools
 		echo "           Install: https://go.dev/dl/"; \
 		MISSING=1; \
 	fi; \
+	if command -v cargo >/dev/null 2>&1; then \
+		CARGO_VER=$$(cargo --version); \
+		echo "  [OK] $$CARGO_VER"; \
+	else \
+		echo "  [MISSING] Rust/cargo (required for compiling ngrok-java native)"; \
+		echo "           Install: https://rustup.rs/"; \
+		MISSING=1; \
+	fi; \
+	if command -v mvn >/dev/null 2>&1; then \
+		MVN_VER=$$(mvn --version 2>&1 | head -1); \
+		echo "  [OK] $$MVN_VER"; \
+	else \
+		echo "  [MISSING] Maven (required for compiling ngrok-java)"; \
+		echo "           Install: brew install maven"; \
+		MISSING=1; \
+	fi; \
 	echo ""; \
 	if [ $$MISSING -eq 1 ]; then \
 		echo "Some dependencies are missing. Please install them."; \
@@ -102,10 +118,10 @@ update-deps: ## Update version catalog with latest stable versions (interactive)
 # Build
 # ─────────────────────────────────────────────────────────────────────────────
 
-build: compile-cloudflared ## Build debug APK
+build: compile-cloudflared compile-ngrok-native ## Build debug APK
 	$(GRADLE) assembleDebug
 
-build-release: compile-cloudflared ## Build release APK
+build-release: compile-cloudflared compile-ngrok-native ## Build release APK
 	$(GRADLE) assembleRelease
 
 clean: ## Clean build artifacts
@@ -260,7 +276,7 @@ version-bump-major: ## Bump major version (1.0.0 -> 2.0.0)
 	echo "Version bumped: $$CURRENT -> $$NEW_VERSION (code: $$CODE -> $$NEW_CODE)"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Native Binary Compilation (cloudflared)
+# Native Binary Compilation (cloudflared + ngrok)
 # ─────────────────────────────────────────────────────────────────────────────
 
 CLOUDFLARED_SRC_DIR := vendor/cloudflared
@@ -293,6 +309,87 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 		./cmd/cloudflared
 	@echo ""
 	@echo "cloudflared compiled successfully for arm64-v8a and x86_64"
+
+NGROK_SRC_DIR := vendor/ngrok-java
+NGROK_NATIVE_DIR := $(NGROK_SRC_DIR)/ngrok-java-native
+NGROK_JNILIBS_DIR := app/src/main/jniLibs
+NGROK_JAVA_JAR := $(NGROK_SRC_DIR)/ngrok-java/target/ngrok-java-1.1.1.jar
+NGROK_HOST_NATIVE_DIR := $(NGROK_NATIVE_DIR)/target/aarch64-apple-darwin/release
+JAVA_HOME_17 ?= /opt/homebrew/opt/openjdk@17
+
+# NDK root auto-detection: check ANDROID_HOME/ndk first, then brew cask location
+NDK_ROOT := $(shell \
+	if [ -d "$(ANDROID_HOME)/ndk" ] && ls "$(ANDROID_HOME)/ndk" 2>/dev/null | grep -q .; then \
+		ls -d "$(ANDROID_HOME)/ndk"/*/ 2>/dev/null | sort -V | tail -1; \
+	elif [ -d "/opt/homebrew/Caskroom/android-ndk" ]; then \
+		NDK_VER=$$(ls /opt/homebrew/Caskroom/android-ndk/ | sort -V | tail -1); \
+		APP_DIR=$$(ls -d "/opt/homebrew/Caskroom/android-ndk/$$NDK_VER/"*.app 2>/dev/null | head -1); \
+		echo "$$APP_DIR/Contents/NDK"; \
+	fi)
+NDK_BIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(shell uname -s | tr A-Z a-z)-$(shell uname -m | sed 's/arm64/x86_64/')/bin
+
+compile-ngrok-native: ## Build ngrok-java native library from source (requires Rust + Android NDK + Maven)
+	@if [ ! -f "$(NGROK_NATIVE_DIR)/Cargo.toml" ]; then \
+		echo "ERROR: ngrok-java submodule not initialized."; \
+		echo "Run: git submodule update --init vendor/ngrok-java"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(NDK_ROOT)" ]; then \
+		echo "ERROR: Android NDK not found."; \
+		echo "Install via: brew install --cask android-ndk"; \
+		exit 1; \
+	fi
+	@if ! command -v cargo >/dev/null 2>&1; then \
+		echo "ERROR: Rust/cargo not found. Install: https://rustup.rs/"; \
+		exit 1; \
+	fi
+	@if ! command -v mvn >/dev/null 2>&1; then \
+		echo "ERROR: Maven not found. Install: brew install maven"; \
+		exit 1; \
+	fi
+	@echo "=== Compiling ngrok-java from source ==="
+	@echo ""
+	@echo "Step 1: Compiling Java classes (needed for JNI code generation)..."
+	cd $(NGROK_SRC_DIR) && \
+		JAVA_HOME=$(JAVA_HOME_17) \
+		JAVA_11_HOME=$(JAVA_HOME_17) \
+		JAVA_17_HOME=$(JAVA_HOME_17) \
+		mvn compile -pl ngrok-java-native --also-make --global-toolchains toolchains.xml -q
+	@echo ""
+	@echo "Step 2: Packaging Java JAR..."
+	cd $(NGROK_SRC_DIR) && \
+		JAVA_HOME=$(JAVA_HOME_17) \
+		JAVA_11_HOME=$(JAVA_HOME_17) \
+		JAVA_17_HOME=$(JAVA_HOME_17) \
+		mvn package -pl ngrok-java -DskipTests --global-toolchains toolchains.xml -q
+	@echo ""
+	@echo "Step 3: Building native library for arm64-v8a (aarch64-linux-android)..."
+	cd $(NGROK_NATIVE_DIR) && \
+		CC_aarch64_linux_android="$(NDK_BIN)/aarch64-linux-android21-clang" \
+		AR_aarch64_linux_android="$(NDK_BIN)/llvm-ar" \
+		CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$(NDK_BIN)/aarch64-linux-android21-clang" \
+		cargo build --release --target aarch64-linux-android
+	@echo ""
+	@echo "Step 4: Building native library for x86_64 (x86_64-linux-android)..."
+	cd $(NGROK_NATIVE_DIR) && \
+		CC_x86_64_linux_android="$(NDK_BIN)/x86_64-linux-android21-clang" \
+		AR_x86_64_linux_android="$(NDK_BIN)/llvm-ar" \
+		CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$(NDK_BIN)/x86_64-linux-android21-clang" \
+		cargo build --release --target x86_64-linux-android
+	@echo ""
+	@echo "Step 5: Building native library for host (JVM tests)..."
+	cd $(NGROK_NATIVE_DIR) && cargo build --release
+	@echo ""
+	@echo "Step 6: Copying .so files to jniLibs..."
+	mkdir -p $(NGROK_JNILIBS_DIR)/arm64-v8a $(NGROK_JNILIBS_DIR)/x86_64
+	cp $(NGROK_NATIVE_DIR)/target/aarch64-linux-android/release/libngrok_java.so $(NGROK_JNILIBS_DIR)/arm64-v8a/
+	cp $(NGROK_NATIVE_DIR)/target/x86_64-linux-android/release/libngrok_java.so $(NGROK_JNILIBS_DIR)/x86_64/
+	@echo ""
+	@echo "ngrok-java compiled successfully:"
+	@echo "  JAR:     $(NGROK_JAVA_JAR)"
+	@echo "  arm64:   $(NGROK_JNILIBS_DIR)/arm64-v8a/libngrok_java.so"
+	@echo "  x86_64:  $(NGROK_JNILIBS_DIR)/x86_64/libngrok_java.so"
+	@echo "  host:    $(NGROK_NATIVE_DIR)/target/release/"
 
 check-so-alignment: ## Check 16KB page alignment of native .so libraries in debug APK
 	@if ! command -v llvm-objdump >/dev/null 2>&1; then \
