@@ -86,7 +86,7 @@ android {
             excludes += "/META-INF/LICENSE-notice.md"
         }
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true
         }
     }
 }
