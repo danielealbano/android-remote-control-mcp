@@ -131,6 +131,71 @@ internal object McpToolUtils {
     }
 
     /**
+     * Extracts an optional integer value from [params],
+     * returning [default] if not present.
+     *
+     * Rejects string-encoded numbers, fractional values, and values outside Int range.
+     *
+     * @throws McpToolException.InvalidParams if the parameter is present but not a valid integer.
+     */
+    @Suppress("ThrowsCount")
+    fun optionalInt(
+        params: JsonObject?,
+        name: String,
+        default: Int,
+    ): Int {
+        val element = params?.get(name) ?: return default
+        val primitive =
+            element as? JsonPrimitive
+                ?: throw McpToolException.InvalidParams("Parameter '$name' must be a number")
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a number, got string: '${primitive.content}'",
+            )
+        }
+        val doubleVal =
+            primitive.content.toDoubleOrNull()
+                ?: throw McpToolException.InvalidParams(
+                    "Parameter '$name' must be a number, got: '${primitive.content}'",
+                )
+        val intVal = doubleVal.toInt()
+        if (doubleVal != intVal.toDouble()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be an integer, got: '${primitive.content}'",
+            )
+        }
+        return intVal
+    }
+
+    /**
+     * Extracts an optional boolean value from [params],
+     * returning [default] if not present.
+     *
+     * Accepts JSON booleans (true/false). Rejects string-encoded booleans.
+     *
+     * @throws McpToolException.InvalidParams if the parameter is present but not a boolean.
+     */
+    fun optionalBoolean(
+        params: JsonObject?,
+        name: String,
+        default: Boolean,
+    ): Boolean {
+        val element = params?.get(name) ?: return default
+        val primitive =
+            element as? JsonPrimitive
+                ?: throw McpToolException.InvalidParams("Parameter '$name' must be a boolean")
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a boolean (true/false), got string: '${primitive.content}'",
+            )
+        }
+        return primitive.content.toBooleanStrictOrNull()
+            ?: throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a boolean (true/false), got: '${primitive.content}'",
+            )
+    }
+
+    /**
      * Extracts a required string value from [params].
      *
      * Rejects non-string primitives (e.g., numeric `123` instead of `"123"`).
