@@ -21,7 +21,7 @@ import javax.inject.Inject
 class AppManagerImpl
     @Inject
     constructor(
-        @ApplicationContext private val context: Context,
+        @param:ApplicationContext private val context: Context,
     ) : AppManager {
         override suspend fun listInstalledApps(
             filter: AppFilter,

@@ -33,7 +33,7 @@ import javax.net.ssl.X509TrustManager
 class FileOperationProviderImpl
     @Inject
     constructor(
-        @ApplicationContext private val context: Context,
+        @param:ApplicationContext private val context: Context,
         private val storageLocationProvider: StorageLocationProvider,
         private val settingsRepository: SettingsRepository,
     ) : FileOperationProvider {
