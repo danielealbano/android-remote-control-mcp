@@ -63,6 +63,7 @@ class SettingsRepositoryImplTest {
                 assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
                 assertEquals("", config.ngrokAuthtoken)
                 assertEquals("", config.ngrokDomain)
+                assertEquals("", config.deviceSlug)
             }
 
         @Test
@@ -480,5 +481,103 @@ class SettingsRepositoryImplTest {
 
                 assertEquals(config1.ngrokDomain, config2.ngrokDomain)
             }
+    }
+
+    @Nested
+    @DisplayName("updateDeviceSlug")
+    inner class UpdateDeviceSlug {
+        @Test
+        fun `persists device slug`() =
+            testScope.runTest {
+                repository.updateDeviceSlug("pixel7")
+                val config = repository.getServerConfig()
+                assertEquals("pixel7", config.deviceSlug)
+            }
+
+        @Test
+        fun `persists empty device slug`() =
+            testScope.runTest {
+                repository.updateDeviceSlug("test_device")
+                repository.updateDeviceSlug("")
+                val config = repository.getServerConfig()
+                assertEquals("", config.deviceSlug)
+            }
+
+        @Test
+        fun `emits updated config via flow`() =
+            testScope.runTest {
+                repository.serverConfig.test {
+                    val initial = awaitItem()
+                    assertEquals("", initial.deviceSlug)
+
+                    repository.updateDeviceSlug("my_phone")
+                    val updated = awaitItem()
+                    assertEquals("my_phone", updated.deviceSlug)
+
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+    }
+
+    @Nested
+    @DisplayName("validateDeviceSlug")
+    inner class ValidateDeviceSlug {
+        @Test
+        fun `accepts empty slug`() {
+            assertTrue(repository.validateDeviceSlug("").isSuccess)
+        }
+
+        @Test
+        fun `accepts valid slug with letters and digits`() {
+            assertTrue(repository.validateDeviceSlug("pixel7").isSuccess)
+        }
+
+        @Test
+        fun `accepts valid slug with underscores`() {
+            assertTrue(repository.validateDeviceSlug("work_phone_1").isSuccess)
+        }
+
+        @Test
+        fun `accepts valid slug with uppercase letters`() {
+            assertTrue(repository.validateDeviceSlug("MyPhone").isSuccess)
+        }
+
+        @Test
+        fun `accepts slug with only underscores`() {
+            assertTrue(repository.validateDeviceSlug("___").isSuccess)
+        }
+
+        @Test
+        fun `accepts slug at max length`() {
+            val slug = "a".repeat(ServerConfig.MAX_DEVICE_SLUG_LENGTH)
+            assertTrue(repository.validateDeviceSlug(slug).isSuccess)
+        }
+
+        @Test
+        fun `rejects slug exceeding max length`() {
+            val slug = "a".repeat(ServerConfig.MAX_DEVICE_SLUG_LENGTH + 1)
+            val result = repository.validateDeviceSlug(slug)
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message?.contains("at most") == true)
+        }
+
+        @Test
+        fun `rejects slug with hyphens`() {
+            val result = repository.validateDeviceSlug("work-phone")
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message?.contains("letters, digits, and underscores") == true)
+        }
+
+        @Test
+        fun `rejects slug with spaces`() {
+            val result = repository.validateDeviceSlug("my phone")
+            assertTrue(result.isFailure)
+        }
+
+        @Test
+        fun `rejects slug with special characters`() {
+            val result = repository.validateDeviceSlug("phone@1")
+            assertTrue(result.isFailure)
+        }
     }
 }

@@ -156,6 +156,12 @@ class SettingsRepositoryImpl
             }
         }
 
+        override suspend fun updateDeviceSlug(slug: String) {
+            dataStore.edit { prefs ->
+                prefs[DEVICE_SLUG_KEY] = slug
+            }
+        }
+
         override fun validateDownloadTimeout(seconds: Int): Result<Int> =
             if (seconds in ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS..ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS) {
                 Result.success(seconds)
@@ -167,6 +173,25 @@ class SettingsRepositoryImpl
                     ),
                 )
             }
+
+        @Suppress("ReturnCount")
+        override fun validateDeviceSlug(slug: String): Result<String> {
+            if (slug.length > ServerConfig.MAX_DEVICE_SLUG_LENGTH) {
+                return Result.failure(
+                    IllegalArgumentException(
+                        "Device slug must be at most ${ServerConfig.MAX_DEVICE_SLUG_LENGTH} characters",
+                    ),
+                )
+            }
+            if (!ServerConfig.DEVICE_SLUG_PATTERN.matches(slug)) {
+                return Result.failure(
+                    IllegalArgumentException(
+                        "Device slug can only contain letters, digits, and underscores",
+                    ),
+                )
+            }
+            return Result.success(slug)
+        }
 
         override suspend fun getAuthorizedLocations(): Map<String, String> {
             val prefs = dataStore.data.first()
@@ -263,6 +288,7 @@ class SettingsRepositoryImpl
                 downloadTimeoutSeconds =
                     prefs[DOWNLOAD_TIMEOUT_KEY]
                         ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
+                deviceSlug = prefs[DEVICE_SLUG_KEY] ?: "",
             )
         }
 
@@ -306,6 +332,7 @@ class SettingsRepositoryImpl
             private val ALLOW_HTTP_DOWNLOADS_KEY = booleanPreferencesKey("allow_http_downloads")
             private val ALLOW_UNVERIFIED_HTTPS_KEY = booleanPreferencesKey("allow_unverified_https_certs")
             private val DOWNLOAD_TIMEOUT_KEY = intPreferencesKey("download_timeout_seconds")
+            private val DEVICE_SLUG_KEY = stringPreferencesKey("device_slug")
             private val AUTHORIZED_LOCATIONS_KEY = stringPreferencesKey("authorized_storage_locations")
 
             /**
