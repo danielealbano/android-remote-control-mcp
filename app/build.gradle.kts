@@ -136,8 +136,8 @@ dependencies {
     implementation(libs.bouncy.castle.pkix)
     implementation(libs.bouncy.castle.prov)
 
-    // ngrok tunnel (in-process, JNI-based)
-    implementation(libs.ngrok.java)
+    // ngrok tunnel (in-process, JNI-based) — built from source via vendor/ngrok-java submodule
+    implementation(files("../vendor/ngrok-java/ngrok-java/target/ngrok-java-1.1.1.jar"))
 
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk.server)
@@ -172,43 +172,17 @@ dependencies {
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
 
-    // ngrok native library for JVM integration tests (linux-x86_64)
-    testRuntimeOnly("com.ngrok:ngrok-java-native:${libs.versions.ngrok.java.get()}:linux-x86_64")
 }
 
-// Extract ngrok-java native library for Android arm64
-val extractNgrokNative by tasks.registering {
-    description = "Extracts ngrok-java native .so for Android arm64 into jniLibs"
-
-    val ngrokNativeConfig =
-        configurations.create("ngrokNativeAndroidArm64") {
-            isTransitive = false
-        }
-    dependencies {
-        ngrokNativeConfig(
-            libs.ngrok.java.native.android.arm64
-                .get()
-                .toString() + ":linux-android-aarch_64",
-        )
-    }
-
-    doLast {
-        val targetDir = file("src/main/jniLibs/arm64-v8a")
-        targetDir.mkdirs()
-        ngrokNativeConfig.files.forEach { jar ->
-            zipTree(jar)
-                .matching {
-                    include("**/*.so")
-                }.forEach { soFile ->
-                    soFile.copyTo(File(targetDir, soFile.name), overwrite = true)
-                }
-        }
-    }
-}
-
-tasks.named("preBuild") {
-    dependsOn(extractNgrokNative)
-}
+// Resolve ngrok-java host native library directory for JVM tests.
+// On macOS the dylib lives under aarch64-apple-darwin or x86_64-apple-darwin;
+// on Linux the .so lives under x86_64-unknown-linux-gnu or the default release dir.
+val ngrokNativeDir: String =
+    listOf(
+        "../vendor/ngrok-java/ngrok-java-native/target/release",
+        "../vendor/ngrok-java/ngrok-java-native/target/aarch64-apple-darwin/release",
+        "../vendor/ngrok-java/ngrok-java-native/target/x86_64-unknown-linux-gnu/release",
+    ).firstOrNull { file(it).exists() } ?: "../vendor/ngrok-java/ngrok-java-native/target/release"
 
 tasks.withType<Test> {
     useJUnitPlatform()
@@ -224,6 +198,8 @@ tasks.withType<Test> {
         "--add-opens",
         "java.base/java.time=ALL-UNNAMED",
     )
+    // ngrok-java host native library for JVM integration tests (built from source)
+    systemProperty("java.library.path", file(ngrokNativeDir).absolutePath)
 }
 
 jacoco {
