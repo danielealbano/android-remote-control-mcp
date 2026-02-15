@@ -17,17 +17,16 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
+import io.mockk.junit5.MockKExtension
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
-import io.mockk.junit5.MockKExtension
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -39,7 +38,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 @ExtendWith(MockKExtension::class)
 @DisplayName("StorageLocationProviderImpl")
 class StorageLocationProviderTest {
-
     @MockK
     private lateinit var mockContext: Context
 
@@ -85,86 +83,87 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("getAvailableLocations")
     inner class GetAvailableLocations {
+        @Test
+        fun `getAvailableLocations returns discovered roots`() =
+            runTest {
+                // Arrange
+                val treeUriString = "content://com.test.provider/tree/primary%3A"
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
+                    mapOf("com.test.provider/primary" to treeUriString)
+
+                val providerInfo = ProviderInfo()
+                providerInfo.authority = "com.test.provider"
+                providerInfo.packageName = "com.test.provider.pkg"
+
+                val resolveInfo = ResolveInfo()
+                resolveInfo.providerInfo = providerInfo
+
+                every {
+                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
+                } returns listOf(resolveInfo)
+
+                val appInfo = ApplicationInfo()
+                appInfo.packageName = "com.test.provider.pkg"
+                every {
+                    mockPackageManager.getApplicationInfo("com.test.provider.pkg", 0)
+                } returns appInfo
+                every {
+                    mockPackageManager.getApplicationLabel(appInfo)
+                } returns "Test Provider" as CharSequence
+
+                val mockRootsUri = mockk<Uri>()
+                every { DocumentsContract.buildRootsUri("com.test.provider") } returns mockRootsUri
+
+                val mockCursor = mockk<Cursor>()
+                every {
+                    mockContentResolver.query(eq(mockRootsUri), any(), any(), any(), any())
+                } returns mockCursor
+
+                // Column indices: ROOT_ID=0, TITLE=1, DOCUMENT_ID=2, AVAILABLE_BYTES=3, ICON=4
+                every { mockCursor.getColumnIndex(any()) } returnsMany listOf(0, 1, 2, 3, 4)
+                every { mockCursor.moveToNext() } returnsMany listOf(true, false)
+                every { mockCursor.getString(0) } returns "primary"
+                every { mockCursor.getString(1) } returns "Internal Storage"
+                every { mockCursor.getString(2) } returns "primary:"
+                every { mockCursor.isNull(3) } returns false
+                every { mockCursor.getLong(3) } returns 5_000_000_000L
+                every { mockCursor.isNull(4) } returns true
+                every { mockCursor.close() } just Runs
+
+                // Act
+                val result = provider.getAvailableLocations()
+
+                // Assert
+                assertEquals(1, result.size)
+                val location = result[0]
+                assertEquals("com.test.provider/primary", location.id)
+                assertEquals("Internal Storage", location.name)
+                assertEquals("Test Provider", location.providerName)
+                assertEquals("com.test.provider", location.authority)
+                assertEquals("primary", location.rootId)
+                assertEquals("primary:", location.rootDocumentId)
+                assertEquals(treeUriString, location.treeUri)
+                assertTrue(location.isAuthorized)
+                assertEquals(5_000_000_000L, location.availableBytes)
+                assertNull(location.iconUri)
+                verify { mockCursor.close() }
+            }
 
         @Test
-        fun `getAvailableLocations returns discovered roots`() = runTest {
-            // Arrange
-            val treeUriString = "content://com.test.provider/tree/primary%3A"
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                mapOf("com.test.provider/primary" to treeUriString)
+        fun `getAvailableLocations returns empty list when no providers found`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+                every {
+                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
+                } returns emptyList()
 
-            val providerInfo = ProviderInfo()
-            providerInfo.authority = "com.test.provider"
-            providerInfo.packageName = "com.test.provider.pkg"
+                // Act
+                val result = provider.getAvailableLocations()
 
-            val resolveInfo = ResolveInfo()
-            resolveInfo.providerInfo = providerInfo
-
-            every {
-                mockPackageManager.queryIntentContentProviders(any(), any())
-            } returns listOf(resolveInfo)
-
-            val appInfo = ApplicationInfo()
-            appInfo.packageName = "com.test.provider.pkg"
-            every {
-                mockPackageManager.getApplicationInfo("com.test.provider.pkg", 0)
-            } returns appInfo
-            every {
-                mockPackageManager.getApplicationLabel(appInfo)
-            } returns "Test Provider" as CharSequence
-
-            val mockRootsUri = mockk<Uri>()
-            every { DocumentsContract.buildRootsUri("com.test.provider") } returns mockRootsUri
-
-            val mockCursor = mockk<Cursor>()
-            every {
-                mockContentResolver.query(eq(mockRootsUri), any(), any(), any(), any())
-            } returns mockCursor
-
-            // Column indices: ROOT_ID=0, TITLE=1, DOCUMENT_ID=2, AVAILABLE_BYTES=3, ICON=4
-            every { mockCursor.getColumnIndex(any()) } returnsMany listOf(0, 1, 2, 3, 4)
-            every { mockCursor.moveToNext() } returnsMany listOf(true, false)
-            every { mockCursor.getString(0) } returns "primary"
-            every { mockCursor.getString(1) } returns "Internal Storage"
-            every { mockCursor.getString(2) } returns "primary:"
-            every { mockCursor.isNull(3) } returns false
-            every { mockCursor.getLong(3) } returns 5_000_000_000L
-            every { mockCursor.isNull(4) } returns true
-            every { mockCursor.close() } just Runs
-
-            // Act
-            val result = provider.getAvailableLocations()
-
-            // Assert
-            assertEquals(1, result.size)
-            val location = result[0]
-            assertEquals("com.test.provider/primary", location.id)
-            assertEquals("Internal Storage", location.name)
-            assertEquals("Test Provider", location.providerName)
-            assertEquals("com.test.provider", location.authority)
-            assertEquals("primary", location.rootId)
-            assertEquals("primary:", location.rootDocumentId)
-            assertEquals(treeUriString, location.treeUri)
-            assertTrue(location.isAuthorized)
-            assertEquals(5_000_000_000L, location.availableBytes)
-            assertNull(location.iconUri)
-            verify { mockCursor.close() }
-        }
-
-        @Test
-        fun `getAvailableLocations returns empty list when no providers found`() = runTest {
-            // Arrange
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
-            every {
-                mockPackageManager.queryIntentContentProviders(any(), any())
-            } returns emptyList()
-
-            // Act
-            val result = provider.getAvailableLocations()
-
-            // Assert
-            assertTrue(result.isEmpty())
-        }
+                // Assert
+                assertTrue(result.isEmpty())
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -174,36 +173,36 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("authorizeLocation")
     inner class AuthorizeLocation {
-
         @Test
-        fun `authorizeLocation persists tree URI and takes permission`() = runTest {
-            // Arrange
-            val locationId = "com.test.provider/primary"
-            val treeUriString = "content://com.test.provider/tree/primary%3A"
-            val mockTreeUri = mockk<Uri>()
-            every { mockTreeUri.toString() } returns treeUriString
-            every {
-                mockContentResolver.takePersistableUriPermission(any(), any())
-            } just Runs
-            coEvery {
-                mockSettingsRepository.addAuthorizedLocation(any(), any())
-            } just Runs
+        fun `authorizeLocation persists tree URI and takes permission`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary"
+                val treeUriString = "content://com.test.provider/tree/primary%3A"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.toString() } returns treeUriString
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+                coEvery {
+                    mockSettingsRepository.addAuthorizedLocation(any(), any())
+                } just Runs
 
-            // Act
-            provider.authorizeLocation(locationId, mockTreeUri)
+                // Act
+                provider.authorizeLocation(locationId, mockTreeUri)
 
-            // Assert
-            verify {
-                mockContentResolver.takePersistableUriPermission(
-                    mockTreeUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
+                // Assert
+                verify {
+                    mockContentResolver.takePersistableUriPermission(
+                        mockTreeUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+                coVerify {
+                    mockSettingsRepository.addAuthorizedLocation(locationId, treeUriString)
+                }
             }
-            coVerify {
-                mockSettingsRepository.addAuthorizedLocation(locationId, treeUriString)
-            }
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -213,38 +212,38 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("deauthorizeLocation")
     inner class DeauthorizeLocation {
-
         @Test
-        fun `deauthorizeLocation removes entry and releases permission`() = runTest {
-            // Arrange
-            val locationId = "com.test.provider/primary"
-            val treeUriString = "content://com.test.provider/tree/primary%3A"
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                mapOf(locationId to treeUriString)
-            coEvery { mockSettingsRepository.removeAuthorizedLocation(any()) } just Runs
+        fun `deauthorizeLocation removes entry and releases permission`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary"
+                val treeUriString = "content://com.test.provider/tree/primary%3A"
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
+                    mapOf(locationId to treeUriString)
+                coEvery { mockSettingsRepository.removeAuthorizedLocation(any()) } just Runs
 
-            val mockParsedUri = mockk<Uri>()
-            mockkStatic(Uri::class)
-            every { Uri.parse(treeUriString) } returns mockParsedUri
-            every {
-                mockContentResolver.releasePersistableUriPermission(any(), any())
-            } just Runs
+                val mockParsedUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockParsedUri
+                every {
+                    mockContentResolver.releasePersistableUriPermission(any(), any())
+                } just Runs
 
-            // Act
-            provider.deauthorizeLocation(locationId)
+                // Act
+                provider.deauthorizeLocation(locationId)
 
-            // Assert
-            verify {
-                mockContentResolver.releasePersistableUriPermission(
-                    mockParsedUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
+                // Assert
+                verify {
+                    mockContentResolver.releasePersistableUriPermission(
+                        mockParsedUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+                coVerify { mockSettingsRepository.removeAuthorizedLocation(locationId) }
+
+                unmockkStatic(Uri::class)
             }
-            coVerify { mockSettingsRepository.removeAuthorizedLocation(locationId) }
-
-            unmockkStatic(Uri::class)
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -254,31 +253,32 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("isLocationAuthorized")
     inner class IsLocationAuthorized {
+        @Test
+        fun `isLocationAuthorized returns true for authorized locations`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
+                    mapOf("loc1" to "content://tree/loc1")
+
+                // Act
+                val result = provider.isLocationAuthorized("loc1")
+
+                // Assert
+                assertTrue(result)
+            }
 
         @Test
-        fun `isLocationAuthorized returns true for authorized locations`() = runTest {
-            // Arrange
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                mapOf("loc1" to "content://tree/loc1")
+        fun `isLocationAuthorized returns false for unauthorized locations`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
 
-            // Act
-            val result = provider.isLocationAuthorized("loc1")
+                // Act
+                val result = provider.isLocationAuthorized("loc1")
 
-            // Assert
-            assertTrue(result)
-        }
-
-        @Test
-        fun `isLocationAuthorized returns false for unauthorized locations`() = runTest {
-            // Arrange
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
-
-            // Act
-            val result = provider.isLocationAuthorized("loc1")
-
-            // Assert
-            assertFalse(result)
-        }
+                // Assert
+                assertFalse(result)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -288,21 +288,21 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("getLocationById")
     inner class GetLocationById {
-
         @Test
-        fun `getLocationById returns null for unknown location`() = runTest {
-            // Arrange — set up getAvailableLocations to return an empty list
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
-            every {
-                mockPackageManager.queryIntentContentProviders(any(), any())
-            } returns emptyList()
+        fun `getLocationById returns null for unknown location`() =
+            runTest {
+                // Arrange — set up getAvailableLocations to return an empty list
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+                every {
+                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
+                } returns emptyList()
 
-            // Act
-            val result = provider.getLocationById("nonexistent/location")
+                // Act
+                val result = provider.getLocationById("nonexistent/location")
 
-            // Assert
-            assertNull(result)
-        }
+                // Assert
+                assertNull(result)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -312,17 +312,17 @@ class StorageLocationProviderTest {
     @Nested
     @DisplayName("getTreeUriForLocation")
     inner class GetTreeUriForLocation {
-
         @Test
-        fun `getTreeUriForLocation returns null for unauthorized location`() = runTest {
-            // Arrange
-            coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+        fun `getTreeUriForLocation returns null for unauthorized location`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
 
-            // Act
-            val result = provider.getTreeUriForLocation("unknown/location")
+                // Act
+                val result = provider.getTreeUriForLocation("unknown/location")
 
-            // Assert
-            assertNull(result)
-        }
+                // Assert
+                assertNull(result)
+            }
     }
 }

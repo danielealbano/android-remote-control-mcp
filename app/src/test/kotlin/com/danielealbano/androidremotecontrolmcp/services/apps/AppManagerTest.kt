@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.apps
 
 import android.app.ActivityManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -21,7 +22,6 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -32,7 +32,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 @ExtendWith(MockKExtension::class)
 @DisplayName("AppManagerImpl")
 class AppManagerTest {
-
     @MockK
     private lateinit var mockContext: Context
 
@@ -74,7 +73,10 @@ class AppManagerTest {
      * Creates an [ApplicationInfo] with the given package name and flags.
      * Uses [ApplicationInfo.FLAG_SYSTEM] for system apps; 0 for user apps.
      */
-    private fun createApplicationInfo(packageName: String, isSystem: Boolean): ApplicationInfo {
+    private fun createApplicationInfo(
+        packageName: String,
+        isSystem: Boolean,
+    ): ApplicationInfo {
         val info = ApplicationInfo()
         info.packageName = packageName
         info.flags = if (isSystem) ApplicationInfo.FLAG_SYSTEM else 0
@@ -125,87 +127,92 @@ class AppManagerTest {
     @Nested
     @DisplayName("listInstalledApps")
     inner class ListInstalledApps {
+        @Test
+        fun `listInstalledApps returns all apps when filter is ALL`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
+
+                // Act
+                val result = appManager.listInstalledApps(AppFilter.ALL)
+
+                // Assert
+                assertEquals(3, result.size)
+            }
 
         @Test
-        fun `listInstalledApps returns all apps when filter is ALL`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
+        fun `listInstalledApps returns only user apps when filter is USER`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
 
-            // Act
-            val result = appManager.listInstalledApps(AppFilter.ALL)
+                // Act
+                val result = appManager.listInstalledApps(AppFilter.USER)
 
-            // Assert
-            assertEquals(3, result.size)
-        }
-
-        @Test
-        fun `listInstalledApps returns only user apps when filter is USER`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
-
-            // Act
-            val result = appManager.listInstalledApps(AppFilter.USER)
-
-            // Assert
-            assertEquals(2, result.size)
-            assertTrue(result.all { !it.isSystemApp })
-            assertTrue(result.any { it.name == "Alpha App" })
-            assertTrue(result.any { it.name == "Beta App" })
-        }
+                // Assert
+                assertEquals(2, result.size)
+                assertTrue(result.all { !it.isSystemApp })
+                assertTrue(result.any { it.name == "Alpha App" })
+                assertTrue(result.any { it.name == "Beta App" })
+            }
 
         @Test
-        fun `listInstalledApps returns only system apps when filter is SYSTEM`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
+        fun `listInstalledApps returns only system apps when filter is SYSTEM`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
 
-            // Act
-            val result = appManager.listInstalledApps(AppFilter.SYSTEM)
+                // Act
+                val result = appManager.listInstalledApps(AppFilter.SYSTEM)
 
-            // Assert
-            assertEquals(1, result.size)
-            assertTrue(result.all { it.isSystemApp })
-            assertEquals("System App", result[0].name)
-            assertEquals("com.system.core", result[0].packageId)
-        }
-
-        @Test
-        fun `listInstalledApps filters by name query case-insensitive`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
-
-            // Act — "alpha" matches "Alpha App" case-insensitively
-            val result = appManager.listInstalledApps(AppFilter.ALL, "alpha")
-
-            // Assert
-            assertEquals(1, result.size)
-            assertEquals("Alpha App", result[0].name)
-        }
+                // Assert
+                assertEquals(1, result.size)
+                assertTrue(result.all { it.isSystemApp })
+                assertEquals("System App", result[0].name)
+                assertEquals("com.system.core", result[0].packageId)
+            }
 
         @Test
-        fun `listInstalledApps returns empty list when no matches`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
+        fun `listInstalledApps filters by name query case-insensitive`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
 
-            // Act
-            val result = appManager.listInstalledApps(AppFilter.ALL, "nonexistent")
+                // Act — "alpha" matches "Alpha App" case-insensitively
+                val result = appManager.listInstalledApps(AppFilter.ALL, "alpha")
 
-            // Assert
-            assertTrue(result.isEmpty())
-        }
+                // Assert
+                assertEquals(1, result.size)
+                assertEquals("Alpha App", result[0].name)
+            }
 
         @Test
-        fun `listInstalledApps results are sorted by name`() = runTest {
-            // Arrange
-            setupThreeInstalledApps()
+        fun `listInstalledApps returns empty list when no matches`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
 
-            // Act
-            val result = appManager.listInstalledApps(AppFilter.ALL)
+                // Act
+                val result = appManager.listInstalledApps(AppFilter.ALL, "nonexistent")
 
-            // Assert — alphabetical by name (case-insensitive)
-            assertEquals("Alpha App", result[0].name)
-            assertEquals("Beta App", result[1].name)
-            assertEquals("System App", result[2].name)
-        }
+                // Assert
+                assertTrue(result.isEmpty())
+            }
+
+        @Test
+        fun `listInstalledApps results are sorted by name`() =
+            runTest {
+                // Arrange
+                setupThreeInstalledApps()
+
+                // Act
+                val result = appManager.listInstalledApps(AppFilter.ALL)
+
+                // Assert — alphabetical by name (case-insensitive)
+                assertEquals("Alpha App", result[0].name)
+                assertEquals("Beta App", result[1].name)
+                assertEquals("System App", result[2].name)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -215,42 +222,62 @@ class AppManagerTest {
     @Nested
     @DisplayName("openApp")
     inner class OpenApp {
+        @Test
+        fun `openApp launches app with correct intent flags`() =
+            runTest {
+                // Arrange
+                val mockIntent = mockk<Intent>(relaxed = true)
+                every {
+                    mockPackageManager.getLaunchIntentForPackage("com.test.app")
+                } returns mockIntent
+                every { mockContext.startActivity(any()) } just Runs
+
+                // Act
+                val result = appManager.openApp("com.test.app")
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify { mockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                verify { mockContext.startActivity(mockIntent) }
+            }
 
         @Test
-        fun `openApp launches app with correct intent flags`() = runTest {
-            // Arrange
-            val mockIntent = mockk<Intent>(relaxed = true)
-            every {
-                mockPackageManager.getLaunchIntentForPackage("com.test.app")
-            } returns mockIntent
-            every { mockContext.startActivity(any()) } just Runs
+        fun `openApp returns failure when no launchable activity`() =
+            runTest {
+                // Arrange
+                every {
+                    mockPackageManager.getLaunchIntentForPackage("com.test.app")
+                } returns null
 
-            // Act
-            val result = appManager.openApp("com.test.app")
+                // Act
+                val result = appManager.openApp("com.test.app")
 
-            // Assert
-            assertTrue(result.isSuccess)
-            verify { mockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-            verify { mockContext.startActivity(mockIntent) }
-        }
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("No launchable activity") == true,
+                )
+            }
 
         @Test
-        fun `openApp returns failure when no launchable activity`() = runTest {
-            // Arrange
-            every {
-                mockPackageManager.getLaunchIntentForPackage("com.test.app")
-            } returns null
+        fun `openApp returns failure when package not found`() =
+            runTest {
+                // Arrange
+                val mockIntent = mockk<Intent>(relaxed = true)
+                every {
+                    mockPackageManager.getLaunchIntentForPackage("com.nonexistent.app")
+                } returns mockIntent
+                every { mockIntent.addFlags(any()) } returns mockIntent
+                every { mockContext.startActivity(any()) } throws ActivityNotFoundException("Activity not found")
 
-            // Act
-            val result = appManager.openApp("com.test.app")
+                // Act
+                val result = appManager.openApp("com.nonexistent.app")
 
-            // Assert
-            assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull() is IllegalArgumentException)
-            assertTrue(
-                result.exceptionOrNull()?.message?.contains("No launchable activity") == true,
-            )
-        }
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is ActivityNotFoundException)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -260,18 +287,18 @@ class AppManagerTest {
     @Nested
     @DisplayName("closeApp")
     inner class CloseApp {
-
         @Test
-        fun `closeApp calls killBackgroundProcesses`() = runTest {
-            // Arrange
-            every { mockActivityManager.killBackgroundProcesses(any()) } just Runs
+        fun `closeApp calls killBackgroundProcesses`() =
+            runTest {
+                // Arrange
+                every { mockActivityManager.killBackgroundProcesses(any()) } just Runs
 
-            // Act
-            val result = appManager.closeApp("com.test.app")
+                // Act
+                val result = appManager.closeApp("com.test.app")
 
-            // Assert
-            assertTrue(result.isSuccess)
-            verify { mockActivityManager.killBackgroundProcesses("com.test.app") }
-        }
+                // Assert
+                assertTrue(result.isSuccess)
+                verify { mockActivityManager.killBackgroundProcesses("com.test.app") }
+            }
     }
 }
