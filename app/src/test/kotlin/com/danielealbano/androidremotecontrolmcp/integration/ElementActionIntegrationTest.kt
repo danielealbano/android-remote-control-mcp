@@ -81,7 +81,7 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "find_elements",
+                        name = "android_find_elements",
                         arguments = mapOf("by" to "text", "value" to "OK"),
                     )
                 assertNotEquals(true, result.isError)
@@ -113,7 +113,7 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "click_element",
+                        name = "android_click_element",
                         arguments = mapOf("element_id" to "node_btn"),
                     )
                 assertNotEquals(true, result.isError)
@@ -136,7 +136,7 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "click_element",
+                        name = "android_click_element",
                         arguments = mapOf("element_id" to "node_xyz"),
                     )
                 assertEquals(true, result.isError)

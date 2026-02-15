@@ -32,7 +32,7 @@ class TouchActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "tap",
+                        name = "android_tap",
                         arguments = mapOf("x" to 500, "y" to 800),
                     )
                 assertNotEquals(true, result.isError)
@@ -46,7 +46,7 @@ class TouchActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "tap",
+                        name = "android_tap",
                         arguments = mapOf("y" to 800),
                     )
                 assertEquals(true, result.isError)
@@ -66,7 +66,7 @@ class TouchActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "swipe",
+                        name = "android_swipe",
                         arguments =
                             mapOf(
                                 "x1" to 100,

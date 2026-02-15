@@ -54,7 +54,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "press_back",
+                        name = "android_press_back",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)
@@ -81,7 +81,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "click_element",
+                        name = "android_click_element",
                         arguments = mapOf("element_id" to "nonexistent"),
                     )
                 assertEquals(true, result.isError)
@@ -108,7 +108,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "click_element",
+                        name = "android_click_element",
                         arguments = mapOf("element_id" to "node_root"),
                     )
                 assertEquals(true, result.isError)
@@ -123,7 +123,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "tap",
+                        name = "android_tap",
                         arguments = mapOf("x" to "not_a_number", "y" to 100),
                     )
                 assertEquals(true, result.isError)
@@ -144,7 +144,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "press_back",
+                        name = "android_press_back",
                         arguments = emptyMap(),
                     )
                 assertEquals(true, result.isError)
@@ -177,7 +177,7 @@ class ErrorHandlingIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "wait_for_element",
+                            name = "android_wait_for_element",
                             arguments =
                                 mapOf(
                                     "by" to "text",
@@ -224,7 +224,7 @@ class ErrorHandlingIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "wait_for_idle",
+                            name = "android_wait_for_idle",
                             arguments = mapOf("timeout" to 1000),
                         )
                     assertNotEquals(true, result.isError)

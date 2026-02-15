@@ -34,7 +34,7 @@ class GestureIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "pinch",
+                        name = "android_pinch",
                         arguments =
                             mapOf(
                                 "center_x" to 540,
@@ -53,7 +53,7 @@ class GestureIntegrationTest {
             McpIntegrationTestHelper.withTestApplication { client, _ ->
                 val result =
                     client.callTool(
-                        name = "pinch",
+                        name = "android_pinch",
                         arguments =
                             mapOf(
                                 "center_x" to 540,
