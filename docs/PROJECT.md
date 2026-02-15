@@ -190,25 +190,27 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
+> **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
+
 ### 1. Screen Introspection Tools (1 tool)
 
 | Tool | Description | Parameters | Output |
 |------|-------------|------------|--------|
-| `get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI elements | `include_screenshot` (boolean, optional, default false) | `TextContent` with compact TSV (text/desc truncated to 100 chars). Optionally includes `ImageContent` with low-resolution JPEG screenshot (700px max). |
+| `android_get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI elements | `include_screenshot` (boolean, optional, default false) | `TextContent` with compact TSV (text/desc truncated to 100 chars). Optionally includes `ImageContent` with low-resolution JPEG screenshot (700px max). |
 
 **Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
-**Note**: `get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `get_element_details` to retrieve full values.
+**Note**: `android_get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `android_get_element_details` to retrieve full values.
 
 ### 2. Touch Action Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `tap` | Single tap at coordinates | `x` (number), `y` (number) | — |
-| `long_press` | Long press at coordinates | `x` (number), `y` (number) | `duration` (number, ms, default 1000) |
-| `double_tap` | Double tap at coordinates | `x` (number), `y` (number) | — |
-| `swipe` | Swipe from point A to B | `x1`, `y1`, `x2`, `y2` (all number) | `duration` (number, ms, default 300) |
-| `scroll` | Scroll in direction | `direction` (string: up/down/left/right) | `amount` (string: small/medium/large, default medium) |
+| `android_tap` | Single tap at coordinates | `x` (number), `y` (number) | — |
+| `android_long_press` | Long press at coordinates | `x` (number), `y` (number) | `duration` (number, ms, default 1000) |
+| `android_double_tap` | Double tap at coordinates | `x` (number), `y` (number) | — |
+| `android_swipe` | Swipe from point A to B | `x1`, `y1`, `x2`, `y2` (all number) | `duration` (number, ms, default 300) |
+| `android_scroll` | Scroll in direction | `direction` (string: up/down/left/right) | `amount` (string: small/medium/large, default medium) |
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
@@ -216,64 +218,64 @@ The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, 
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `find_elements` | Find UI elements by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
-| `click_element` | Click an accessibility node | `element_id` (string) | — |
-| `long_click_element` | Long-click an accessibility node | `element_id` (string) | — |
-| `set_text` | Set text on editable node | `element_id` (string), `text` (string) | — |
-| `scroll_to_element` | Scroll to make element visible | `element_id` (string) | — |
+| `android_find_elements` | Find UI elements by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
+| `android_click_element` | Click an accessibility node | `element_id` (string) | — |
+| `android_long_click_element` | Long-click an accessibility node | `element_id` (string) | — |
+| `android_set_text` | Set text on editable node | `element_id` (string), `text` (string) | — |
+| `android_scroll_to_element` | Scroll to make element visible | `element_id` (string) | — |
 
-**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable/editable. `find_elements` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable/editable. `android_find_elements` returns empty array (not error) when no matches found.
 
 ### 4. Text Input Tools (3 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `input_text` | Type text into focused/target input | `text` (string) | `element_id` (string) |
-| `clear_text` | Clear text from focused/target input | — | `element_id` (string) |
-| `press_key` | Press a specific key | `key` (string: ENTER/BACK/DEL/HOME/TAB/SPACE) | — |
+| `android_input_text` | Type text into focused/target input | `text` (string) | `element_id` (string) |
+| `android_clear_text` | Clear text from focused/target input | — | `element_id` (string) |
+| `android_press_key` | Press a specific key | `key` (string: ENTER/BACK/DEL/HOME/TAB/SPACE) | — |
 
 ### 5. System Action Tools (6 tools)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `press_back` | Press back button | None |
-| `press_home` | Navigate to home screen | None |
-| `press_recents` | Open recent apps | None |
-| `open_notifications` | Pull down notification shade | None |
-| `open_quick_settings` | Open quick settings panel | None |
-| `get_device_logs` | Retrieve filtered logcat logs | `last_lines` (int, 1-1000, default 100), `since`/`until` (ISO 8601 timestamp), `tag` (string), `level` (string: V/D/I/W/E/F, default D), `package_name` (string) — all optional |
+| `android_press_back` | Press back button | None |
+| `android_press_home` | Navigate to home screen | None |
+| `android_press_recents` | Open recent apps | None |
+| `android_open_notifications` | Pull down notification shade | None |
+| `android_open_quick_settings` | Open quick settings panel | None |
+| `android_get_device_logs` | Retrieve filtered logcat logs | `last_lines` (int, 1-1000, default 100), `since`/`until` (ISO 8601 timestamp), `tag` (string), `level` (string: V/D/I/W/E/F, default D), `package_name` (string) — all optional |
 
 ### 6. Gesture Tools (2 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `pinch` | Pinch-to-zoom gesture | `center_x` (number), `center_y` (number), `scale` (number: >1 zoom in, <1 zoom out) | `duration` (number, ms, default 300) |
-| `custom_gesture` | Multi-touch gesture from path points | `paths` (array of arrays of {x, y, time} objects) | — |
+| `android_pinch` | Pinch-to-zoom gesture | `center_x` (number), `center_y` (number), `scale` (number: >1 zoom in, <1 zoom out) | `duration` (number, ms, default 300) |
+| `android_custom_gesture` | Multi-touch gesture from path points | `paths` (array of arrays of {x, y, time} objects) | — |
 
 ### 7. Utility Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `get_clipboard` | Get current clipboard content | — | — |
-| `set_clipboard` | Set clipboard content | `text` (string) | — |
-| `wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
-| `wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
-| `get_element_details` | Get full untruncated text/desc by element IDs | `ids` (array of strings) | — |
+| `android_get_clipboard` | Get current clipboard content | — | — |
+| `android_set_clipboard` | Set clipboard content | `text` (string) | — |
+| `android_wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
+| `android_wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
+| `android_get_element_details` | Get full untruncated text/desc by element IDs | `ids` (array of strings) | — |
 
-**Timeout behavior**: Both `wait_for_element` and `wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
+**Timeout behavior**: Both `android_wait_for_element` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
 ### 8. File Tools (8 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `list_storage_locations` | List available storage locations with authorization status | — | — |
-| `list_files` | List files/directories in an authorized storage location | `location_id` (string) | `path` (string, default ""), `offset` (int, default 0), `limit` (int, default 200, max 200) |
-| `read_file` | Read text file with line-based pagination | `location_id` (string), `path` (string) | `offset` (int, 1-based line number, default 1), `limit` (int, default 200, max 200) |
-| `write_file` | Write/create text file (creates parents, overwrites) | `location_id` (string), `path` (string), `content` (string) | — |
-| `append_file` | Append to text file (tries native "wa" mode) | `location_id` (string), `path` (string), `content` (string) | — |
-| `file_replace` | Literal string replacement in text file | `location_id` (string), `path` (string), `old_string` (string), `new_string` (string) | `replace_all` (boolean, default false) |
-| `download_from_url` | Download file from URL to authorized storage | `location_id` (string), `path` (string), `url` (string) | — |
-| `delete_file` | Delete a single file (not directories) | `location_id` (string), `path` (string) | — |
+| `android_list_storage_locations` | List available storage locations with authorization status | — | — |
+| `android_list_files` | List files/directories in an authorized storage location | `location_id` (string) | `path` (string, default ""), `offset` (int, default 0), `limit` (int, default 200, max 200) |
+| `android_read_file` | Read text file with line-based pagination | `location_id` (string), `path` (string) | `offset` (int, 1-based line number, default 1), `limit` (int, default 200, max 200) |
+| `android_write_file` | Write/create text file (creates parents, overwrites) | `location_id` (string), `path` (string), `content` (string) | — |
+| `android_append_file` | Append to text file (tries native "wa" mode) | `location_id` (string), `path` (string), `content` (string) | — |
+| `android_file_replace` | Literal string replacement in text file | `location_id` (string), `path` (string), `old_string` (string), `new_string` (string) | `replace_all` (boolean, default false) |
+| `android_download_from_url` | Download file from URL to authorized storage | `location_id` (string), `path` (string), `url` (string) | — |
+| `android_delete_file` | Delete a single file (not directories) | `location_id` (string), `path` (string) | — |
 
 **Virtual path system**: All file tools use virtual paths: `{location_id}/{relative_path}` where `location_id` is `{authority}/{rootId}`. The location must be authorized by the user via the UI before file operations can be performed.
 
@@ -281,17 +283,17 @@ The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, 
 
 **Encoding**: All text operations use UTF-8.
 
-**Errors**: Returns `CallToolResult(isError = true)` if location not authorized, file not found, file exceeds size limit, or operation fails. `append_file` returns a hint to use `write_file` if the storage provider does not support append mode. `download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
+**Errors**: Returns `CallToolResult(isError = true)` if location not authorized, file not found, file exceeds size limit, or operation fails. `android_append_file` returns a hint to use `android_write_file` if the storage provider does not support append mode. `android_download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
 
 ### 9. App Management Tools (3 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `open_app` | Launch an application by package ID | `package_id` (string) | — |
-| `list_apps` | List installed applications with filtering | — | `filter` (string: all/user/system, default "all"), `name_query` (string) |
-| `close_app` | Kill a background application process | `package_id` (string) | — |
+| `android_open_app` | Launch an application by package ID | `package_id` (string) | — |
+| `android_list_apps` | List installed applications with filtering | — | `filter` (string: all/user/system, default "all"), `name_query` (string) |
+| `android_close_app` | Kill a background application process | `package_id` (string) | — |
 
-**Errors**: `open_app` returns `CallToolResult(isError = true)` if the app is not installed or has no launchable activity. `close_app` only affects background processes — for foreground apps, use `press_home` first to send the app to the background. `list_apps` requires the `QUERY_ALL_PACKAGES` permission. `close_app` requires the `KILL_BACKGROUND_PROCESSES` permission.
+**Errors**: `android_open_app` returns `CallToolResult(isError = true)` if the app is not installed or has no launchable activity. `android_close_app` only affects background processes — for foreground apps, use `android_press_home` first to send the app to the background. `android_list_apps` requires the `QUERY_ALL_PACKAGES` permission. `android_close_app` requires the `KILL_BACKGROUND_PROCESSES` permission.
 
 ---
 
@@ -572,6 +574,7 @@ Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMP
 - **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
 - **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)
 - **Download Timeout**: 60 seconds (range 10-300 seconds, configurable via UI)
+- **Device Slug** (`String`, default: `""`): Optional device identifier used as part of the MCP tool name prefix. When empty, tools use the `android_` prefix. When set (e.g., `pixel7`), tools use `android_pixel7_` prefix. Valid characters: letters (a-z, A-Z), digits (0-9), underscores (_). Maximum length: 20 characters.
 
 ### MCP Defaults
 
