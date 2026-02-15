@@ -3,7 +3,10 @@
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +40,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.PermissionsSectio
 import com.danielealbano.androidremotecontrolmcp.ui.components.RemoteAccessSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
+import com.danielealbano.androidremotecontrolmcp.ui.components.StorageLocationsSection
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 
@@ -61,10 +65,27 @@ fun HomeScreen(
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
     val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
     val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
+    val storageLocations by viewModel.storageLocations.collectAsStateWithLifecycle()
+    val fileSizeLimitInput by viewModel.fileSizeLimitInput.collectAsStateWithLifecycle()
+    val fileSizeLimitError by viewModel.fileSizeLimitError.collectAsStateWithLifecycle()
+    val downloadTimeoutInput by viewModel.downloadTimeoutInput.collectAsStateWithLifecycle()
+    val downloadTimeoutError by viewModel.downloadTimeoutError.collectAsStateWithLifecycle()
 
     val isServerRunning =
         serverStatus is ServerStatus.Running ||
             serverStatus is ServerStatus.Starting
+
+    val documentTreeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            // Permission is taken inside StorageLocationProviderImpl.authorizeLocation()
+            // — do NOT call takePersistableUriPermission here to avoid a double call.
+            viewModel.onLocationAuthorized(uri)
+        } else {
+            viewModel.onLocationAuthorizationCancelled()
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer =
@@ -127,6 +148,30 @@ fun HomeScreen(
                 onHttpsEnabledChange = viewModel::updateHttpsEnabled,
                 onCertificateSourceChange = viewModel::updateCertificateSource,
                 onHostnameChange = viewModel::updateCertificateHostname,
+            )
+
+            StorageLocationsSection(
+                storageLocations = storageLocations,
+                fileSizeLimitInput = fileSizeLimitInput,
+                fileSizeLimitError = fileSizeLimitError,
+                downloadTimeoutInput = downloadTimeoutInput,
+                downloadTimeoutError = downloadTimeoutError,
+                allowHttpDownloads = serverConfig.allowHttpDownloads,
+                allowUnverifiedHttpsCerts = serverConfig.allowUnverifiedHttpsCerts,
+                isServerRunning = isServerRunning,
+                onToggleLocation = { location ->
+                    if (location.isAuthorized) {
+                        viewModel.deauthorizeLocation(location.id)
+                    } else {
+                        viewModel.requestLocationAuthorization(location.id)
+                        val initialUri = viewModel.getInitialPickerUri(location.id)
+                        documentTreeLauncher.launch(initialUri)
+                    }
+                },
+                onFileSizeLimitChange = viewModel::updateFileSizeLimit,
+                onDownloadTimeoutChange = viewModel::updateDownloadTimeout,
+                onAllowHttpDownloadsChange = viewModel::updateAllowHttpDownloads,
+                onAllowUnverifiedHttpsCertsChange = viewModel::updateAllowUnverifiedHttpsCerts,
             )
 
             RemoteAccessSection(
