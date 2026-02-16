@@ -8,33 +8,33 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
-
-private val AuthorizedColor = Color(0xFF4CAF50)
-private val UnauthorizedColor = Color(0xFFF44336)
 
 @Suppress("LongMethod")
 @Composable
@@ -47,7 +47,9 @@ fun StorageLocationsSection(
     allowHttpDownloads: Boolean,
     allowUnverifiedHttpsCerts: Boolean,
     isServerRunning: Boolean,
-    onToggleLocation: (StorageLocation) -> Unit,
+    onAddLocation: () -> Unit,
+    onEditDescription: (StorageLocation) -> Unit,
+    onDeleteLocation: (StorageLocation) -> Unit,
     onFileSizeLimitChange: (String) -> Unit,
     onDownloadTimeoutChange: (String) -> Unit,
     onAllowHttpDownloadsChange: (Boolean) -> Unit,
@@ -73,6 +75,17 @@ fun StorageLocationsSection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            OutlinedButton(onClick = onAddLocation) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.storage_location_add_button))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             if (storageLocations.isEmpty()) {
                 Text(
                     text = stringResource(R.string.storage_location_no_locations),
@@ -83,7 +96,8 @@ fun StorageLocationsSection(
                 storageLocations.forEach { location ->
                     StorageLocationRow(
                         location = location,
-                        onToggle = { onToggleLocation(location) },
+                        onEdit = { onEditDescription(location) },
+                        onDelete = { onDeleteLocation(location) },
                     )
                 }
             }
@@ -93,7 +107,6 @@ fun StorageLocationsSection(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // File Size Limit
             OutlinedTextField(
                 value = fileSizeLimitInput,
                 onValueChange = onFileSizeLimitChange,
@@ -108,7 +121,6 @@ fun StorageLocationsSection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Download Timeout
             OutlinedTextField(
                 value = downloadTimeoutInput,
                 onValueChange = onDownloadTimeoutChange,
@@ -123,7 +135,6 @@ fun StorageLocationsSection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Allow HTTP Downloads toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -150,7 +161,6 @@ fun StorageLocationsSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Allow Unverified HTTPS toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -181,7 +191,8 @@ fun StorageLocationsSection(
 @Composable
 private fun StorageLocationRow(
     location: StorageLocation,
-    onToggle: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Row(
         modifier =
@@ -190,40 +201,40 @@ private fun StorageLocationRow(
                 .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector =
-                if (location.isAuthorized) {
-                    Icons.Default.CheckCircle
-                } else {
-                    Icons.Default.Error
-                },
-            contentDescription =
-                if (location.isAuthorized) {
-                    stringResource(R.string.storage_location_authorized)
-                } else {
-                    stringResource(R.string.storage_location_authorize)
-                },
-            tint = if (location.isAuthorized) AuthorizedColor else UnauthorizedColor,
-            modifier = Modifier.size(24.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
         Column(
             modifier = Modifier.weight(1f),
         ) {
             Text(
                 text = location.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
             )
             Text(
-                text = stringResource(R.string.storage_location_provider_label, location.providerName),
+                text = location.path,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (location.description.isNotEmpty()) {
+                Text(
+                    text = location.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = FontStyle.Italic,
+                )
+            }
         }
-        Switch(
-            checked = location.isAuthorized,
-            onCheckedChange = { onToggle() },
-        )
+        IconButton(onClick = onEdit) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = stringResource(R.string.storage_location_edit_dialog_title),
+            )
+        }
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = stringResource(R.string.storage_location_delete_dialog_title),
+            )
+        }
     }
 }
 
@@ -238,26 +249,18 @@ private fun StorageLocationsSectionPreview() {
                     StorageLocation(
                         id = "com.android.externalstorage/primary",
                         name = "Internal Storage",
-                        providerName = "External Storage",
-                        authority = "com.android.externalstorage",
-                        rootId = "primary",
-                        rootDocumentId = "primary:",
-                        treeUri = null,
-                        isAuthorized = false,
+                        path = "/",
+                        description = "",
+                        treeUri = "content://com.android.externalstorage.documents/tree/primary%3A",
                         availableBytes = null,
-                        iconUri = null,
                     ),
                     StorageLocation(
                         id = "com.android.providers.downloads.documents/downloads",
                         name = "Downloads",
-                        providerName = "Downloads",
-                        authority = "com.android.providers.downloads.documents",
-                        rootId = "downloads",
-                        rootDocumentId = "downloads",
+                        path = "/",
+                        description = "Downloaded files",
                         treeUri = "content://com.android.providers.downloads.documents/tree/downloads",
-                        isAuthorized = true,
                         availableBytes = null,
-                        iconUri = null,
                     ),
                 ),
             fileSizeLimitInput = "50",
@@ -267,7 +270,9 @@ private fun StorageLocationsSectionPreview() {
             allowHttpDownloads = false,
             allowUnverifiedHttpsCerts = false,
             isServerRunning = false,
-            onToggleLocation = {},
+            onAddLocation = {},
+            onEditDescription = {},
+            onDeleteLocation = {},
             onFileSizeLimitChange = {},
             onDownloadTimeoutChange = {},
             onAllowHttpDownloadsChange = {},
