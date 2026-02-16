@@ -1,17 +1,24 @@
 package com.danielealbano.androidremotecontrolmcp.data.repository
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -35,14 +42,30 @@ class SettingsRepositoryImplTest {
     private lateinit var dataStore: DataStore<Preferences>
     private lateinit var repository: SettingsRepositoryImpl
 
+    private var testFileCounter = 0
+
     @BeforeEach
     fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+
+        testFileCounter++
         dataStore =
             PreferenceDataStoreFactory.create(
                 scope = testScope.backgroundScope,
-                produceFile = { File(tempDir, "test_settings.preferences_pb") },
+                produceFile = { File(tempDir, "test_settings_$testFileCounter.preferences_pb") },
             )
         repository = SettingsRepositoryImpl(dataStore)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(Log::class)
     }
 
     @Nested
@@ -578,6 +601,266 @@ class SettingsRepositoryImplTest {
         fun `rejects slug with special characters`() {
             val result = repository.validateDeviceSlug("phone@1")
             assertTrue(result.isFailure)
+        }
+    }
+
+    @Nested
+    @DisplayName("Storage Location Methods")
+    inner class StorageLocationMethods {
+        private val locationsKey = stringPreferencesKey("authorized_storage_locations")
+
+        @Nested
+        @DisplayName("getStoredLocations")
+        inner class GetStoredLocations {
+            @Test
+            fun `returns empty list when no data stored`() =
+                testScope.runTest {
+                    val result = repository.getStoredLocations()
+
+                    assertTrue(result.isEmpty())
+                }
+
+            @Test
+            fun `returns stored locations`() =
+                testScope.runTest {
+                    val json =
+                        """[{"id":"loc1","name":"Downloads","path":"/Downloads","description":"My downloads","treeUri":"content://com.android.externalstorage.documents/tree/primary%3ADownloads"}]"""
+                    dataStore.edit { prefs -> prefs[locationsKey] = json }
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertEquals("Downloads", result[0].name)
+                    assertEquals("/Downloads", result[0].path)
+                    assertEquals("My downloads", result[0].description)
+                    assertEquals(
+                        "content://com.android.externalstorage.documents/tree/primary%3ADownloads",
+                        result[0].treeUri,
+                    )
+                }
+
+            @Test
+            fun `handles corrupt JSON gracefully and returns empty list`() =
+                testScope.runTest {
+                    dataStore.edit { prefs -> prefs[locationsKey] = "not-valid-json{{{" }
+
+                    val result = repository.getStoredLocations()
+
+                    assertTrue(result.isEmpty())
+                }
+        }
+
+        @Nested
+        @DisplayName("addStoredLocation")
+        inner class AddStoredLocation {
+            @Test
+            fun `appends to existing list`() =
+                testScope.runTest {
+                    val existing =
+                        """[{"id":"loc1","name":"Downloads","path":"/","description":"","treeUri":"content://test/tree/1"}]"""
+                    dataStore.edit { prefs -> prefs[locationsKey] = existing }
+
+                    val newLocation =
+                        SettingsRepository.StoredLocation(
+                            id = "loc2",
+                            name = "Documents",
+                            path = "/Documents",
+                            description = "Work docs",
+                            treeUri = "content://test/tree/2",
+                        )
+                    repository.addStoredLocation(newLocation)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(2, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertEquals("loc2", result[1].id)
+                    assertEquals("Documents", result[1].name)
+                    assertEquals("/Documents", result[1].path)
+                    assertEquals("Work docs", result[1].description)
+                    assertEquals("content://test/tree/2", result[1].treeUri)
+                }
+
+            @Test
+            fun `works on empty list`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/Downloads",
+                            description = "First location",
+                            treeUri = "content://test/tree/1",
+                        )
+                    repository.addStoredLocation(location)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertEquals("Downloads", result[0].name)
+                    assertEquals("First location", result[0].description)
+                }
+        }
+
+        @Nested
+        @DisplayName("removeStoredLocation")
+        inner class RemoveStoredLocation {
+            @Test
+            fun `removes matching entry`() =
+                testScope.runTest {
+                    val loc1 =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                        )
+                    val loc2 =
+                        SettingsRepository.StoredLocation(
+                            id = "loc2",
+                            name = "Documents",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/2",
+                        )
+                    repository.addStoredLocation(loc1)
+                    repository.addStoredLocation(loc2)
+
+                    repository.removeStoredLocation("loc1")
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("loc2", result[0].id)
+                }
+
+            @Test
+            fun `is no-op for non-existent ID`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.removeStoredLocation("non-existent-id")
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                }
+        }
+
+        @Nested
+        @DisplayName("updateLocationDescription")
+        inner class UpdateLocationDescription {
+            @Test
+            fun `updates matching entry`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "Old description",
+                            treeUri = "content://test/tree/1",
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationDescription("loc1", "New description")
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("New description", result[0].description)
+                    assertEquals("loc1", result[0].id)
+                    assertEquals("Downloads", result[0].name)
+                    assertEquals("content://test/tree/1", result[0].treeUri)
+                }
+
+            @Test
+            fun `is no-op for non-existent ID`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "Original",
+                            treeUri = "content://test/tree/1",
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationDescription("non-existent-id", "New description")
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("Original", result[0].description)
+                }
+        }
+
+        @Nested
+        @DisplayName("Migration")
+        inner class Migration {
+            @Test
+            fun `getStoredLocations migrates old JSON object format to new array format`() =
+                testScope.runTest {
+                    val oldFormatJson =
+                        """{"com.android.externalstorage.documents/tree/primary":"content://com.android.externalstorage.documents/tree/primary%3A"}"""
+                    dataStore.edit { prefs -> prefs[locationsKey] = oldFormatJson }
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals(
+                        "com.android.externalstorage.documents/tree/primary",
+                        result[0].id,
+                    )
+                    assertEquals(
+                        "content://com.android.externalstorage.documents/tree/primary%3A",
+                        result[0].treeUri,
+                    )
+                }
+
+            @Test
+            fun `getStoredLocations preserves data during migration`() =
+                testScope.runTest {
+                    val oldFormatJson =
+                        """{"com.test/primary":"content://com.test/tree/primary%3A","com.test/secondary":"content://com.test/tree/secondary%3A"}"""
+                    dataStore.edit { prefs -> prefs[locationsKey] = oldFormatJson }
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(2, result.size)
+
+                    val loc1 = result.find { it.id == "com.test/primary" }
+                    val loc2 = result.find { it.id == "com.test/secondary" }
+
+                    assertTrue(loc1 != null)
+                    assertEquals("content://com.test/tree/primary%3A", loc1!!.treeUri)
+                    assertEquals("primary", loc1.name)
+                    assertEquals("/", loc1.path)
+                    assertEquals("", loc1.description)
+
+                    assertTrue(loc2 != null)
+                    assertEquals("content://com.test/tree/secondary%3A", loc2!!.treeUri)
+                    assertEquals("secondary", loc2.name)
+                    assertEquals("/", loc2.path)
+                    assertEquals("", loc2.description)
+                }
+
+            @Test
+            fun `getStoredLocations returns empty list for completely invalid JSON`() =
+                testScope.runTest {
+                    dataStore.edit { prefs -> prefs[locationsKey] = "<<<completely-invalid>>>" }
+
+                    val result = repository.getStoredLocations()
+
+                    assertTrue(result.isEmpty())
+                }
         }
     }
 }
