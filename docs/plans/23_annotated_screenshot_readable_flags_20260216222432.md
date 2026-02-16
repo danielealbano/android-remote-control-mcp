@@ -17,6 +17,7 @@ Enhance the `get_screen_state` tool with two improvements:
 - Note lines (flags legend, offscreen hint) are always present.
 - No per-element screenshots.
 - No interleaved `TextContent` captions.
+- **All elements are annotated, including password/sensitive fields.** This is intentional — the MCP server must allow models to identify and interact with password fields. Android already masks password text with dots/asterisks at the display level, so the screenshot does not expose actual password content.
 
 ### Flag Abbreviation Map
 
@@ -117,7 +118,7 @@ node_e5f6	Button	Hidden	-	-	100,2600,300,2660	off,clk,ena
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/CompactTreeFormatter.kt`
 **Lines**: 158-168 (`buildFlags` method)
 
-**What**: Replace single-letter flag building with comma-separated abbreviated words. Add `on`/`off` as the first flag based on the `visible` property.
+**What**: Replace single-letter flag building with comma-separated abbreviated words using `buildString` (zero intermediate allocations). Add `on`/`off` as the first flag based on the `visible` property.
 
 ```diff
 -    internal fun buildFlags(node: AccessibilityNodeData): String {
@@ -131,18 +132,18 @@ node_e5f6	Button	Hidden	-	-	100,2600,300,2660	off,clk,ena
 -        if (node.enabled) sb.append('n')
 -        return sb.toString()
 -    }
-+    internal fun buildFlags(node: AccessibilityNodeData): String {
-+        val flags = mutableListOf<String>()
-+        flags.add(if (node.visible) FLAG_ONSCREEN else FLAG_OFFSCREEN)
-+        if (node.clickable) flags.add(FLAG_CLICKABLE)
-+        if (node.longClickable) flags.add(FLAG_LONG_CLICKABLE)
-+        if (node.focusable) flags.add(FLAG_FOCUSABLE)
-+        if (node.scrollable) flags.add(FLAG_SCROLLABLE)
-+        if (node.editable) flags.add(FLAG_EDITABLE)
-+        if (node.enabled) flags.add(FLAG_ENABLED)
-+        return flags.joinToString(FLAG_SEPARATOR)
++    internal fun buildFlags(node: AccessibilityNodeData): String = buildString {
++        append(if (node.visible) FLAG_ONSCREEN else FLAG_OFFSCREEN)
++        if (node.clickable) { append(FLAG_SEPARATOR); append(FLAG_CLICKABLE) }
++        if (node.longClickable) { append(FLAG_SEPARATOR); append(FLAG_LONG_CLICKABLE) }
++        if (node.focusable) { append(FLAG_SEPARATOR); append(FLAG_FOCUSABLE) }
++        if (node.scrollable) { append(FLAG_SEPARATOR); append(FLAG_SCROLLABLE) }
++        if (node.editable) { append(FLAG_SEPARATOR); append(FLAG_EDITABLE) }
++        if (node.enabled) { append(FLAG_SEPARATOR); append(FLAG_ENABLED) }
 +    }
 ```
+
+**Note**: Uses `buildString` instead of `mutableListOf + joinToString` to avoid intermediate list allocation and the `joinToString` overhead. This keeps allocation minimal (single `StringBuilder`), similar to the original implementation.
 
 #### Action 1.1.3: Update `format()` to include new note lines
 
@@ -277,6 +278,13 @@ node_e5f6	Button	Hidden	-	-	100,2600,300,2660	off,clk,ena
 +            )
 +        val flags = formatter.buildFlags(node)
 +        assertTrue(flags.startsWith("on,") || flags == "on")
++    }
++
++    @Test
++    @DisplayName("returns only on when visible and no other flags set")
++    fun returnsOnlyOnWhenVisibleAndNoOtherFlags() {
++        val node = makeNode(visible = true)
++        assertEquals("on", formatter.buildFlags(node))
 +    }
  }
 ```
@@ -519,6 +527,9 @@ Key changes:
              assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
              assertTrue(textContent.contains("node_btn"))
 +            assertTrue(textContent.contains("on,clk,ena"))
++            // Negative assertions: ensure old single-char flag format is gone
++            assertFalse(textContent.contains("\tvcn"))
++            assertFalse(textContent.contains("\tvclfsen"))
          }
      }
 ```
@@ -669,7 +680,11 @@ Key changes:
    - Text color: `Color.WHITE`
    - Position: top-left corner of bounding box, shifted inside if near edge
 
-5. **Return**: A new `Bitmap` (mutable software copy of input). Input bitmap is NOT recycled — caller retains ownership.
+5. **Paint object reuse** (IMPORTANT for performance):
+   - All `Paint` objects (box stroke paint, label background paint, label text paint) MUST be created **once** before the element loop, NOT inside the per-element loop.
+   - The `Canvas` object wrapping the mutable bitmap copy is also created once.
+
+6. **Return**: A new `Bitmap` (mutable software copy of input via `bitmap.copy(config, true)`). Input bitmap is NOT recycled — caller retains ownership.
 
 6. **Edge cases**:
    - Empty elements list → return copy of bitmap unchanged
@@ -690,6 +705,7 @@ import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Typeface
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import javax.inject.Inject
 
@@ -715,6 +731,8 @@ class ScreenshotAnnotator
      * Creates a mutable copy of the input bitmap and draws on it. The input bitmap
      * is NOT modified or recycled — the caller retains ownership of both.
      *
+     * Paint objects are created ONCE before the element loop for efficiency.
+     *
      * @param bitmap The resized screenshot bitmap.
      * @param elements Flat list of on-screen elements to annotate (already filtered).
      * @param screenWidth Original screen width in pixels (for coordinate mapping).
@@ -727,11 +745,105 @@ class ScreenshotAnnotator
         screenWidth: Int,
         screenHeight: Int,
     ): Bitmap {
-        // ...implementation...
+        val copy = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+        if (elements.isEmpty()) return copy
+
+        val canvas = Canvas(copy)
+        val scaleX = copy.width.toFloat() / screenWidth.toFloat()
+        val scaleY = copy.height.toFloat() / screenHeight.toFloat()
+        val density = copy.width.toFloat() / REFERENCE_WIDTH_DP
+
+        // Create Paint objects ONCE before the loop
+        val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.RED
+            style = Paint.Style.STROKE
+            strokeWidth = BOX_STROKE_WIDTH_DP * density
+            pathEffect = DashPathEffect(
+                floatArrayOf(DASH_LENGTH_DP * density, DASH_GAP_DP * density),
+                0f,
+            )
+        }
+        val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(LABEL_BG_ALPHA, 255, 0, 0)
+            style = Paint.Style.FILL
+        }
+        val labelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = LABEL_TEXT_SIZE_DP * density
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val padding = LABEL_PADDING_DP * density
+
+        for (element in elements) {
+            val scaledRect = computeScaledBounds(
+                element, scaleX, scaleY, copy.width, copy.height,
+            ) ?: continue
+
+            // Draw bounding box
+            canvas.drawRect(scaledRect, boxPaint)
+
+            // Draw label
+            val label = extractLabel(element.id)
+            val textWidth = labelTextPaint.measureText(label)
+            val textHeight = labelTextPaint.textSize
+            val labelRect = RectF(
+                scaledRect.left,
+                scaledRect.top - textHeight - padding * 2,
+                scaledRect.left + textWidth + padding * 2,
+                scaledRect.top,
+            )
+            // Shift label inside box if it would go above bitmap
+            if (labelRect.top < 0) {
+                labelRect.offset(0f, -labelRect.top)
+            }
+            canvas.drawRoundRect(labelRect, padding, padding, labelBgPaint)
+            canvas.drawText(
+                label,
+                labelRect.left + padding,
+                labelRect.bottom - padding,
+                labelTextPaint,
+            )
+        }
+
+        return copy
     }
 
+    /**
+     * Computes the scaled bounding rectangle for an element on the bitmap.
+     *
+     * @return Scaled [RectF] clamped to bitmap bounds, or null if fully outside.
+     */
+    internal fun computeScaledBounds(
+        element: AccessibilityNodeData,
+        scaleX: Float,
+        scaleY: Float,
+        bitmapWidth: Int,
+        bitmapHeight: Int,
+    ): RectF? {
+        val bounds = element.bounds ?: return null
+        val left = (bounds.left * scaleX).coerceIn(0f, bitmapWidth.toFloat())
+        val top = (bounds.top * scaleY).coerceIn(0f, bitmapHeight.toFloat())
+        val right = (bounds.right * scaleX).coerceIn(0f, bitmapWidth.toFloat())
+        val bottom = (bounds.bottom * scaleY).coerceIn(0f, bitmapHeight.toFloat())
+
+        // Skip if fully collapsed after clamping
+        if (right <= left || bottom <= top) return null
+
+        return RectF(left, top, right, bottom)
+    }
+
+    /**
+     * Extracts the display label from an element ID by stripping the `node_` prefix.
+     */
+    internal fun extractLabel(elementId: String): String =
+        if (elementId.startsWith(NODE_ID_PREFIX)) {
+            elementId.removePrefix(NODE_ID_PREFIX)
+        } else {
+            elementId
+        }
+
     companion object {
-        private const val NODE_ID_PREFIX = "node_"
+        internal const val NODE_ID_PREFIX = "node_"
         private const val BOX_STROKE_WIDTH_DP = 2f
         private const val DASH_LENGTH_DP = 6f
         private const val DASH_GAP_DP = 3f
@@ -742,6 +854,13 @@ class ScreenshotAnnotator
     }
 }
 ```
+
+**Key design points**:
+- All `Paint` objects are created **once** before the loop (performance review fix).
+- `computeScaledBounds` and `extractLabel` are `internal` methods, directly unit-testable on JVM without mocking Android graphics classes.
+- `annotate` creates a mutable copy via `bitmap.copy()` — input is never modified.
+- Password/sensitive fields are intentionally annotated — Android masks display text, so no secrets are exposed.
+- Elements with null bounds are skipped. Elements fully outside bitmap after scaling are skipped.
 
 ---
 
@@ -829,25 +948,61 @@ class ScreenshotAnnotator
  )
 ```
 
-#### Action 2.3.4: Update `McpIntegrationTestHelper.registerAllTools`
+#### Action 2.3.4: Update `McpIntegrationTestHelper` — add mocks to `MockDependencies` and pass them
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/McpIntegrationTestHelper.kt`
-**Lines**: 70-83
 
-**What**: Pass real `ScreenshotAnnotator()` and `ScreenshotEncoder()` instances (they're stateless, no need to mock). Note: the integration tests for screenshot mock the `ScreenCaptureProvider` which now returns `ScreenshotData` directly in the test, so the annotator/encoder won't be called in tests that mock `captureScreenshot`. For the new annotated screenshot path, the integration test will need to mock `captureScreenshotBitmap` instead — this is handled in Task 2.5.
+**What**: Add `screenshotAnnotator` and `screenshotEncoder` as **mocked** fields in `MockDependencies`. Using real instances would crash JVM tests because `ScreenshotAnnotator` uses `Canvas`, `Paint`, `Color`, `DashPathEffect` etc. (Android native classes), and `ScreenshotEncoder` uses `Base64` (Android static). Mock them to avoid needing to mock a dozen Android framework classes.
+
+**Step 1**: Update `MockDependencies` data class (lines 252-261):
 
 ```diff
 +import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 +import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 
+ data class MockDependencies(
+     val actionExecutor: ActionExecutor,
+     val accessibilityServiceProvider: AccessibilityServiceProvider,
+     val screenCaptureProvider: ScreenCaptureProvider,
+     val treeParser: AccessibilityTreeParser,
+     val elementFinder: ElementFinder,
+     val storageLocationProvider: StorageLocationProvider,
+     val fileOperationProvider: FileOperationProvider,
+     val appManager: AppManager,
++    val screenshotAnnotator: ScreenshotAnnotator,
++    val screenshotEncoder: ScreenshotEncoder,
+ )
+```
+
+**Step 2**: Update `createMockDependencies()` (lines 55-65):
+
+```diff
+ fun createMockDependencies(): MockDependencies =
+     MockDependencies(
+         actionExecutor = mockk(relaxed = true),
+         accessibilityServiceProvider = mockk(relaxed = true),
+         screenCaptureProvider = mockk(relaxed = true),
+         treeParser = mockk(relaxed = true),
+         elementFinder = mockk(relaxed = true),
+         storageLocationProvider = mockk(relaxed = true),
+         fileOperationProvider = mockk(relaxed = true),
+         appManager = mockk(relaxed = true),
++        screenshotAnnotator = mockk(relaxed = true),
++        screenshotEncoder = mockk(relaxed = true),
+     )
+```
+
+**Step 3**: Update `registerAllTools` to use mocked instances (lines 76-83):
+
+```diff
  registerScreenIntrospectionTools(
      server,
      deps.treeParser,
      deps.accessibilityServiceProvider,
      deps.screenCaptureProvider,
      CompactTreeFormatter(),
-+    ScreenshotAnnotator(),
-+    ScreenshotEncoder(),
++    deps.screenshotAnnotator,
++    deps.screenshotEncoder,
      toolNamePrefix,
  )
 ```
@@ -873,14 +1028,19 @@ class ScreenshotAnnotator
 /**
  * Collects elements that should be annotated on the screenshot:
  * nodes that pass the formatter's keep filter AND are visible (on-screen).
+ *
+ * Uses an accumulator parameter to avoid O(N) intermediate list allocations
+ * and O(N²) element copies from recursive addAll calls.
  */
-private fun collectOnScreenElements(node: AccessibilityNodeData): List<AccessibilityNodeData> {
-    val result = mutableListOf<AccessibilityNodeData>()
+private fun collectOnScreenElements(
+    node: AccessibilityNodeData,
+    result: MutableList<AccessibilityNodeData> = mutableListOf(),
+): List<AccessibilityNodeData> {
     if (compactTreeFormatter.shouldKeepNode(node) && node.visible) {
         result.add(node)
     }
     for (child in node.children) {
-        result.addAll(collectOnScreenElements(child))
+        collectOnScreenElements(child, result)
     }
     return result
 }
@@ -966,44 +1126,231 @@ Add the necessary imports at the top of the file:
 - [ ] Tests cover: empty elements list, single element, multiple elements, coordinate mapping, bounds clamping, element outside bitmap, ID hash extraction
 - [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
 
-#### Action 2.5.1: Create `ScreenshotAnnotatorTest.kt`
+#### Action 2.5.1: Separate testable coordinate/label logic from drawing in `ScreenshotAnnotator`
+
+**File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotAnnotator.kt`
+
+**What**: To make the `ScreenshotAnnotator` properly testable on JVM without mocking a dozen Android graphics classes, extract **pure logic** into `internal` helper methods that the unit tests can call directly:
+
+1. `internal fun computeScaledBounds(element: AccessibilityNodeData, scaleX: Float, scaleY: Float, bitmapWidth: Int, bitmapHeight: Int): RectF?`
+   - Computes the scaled rectangle for an element.
+   - Returns `null` if the element is fully outside the bitmap.
+   - Clamps coordinates to bitmap edges if partially outside.
+   - This is pure math — no Android drawing APIs.
+
+2. `internal fun extractLabel(elementId: String): String`
+   - Strips `node_` prefix from element ID to get hash.
+   - Returns full ID if prefix not present.
+   - Pure string logic.
+
+3. `internal fun computeLabelRect(label: String, boxRect: RectF, textSize: Float, padding: Float): RectF`
+   - Computes the pill background rectangle position for a label.
+   - Pure math based on estimated text width (can use `label.length * textSize * 0.6f` as approximation, or accept textWidth as parameter).
+
+The `annotate` method itself calls these helpers and performs the actual Canvas drawing. The drawing logic is a thin layer that's verified via integration tests.
+
+#### Action 2.5.2: Create `ScreenshotAnnotatorTest.kt`
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotAnnotatorTest.kt` (NEW)
 
-**What**: Create unit tests for `ScreenshotAnnotator`. Since we're running on JVM (not Android instrumentation), we need to mock `Bitmap`, `Canvas`, and `Paint` using MockK. The tests verify:
+**What**: Create unit tests that test the **extracted pure logic methods** and the overall `annotate` method using MockK for Android graphics classes. Structure:
 
-1. **Empty element list**: Returns a bitmap with same dimensions, no drawing calls
-2. **Single on-screen element**: Verifies Canvas draw methods are called (drawRect, drawText, drawRoundRect)
-3. **Multiple elements**: Verifies draw methods called for each element
-4. **Coordinate mapping math**: Verify scaled coordinates (e.g., screen 1080x2400, bitmap 315x700 → element at 540,1200 maps to 157.5,350.0)
-5. **Element fully outside bitmap bounds**: Skipped, no draw calls for that element
-6. **Element partially outside**: Clamped, still drawn
-7. **ID hash extraction**: `node_a3f2` → label shows `a3f2`; node with no `node_` prefix → shows full ID
+**Inner class 1: `ExtractLabelTests`** (pure logic, no mocking needed):
+```kotlin
+@Nested
+@DisplayName("extractLabel")
+inner class ExtractLabelTests {
+    @Test
+    fun `strips node_ prefix`() {
+        assertEquals("a3f2", annotator.extractLabel("node_a3f2"))
+    }
 
-Note: Since `Bitmap.createBitmap`, `Canvas`, etc. are Android framework classes, these tests will use MockK `mockkStatic` and `mockkConstructor` patterns similar to how other tests in this project mock Android classes. The key assertions focus on verifying the annotator calls the expected draw operations with correct coordinates.
+    @Test
+    fun `returns full id when no prefix`() {
+        assertEquals("custom_id", annotator.extractLabel("custom_id"))
+    }
+
+    @Test
+    fun `handles empty string`() {
+        assertEquals("", annotator.extractLabel(""))
+    }
+}
+```
+
+**Inner class 2: `ComputeScaledBoundsTests`** (pure math, no mocking needed):
+```kotlin
+@Nested
+@DisplayName("computeScaledBounds")
+inner class ComputeScaledBoundsTests {
+    @Test
+    fun `correctly scales coordinates`() {
+        // Screen 1080x2400, bitmap 540x1200 → scaleX=0.5, scaleY=0.5
+        val element = makeNode(bounds = BoundsData(100, 200, 300, 400))
+        val result = annotator.computeScaledBounds(element, 0.5f, 0.5f, 540, 1200)
+        assertNotNull(result)
+        assertEquals(50f, result!!.left)
+        assertEquals(100f, result.top)
+        assertEquals(150f, result.right)
+        assertEquals(200f, result.bottom)
+    }
+
+    @Test
+    fun `returns null for element fully outside bitmap`() {
+        val element = makeNode(bounds = BoundsData(2000, 3000, 2100, 3100))
+        val result = annotator.computeScaledBounds(element, 0.5f, 0.5f, 540, 1200)
+        assertNull(result)
+    }
+
+    @Test
+    fun `clamps partially outside element`() {
+        val element = makeNode(bounds = BoundsData(1000, 2300, 1200, 2600))
+        val result = annotator.computeScaledBounds(element, 0.5f, 0.5f, 540, 1200)
+        assertNotNull(result)
+        assertEquals(500f, result!!.left)
+        assertEquals(540f, result.right) // clamped to bitmapWidth
+    }
+}
+```
+
+**Inner class 3: `AnnotateTests`** (uses MockK for Bitmap/Canvas):
+```kotlin
+@Nested
+@DisplayName("annotate")
+inner class AnnotateTests {
+    private lateinit var mockBitmap: Bitmap
+    private lateinit var mockCopy: Bitmap
+    private lateinit var mockCanvas: Canvas
+
+    @BeforeEach
+    fun setup() {
+        mockBitmap = mockk(relaxed = true)
+        mockCopy = mockk(relaxed = true)
+        mockCanvas = mockk(relaxed = true)
+        every { mockBitmap.width } returns 540
+        every { mockBitmap.height } returns 1200
+        every { mockBitmap.config } returns Bitmap.Config.ARGB_8888
+        every { mockBitmap.copy(Bitmap.Config.ARGB_8888, true) } returns mockCopy
+        every { mockCopy.width } returns 540
+        every { mockCopy.height } returns 1200
+        mockkConstructor(Canvas::class)
+        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRoundRect(any(), any(), any(), any()) } just Runs
+        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRect(any<RectF>(), any()) } just Runs
+        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawText(any(), any(), any(), any()) } just Runs
+    }
+
+    @AfterEach
+    fun teardown() {
+        unmockkConstructor(Canvas::class)
+    }
+
+    @Test
+    fun `empty elements returns copy without draw calls`() {
+        val result = annotator.annotate(mockBitmap, emptyList(), 1080, 2400)
+        assertEquals(mockCopy, result)
+        verify(exactly = 0) { mockCopy.recycle() } // input not recycled
+    }
+
+    @Test
+    fun `single element draws box and label`() {
+        val element = makeNode(id = "node_a3f2", bounds = BoundsData(100, 200, 300, 400), visible = true)
+        annotator.annotate(mockBitmap, listOf(element), 1080, 2400)
+        // Verify at least one drawRect and one drawText were called
+        verify(atLeast = 1) { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRect(any<RectF>(), any()) }
+        verify(atLeast = 1) { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawText(match { it.contains("a3f2") }, any(), any(), any()) }
+    }
+
+    @Test
+    fun `does not mutate input bitmap`() {
+        val element = makeNode(id = "node_x1y2", bounds = BoundsData(100, 200, 300, 400), visible = true)
+        val result = annotator.annotate(mockBitmap, listOf(element), 1080, 2400)
+        assertNotSame(mockBitmap, result)
+        assertEquals(mockCopy, result)
+    }
+}
+```
+
+**Note**: The `AnnotateTests` use `mockkConstructor(Canvas::class)` to intercept Canvas construction with a Bitmap argument. `@AfterEach` ensures `unmockkConstructor` is always called to prevent test pollution. The exact verify patterns may need adjustment during implementation based on the final drawing code.
 
 ---
 
-### Task 2.6: Update `ScreenIntrospectionIntegrationTest` for annotated screenshot
+### Task 2.6: Add unit tests for `ScreenCaptureProviderImpl.captureScreenshotBitmap`
 
 **Acceptance Criteria**:
-- [ ] Integration test for screenshot now mocks `captureScreenshotBitmap` instead of `captureScreenshot`
+- [ ] New test class/inner class covering `captureScreenshotBitmap` in the existing `ScreenCaptureProviderImplTest.kt` (or a new file if it doesn't exist)
+- [ ] Tests cover: success path, failure path (null bitmap), bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same bitmap
+- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
+
+#### Action 2.6.1: Add `captureScreenshotBitmap` tests
+
+**File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureProviderImplTest.kt` (existing or new)
+
+**What**: Add unit tests for the new method. The test approach:
+- Mock `McpAccessibilityService.takeScreenshotBitmap()` and `ScreenshotEncoder.resizeBitmapProportional()`
+- Verify bitmap recycling behavior
+
+```kotlin
+@Nested
+@DisplayName("captureScreenshotBitmap")
+inner class CaptureScreenshotBitmapTests {
+    @Test
+    fun `returns resized bitmap on success`() = runTest {
+        val originalBitmap = mockk<Bitmap>(relaxed = true)
+        val resizedBitmap = mockk<Bitmap>(relaxed = true)
+        // Mock service.takeScreenshotBitmap() → originalBitmap
+        // Mock screenshotEncoder.resizeBitmapProportional(originalBitmap, ...) → resizedBitmap
+        val result = provider.captureScreenshotBitmap(maxWidth = 700, maxHeight = 700)
+        assertTrue(result.isSuccess)
+        assertEquals(resizedBitmap, result.getOrNull())
+        // Original bitmap recycled because a new one was produced
+        verify { originalBitmap.recycle() }
+    }
+
+    @Test
+    fun `does not recycle bitmap when resize returns same instance`() = runTest {
+        val bitmap = mockk<Bitmap>(relaxed = true)
+        // Mock service.takeScreenshotBitmap() → bitmap
+        // Mock screenshotEncoder.resizeBitmapProportional(bitmap, ...) → bitmap (same)
+        val result = provider.captureScreenshotBitmap(maxWidth = 700, maxHeight = 700)
+        assertTrue(result.isSuccess)
+        verify(exactly = 0) { bitmap.recycle() }
+    }
+
+    @Test
+    fun `returns failure when takeScreenshotBitmap returns null`() = runTest {
+        // Mock service.takeScreenshotBitmap() → null
+        val result = provider.captureScreenshotBitmap(maxWidth = 700, maxHeight = 700)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `returns failure when service not available`() = runTest {
+        // Mock validateService() → Invalid
+        val result = provider.captureScreenshotBitmap(maxWidth = 700, maxHeight = 700)
+        assertTrue(result.isFailure)
+    }
+}
+```
+
+---
+
+### Task 2.7: Update `ScreenIntrospectionIntegrationTest` for annotated screenshot
+
+**Acceptance Criteria**:
+- [ ] Integration test for screenshot now mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` instead of `captureScreenshot`
+- [ ] No Android framework mocking needed (no `mockkStatic(Bitmap::class)`)
 - [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
 
-#### Action 2.6.1: Update `get_screen_state with include_screenshot returns text and image`
+#### Action 2.7.1: Update `get_screen_state with include_screenshot returns text and image`
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/ScreenIntrospectionIntegrationTest.kt`
 **Lines**: 102-136
 
-**What**: The handler now calls `captureScreenshotBitmap` instead of `captureScreenshot`, then annotates, then encodes. The integration test needs to mock `captureScreenshotBitmap` to return a mock Bitmap. Since `ScreenshotAnnotator` and `ScreenshotEncoder` are real instances passed in `McpIntegrationTestHelper`, we need to also mock the Bitmap/Canvas Android classes. 
-
-Alternatively, since the integration test's purpose is to verify the MCP tool returns text + image content, we can mock the Bitmap creation chain. The approach:
+**What**: Since `ScreenshotAnnotator` and `ScreenshotEncoder` are now **mocked** (via `MockDependencies`, see Action 2.3.4), the integration test does NOT need to mock Android `Bitmap`/`Canvas`/`Paint` classes. Instead:
 - Mock `captureScreenshotBitmap` to return a mock Bitmap
-- Mock `Bitmap.createBitmap(Bitmap, ...)` and `Bitmap.copy(...)` (used by annotator)
-- Mock `Bitmap.compress(...)` (used by encoder) to write known bytes
-- Assert the result still has TextContent + ImageContent
+- Mock `screenshotAnnotator.annotate()` to return the same mock Bitmap
+- Mock `screenshotEncoder.bitmapToScreenshotData()` to return a known `ScreenshotData`
 
-This requires careful setup of Android class mocks. The exact mock setup will depend on what methods `ScreenshotAnnotator.annotate` and `ScreenshotEncoder.bitmapToScreenshotData` call on the Bitmap.
+This is clean, avoids all Android framework mocking, and isolates each component properly.
 
 ```diff
  @Test
@@ -1012,6 +1359,7 @@ This requires careful setup of Android class mocks. The exact mock setup will de
          val deps = McpIntegrationTestHelper.createMockDependencies()
          deps.setupReadyService()
          every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
 -        coEvery {
 -            deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
 -        } returns
@@ -1022,25 +1370,22 @@ This requires careful setup of Android class mocks. The exact mock setup will de
 -                    height = 500,
 -                ),
 -            )
-+        // Mock captureScreenshotBitmap to return a mock Bitmap
++        // Mock captureScreenshotBitmap to return a relaxed mock Bitmap
 +        val mockBitmap = mockk<Bitmap>(relaxed = true)
-+        every { mockBitmap.width } returns 700
-+        every { mockBitmap.height } returns 500
-+        every { mockBitmap.config } returns Bitmap.Config.ARGB_8888
-+        every { mockBitmap.copy(any(), any()) } returns mockBitmap
-+        every { mockBitmap.compress(any(), any(), any()) } answers {
-+            val outputStream = thirdArg<java.io.OutputStream>()
-+            outputStream.write("test".toByteArray())
-+            true
-+        }
 +        coEvery {
 +            deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
 +        } returns Result.success(mockBitmap)
 +
-+        // Mock Bitmap.createBitmap for the annotator's copy
-+        mockkStatic(Bitmap::class)
-+        every { Bitmap.createBitmap(any<Bitmap>(), any(), any(), any(), any()) } returns mockBitmap
-+        every { Bitmap.createBitmap(any<Int>(), any<Int>(), any()) } returns mockBitmap
++        // Mock annotator to return the same mock bitmap (no Android Canvas needed)
++        val annotatedMockBitmap = mockk<Bitmap>(relaxed = true)
++        every {
++            deps.screenshotAnnotator.annotate(any(), any(), any(), any())
++        } returns annotatedMockBitmap
++
++        // Mock encoder to return known ScreenshotData
++        every {
++            deps.screenshotEncoder.bitmapToScreenshotData(any(), any())
++        } returns ScreenshotData(data = "dGVzdA==", width = 700, height = 500)
 
          McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
              val result =
@@ -1053,19 +1398,20 @@ This requires careful setup of Android class mocks. The exact mock setup will de
 
              val textContent = (result.content[0] as TextContent).text
              assertTrue(textContent.contains("note:"))
++            assertTrue(textContent.contains("note:flags:"))
++            assertTrue(textContent.contains("note:offscreen items"))
              assertTrue(textContent.contains("app:"))
 
              val imageContent = result.content[1] as ImageContent
              assertEquals("image/jpeg", imageContent.mimeType)
--            assertEquals("dGVzdA==", imageContent.data)
-+            assertTrue(imageContent.data.isNotEmpty())
+             assertEquals("dGVzdA==", imageContent.data)
          }
-+
-+        unmockkStatic(Bitmap::class)
      }
 ```
 
-#### Action 2.6.2: Update `get_screen_state without screenshot does not call captureScreenshot`
+**Note**: No `mockkStatic(Bitmap::class)` is needed because we mock the `ScreenshotAnnotator` and `ScreenshotEncoder` interfaces, so no Android drawing code runs in this test.
+
+#### Action 2.7.2: Update `get_screen_state without screenshot does not call captureScreenshot`
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/ScreenIntrospectionIntegrationTest.kt`
 **Lines**: 138-158
@@ -1077,6 +1423,53 @@ This requires careful setup of Android class mocks. The exact mock setup will de
 -    deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
 +    deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
  }
+```
+
+---
+
+### Task 2.8: Add integration test for exception propagation and bitmap cleanup
+
+**Acceptance Criteria**:
+- [ ] New test verifies that when `screenshotAnnotator.annotate()` throws an exception, the tool returns an error and both bitmaps are still recycled
+- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
+
+#### Action 2.8.1: Add `get_screen_state with screenshot annotation failure returns error`
+
+**File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/ScreenIntrospectionIntegrationTest.kt`
+
+**What**: Add a new test that simulates `screenshotAnnotator.annotate()` throwing an exception. Verify the tool returns an error result. Since this test uses mocked annotator/encoder (via MockDependencies), we just configure the mock to throw.
+
+```kotlin
+@Test
+fun `get_screen_state with screenshot annotation failure returns error`() =
+    runTest {
+        val deps = McpIntegrationTestHelper.createMockDependencies()
+        deps.setupReadyService()
+        every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+        coEvery {
+            deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+        } returns Result.success(mockBitmap)
+
+        // Simulate annotation failure
+        every {
+            deps.screenshotAnnotator.annotate(any(), any(), any(), any())
+        } throws RuntimeException("Canvas error")
+
+        McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+            val result =
+                client.callTool(
+                    name = "android_get_screen_state",
+                    arguments = mapOf("include_screenshot" to true),
+                )
+            // The tool should return an error
+            assertEquals(true, result.isError)
+        }
+
+        // Verify the bitmap was still recycled via the finally block
+        verify { mockBitmap.recycle() }
+    }
 ```
 
 ---
@@ -1238,9 +1631,30 @@ make lint
 
 ---
 
-### Task 4.2: Final verification against plan
+### Task 4.2: Update E2E tests for new TSV format and annotated screenshot
 
-#### Action 4.2.1: Re-read every changed file and verify against this plan
+**Acceptance Criteria**:
+- [ ] Existing E2E tests that call `get_screen_state` are updated to assert new TSV note lines and flag format
+- [ ] If screenshot E2E tests exist, they should verify the screenshot is non-empty (visual annotation verification is not feasible in automated E2E)
+- [ ] E2E tests pass: `make test-e2e` (if E2E environment is available)
+
+#### Action 4.2.1: Update E2E test assertions for TSV format
+
+**File**: E2E test files in `e2e-tests/src/test/kotlin/` that call `get_screen_state`
+
+**What**: Update assertions to check for:
+- New note lines (`note:flags:` and `note:offscreen items`)
+- New flag format (comma-separated abbreviations like `on,clk,ena`)
+- Negative assertions for old format (`vcn`, `vclfsen` should NOT appear)
+- If the E2E test checks screenshot content, verify `ImageContent` is returned with `image/jpeg` mimeType and non-empty data
+
+**Note**: If no E2E test currently tests `get_screen_state`, document this as a gap and skip this action. The Unit + Integration tests provide sufficient coverage for the logic changes.
+
+---
+
+### Task 4.3: Final verification against plan
+
+#### Action 4.3.1: Re-read every changed file and verify against this plan
 
 **What**: Systematically go through each file changed during implementation and verify:
 
@@ -1278,16 +1692,20 @@ make lint
    - [ ] Coordinate mapping from screen to bitmap space
    - [ ] Handles empty list, out-of-bounds elements, partial clipping
    - [ ] Returns new bitmap (does not mutate input)
+   - [ ] Paint objects created ONCE before the element loop (not per-element)
+   - [ ] Testable helper methods extracted: `computeScaledBounds`, `extractLabel`, `computeLabelRect`
+   - [ ] Password/sensitive fields ARE annotated (intentional; Android already masks display text)
 
 6. **`ScreenshotAnnotatorTest.kt`** (NEW):
-   - [ ] Tests for empty list, single element, multiple elements
-   - [ ] Tests for coordinate mapping
-   - [ ] Tests for ID hash extraction
-   - [ ] Tests for out-of-bounds elements
+   - [ ] Tests for empty list, single element, multiple elements (AnnotateTests inner class)
+   - [ ] Tests for coordinate mapping (ComputeScaledBoundsTests inner class)
+   - [ ] Tests for ID hash extraction (ExtractLabelTests inner class)
+   - [ ] Tests for out-of-bounds elements (fully outside → null, partially outside → clamped)
+   - [ ] `unmockkConstructor(Canvas::class)` in `@AfterEach` to prevent test pollution
 
 7. **`ScreenIntrospectionTools.kt`**:
    - [ ] `GetScreenStateHandler` constructor takes `ScreenshotAnnotator` and `ScreenshotEncoder`
-   - [ ] `collectOnScreenElements` helper method
+   - [ ] `collectOnScreenElements` helper method uses accumulator pattern (single `MutableList` parameter, no `addAll`)
    - [ ] Screenshot path: `captureScreenshotBitmap` → annotate → encode → return
    - [ ] Proper bitmap recycling (resized + annotated in finally block)
 
@@ -1297,20 +1715,31 @@ make lint
    - [ ] Both passed to `registerScreenIntrospectionTools`
 
 9. **`McpIntegrationTestHelper.kt`**:
-   - [ ] `ScreenshotAnnotator()` and `ScreenshotEncoder()` passed to `registerScreenIntrospectionTools`
+   - [ ] `MockDependencies` has `screenshotAnnotator` and `screenshotEncoder` fields (mocked, NOT real instances)
+   - [ ] `createMockDependencies()` creates both as `mockk(relaxed = true)`
+   - [ ] `registerAllTools` passes `deps.screenshotAnnotator` and `deps.screenshotEncoder` to `registerScreenIntrospectionTools`
 
 10. **`ScreenIntrospectionIntegrationTest.kt`**:
-    - [ ] Assertions for new note lines
+    - [ ] Assertions for new note lines (`note:flags:`, `note:offscreen items`)
     - [ ] Assertions for new flag format (`on,clk,ena`)
-    - [ ] Screenshot test mocks `captureScreenshotBitmap` instead of `captureScreenshot`
+    - [ ] Negative assertions for old flag format (no `vcn`, no `vclfsen`)
+    - [ ] Screenshot test mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` — NO `mockkStatic(Bitmap::class)` needed
     - [ ] No-screenshot test verifies `captureScreenshotBitmap` not called
+    - [ ] New test for annotation failure exception propagation and bitmap cleanup
 
-11. **`docs/MCP_TOOLS.md`**:
+11. **`ScreenCaptureProviderImplTest.kt`** (existing or new):
+    - [ ] Tests for `captureScreenshotBitmap`: success, failure (null bitmap), bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same instance
+
+12. **`docs/MCP_TOOLS.md`**:
     - [ ] Response examples use new flag format
     - [ ] Output Format lists 4 note lines
     - [ ] Flags Reference table uses abbreviations
     - [ ] Screenshot section describes annotations
 
-12. **`docs/PROJECT.md`**:
+13. **`docs/PROJECT.md`**:
     - [ ] Screen Introspection Tools table updated
     - [ ] Note updated with flag format and annotation info
+
+14. **E2E tests** (if applicable):
+    - [ ] Assertions for new TSV note lines and flag format
+    - [ ] Negative assertions for old format

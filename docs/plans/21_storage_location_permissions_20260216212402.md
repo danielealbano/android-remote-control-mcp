@@ -518,18 +518,18 @@ Test: `addLocation creates StoredLocation with allowWrite=false and allowDelete=
 **Description**: Add write and delete permission checks in `FileOperationProviderImpl`. Write operations (`writeFile`, `appendFile`, `replaceInFile`, `downloadFromUrl`) check `allowWrite`. Delete operations (`deleteFile`) check `allowDelete`. Denied operations throw `McpToolException.PermissionDenied` with a generic message.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `checkWritePermission(locationId)` method added to `FileOperationProviderImpl`
-- [ ] `checkDeletePermission(locationId)` method added to `FileOperationProviderImpl`
-- [ ] `writeFile` calls `checkAuthorization` then `checkWritePermission` before proceeding
-- [ ] `appendFile` has explicit `checkAuthorization` then `checkWritePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
-- [ ] `replaceInFile` has explicit `checkAuthorization` then `checkWritePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
-- [ ] `downloadFromUrl` calls `checkAuthorization` then `checkWritePermission` before proceeding
-- [ ] `deleteFile` has explicit `checkAuthorization` then `checkDeletePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
-- [ ] All 5 methods have consistent check ordering: authorization → permission → operation
-- [ ] All existing `FileOperationProviderTest` tests updated and passing
-- [ ] Permission denial tests added for all 5 operations
-- [ ] All targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileOperationProviderTest"`
-- [ ] Lint clean on changed files
+- [x] `checkWritePermission(locationId)` method added to `FileOperationProviderImpl`
+- [x] `checkDeletePermission(locationId)` method added to `FileOperationProviderImpl`
+- [x] `writeFile` calls `checkAuthorization` then `checkWritePermission` before proceeding
+- [x] `appendFile` has explicit `checkAuthorization` then `checkWritePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
+- [x] `replaceInFile` has explicit `checkAuthorization` then `checkWritePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
+- [x] `downloadFromUrl` calls `checkAuthorization` then `checkWritePermission` before proceeding
+- [x] `deleteFile` has explicit `checkAuthorization` then `checkDeletePermission` at the top (standardized — previously relied on `resolveDocumentFile` for authorization)
+- [x] All 5 methods have consistent check ordering: authorization → permission → operation
+- [x] All existing `FileOperationProviderTest` tests updated and passing
+- [x] Permission denial tests added for all 5 operations
+- [x] All targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileOperationProviderTest"`
+- [x] Lint clean on changed files
 
 ---
 
