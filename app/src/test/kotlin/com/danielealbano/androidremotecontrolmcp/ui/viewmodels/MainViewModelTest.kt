@@ -773,6 +773,38 @@ class MainViewModelTest {
         }
 
     @Test
+    fun `updateLocationAllowDelete with non-existent locationId is a no-op`() =
+        runTest {
+            // Arrange - populate state
+            coEvery { storageLocationProvider.getAllLocations() } returns
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Test",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://test/tree/loc1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowDelete("nonexistent", true) } just Runs
+
+            // Act
+            viewModel.updateLocationAllowDelete("nonexistent", true)
+            advanceUntilIdle()
+
+            // Assert - state unchanged
+            assertEquals(1, viewModel.storageLocations.value.size)
+            assertEquals(false, viewModel.storageLocations.value[0].allowWrite)
+            assertEquals(false, viewModel.storageLocations.value[0].allowDelete)
+        }
+
+    @Test
     fun `updateFileSizeLimit validates and persists valid value`() =
         runTest {
             advanceUntilIdle()

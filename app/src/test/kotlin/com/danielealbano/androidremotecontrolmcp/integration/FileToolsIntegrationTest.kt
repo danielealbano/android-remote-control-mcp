@@ -77,6 +77,8 @@ class FileToolsIntegrationTest {
                 // Second location assertions
                 assertTrue(text.contains("Documents"))
                 assertTrue(text.contains("Document files"))
+                // Verify allow_read is always true for all locations
+                assertTrue(text.contains("\"allow_read\":true"))
                 // Verify both permission combinations are present (write=true/delete=false AND write=false/delete=true)
                 assertTrue(text.contains("\"allow_write\":true"))
                 assertTrue(text.contains("\"allow_write\":false"))
