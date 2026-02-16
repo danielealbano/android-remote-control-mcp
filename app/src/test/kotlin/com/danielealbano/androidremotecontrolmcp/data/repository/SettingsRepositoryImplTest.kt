@@ -624,7 +624,10 @@ class SettingsRepositoryImplTest {
             fun `returns stored locations`() =
                 testScope.runTest {
                     val json =
-                        """[{"id":"loc1","name":"Downloads","path":"/Downloads","description":"My downloads","treeUri":"content://com.android.externalstorage.documents/tree/primary%3ADownloads"}]"""
+                        "[{\"id\":\"loc1\",\"name\":\"Downloads\"," +
+                            "\"path\":\"/Downloads\",\"description\":\"My downloads\"," +
+                            "\"treeUri\":\"content://com.android.externalstorage.documents" +
+                            "/tree/primary%3ADownloads\"}]"
                     dataStore.edit { prefs -> prefs[locationsKey] = json }
 
                     val result = repository.getStoredLocations()
@@ -658,7 +661,9 @@ class SettingsRepositoryImplTest {
             fun `appends to existing list`() =
                 testScope.runTest {
                     val existing =
-                        """[{"id":"loc1","name":"Downloads","path":"/","description":"","treeUri":"content://test/tree/1"}]"""
+                        "[{\"id\":\"loc1\",\"name\":\"Downloads\"," +
+                            "\"path\":\"/\",\"description\":\"\"," +
+                            "\"treeUri\":\"content://test/tree/1\"}]"
                     dataStore.edit { prefs -> prefs[locationsKey] = existing }
 
                     val newLocation =
@@ -809,7 +814,9 @@ class SettingsRepositoryImplTest {
             fun `getStoredLocations migrates old JSON object format to new array format`() =
                 testScope.runTest {
                     val oldFormatJson =
-                        """{"com.android.externalstorage.documents/tree/primary":"content://com.android.externalstorage.documents/tree/primary%3A"}"""
+                        "{\"com.android.externalstorage.documents/tree/primary\":" +
+                            "\"content://com.android.externalstorage.documents" +
+                            "/tree/primary%3A\"}"
                     dataStore.edit { prefs -> prefs[locationsKey] = oldFormatJson }
 
                     val result = repository.getStoredLocations()
@@ -829,7 +836,10 @@ class SettingsRepositoryImplTest {
             fun `getStoredLocations preserves data during migration`() =
                 testScope.runTest {
                     val oldFormatJson =
-                        """{"com.test/primary":"content://com.test/tree/primary%3A","com.test/secondary":"content://com.test/tree/secondary%3A"}"""
+                        "{\"com.test/primary\":" +
+                            "\"content://com.test/tree/primary%3A\"," +
+                            "\"com.test/secondary\":" +
+                            "\"content://com.test/tree/secondary%3A\"}"
                     dataStore.edit { prefs -> prefs[locationsKey] = oldFormatJson }
 
                     val result = repository.getStoredLocations()

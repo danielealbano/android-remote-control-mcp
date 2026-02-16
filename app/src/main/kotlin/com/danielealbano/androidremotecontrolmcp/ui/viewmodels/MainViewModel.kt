@@ -295,7 +295,10 @@ class MainViewModel
         }
 
         @Suppress("TooGenericExceptionCaught")
-        fun addLocation(treeUri: Uri, description: String) {
+        fun addLocation(
+            treeUri: Uri,
+            description: String,
+        ) {
             viewModelScope.launch(ioDispatcher) {
                 try {
                     storageLocationProvider.addLocation(treeUri, description)
@@ -321,7 +324,10 @@ class MainViewModel
         }
 
         @Suppress("TooGenericExceptionCaught")
-        fun updateLocationDescription(locationId: String, description: String) {
+        fun updateLocationDescription(
+            locationId: String,
+            description: String,
+        ) {
             viewModelScope.launch(ioDispatcher) {
                 try {
                     storageLocationProvider.updateLocationDescription(locationId, description)
@@ -333,8 +339,7 @@ class MainViewModel
             }
         }
 
-        suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean =
-            storageLocationProvider.isDuplicateTreeUri(treeUri)
+        suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean = storageLocationProvider.isDuplicateTreeUri(treeUri)
 
         @Suppress("ReturnCount")
         fun updateFileSizeLimit(limitString: String) {

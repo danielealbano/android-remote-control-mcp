@@ -8,7 +8,6 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
-import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import io.mockk.Runs
 import io.mockk.coEvery

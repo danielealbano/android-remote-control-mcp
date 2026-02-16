@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "LongMethod")
+@file:Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
@@ -310,7 +310,11 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (addDialogSelectedName != null) {
                         Text(
-                            text = stringResource(R.string.storage_location_add_dialog_selected, addDialogSelectedName!!),
+                            text =
+                                stringResource(
+                                    R.string.storage_location_add_dialog_selected,
+                                    addDialogSelectedName!!,
+                                ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
