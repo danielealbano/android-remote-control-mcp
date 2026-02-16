@@ -34,6 +34,8 @@ class StorageLocationProviderImpl
                     description = loc.description,
                     treeUri = loc.treeUri,
                     availableBytes = queryAvailableBytes(loc.treeUri),
+                    allowWrite = loc.allowWrite,
+                    allowDelete = loc.allowDelete,
                 )
             }
         }
@@ -83,6 +85,8 @@ class StorageLocationProviderImpl
                         path = path,
                         description = trimmedDescription,
                         treeUri = treeUri.toString(),
+                        allowWrite = false,
+                        allowDelete = false,
                     )
                 settingsRepository.addStoredLocation(storedLocation)
                 Log.i(TAG, "Added storage location: $locationId ($name)")
@@ -149,7 +153,31 @@ class StorageLocationProviderImpl
                 description = stored.description,
                 treeUri = stored.treeUri,
                 availableBytes = queryAvailableBytes(stored.treeUri),
+                allowWrite = stored.allowWrite,
+                allowDelete = stored.allowDelete,
             )
+        }
+
+        override suspend fun isWriteAllowed(locationId: String): Boolean =
+            settingsRepository.getStoredLocations().find { it.id == locationId }?.allowWrite ?: false
+
+        override suspend fun isDeleteAllowed(locationId: String): Boolean =
+            settingsRepository.getStoredLocations().find { it.id == locationId }?.allowDelete ?: false
+
+        override suspend fun updateLocationAllowWrite(
+            locationId: String,
+            allowWrite: Boolean,
+        ) {
+            settingsRepository.updateLocationAllowWrite(locationId, allowWrite)
+            Log.i(TAG, "Updated allowWrite=$allowWrite for location: $locationId")
+        }
+
+        override suspend fun updateLocationAllowDelete(
+            locationId: String,
+            allowDelete: Boolean,
+        ) {
+            settingsRepository.updateLocationAllowDelete(locationId, allowDelete)
+            Log.i(TAG, "Updated allowDelete=$allowDelete for location: $locationId")
         }
 
         override suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean {

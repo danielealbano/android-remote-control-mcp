@@ -65,6 +65,42 @@ interface StorageLocationProvider {
     suspend fun getLocationById(locationId: String): StorageLocation?
 
     /**
+     * Checks whether write operations are allowed for the given storage location.
+     *
+     * @return true if the location exists and has allowWrite=true; false otherwise.
+     */
+    suspend fun isWriteAllowed(locationId: String): Boolean
+
+    /**
+     * Checks whether delete operations are allowed for the given storage location.
+     *
+     * @return true if the location exists and has allowDelete=true; false otherwise.
+     */
+    suspend fun isDeleteAllowed(locationId: String): Boolean
+
+    /**
+     * Updates whether write operations are allowed for a storage location.
+     *
+     * @param locationId The storage location identifier.
+     * @param allowWrite Whether write operations are allowed.
+     */
+    suspend fun updateLocationAllowWrite(
+        locationId: String,
+        allowWrite: Boolean,
+    )
+
+    /**
+     * Updates whether delete operations are allowed for a storage location.
+     *
+     * @param locationId The storage location identifier.
+     * @param allowDelete Whether delete operations are allowed.
+     */
+    suspend fun updateLocationAllowDelete(
+        locationId: String,
+        allowDelete: Boolean,
+    )
+
+    /**
      * Checks if a tree URI is already used by an existing location.
      * Used to prevent duplicate entries.
      *

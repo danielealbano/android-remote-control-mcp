@@ -14,6 +14,8 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property description User-provided description to give context/hints to MCP clients.
  * @property treeUri The granted persistent tree URI string.
  * @property availableBytes Available space in bytes, or null if unknown/virtual.
+ * @property allowWrite Whether MCP tools are permitted to write/modify files in this location.
+ * @property allowDelete Whether MCP tools are permitted to delete files in this location.
  */
 data class StorageLocation(
     val id: String,
@@ -22,4 +24,6 @@ data class StorageLocation(
     val description: String,
     val treeUri: String,
     val availableBytes: Long?,
+    val allowWrite: Boolean = false,
+    val allowDelete: Boolean = false,
 )

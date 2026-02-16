@@ -163,6 +163,8 @@ interface SettingsRepository {
      * @property path Human-readable path within the provider.
      * @property description User-provided description.
      * @property treeUri The granted persistent tree URI string.
+     * @property allowWrite Whether write operations are allowed for this location.
+     * @property allowDelete Whether delete operations are allowed for this location.
      */
     data class StoredLocation(
         val id: String,
@@ -170,6 +172,8 @@ interface SettingsRepository {
         val path: String,
         val description: String,
         val treeUri: String,
+        val allowWrite: Boolean = false,
+        val allowDelete: Boolean = false,
     )
 
     /**
@@ -196,5 +200,27 @@ interface SettingsRepository {
     suspend fun updateLocationDescription(
         locationId: String,
         description: String,
+    )
+
+    /**
+     * Updates whether write operations are allowed for a storage location.
+     *
+     * @param locationId The storage location identifier.
+     * @param allowWrite Whether write operations are allowed.
+     */
+    suspend fun updateLocationAllowWrite(
+        locationId: String,
+        allowWrite: Boolean,
+    )
+
+    /**
+     * Updates whether delete operations are allowed for a storage location.
+     *
+     * @param locationId The storage location identifier.
+     * @param allowDelete Whether delete operations are allowed.
+     */
+    suspend fun updateLocationAllowDelete(
+        locationId: String,
+        allowDelete: Boolean,
     )
 }
