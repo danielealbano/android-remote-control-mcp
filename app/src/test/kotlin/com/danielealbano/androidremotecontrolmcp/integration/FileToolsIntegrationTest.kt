@@ -11,6 +11,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -37,19 +38,15 @@ class FileToolsIntegrationTest {
     fun `list_storage_locations returns available locations`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            coEvery { deps.storageLocationProvider.getAvailableLocations() } returns
+            coEvery { deps.storageLocationProvider.getAllLocations() } returns
                 listOf(
                     StorageLocation(
                         id = "loc1",
                         name = "Downloads",
-                        providerName = "com.android.providers.downloads",
-                        authority = "com.android.providers.downloads.documents",
-                        rootId = "downloads",
-                        rootDocumentId = "downloads",
+                        path = "/",
+                        description = "Downloaded files",
                         treeUri = "content://com.android.providers.downloads.documents/tree/downloads",
-                        isAuthorized = true,
                         availableBytes = 1024000L,
-                        iconUri = null,
                     ),
                 )
 
@@ -59,6 +56,10 @@ class FileToolsIntegrationTest {
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Downloads"))
+                assertTrue(text.contains("Downloaded files"))
+                assertTrue(text.contains("path"))
+                assertFalse(text.contains("authorized"))
+                assertFalse(text.contains("provider"))
             }
         }
 
@@ -105,7 +106,7 @@ class FileToolsIntegrationTest {
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             coEvery { deps.fileOperationProvider.listFiles(any(), any(), any(), any()) } throws
-                McpToolException.PermissionDenied("Storage location 'loc1' is not authorized.")
+                McpToolException.PermissionDenied("Storage location 'loc1' not found.")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -115,7 +116,7 @@ class FileToolsIntegrationTest {
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("not authorized"))
+                assertTrue(text.contains("not found"))
             }
         }
 
@@ -248,7 +249,7 @@ class FileToolsIntegrationTest {
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             coEvery { deps.fileOperationProvider.readFile(any(), any(), any(), any()) } throws
-                McpToolException.PermissionDenied("Storage location 'loc1' is not authorized.")
+                McpToolException.PermissionDenied("Storage location 'loc1' not found.")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -262,7 +263,7 @@ class FileToolsIntegrationTest {
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("not authorized"))
+                assertTrue(text.contains("not found"))
             }
         }
 

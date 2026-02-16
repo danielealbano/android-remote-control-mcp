@@ -813,7 +813,7 @@ SettingsRepositoryImpl — Storage Location Methods
 
 **Definition of Done**: MCP output matches new schema. No `authorized` or `provider` fields. `path` and `description` fields present.
 
-- [ ] **Action 2.1.1**: Update `ListStorageLocationsHandler.execute()`
+- [x] **Action 2.1.1**: Update `ListStorageLocationsHandler.execute()`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/FileTools.kt`
 
@@ -881,7 +881,7 @@ description =
 
 **Definition of Done**: Error message references "add" instead of "authorize".
 
-- [ ] **Action 2.2.1**: Update `checkAuthorization` error message
+- [x] **Action 2.2.1**: Update `checkAuthorization` error message
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/storage/FileOperationProviderImpl.kt`
 
@@ -909,7 +909,7 @@ throw McpToolException.PermissionDenied(
 
 **Definition of Done**: `list_storage_locations` test uses new `StorageLocation` data class and verifies new output format.
 
-- [ ] **Action 2.3.1**: Update `list_storage_locations returns available locations` test
+- [x] **Action 2.3.1**: Update `list_storage_locations returns available locations` test
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/FileToolsIntegrationTest.kt`
 
@@ -958,7 +958,7 @@ assertFalse(text.contains("authorized"))
 assertFalse(text.contains("provider"))
 ```
 
-- [ ] **Action 2.3.2**: Update other integration tests and mock helpers
+- [x] **Action 2.3.2**: Update other integration tests and mock helpers
 
 1. Search all tests in `FileToolsIntegrationTest.kt` — the `list_files with unauthorized location` test (around line 103) and `read_file with unauthorized location` test (around line 251) use `McpToolException.PermissionDenied` with message "not authorized". Update the mock exception messages and assertions to match the new error text: "not found".
 
@@ -976,7 +976,7 @@ assertFalse(text.contains("provider"))
 
 **Definition of Done**: Tests referencing "not authorized" updated to "not found".
 
-- [ ] **Action 2.4.1**: Update authorization error message assertions in `FileOperationProviderTest.kt`
+- [x] **Action 2.4.1**: Update authorization error message assertions in `FileOperationProviderTest.kt`
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/storage/FileOperationProviderTest.kt`
 

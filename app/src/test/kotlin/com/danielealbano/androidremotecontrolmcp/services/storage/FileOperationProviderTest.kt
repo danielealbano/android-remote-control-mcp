@@ -178,7 +178,7 @@ class FileOperationProviderTest {
                     assertThrows<McpToolException.PermissionDenied> {
                         provider.listFiles("loc1", "", 0, 10)
                     }
-                assertTrue(exception.message!!.contains("not authorized"))
+                assertTrue(exception.message!!.contains("not found"))
             }
 
         @Test
@@ -359,7 +359,7 @@ class FileOperationProviderTest {
                     assertThrows<McpToolException.PermissionDenied> {
                         provider.readFile("loc1", "file.txt", 1, 100)
                     }
-                assertTrue(exception.message!!.contains("not authorized"))
+                assertTrue(exception.message!!.contains("not found"))
             }
 
         @Test
