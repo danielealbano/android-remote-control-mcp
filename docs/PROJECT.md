@@ -348,6 +348,21 @@ The application uses Android's Storage Access Framework (SAF) for unified, secur
 
 **Known constraint — Android URI permission limit**: Android enforces a limit on the number of persistable URI permissions per app (typically 128-512 depending on OEM/version). Once the limit is reached, oldest permissions may be silently evicted. In practice, users will have far fewer storage locations than this limit, but it is a known platform constraint.
 
+### Storage Location Permissions
+
+Each storage location has per-location permission flags controlling what MCP tools can do:
+
+| Permission | Default (new) | Default (migrated) | Description |
+|---|---|---|---|
+| Read | Always `true` | Always `true` | List files and read file content. Cannot be disabled. |
+| Write | `false` | `true` | Write, append, replace file content, download files. |
+| Delete | `false` | `true` | Delete files. |
+
+- Permissions are managed per-location via toggle switches in the UI.
+- Permissions can be changed while the MCP server is running.
+- When a tool attempts an operation not permitted by the location's permissions, a generic error is returned ("Write not allowed" or "Delete not allowed") with no guidance on how to enable the permission.
+- The `list_storage_locations` MCP tool exposes `allow_read`, `allow_write`, `allow_delete` for each location.
+
 ### Background Restrictions & Memory Management
 
 - Foreground services are exempt from Doze restrictions
@@ -557,6 +572,7 @@ Tunnel architecture:
 ### Permission Security
 
 Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
+Per-location read/write/delete permissions are enforced by `FileOperationProvider` — see the Storage Location Permissions section above.
 
 ### Code Security
 
