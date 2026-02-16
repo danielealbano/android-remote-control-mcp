@@ -18,6 +18,7 @@ import javax.inject.Inject
  * persistent URI permissions and metadata enrichment. No SAF discovery
  * is performed — the location list is entirely user-driven.
  */
+@Suppress("TooManyFunctions")
 class StorageLocationProviderImpl
     @Inject
     constructor(

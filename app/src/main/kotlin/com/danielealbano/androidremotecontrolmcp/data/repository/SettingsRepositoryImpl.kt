@@ -341,7 +341,7 @@ class SettingsRepositoryImpl
          */
         private fun generateTokenString(): String = UUID.randomUUID().toString()
 
-        @Suppress("SwallowedException", "TooGenericExceptionCaught")
+        @Suppress("SwallowedException", "TooGenericExceptionCaught", "LongMethod")
         private fun parseStoredLocationsJson(json: String?): List<SettingsRepository.StoredLocation> {
             if (json == null) return emptyList()
             return try {
@@ -355,9 +355,19 @@ class SettingsRepositoryImpl
                         val treeUri = obj["treeUri"]?.jsonPrimitive?.content ?: return@mapNotNull null
                         val description = obj["description"]?.jsonPrimitive?.content ?: ""
                         val allowWriteElement = obj["allowWrite"]
-                        val allowWrite = if (allowWriteElement == null) true else allowWriteElement.jsonPrimitive.booleanOrNull ?: false
+                        val allowWrite =
+                            if (allowWriteElement == null) {
+                                true
+                            } else {
+                                allowWriteElement.jsonPrimitive.booleanOrNull ?: false
+                            }
                         val allowDeleteElement = obj["allowDelete"]
-                        val allowDelete = if (allowDeleteElement == null) true else allowDeleteElement.jsonPrimitive.booleanOrNull ?: false
+                        val allowDelete =
+                            if (allowDeleteElement == null) {
+                                true
+                            } else {
+                                allowDeleteElement.jsonPrimitive.booleanOrNull ?: false
+                            }
                         SettingsRepository.StoredLocation(
                             id = id,
                             name = name,

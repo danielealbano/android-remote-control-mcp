@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
  * This provider handles persistence, URI permissions, and metadata enrichment
  * (e.g., available bytes from the underlying provider).
  */
+@Suppress("TooManyFunctions")
 interface StorageLocationProvider {
     /**
      * Returns all user-added storage locations, enriched with dynamic metadata

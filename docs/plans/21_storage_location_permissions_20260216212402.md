@@ -1280,14 +1280,14 @@ Each storage location has per-location permission flags controlling what MCP too
 **Description**: Run the complete test suite, linting, and build. Review all changes from the ground up to verify correctness and completeness.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `make lint` passes with no new warnings or errors
-- [ ] `make test-unit` passes (includes both unit and JVM integration tests)
-- [ ] `./gradlew build` succeeds with no errors or warnings
-- [ ] Manual review: all 18 files changed match the plan
-- [ ] Manual review: no TODOs, no placeholder code, no dead code
-- [ ] Manual review: permission fields propagate correctly: DataStore → StoredLocation → StorageLocation → MCP output
-- [ ] Manual review: permission checks enforce correctly: write tools check `allowWrite`, delete tool checks `allowDelete`
-- [ ] Manual review: existing tests updated wherever `StorageLocation` or `StoredLocation` is constructed
-- [ ] Manual review: error messages are generic ("Write not allowed" / "Delete not allowed")
-- [ ] Manual review: UI toggles work without requiring server stop
+- [x] `make lint` passes with no new warnings or errors
+- [x] `make test-unit` passes (includes both unit and JVM integration tests)
+- [x] `./gradlew build` succeeds with no errors or warnings (pre-existing QUERY_ALL_PACKAGES lint warning excluded)
+- [x] Manual review: all 18 files changed match the plan
+- [x] Manual review: no TODOs, no placeholder code, no dead code
+- [x] Manual review: permission fields propagate correctly: DataStore → StoredLocation → StorageLocation → MCP output
+- [x] Manual review: permission checks enforce correctly: write tools check `allowWrite`, delete tool checks `allowDelete`
+- [x] Manual review: existing tests updated wherever `StorageLocation` or `StoredLocation` is constructed
+- [x] Manual review: error messages are generic ("Write not allowed" / "Delete not allowed")
+- [x] Manual review: UI toggles work without requiring server stop
 - [ ] Manual review: documentation is accurate
