@@ -96,6 +96,7 @@ fun HomeScreen(
     var addDialogSelectedUri by remember { mutableStateOf<Uri?>(null) }
     var addDialogSelectedName by remember { mutableStateOf<String?>(null) }
     var addDialogDuplicateError by remember { mutableStateOf(false) }
+    var addDialogDuplicateChecking by remember { mutableStateOf(false) }
 
     var showEditDialog by remember { mutableStateOf(false) }
     var editDialogLocation by remember { mutableStateOf<StorageLocation?>(null) }
@@ -125,8 +126,11 @@ fun HomeScreen(
                 addDialogSelectedUri = uri
                 val docFile = DocumentFile.fromTreeUri(context, uri)
                 addDialogSelectedName = docFile?.name ?: uri.lastPathSegment ?: "Unknown"
+                addDialogDuplicateChecking = true
+                addDialogDuplicateError = false
                 scope.launch {
                     addDialogDuplicateError = viewModel.isDuplicateTreeUri(uri)
+                    addDialogDuplicateChecking = false
                 }
             }
         }
@@ -212,6 +216,7 @@ fun HomeScreen(
                     addDialogSelectedUri = null
                     addDialogSelectedName = null
                     addDialogDuplicateError = false
+                    addDialogDuplicateChecking = false
                     showAddDialog = true
                 },
                 onEditDescription = { location ->
@@ -341,7 +346,10 @@ fun HomeScreen(
                         }
                         showAddDialog = false
                     },
-                    enabled = addDialogSelectedUri != null && !addDialogDuplicateError,
+                    enabled =
+                        addDialogSelectedUri != null &&
+                            !addDialogDuplicateError &&
+                            !addDialogDuplicateChecking,
                 ) {
                     Text(stringResource(R.string.storage_location_add_dialog_add))
                 }
