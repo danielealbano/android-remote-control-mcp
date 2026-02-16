@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.data.repository
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import kotlinx.coroutines.flow.Flow
 
@@ -153,25 +154,47 @@ interface SettingsRepository {
     fun validateDeviceSlug(slug: String): Result<String>
 
     /**
-     * Returns the map of authorized storage location IDs to their tree URI strings.
-     */
-    suspend fun getAuthorizedLocations(): Map<String, String>
-
-    /**
-     * Adds an authorized storage location with its tree URI.
+     * Data class representing a stored storage location record.
+     * This is the persistence format; the full [StorageLocation] includes
+     * dynamic fields like [StorageLocation.availableBytes].
      *
-     * @param locationId The storage location identifier ("{authority}/{rootId}").
-     * @param treeUri The granted document tree URI string.
+     * @property id Unique identifier: "{authority}/{documentId}".
+     * @property name Display name of the directory.
+     * @property path Human-readable path within the provider.
+     * @property description User-provided description.
+     * @property treeUri The granted persistent tree URI string.
      */
-    suspend fun addAuthorizedLocation(
-        locationId: String,
-        treeUri: String,
+    data class StoredLocation(
+        val id: String,
+        val name: String,
+        val path: String,
+        val description: String,
+        val treeUri: String,
     )
 
     /**
-     * Removes an authorized storage location.
+     * Returns all stored storage locations.
+     */
+    suspend fun getStoredLocations(): List<StoredLocation>
+
+    /**
+     * Adds a storage location.
+     */
+    suspend fun addStoredLocation(location: StoredLocation)
+
+    /**
+     * Removes a storage location by ID.
+     */
+    suspend fun removeStoredLocation(locationId: String)
+
+    /**
+     * Updates the description of an existing storage location.
      *
      * @param locationId The storage location identifier.
+     * @param description The new description.
      */
-    suspend fun removeAuthorizedLocation(locationId: String)
+    suspend fun updateLocationDescription(
+        locationId: String,
+        description: String,
+    )
 }

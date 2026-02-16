@@ -2,21 +2,21 @@ package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.provider.DocumentsContract.Root
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 /**
- * Default implementation of [StorageLocationProvider] using the Storage Access Framework.
+ * User-managed implementation of [StorageLocationProvider].
  *
- * Discovers document provider roots and manages persistent URI permissions
- * through [SettingsRepository] for authorization state persistence.
+ * Users add storage locations via the SAF picker. This class manages
+ * persistent URI permissions and metadata enrichment. No SAF discovery
+ * is performed — the location list is entirely user-driven.
  */
 class StorageLocationProviderImpl
     @Inject
@@ -24,179 +24,197 @@ class StorageLocationProviderImpl
         @param:ApplicationContext private val context: Context,
         private val settingsRepository: SettingsRepository,
     ) : StorageLocationProvider {
-        @Suppress(
-            "TooGenericExceptionCaught",
-            "LoopWithTooManyJumpStatements",
-            "LongMethod",
-            "CyclomaticComplexMethod",
-            "NestedBlockDepth",
-        )
-        override suspend fun getAvailableLocations(): List<StorageLocation> {
-            val authorizedLocations = settingsRepository.getAuthorizedLocations()
-            val locations = mutableListOf<StorageLocation>()
 
-            val intent = Intent(DocumentsContract.PROVIDER_INTERFACE)
-            val providers =
-                context.packageManager.queryIntentContentProviders(
-                    intent,
-                    PackageManager.MATCH_ALL,
+        override suspend fun getAllLocations(): List<StorageLocation> {
+            val stored = settingsRepository.getStoredLocations()
+            return stored.map { loc ->
+                StorageLocation(
+                    id = loc.id,
+                    name = loc.name,
+                    path = loc.path,
+                    description = loc.description,
+                    treeUri = loc.treeUri,
+                    availableBytes = queryAvailableBytes(loc.treeUri),
                 )
-
-            for (providerInfo in providers) {
-                val authority = providerInfo.providerInfo.authority
-                val providerName =
-                    try {
-                        context.packageManager
-                            .getApplicationLabel(
-                                context.packageManager.getApplicationInfo(
-                                    providerInfo.providerInfo.packageName,
-                                    0,
-                                ),
-                            ).toString()
-                    } catch (e: PackageManager.NameNotFoundException) {
-                        Log.w(TAG, "Could not resolve provider name for ${providerInfo.providerInfo.packageName}", e)
-                        providerInfo.providerInfo.packageName
-                    }
-
-                val rootsUri = DocumentsContract.buildRootsUri(authority)
-                val cursor =
-                    try {
-                        context.contentResolver.query(
-                            rootsUri,
-                            arrayOf(
-                                Root.COLUMN_ROOT_ID,
-                                Root.COLUMN_TITLE,
-                                Root.COLUMN_DOCUMENT_ID,
-                                Root.COLUMN_AVAILABLE_BYTES,
-                                Root.COLUMN_ICON,
-                            ),
-                            null,
-                            null,
-                            null,
-                        )
-                    } catch (e: SecurityException) {
-                        Log.w(TAG, "SecurityException querying roots for authority=$authority, skipping", e)
-                        continue
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to query roots for authority=$authority, skipping", e)
-                        continue
-                    }
-
-                if (cursor == null) {
-                    Log.w(TAG, "Null cursor for roots query on authority=$authority")
-                    continue
-                }
-
-                try {
-                    val rootIdIdx = cursor.getColumnIndex(Root.COLUMN_ROOT_ID)
-                    val titleIdx = cursor.getColumnIndex(Root.COLUMN_TITLE)
-                    val documentIdIdx = cursor.getColumnIndex(Root.COLUMN_DOCUMENT_ID)
-                    val availableBytesIdx = cursor.getColumnIndex(Root.COLUMN_AVAILABLE_BYTES)
-                    val iconIdx = cursor.getColumnIndex(Root.COLUMN_ICON)
-
-                    while (cursor.moveToNext()) {
-                        val rootId = cursor.getString(rootIdIdx) ?: continue
-                        val title = cursor.getString(titleIdx) ?: rootId
-                        val documentId = cursor.getString(documentIdIdx) ?: continue
-                        val availableBytes =
-                            if (availableBytesIdx >= 0 && !cursor.isNull(availableBytesIdx)) {
-                                cursor.getLong(availableBytesIdx)
-                            } else {
-                                null
-                            }
-                        val iconResId =
-                            if (iconIdx >= 0 && !cursor.isNull(iconIdx)) {
-                                cursor.getInt(iconIdx)
-                            } else {
-                                0
-                            }
-
-                        val locationId = "$authority/$rootId"
-                        val storedTreeUri = authorizedLocations[locationId]
-                        val isAuthorized = storedTreeUri != null
-
-                        val iconUri =
-                            if (iconResId != 0) {
-                                Uri
-                                    .Builder()
-                                    .scheme("android.resource")
-                                    .authority(providerInfo.providerInfo.packageName)
-                                    .appendPath(iconResId.toString())
-                                    .build()
-                                    .toString()
-                            } else {
-                                null
-                            }
-
-                        locations.add(
-                            StorageLocation(
-                                id = locationId,
-                                name = title,
-                                providerName = providerName,
-                                authority = authority,
-                                rootId = rootId,
-                                rootDocumentId = documentId,
-                                treeUri = storedTreeUri,
-                                isAuthorized = isAuthorized,
-                                availableBytes = availableBytes,
-                                iconUri = iconUri,
-                            ),
-                        )
-                    }
-                } finally {
-                    cursor.close()
-                }
             }
-
-            Log.d(TAG, "Discovered ${locations.size} storage locations from ${providers.size} providers")
-            return locations.sortedBy { it.name }
-        }
-
-        override suspend fun getAuthorizedLocations(): List<StorageLocation> =
-            getAvailableLocations()
-                .filter { it.isAuthorized }
-
-        override suspend fun authorizeLocation(
-            locationId: String,
-            treeUri: Uri,
-        ) {
-            context.contentResolver.takePersistableUriPermission(
-                treeUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-            settingsRepository.addAuthorizedLocation(locationId, treeUri.toString())
-            Log.i(TAG, "Authorized storage location: $locationId")
         }
 
         @Suppress("TooGenericExceptionCaught")
-        override suspend fun deauthorizeLocation(locationId: String) {
-            val authorizedLocations = settingsRepository.getAuthorizedLocations()
-            val treeUriString = authorizedLocations[locationId]
-            if (treeUriString != null) {
+        override suspend fun addLocation(
+            treeUri: Uri,
+            description: String,
+        ) {
+            // Validate tree URI
+            require(treeUri.scheme == "content") {
+                "Invalid URI scheme: expected content://, got ${treeUri.scheme}"
+            }
+            require(DocumentsContract.isTreeUri(treeUri)) {
+                "URI is not a valid document tree URI"
+            }
+            val authority = treeUri.authority
+            requireNotNull(authority) {
+                "URI has no authority component"
+            }
+
+            // Validate description length
+            val trimmedDescription = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
+
+            // Defense-in-depth duplicate check
+            if (isDuplicateTreeUri(treeUri)) {
+                throw IllegalStateException(
+                    "A storage location with this directory already exists",
+                )
+            }
+
+            val permissionFlags =
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(treeUri, permissionFlags)
+
+            try {
+                val treeDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+                val locationId = "$authority/$treeDocumentId"
+
+                val docFile = DocumentFile.fromTreeUri(context, treeUri)
+                val name = docFile?.name ?: treeDocumentId
+
+                val path = deriveHumanReadablePath(treeDocumentId)
+
+                val storedLocation = SettingsRepository.StoredLocation(
+                    id = locationId,
+                    name = name,
+                    path = path,
+                    description = trimmedDescription,
+                    treeUri = treeUri.toString(),
+                )
+                settingsRepository.addStoredLocation(storedLocation)
+                Log.i(TAG, "Added storage location: $locationId ($name)")
+            } catch (e: Exception) {
+                // Release permission if anything after takePersistableUriPermission fails
                 try {
-                    val uri = Uri.parse(treeUriString)
+                    context.contentResolver.releasePersistableUriPermission(
+                        treeUri,
+                        permissionFlags,
+                    )
+                } catch (releaseEx: Exception) {
+                    Log.w(TAG, "Failed to release permission after addLocation failure", releaseEx)
+                }
+                throw e
+            }
+        }
+
+        @Suppress("TooGenericExceptionCaught")
+        override suspend fun removeLocation(locationId: String) {
+            val stored = settingsRepository.getStoredLocations()
+            val location = stored.find { it.id == locationId }
+            if (location != null) {
+                try {
+                    val uri = Uri.parse(location.treeUri)
                     context.contentResolver.releasePersistableUriPermission(
                         uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
-                } catch (e: SecurityException) {
-                    Log.w(TAG, "Permission already revoked for location=$locationId", e)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to release permission for location=$locationId", e)
                 }
             }
-            settingsRepository.removeAuthorizedLocation(locationId)
-            Log.i(TAG, "Deauthorized storage location: $locationId")
+            settingsRepository.removeStoredLocation(locationId)
+            Log.i(TAG, "Removed storage location: $locationId")
+        }
+
+        override suspend fun updateLocationDescription(
+            locationId: String,
+            description: String,
+        ) {
+            val trimmedDescription = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
+            settingsRepository.updateLocationDescription(locationId, trimmedDescription)
+            Log.i(TAG, "Updated description for location: $locationId")
         }
 
         override suspend fun isLocationAuthorized(locationId: String): Boolean =
-            settingsRepository.getAuthorizedLocations().containsKey(locationId)
-
-        override suspend fun getLocationById(locationId: String): StorageLocation? =
-            getAvailableLocations()
-                .find { it.id == locationId }
+            settingsRepository.getStoredLocations().any { it.id == locationId }
 
         override suspend fun getTreeUriForLocation(locationId: String): Uri? {
-            val treeUriString = settingsRepository.getAuthorizedLocations()[locationId]
-            return treeUriString?.let { Uri.parse(it) }
+            val stored = settingsRepository.getStoredLocations()
+            val location = stored.find { it.id == locationId }
+            return location?.let { Uri.parse(it.treeUri) }
+        }
+
+        override suspend fun getLocationById(locationId: String): StorageLocation? {
+            val stored = settingsRepository.getStoredLocations().find { it.id == locationId }
+                ?: return null
+            return StorageLocation(
+                id = stored.id,
+                name = stored.name,
+                path = stored.path,
+                description = stored.description,
+                treeUri = stored.treeUri,
+                availableBytes = queryAvailableBytes(stored.treeUri),
+            )
+        }
+
+        override suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean {
+            val treeUriString = treeUri.toString()
+            return settingsRepository.getStoredLocations().any { it.treeUri == treeUriString }
+        }
+
+        /**
+         * Derives a human-readable path from a SAF document ID.
+         *
+         * For physical storage providers, the document ID format is typically
+         * "{rootId}:{path}" (e.g., "primary:Documents/MyProject"). This method
+         * extracts the path portion after the colon.
+         *
+         * For virtual providers (Google Drive, etc.) the document ID is opaque,
+         * so this returns "/".
+         */
+        private fun deriveHumanReadablePath(documentId: String): String {
+            val colonIndex = documentId.indexOf(':')
+            if (colonIndex < 0) return "/"
+            val pathPart = documentId.substring(colonIndex + 1)
+            return if (pathPart.isEmpty()) "/" else "/$pathPart"
+        }
+
+        /**
+         * Queries available bytes for a location by querying the provider's roots.
+         * Returns null if the query fails or the provider doesn't report this info.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException", "NestedBlockDepth")
+        private fun queryAvailableBytes(treeUriString: String): Long? {
+            return try {
+                val treeUri = Uri.parse(treeUriString)
+                val authority = treeUri.authority ?: return null
+                val treeDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+
+                // Extract root ID from document ID (portion before the colon)
+                val rootId = treeDocumentId.substringBefore(":")
+
+                val rootsUri = DocumentsContract.buildRootsUri(authority)
+                val cursor = context.contentResolver.query(
+                    rootsUri,
+                    arrayOf(
+                        DocumentsContract.Root.COLUMN_ROOT_ID,
+                        DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
+                    ),
+                    null,
+                    null,
+                    null,
+                )
+                cursor?.use {
+                    val rootIdIdx = it.getColumnIndex(DocumentsContract.Root.COLUMN_ROOT_ID)
+                    val bytesIdx = it.getColumnIndex(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
+                    while (it.moveToNext()) {
+                        val curRootId = it.getString(rootIdIdx)
+                        if (curRootId == rootId && bytesIdx >= 0 && !it.isNull(bytesIdx)) {
+                            return it.getLong(bytesIdx)
+                        }
+                    }
+                }
+                null
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query available bytes for $treeUriString", e)
+                null
+            }
         }
 
         companion object {

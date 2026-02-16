@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.data.repository
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -14,8 +15,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -193,30 +195,36 @@ class SettingsRepositoryImpl
             return Result.success(slug)
         }
 
-        override suspend fun getAuthorizedLocations(): Map<String, String> {
+        override suspend fun getStoredLocations(): List<SettingsRepository.StoredLocation> {
             val prefs = dataStore.data.first()
-            val jsonString = prefs[AUTHORIZED_LOCATIONS_KEY] ?: return emptyMap()
-            return parseAuthorizedLocationsJson(jsonString)
+            val jsonString = prefs[AUTHORIZED_LOCATIONS_KEY] ?: return emptyList()
+            return parseStoredLocationsJson(jsonString)
         }
 
-        override suspend fun addAuthorizedLocation(
-            locationId: String,
-            treeUri: String,
-        ) {
+        override suspend fun addStoredLocation(location: SettingsRepository.StoredLocation) {
             dataStore.edit { prefs ->
-                val existing = parseAuthorizedLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY])
-                val updated = existing.toMutableMap()
-                updated[locationId] = treeUri
-                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeAuthorizedLocationsJson(updated)
+                val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
+                existing.add(location)
+                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
             }
         }
 
-        override suspend fun removeAuthorizedLocation(locationId: String) {
+        override suspend fun removeStoredLocation(locationId: String) {
             dataStore.edit { prefs ->
-                val existing = parseAuthorizedLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY])
-                val updated = existing.toMutableMap()
-                updated.remove(locationId)
-                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeAuthorizedLocationsJson(updated)
+                val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
+                existing.removeAll { it.id == locationId }
+                prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
+            }
+        }
+
+        override suspend fun updateLocationDescription(locationId: String, description: String) {
+            dataStore.edit { prefs ->
+                val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
+                val index = existing.indexOfFirst { it.id == locationId }
+                if (index >= 0) {
+                    existing[index] = existing[index].copy(description = description)
+                    prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
+                }
             }
         }
 
@@ -298,25 +306,69 @@ class SettingsRepositoryImpl
         private fun generateTokenString(): String = UUID.randomUUID().toString()
 
         @Suppress("SwallowedException")
-        private fun parseAuthorizedLocationsJson(json: String?): Map<String, String> {
-            if (json == null) return emptyMap()
+        private fun parseStoredLocationsJson(json: String?): List<SettingsRepository.StoredLocation> {
+            if (json == null) return emptyList()
             return try {
-                val jsonObject = Json.parseToJsonElement(json).jsonObject
-                jsonObject.mapValues { it.value.jsonPrimitive.content }
+                val jsonArray = Json.parseToJsonElement(json).jsonArray
+                jsonArray.mapNotNull { element ->
+                    try {
+                        val obj = element.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val name = obj["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val path = obj["path"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val treeUri = obj["treeUri"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val description = obj["description"]?.jsonPrimitive?.content ?: ""
+                        SettingsRepository.StoredLocation(
+                            id = id,
+                            name = name,
+                            path = path,
+                            description = description,
+                            treeUri = treeUri,
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Skipping malformed stored location entry", e)
+                        null
+                    }
+                }
             } catch (_: Exception) {
-                emptyMap()
+                // Migration: try parsing old format (JSON object: {"locationId": "treeUri"})
+                try {
+                    val jsonObject = Json.parseToJsonElement(json).jsonObject
+                    jsonObject.map { (key, value) ->
+                        SettingsRepository.StoredLocation(
+                            id = key,
+                            name = key.substringAfterLast("/"),
+                            path = "/",
+                            description = "",
+                            treeUri = value.jsonPrimitive.content,
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to parse stored locations JSON, returning empty list", e)
+                    emptyList()
+                }
             }
         }
 
-        private fun serializeAuthorizedLocationsJson(map: Map<String, String>): String =
+        private fun serializeStoredLocationsJson(locations: List<SettingsRepository.StoredLocation>): String =
             Json.encodeToString(
-                JsonObject.serializer(),
-                buildJsonObject {
-                    map.forEach { (key, value) -> put(key, value) }
+                buildJsonArray {
+                    for (loc in locations) {
+                        add(
+                            buildJsonObject {
+                                put("id", loc.id)
+                                put("name", loc.name)
+                                put("path", loc.path)
+                                put("description", loc.description)
+                                put("treeUri", loc.treeUri)
+                            },
+                        )
+                    }
                 },
             )
 
         companion object {
+            private const val TAG = "MCP:SettingsRepo"
             private val PORT_KEY = intPreferencesKey("port")
             private val BINDING_ADDRESS_KEY = stringPreferencesKey("binding_address")
             private val BEARER_TOKEN_KEY = stringPreferencesKey("bearer_token")
