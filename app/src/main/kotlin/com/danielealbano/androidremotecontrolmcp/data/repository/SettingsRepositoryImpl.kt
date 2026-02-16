@@ -217,7 +217,10 @@ class SettingsRepositoryImpl
             }
         }
 
-        override suspend fun updateLocationDescription(locationId: String, description: String) {
+        override suspend fun updateLocationDescription(
+            locationId: String,
+            description: String,
+        ) {
             dataStore.edit { prefs ->
                 val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
                 val index = existing.indexOfFirst { it.id == locationId }
@@ -305,7 +308,7 @@ class SettingsRepositoryImpl
          */
         private fun generateTokenString(): String = UUID.randomUUID().toString()
 
-        @Suppress("SwallowedException")
+        @Suppress("SwallowedException", "TooGenericExceptionCaught")
         private fun parseStoredLocationsJson(json: String?): List<SettingsRepository.StoredLocation> {
             if (json == null) return emptyList()
             return try {

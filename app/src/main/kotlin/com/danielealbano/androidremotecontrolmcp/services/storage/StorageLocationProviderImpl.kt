@@ -24,7 +24,6 @@ class StorageLocationProviderImpl
         @param:ApplicationContext private val context: Context,
         private val settingsRepository: SettingsRepository,
     ) : StorageLocationProvider {
-
         override suspend fun getAllLocations(): List<StorageLocation> {
             val stored = settingsRepository.getStoredLocations()
             return stored.map { loc ->
@@ -60,10 +59,8 @@ class StorageLocationProviderImpl
             val trimmedDescription = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
 
             // Defense-in-depth duplicate check
-            if (isDuplicateTreeUri(treeUri)) {
-                throw IllegalStateException(
-                    "A storage location with this directory already exists",
-                )
+            check(!isDuplicateTreeUri(treeUri)) {
+                "A storage location with this directory already exists"
             }
 
             val permissionFlags =
@@ -79,13 +76,14 @@ class StorageLocationProviderImpl
 
                 val path = deriveHumanReadablePath(treeDocumentId)
 
-                val storedLocation = SettingsRepository.StoredLocation(
-                    id = locationId,
-                    name = name,
-                    path = path,
-                    description = trimmedDescription,
-                    treeUri = treeUri.toString(),
-                )
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = locationId,
+                        name = name,
+                        path = path,
+                        description = trimmedDescription,
+                        treeUri = treeUri.toString(),
+                    )
                 settingsRepository.addStoredLocation(storedLocation)
                 Log.i(TAG, "Added storage location: $locationId ($name)")
             } catch (e: Exception) {
@@ -141,8 +139,9 @@ class StorageLocationProviderImpl
         }
 
         override suspend fun getLocationById(locationId: String): StorageLocation? {
-            val stored = settingsRepository.getStoredLocations().find { it.id == locationId }
-                ?: return null
+            val stored =
+                settingsRepository.getStoredLocations().find { it.id == locationId }
+                    ?: return null
             return StorageLocation(
                 id = stored.id,
                 name = stored.name,
@@ -179,7 +178,7 @@ class StorageLocationProviderImpl
          * Queries available bytes for a location by querying the provider's roots.
          * Returns null if the query fails or the provider doesn't report this info.
          */
-        @Suppress("TooGenericExceptionCaught", "SwallowedException", "NestedBlockDepth")
+        @Suppress("TooGenericExceptionCaught", "SwallowedException", "NestedBlockDepth", "ReturnCount")
         private fun queryAvailableBytes(treeUriString: String): Long? {
             return try {
                 val treeUri = Uri.parse(treeUriString)
@@ -190,16 +189,17 @@ class StorageLocationProviderImpl
                 val rootId = treeDocumentId.substringBefore(":")
 
                 val rootsUri = DocumentsContract.buildRootsUri(authority)
-                val cursor = context.contentResolver.query(
-                    rootsUri,
-                    arrayOf(
-                        DocumentsContract.Root.COLUMN_ROOT_ID,
-                        DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
-                    ),
-                    null,
-                    null,
-                    null,
-                )
+                val cursor =
+                    context.contentResolver.query(
+                        rootsUri,
+                        arrayOf(
+                            DocumentsContract.Root.COLUMN_ROOT_ID,
+                            DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
+                        ),
+                        null,
+                        null,
+                        null,
+                    )
                 cursor?.use {
                     val rootIdIdx = it.getColumnIndex(DocumentsContract.Root.COLUMN_ROOT_ID)
                     val bytesIdx = it.getColumnIndex(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
