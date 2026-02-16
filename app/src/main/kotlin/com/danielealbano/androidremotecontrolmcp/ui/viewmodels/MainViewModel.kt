@@ -339,6 +339,46 @@ class MainViewModel
             }
         }
 
+        @Suppress("TooGenericExceptionCaught")
+        fun updateLocationAllowWrite(
+            locationId: String,
+            allowWrite: Boolean,
+        ) {
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    storageLocationProvider.updateLocationAllowWrite(locationId, allowWrite)
+                    _storageLocations.value =
+                        _storageLocations.value.map { loc ->
+                            if (loc.id == locationId) loc.copy(allowWrite = allowWrite) else loc
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to update allowWrite for $locationId", e)
+                    refreshStorageLocations()
+                    _storageError.tryEmit("Failed to update write permission: ${e.message}")
+                }
+            }
+        }
+
+        @Suppress("TooGenericExceptionCaught")
+        fun updateLocationAllowDelete(
+            locationId: String,
+            allowDelete: Boolean,
+        ) {
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    storageLocationProvider.updateLocationAllowDelete(locationId, allowDelete)
+                    _storageLocations.value =
+                        _storageLocations.value.map { loc ->
+                            if (loc.id == locationId) loc.copy(allowDelete = allowDelete) else loc
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to update allowDelete for $locationId", e)
+                    refreshStorageLocations()
+                    _storageError.tryEmit("Failed to update delete permission: ${e.message}")
+                }
+            }
+        }
+
         suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean = storageLocationProvider.isDuplicateTreeUri(treeUri)
 
         @Suppress("ReturnCount")

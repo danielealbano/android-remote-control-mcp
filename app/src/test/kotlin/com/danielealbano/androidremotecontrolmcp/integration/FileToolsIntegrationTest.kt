@@ -47,6 +47,8 @@ class FileToolsIntegrationTest {
                         description = "Downloaded files",
                         treeUri = "content://com.android.providers.downloads.documents/tree/downloads",
                         availableBytes = 1024000L,
+                        allowWrite = true,
+                        allowDelete = false,
                     ),
                 )
 
@@ -60,6 +62,9 @@ class FileToolsIntegrationTest {
                 assertTrue(text.contains("path"))
                 assertFalse(text.contains("authorized"))
                 assertFalse(text.contains("provider"))
+                assertTrue(text.contains("\"allow_read\":true"))
+                assertTrue(text.contains("\"allow_write\":true"))
+                assertTrue(text.contains("\"allow_delete\":false"))
             }
         }
 
@@ -626,6 +631,132 @@ class FileToolsIntegrationTest {
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Cannot delete a directory"))
+            }
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Permission denial tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `write_file returns error when write not allowed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.writeFile(any(), any(), any()) } throws
+                McpToolException.PermissionDenied("Write not allowed")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_write_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                                "content" to "hello",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Write not allowed"))
+            }
+        }
+
+    @Test
+    fun `append_file returns error when write not allowed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.appendFile(any(), any(), any()) } throws
+                McpToolException.PermissionDenied("Write not allowed")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_append_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                                "content" to "more data",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Write not allowed"))
+            }
+        }
+
+    @Test
+    fun `file_replace returns error when write not allowed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery {
+                deps.fileOperationProvider.replaceInFile(any(), any(), any(), any(), any())
+            } throws McpToolException.PermissionDenied("Write not allowed")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_file_replace",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                                "old_string" to "old",
+                                "new_string" to "new",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Write not allowed"))
+            }
+        }
+
+    @Test
+    fun `download_from_url returns error when write not allowed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery {
+                deps.fileOperationProvider.downloadFromUrl(any(), any(), any())
+            } throws McpToolException.PermissionDenied("Write not allowed")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_download_from_url",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                                "url" to "https://example.com/file.txt",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Write not allowed"))
+            }
+        }
+
+    @Test
+    fun `delete_file returns error when delete not allowed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.deleteFile(any(), any()) } throws
+                McpToolException.PermissionDenied("Delete not allowed")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_delete_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Delete not allowed"))
             }
         }
 }

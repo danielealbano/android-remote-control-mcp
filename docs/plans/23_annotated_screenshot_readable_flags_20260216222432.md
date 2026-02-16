@@ -546,10 +546,16 @@ Key changes:
 - [ ] Element bounds from screen coordinates are correctly mapped to the scaled screenshot coordinates
 - [ ] Off-screen elements have no bounding boxes
 - [ ] Elements not in the TSV (filtered out by `shouldKeepNode`) have no bounding boxes
+- [ ] Password/sensitive fields ARE annotated (intentional — Android masks display text)
 - [ ] `ScreenCaptureProvider` interface exposes a method to get the raw resized `Bitmap`
-- [ ] `ScreenshotAnnotator` is a new injectable class under `services/screencapture/`
+- [ ] `ScreenCaptureProviderImpl.captureScreenshotBitmap` is unit tested (success, failure, bitmap recycling)
+- [ ] `ScreenshotAnnotator` is a new injectable class under `services/screencapture/` with testable helper methods
+- [ ] `ScreenshotAnnotator` creates Paint objects ONCE before the element loop
+- [ ] `collectOnScreenElements` uses accumulator pattern (no intermediate list allocations)
 - [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
+- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
 - [ ] All integration tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
+- [ ] Integration test for annotation failure / bitmap cleanup passes
 - [ ] Lint passes on changed files
 
 ---
@@ -686,15 +692,12 @@ Key changes:
 
 6. **Return**: A new `Bitmap` (mutable software copy of input via `bitmap.copy(config, true)`). Input bitmap is NOT recycled — caller retains ownership.
 
-6. **Edge cases**:
+7. **Edge cases**:
    - Empty elements list → return copy of bitmap unchanged
    - Element bounds fully outside bitmap → skip that element
    - Element bounds partially outside bitmap → clamp to bitmap edges
 
-**Helper method**: `collectAnnotatableElements(tree: AccessibilityNodeData): List<AccessibilityNodeData>`
-   - Walks the tree recursively
-   - Collects nodes where `shouldKeepNode(node) == true` AND `node.visible == true`
-   - This reuses the same `shouldKeepNode` logic from `CompactTreeFormatter` — to avoid duplication, extract the predicate or accept it as a parameter. Since `CompactTreeFormatter.shouldKeepNode` is `internal`, the simplest approach is to make `ScreenshotAnnotator` accept the already-filtered list from the caller.
+**Note**: `ScreenshotAnnotator` receives the already-filtered list of elements from the caller (`GetScreenStateHandler.collectOnScreenElements`). It does NOT perform its own filtering — the `shouldKeepNode` logic stays in `CompactTreeFormatter`, and element collection stays in `GetScreenStateHandler`.
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
@@ -1143,11 +1146,7 @@ Add the necessary imports at the top of the file:
    - Returns full ID if prefix not present.
    - Pure string logic.
 
-3. `internal fun computeLabelRect(label: String, boxRect: RectF, textSize: Float, padding: Float): RectF`
-   - Computes the pill background rectangle position for a label.
-   - Pure math based on estimated text width (can use `label.length * textSize * 0.6f` as approximation, or accept textWidth as parameter).
-
-The `annotate` method itself calls these helpers and performs the actual Canvas drawing. The drawing logic is a thin layer that's verified via integration tests.
+The `annotate` method itself calls these helpers and performs the actual Canvas drawing. The label rect computation remains inline in `annotate()` because it uses `Paint.measureText()` (Android API). The drawing logic is a thin layer that's verified via integration tests.
 
 #### Action 2.5.2: Create `ScreenshotAnnotatorTest.kt`
 
@@ -1693,7 +1692,7 @@ make lint
    - [ ] Handles empty list, out-of-bounds elements, partial clipping
    - [ ] Returns new bitmap (does not mutate input)
    - [ ] Paint objects created ONCE before the element loop (not per-element)
-   - [ ] Testable helper methods extracted: `computeScaledBounds`, `extractLabel`, `computeLabelRect`
+   - [ ] Testable helper methods extracted: `computeScaledBounds`, `extractLabel`
    - [ ] Password/sensitive fields ARE annotated (intentional; Android already masks display text)
 
 6. **`ScreenshotAnnotatorTest.kt`** (NEW):

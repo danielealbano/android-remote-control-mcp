@@ -50,11 +50,14 @@ class ListStorageLocationsHandler
                                     put("name", location.name)
                                     put("path", location.path)
                                     put("description", location.description)
-                                    if (location.availableBytes != null) {
-                                        put("available_bytes", location.availableBytes)
-                                    } else {
-                                        put("available_bytes", JsonNull)
-                                    }
+                                if (location.availableBytes != null) {
+                                    put("available_bytes", location.availableBytes)
+                                } else {
+                                    put("available_bytes", JsonNull)
+                                }
+                                put("allow_read", true)
+                                put("allow_write", location.allowWrite)
+                                put("allow_delete", location.allowDelete)
                                 },
                             )
                         }
