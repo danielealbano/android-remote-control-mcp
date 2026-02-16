@@ -268,22 +268,22 @@ The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, 
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_list_storage_locations` | List available storage locations with authorization status | — | — |
-| `android_list_files` | List files/directories in an authorized storage location | `location_id` (string) | `path` (string, default ""), `offset` (int, default 0), `limit` (int, default 200, max 200) |
+| `android_list_storage_locations` | List user-added storage locations with metadata | — | — |
+| `android_list_files` | List files/directories in a storage location | `location_id` (string) | `path` (string, default ""), `offset` (int, default 0), `limit` (int, default 200, max 200) |
 | `android_read_file` | Read text file with line-based pagination | `location_id` (string), `path` (string) | `offset` (int, 1-based line number, default 1), `limit` (int, default 200, max 200) |
 | `android_write_file` | Write/create text file (creates parents, overwrites) | `location_id` (string), `path` (string), `content` (string) | — |
 | `android_append_file` | Append to text file (tries native "wa" mode) | `location_id` (string), `path` (string), `content` (string) | — |
 | `android_file_replace` | Literal string replacement in text file | `location_id` (string), `path` (string), `old_string` (string), `new_string` (string) | `replace_all` (boolean, default false) |
-| `android_download_from_url` | Download file from URL to authorized storage | `location_id` (string), `path` (string), `url` (string) | — |
+| `android_download_from_url` | Download file from URL to storage location | `location_id` (string), `path` (string), `url` (string) | — |
 | `android_delete_file` | Delete a single file (not directories) | `location_id` (string), `path` (string) | — |
 
-**Virtual path system**: All file tools use virtual paths: `{location_id}/{relative_path}` where `location_id` is `{authority}/{rootId}`. The location must be authorized by the user via the UI before file operations can be performed.
+**Virtual path system**: All file tools use virtual paths: `{location_id}/{relative_path}` where `location_id` is `{authority}/{treeDocumentId}`. The location must be added by the user via the UI before file operations can be performed.
 
 **File size limit**: All file operations are subject to the configurable file size limit (default 50 MB, range 1-500 MB). Stored in `ServerConfig.fileSizeLimitMb`.
 
 **Encoding**: All text operations use UTF-8.
 
-**Errors**: Returns `CallToolResult(isError = true)` if location not authorized, file not found, file exceeds size limit, or operation fails. `android_append_file` returns a hint to use `android_write_file` if the storage provider does not support append mode. `android_download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
+**Errors**: Returns `CallToolResult(isError = true)` if location not found, file not found, file exceeds size limit, or operation fails. `android_append_file` returns a hint to use `android_write_file` if the storage provider does not support append mode. `android_download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
 
 ### 9. App Management Tools (3 tools)
 
@@ -322,22 +322,31 @@ The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, 
 - **KILL_BACKGROUND_PROCESSES**: Required for killing background app processes via `ActivityManager.killBackgroundProcesses()`. Declared in manifest, granted automatically
 - Always check permission state before operations; return `CallToolResult(isError = true)` if permission missing
 
-### Storage Access Framework (SAF) Authorization
+### Storage Access Framework (SAF) — User-Managed Locations
 
 The application uses Android's Storage Access Framework (SAF) for unified, secure access to both physical and virtual storage (device storage, SD cards, Google Drive, Dropbox, etc.).
 
-**Discovery**: Storage locations are discovered by querying all installed document providers for their roots via `ContentResolver.query()` on `DocumentsContract.Root`.
+**User-managed model**: Storage locations are entirely user-driven — no automatic discovery.
 
-**Authorization flow**:
-1. The UI displays a "Storage Locations" section listing all discovered locations with toggle switches
-2. When the user enables a toggle, the app launches the system file picker via `ACTION_OPEN_DOCUMENT_TREE` with a hint URI pointing to the selected root
-3. The user confirms the location in the system picker (mandatory Android security requirement — apps cannot self-grant storage access)
-4. The granted tree URI is persisted via `ContentResolver.takePersistableUriPermission()` (read + write)
-5. The URI string is stored in DataStore (via `SettingsRepository`) for restoration across app restarts
+**Add flow**:
+1. The user taps "Add Storage Location" in the UI
+2. A dialog appears with a description field and a "Browse" button
+3. Tapping "Browse" launches the system file picker via `ACTION_OPEN_DOCUMENT_TREE`
+4. The user selects a directory (mandatory Android security requirement — apps cannot self-grant storage access)
+5. The granted tree URI is persisted via `ContentResolver.takePersistableUriPermission()` (read + write)
+6. The location metadata (ID, name, path, description, tree URI) is stored in DataStore (via `SettingsRepository`)
 
-**Virtual path system**: All file operations use virtual paths in the format `{location_id}/{relative_path}`, where `location_id` is `{authority}/{rootId}` (e.g., `com.android.externalstorage.documents/primary`). This provides a stable, cross-session identifier for each storage root.
+**Location ID format**: `{authority}/{treeDocumentId}` derived from the tree URI (e.g., `com.android.externalstorage.documents/primary:Documents`). This provides a stable, cross-session identifier.
 
-**Deauthorization**: When the user disables a toggle, the persistent URI permission is released via `ContentResolver.releasePersistableUriPermission()` and removed from DataStore.
+**Edit**: Users can update the description of any location via the UI.
+
+**Delete**: Users can remove a location. The persistent URI permission is released via `ContentResolver.releasePersistableUriPermission()` and the entry is removed from DataStore. A confirmation dialog is shown before deletion.
+
+**Duplicate prevention**: The app prevents adding the same tree URI twice (both in the UI and as a defense-in-depth check inside the provider).
+
+**Description**: Each location has an optional user-provided description (max 500 characters) to give context/hints to MCP clients.
+
+**Known constraint — Android URI permission limit**: Android enforces a limit on the number of persistable URI permissions per app (typically 128-512 depending on OEM/version). Once the limit is reached, oldest permissions may be silently evicted. In practice, users will have far fewer storage locations than this limit, but it is a known platform constraint.
 
 ### Background Restrictions & Memory Management
 
@@ -407,7 +416,7 @@ The application uses Android's Storage Access Framework (SAF) for unified, secur
 
 ### Screen Structure
 
-HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS, file size limit, download settings), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), StorageLocationsSection (discovered SAF storage roots with authorization toggle switches), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
+HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS, file size limit, download settings), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), StorageLocationsSection (user-managed SAF storage locations with add/edit/delete), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
 
 ### Accessibility (UI)
 
