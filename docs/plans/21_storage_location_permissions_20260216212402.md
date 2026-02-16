@@ -1190,11 +1190,11 @@ Test: `updateLocationAllowDelete emits error and refreshes on failure`
 **Description**: Update MCP_TOOLS.md and PROJECT.md to document the permission model and updated `list_storage_locations` output format.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `MCP_TOOLS.md` updated: `list_storage_locations` output includes `allow_read`, `allow_write`, `allow_delete` fields
-- [ ] `MCP_TOOLS.md` updated: write/delete tools document the permission denied error
-- [ ] `PROJECT.md` updated: documents the storage location permission model (new section after SAF documentation)
-- [ ] `PROJECT.md` updated: Permission Security section references the per-location permission model
-- [ ] Documentation is accurate and matches implementation
+- [x] `MCP_TOOLS.md` updated: `list_storage_locations` output includes `allow_read`, `allow_write`, `allow_delete` fields
+- [x] `MCP_TOOLS.md` updated: write/delete tools document the permission denied error
+- [x] `PROJECT.md` updated: documents the storage location permission model (new section after SAF documentation)
+- [x] `PROJECT.md` updated: Permission Security section references the per-location permission model
+- [x] Documentation is accurate and matches implementation
 
 ---
 
