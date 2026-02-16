@@ -58,7 +58,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 1. Click `element_id` to focus
 2. Get current text length via `getSurroundingText()`
 3. `setSelection(textLength, textLength)` — cursor at end
-4. Type `text` char by char via `commitText(char, 1, null)` with timing delays
+4. Type `text` code point by code point via `commitText(codePoint, 1, null)` with timing delays
 5. Return success
 
 ### `android_type_insert_text`
@@ -76,7 +76,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 2. Get current text length via `getSurroundingText()`
 3. Validate `offset` is in range `[0, textLength]` — error if out of range
 4. `setSelection(offset, offset)` — cursor at specified position
-5. Type `text` char by char via `commitText(char, 1, null)` with timing delays
+5. Type `text` code point by code point via `commitText(codePoint, 1, null)` with timing delays
 6. Return success
 
 ### `android_type_replace_text`
@@ -95,7 +95,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 3. Find first occurrence of `search` in the text — error if not found
 4. `setSelection(startIndex, endIndex)` to select the found text
 5. Send DELETE key event (`KeyEvent(ACTION_DOWN, KEYCODE_DEL)` + `KeyEvent(ACTION_UP, KEYCODE_DEL)`) to delete selection
-6. Type `new_text` char by char via `commitText(char, 1, null)` with timing delays (if `new_text` is non-empty)
+6. Type `new_text` code point by code point via `commitText(codePoint, 1, null)` with timing delays (if `new_text` is non-empty)
 7. Return success
 
 ### `android_type_clear_text`
@@ -841,7 +841,7 @@ Add import for `TypeInputController`.
 ./gradlew detekt
 ```
 
-Note: The `registerTextInputTools` signature has not changed in this user story — `typeInputController` is added as an additional parameter while keeping all existing params. All existing tools still receive their dependencies and the new `typeInputController` is simply ignored by `PressKeyTool` (it doesn't use it). The key validation here is that the new infrastructure code (TypeInputController, McpAccessibilityService changes, config XML, Hilt bindings) compiles and doesn't break existing tests.
+Note: `typeInputController` is added as an additional parameter to `registerTextInputTools()` while keeping all existing params (`treeParser`, `actionExecutor`, `accessibilityServiceProvider`). `PressKeyTool` is constructed independently inside the function and does not receive `typeInputController` — only the new type tools will use it (added in User Story 3). The key validation here is that the new infrastructure code (TypeInputController, McpAccessibilityService changes, config XML, Hilt bindings) compiles and doesn't break existing tests.
 
 ---
 
@@ -859,7 +859,7 @@ Note: The `registerTextInputTools` signature has not changed in this user story 
 - [ ] `android_set_text` tool is removed (no longer registered)
 - [ ] `android_press_key` tool is preserved and functional
 - [ ] All four tools use `element_id` (mandatory), click to focus, `setSelection()` for cursor positioning
-- [ ] `type_append_text` and `type_insert_text` type char by char with configurable speed/variance
+- [ ] `type_append_text` and `type_insert_text` type code point by code point with configurable speed/variance
 - [ ] `type_replace_text` finds first occurrence, selects it, sends DELETE, types replacement
 - [ ] `type_clear_text` performs select all + DELETE
 - [ ] Max text length enforced at 2000 characters
@@ -937,6 +937,8 @@ Also add unit tests for `requireInt()` in `McpToolUtilsTest.kt`, following the s
 
 **What changes**: Delete the `InputTextTool` class entirely and `ClearTextTool` class entirely. Keep `PressKeyTool` and `findFocusedEditableNode()` (`PressKeyTool` uses `findFocusedEditableNode()` in `pressEnter()`, `pressDelete()`, and `appendCharToFocused()`, so it must be kept).
 
+Note: The existing `@file:Suppress("TooManyFunctions")` annotation at the top of the file should be kept — after removing 2 classes and adding 4 new classes + 4 utility functions, it is still needed (even more so).
+
 - [ ] **Action 3.1.2**: Add shared typing constants, Mutex, and utility functions
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
@@ -964,7 +966,7 @@ private const val FOCUS_POLL_MAX_MS = 500L
 internal val typeOperationMutex = Mutex()
 
 /**
- * Types text character by character using the given [TypeInputController],
+ * Types text code point by code point using the given [TypeInputController],
  * with configurable speed and variance to simulate natural human typing.
  *
  * Iterates by **Unicode code points** (not Char), so supplementary characters
@@ -1323,7 +1325,7 @@ class TypeInsertTextTool
                 // Position cursor at offset
                 typeInputController.setSelection(offset, offset)
 
-                // Type character by character (code point aware)
+                // Type code point by code point
                 typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
             }
 
@@ -1392,7 +1394,7 @@ class TypeInsertTextTool
  *
  * Finds the first occurrence of search text in a field, selects it,
  * deletes it via DELETE key event, then types the replacement text
- * character by character using the InputConnection pipeline.
+ * code point by code point using the InputConnection pipeline.
  *
  * **Known limitation (TOCTOU race)**: There is an inherent time-of-check to
  * time-of-use race between `getSurroundingText()` (read) and `setSelection()`
@@ -1409,7 +1411,7 @@ class TypeInsertTextTool
  * 3. Find first occurrence of search text — error if not found
  * 4. setSelection(startIndex, endIndex) to select found text
  * 5. Send DELETE key event to remove selection
- * 6. Type new_text char by char via commitText() (if non-empty)
+ * 6. Type new_text code point by code point via commitText() (if non-empty)
  */
 class TypeReplaceTextTool
     @Inject
@@ -1483,7 +1485,7 @@ class TypeReplaceTextTool
                     android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL),
                 )
 
-                // Type replacement text character by character (if non-empty)
+                // Type replacement text code point by code point (if non-empty)
                 if (newText.isNotEmpty()) {
                     typeCharByChar(newText, typingSpeed, typingSpeedVariance, typeInputController)
                 }

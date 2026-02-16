@@ -1675,12 +1675,24 @@ Lists user-added storage locations with their metadata. Each location represents
     "content": [
       {
         "type": "text",
-        "text": "[{\"id\":\"com.android.externalstorage.documents/primary:\",\"name\":\"Internal Storage\",\"path\":\"/\",\"description\":\"Main device storage\",\"available_bytes\":52428800000}]"
+        "text": "[{\"id\":\"com.android.externalstorage.documents/primary:\",\"name\":\"Internal Storage\",\"path\":\"/\",\"description\":\"Main device storage\",\"available_bytes\":52428800000,\"allow_read\":true,\"allow_write\":false,\"allow_delete\":false}]"
       }
     ]
   }
 }
 ```
+
+**Response Fields** (per location):
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique location identifier |
+| `name` | string | Display name of the directory |
+| `path` | string | Human-readable path |
+| `description` | string | User-provided description |
+| `available_bytes` | number \| null | Available space in bytes, or null if unknown |
+| `allow_read` | boolean | Always `true` — read access is always permitted |
+| `allow_write` | boolean | Whether write operations are permitted (write_file, append_file, file_replace, download_from_url) |
+| `allow_delete` | boolean | Whether delete operations are permitted (delete_file) |
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Action failed**: Failed to query storage locations
@@ -1850,6 +1862,7 @@ Writes text content to a file. Creates the file if it doesn't exist, creates par
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `content`
+- **Permission denied**: Write not allowed
 - **Action failed**: Storage location not found, content exceeds file size limit, write operation failed
 
 ---
@@ -1904,6 +1917,7 @@ Appends text content to an existing file. If the storage provider does not suppo
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `content`
+- **Permission denied**: Write not allowed
 - **Action failed**: Storage location not found, file not found, append mode not supported by provider, content exceeds file size limit
 
 ---
@@ -1963,6 +1977,7 @@ Performs literal string replacement in a text file. Uses advisory file locking w
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, `old_string`, or `new_string`; `old_string` is empty
+- **Permission denied**: Write not allowed
 - **Action failed**: Storage location not found, file not found, `old_string` not found in file, file exceeds size limit
 
 ---
@@ -2019,6 +2034,7 @@ Downloads a file from a URL and saves it to a storage location.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `url`; invalid URL format
+- **Permission denied**: Write not allowed
 - **Action failed**: Storage location not found, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed
 
 ---
@@ -2067,6 +2083,7 @@ Deletes a single file from a storage location. Cannot delete directories.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id` or `path`
+- **Permission denied**: Delete not allowed
 - **Action failed**: Storage location not found, file not found, target is a directory (not a file), delete operation failed
 
 ---
