@@ -51,6 +51,16 @@ class FileToolsIntegrationTest {
                         allowWrite = true,
                         allowDelete = false,
                     ),
+                    StorageLocation(
+                        id = "loc2",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "Document files",
+                        treeUri = "content://com.android.externalstorage.documents/tree/primary%3ADocuments",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = true,
+                    ),
                 )
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
@@ -58,14 +68,20 @@ class FileToolsIntegrationTest {
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text
+                // First location assertions
                 assertTrue(text.contains("Downloads"))
                 assertTrue(text.contains("Downloaded files"))
                 assertTrue(text.contains("path"))
                 assertFalse(text.contains("authorized"))
                 assertFalse(text.contains("provider"))
-                assertTrue(text.contains("\"allow_read\":true"))
+                // Second location assertions
+                assertTrue(text.contains("Documents"))
+                assertTrue(text.contains("Document files"))
+                // Verify both permission combinations are present (write=true/delete=false AND write=false/delete=true)
                 assertTrue(text.contains("\"allow_write\":true"))
+                assertTrue(text.contains("\"allow_write\":false"))
                 assertTrue(text.contains("\"allow_delete\":false"))
+                assertTrue(text.contains("\"allow_delete\":true"))
             }
         }
 

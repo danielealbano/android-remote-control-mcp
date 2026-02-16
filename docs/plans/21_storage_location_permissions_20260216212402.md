@@ -1126,7 +1126,7 @@ Add no-op callbacks:
     }
 ```
 
-**Performance rationale**: Using optimistic in-place update instead of `refreshStorageLocations()` avoids re-querying `queryAvailableBytes()` (ContentResolver I/O) for ALL locations when only a boolean changed. On success, only the changed field is updated in the existing list. On failure, a full refresh is performed to ensure consistency.
+**Performance rationale**: Using persist-first-then-update (in-place state update) instead of `refreshStorageLocations()` avoids re-querying `queryAvailableBytes()` (ContentResolver I/O) for ALL locations when only a boolean changed. On success, only the changed field is updated in the existing list. On failure, a full refresh is performed to ensure consistency.
 
 ---
 
@@ -1165,10 +1165,10 @@ Add no-op callbacks:
 
 **Action 4.5.2**: Add tests for `updateLocationAllowWrite()`.
 
-Test: `updateLocationAllowWrite calls provider and optimistically updates state`
+Test: `updateLocationAllowWrite calls provider and updates state in-place`
 - Arrange: Mock `storageLocationProvider.getAllLocations()` → list with one `StorageLocation(id="loc1", allowWrite=false, allowDelete=false, ...)`. Mock `storageLocationProvider.updateLocationAllowWrite()` to succeed. Call `viewModel.refreshStorageLocations()` + `advanceUntilIdle()` to populate `_storageLocations` (private field). Then clear recorded mock calls: `clearMocks(storageLocationProvider, answers = false, recordedCalls = true)` (keeps stubs, clears call records for clean verification).
 - Act: Call `viewModel.updateLocationAllowWrite("loc1", true)` + `advanceUntilIdle()`.
-- Assert: Verify `storageLocationProvider.updateLocationAllowWrite("loc1", true)` was called. Verify `storageLocations` state contains the location with `allowWrite=true` (optimistic update). Verify `storageLocationProvider.getAllLocations()` was NOT called (no full refresh on success — verified cleanly after clearing recorded calls).
+- Assert: Verify `storageLocationProvider.updateLocationAllowWrite("loc1", true)` was called. Verify `storageLocations` state contains the location with `allowWrite=true` (persist-first-then-update). Verify `storageLocationProvider.getAllLocations()` was NOT called (no full refresh on success — verified cleanly after clearing recorded calls).
 
 Test: `updateLocationAllowWrite emits error and refreshes on failure`
 - Arrange: Mock `storageLocationProvider.getAllLocations()` → list with location. Call `refreshStorageLocations()` + `advanceUntilIdle()` to populate state. Then clear recorded mock calls. Mock `storageLocationProvider.updateLocationAllowWrite()` to throw `RuntimeException("test error")`. Re-mock `storageLocationProvider.getAllLocations()` for the fallback refresh.
@@ -1177,7 +1177,7 @@ Test: `updateLocationAllowWrite emits error and refreshes on failure`
 
 **Action 4.5.3**: Add tests for `updateLocationAllowDelete()`.
 
-Test: `updateLocationAllowDelete calls provider and optimistically updates state`
+Test: `updateLocationAllowDelete calls provider and updates state in-place`
 - Same pattern as `updateLocationAllowWrite` but for `allowDelete`.
 
 Test: `updateLocationAllowDelete emits error and refreshes on failure`
@@ -1290,4 +1290,4 @@ Each storage location has per-location permission flags controlling what MCP too
 - [x] Manual review: existing tests updated wherever `StorageLocation` or `StoredLocation` is constructed
 - [x] Manual review: error messages are generic ("Write not allowed" / "Delete not allowed")
 - [x] Manual review: UI toggles work without requiring server stop
-- [ ] Manual review: documentation is accurate
+- [x] Manual review: documentation is accurate

@@ -998,6 +998,86 @@ class FileOperationProviderTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // AuthorizationDeniedForWriteDelete
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("AuthorizationDeniedForWriteDelete")
+    inner class AuthorizationDeniedForWriteDelete {
+        @Test
+        fun `writeFile throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange — getServerConfig() runs before checkAuthorization()
+                coEvery { mockSettingsRepository.getServerConfig() } returns
+                    ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.writeFile("loc1", "file.txt", "content")
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+
+        @Test
+        fun `appendFile throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.appendFile("loc1", "file.txt", "content")
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+
+        @Test
+        fun `replaceInFile throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.replaceInFile("loc1", "file.txt", "old", "new", false)
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+
+        @Test
+        fun `downloadFromUrl throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.downloadFromUrl("loc1", "file.txt", "https://example.com/file")
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+
+        @Test
+        fun `deleteFile throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.deleteFile("loc1", "file.txt")
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // WritePermissionDenied
     // ─────────────────────────────────────────────────────────────────────
 

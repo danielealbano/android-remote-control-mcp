@@ -170,7 +170,7 @@ class StorageLocationProviderImpl
             allowWrite: Boolean,
         ) {
             settingsRepository.updateLocationAllowWrite(locationId, allowWrite)
-            Log.i(TAG, "Updated allowWrite=$allowWrite for location: $locationId")
+            Log.i(TAG, "Updated allowWrite=$allowWrite for location: ${sanitizeLocationId(locationId)}")
         }
 
         override suspend fun updateLocationAllowDelete(
@@ -178,7 +178,7 @@ class StorageLocationProviderImpl
             allowDelete: Boolean,
         ) {
             settingsRepository.updateLocationAllowDelete(locationId, allowDelete)
-            Log.i(TAG, "Updated allowDelete=$allowDelete for location: $locationId")
+            Log.i(TAG, "Updated allowDelete=$allowDelete for location: ${sanitizeLocationId(locationId)}")
         }
 
         override suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean {
@@ -248,5 +248,10 @@ class StorageLocationProviderImpl
 
         companion object {
             private const val TAG = "MCP:StorageProvider"
+            private const val MAX_LOCATION_ID_LOG_LENGTH = 200
+            private val CONTROL_CHAR_REGEX = Regex("[\\p{Cntrl}]")
+
+            private fun sanitizeLocationId(locationId: String): String =
+                locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")
         }
     }
