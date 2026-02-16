@@ -93,6 +93,8 @@ class FileOperationProviderTest {
     private fun setupAuthorizedLocation(locationId: String) {
         coEvery { mockStorageLocationProvider.isLocationAuthorized(locationId) } returns true
         coEvery { mockStorageLocationProvider.getTreeUriForLocation(locationId) } returns mockTreeUri
+        coEvery { mockStorageLocationProvider.isWriteAllowed(locationId) } returns true
+        coEvery { mockStorageLocationProvider.isDeleteAllowed(locationId) } returns true
     }
 
     /**
@@ -992,6 +994,99 @@ class FileOperationProviderTest {
                         provider.deleteFile("loc1", "subdir")
                     }
                 assertTrue(exception.message!!.contains("Cannot delete a directory"))
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // WritePermissionDenied
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("WritePermissionDenied")
+    inner class WritePermissionDenied {
+        @Test
+        fun `writeFile throws PermissionDenied when write not allowed`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getServerConfig() } returns
+                    ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.isWriteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.writeFile("loc1", "file.txt", "small content")
+                    }
+                assertEquals("Write not allowed", exception.message)
+            }
+
+        @Test
+        fun `appendFile throws PermissionDenied when write not allowed`() =
+            runTest {
+                // Arrange
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.isWriteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.appendFile("loc1", "file.txt", "more data")
+                    }
+                assertEquals("Write not allowed", exception.message)
+            }
+
+        @Test
+        fun `replaceInFile throws PermissionDenied when write not allowed`() =
+            runTest {
+                // Arrange
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.isWriteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.replaceInFile("loc1", "file.txt", "old", "new", false)
+                    }
+                assertEquals("Write not allowed", exception.message)
+            }
+
+        @Test
+        fun `downloadFromUrl throws PermissionDenied when write not allowed`() =
+            runTest {
+                // Arrange
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.isWriteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.downloadFromUrl("loc1", "file.txt", "https://example.com/file.txt")
+                    }
+                assertEquals("Write not allowed", exception.message)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DeletePermissionDenied
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("DeletePermissionDenied")
+    inner class DeletePermissionDenied {
+        @Test
+        fun `deleteFile throws PermissionDenied when delete not allowed`() =
+            runTest {
+                // Arrange
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.isDeleteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.deleteFile("loc1", "file.txt")
+                    }
+                assertEquals("Delete not allowed", exception.message)
             }
     }
 
