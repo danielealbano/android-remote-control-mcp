@@ -3,14 +3,12 @@ package com.danielealbano.androidremotecontrolmcp.services.storage
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.content.pm.ProviderInfo
-import android.content.pm.ResolveInfo
 import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -27,12 +25,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 
 @ExtendWith(MockKExtension::class)
@@ -45,9 +45,6 @@ class StorageLocationProviderTest {
     private lateinit var mockContentResolver: ContentResolver
 
     @MockK
-    private lateinit var mockPackageManager: PackageManager
-
-    @MockK
     private lateinit var mockSettingsRepository: SettingsRepository
 
     private lateinit var provider: StorageLocationProviderImpl
@@ -55,17 +52,17 @@ class StorageLocationProviderTest {
     @BeforeEach
     fun setUp() {
         mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
-        every { android.util.Log.w(any<String>(), any<String>()) } returns 0
-        every { android.util.Log.w(any<String>(), any<String>(), any()) } returns 0
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
+        every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
 
         mockkStatic(DocumentsContract::class)
+        mockkStatic(DocumentFile::class)
 
         every { mockContext.contentResolver } returns mockContentResolver
-        every { mockContext.packageManager } returns mockPackageManager
 
         provider = StorageLocationProviderImpl(mockContext, mockSettingsRepository)
     }
@@ -74,42 +71,39 @@ class StorageLocationProviderTest {
     fun tearDown() {
         unmockkStatic(android.util.Log::class)
         unmockkStatic(DocumentsContract::class)
+        unmockkStatic(DocumentFile::class)
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // getAvailableLocations
+    // getAllLocations
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("getAvailableLocations")
-    inner class GetAvailableLocations {
+    @DisplayName("GetAllLocations")
+    inner class GetAllLocations {
         @Test
-        fun `getAvailableLocations returns discovered roots`() =
+        fun `getAllLocations returns stored locations with enriched metadata`() =
             runTest {
                 // Arrange
-                val treeUriString = "content://com.test.provider/tree/primary%3A"
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                    mapOf("com.test.provider/primary" to treeUriString)
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My documents",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
-                val providerInfo = ProviderInfo()
-                providerInfo.authority = "com.test.provider"
-                providerInfo.packageName = "com.test.provider.pkg"
-
-                val resolveInfo = ResolveInfo()
-                resolveInfo.providerInfo = providerInfo
+                val mockTreeUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockTreeUri
+                every { mockTreeUri.authority } returns "com.test.provider"
 
                 every {
-                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
-                } returns listOf(resolveInfo)
-
-                val appInfo = ApplicationInfo()
-                appInfo.packageName = "com.test.provider.pkg"
-                every {
-                    mockPackageManager.getApplicationInfo("com.test.provider.pkg", 0)
-                } returns appInfo
-                every {
-                    mockPackageManager.getApplicationLabel(appInfo)
-                } returns "Test Provider" as CharSequence
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
 
                 val mockRootsUri = mockk<Uri>()
                 every { DocumentsContract.buildRootsUri("com.test.provider") } returns mockRootsUri
@@ -119,77 +113,124 @@ class StorageLocationProviderTest {
                     mockContentResolver.query(eq(mockRootsUri), any(), any(), any(), any())
                 } returns mockCursor
 
-                // Column indices: ROOT_ID=0, TITLE=1, DOCUMENT_ID=2, AVAILABLE_BYTES=3, ICON=4
-                every { mockCursor.getColumnIndex(any()) } returnsMany listOf(0, 1, 2, 3, 4)
+                every {
+                    mockCursor.getColumnIndex(DocumentsContract.Root.COLUMN_ROOT_ID)
+                } returns 0
+                every {
+                    mockCursor.getColumnIndex(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
+                } returns 1
                 every { mockCursor.moveToNext() } returnsMany listOf(true, false)
                 every { mockCursor.getString(0) } returns "primary"
-                every { mockCursor.getString(1) } returns "Internal Storage"
-                every { mockCursor.getString(2) } returns "primary:"
-                every { mockCursor.isNull(3) } returns false
-                every { mockCursor.getLong(3) } returns 5_000_000_000L
-                every { mockCursor.isNull(4) } returns true
+                every { mockCursor.isNull(1) } returns false
+                every { mockCursor.getLong(1) } returns 5_000_000_000L
                 every { mockCursor.close() } just Runs
 
                 // Act
-                val result = provider.getAvailableLocations()
+                val result = provider.getAllLocations()
 
                 // Assert
                 assertEquals(1, result.size)
                 val location = result[0]
-                assertEquals("com.test.provider/primary", location.id)
-                assertEquals("Internal Storage", location.name)
-                assertEquals("Test Provider", location.providerName)
-                assertEquals("com.test.provider", location.authority)
-                assertEquals("primary", location.rootId)
-                assertEquals("primary:", location.rootDocumentId)
+                assertEquals("com.test.provider/primary:Documents", location.id)
+                assertEquals("Documents", location.name)
+                assertEquals("/Documents", location.path)
+                assertEquals("My documents", location.description)
                 assertEquals(treeUriString, location.treeUri)
-                assertTrue(location.isAuthorized)
                 assertEquals(5_000_000_000L, location.availableBytes)
-                assertNull(location.iconUri)
+
                 verify { mockCursor.close() }
+                unmockkStatic(Uri::class)
             }
 
         @Test
-        fun `getAvailableLocations returns empty list when no providers found`() =
+        fun `getAllLocations returns empty list when no locations stored`() =
             runTest {
                 // Arrange
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
-                every {
-                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
-                } returns emptyList()
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
 
                 // Act
-                val result = provider.getAvailableLocations()
+                val result = provider.getAllLocations()
 
                 // Assert
                 assertTrue(result.isEmpty())
             }
+
+        @Test
+        fun `getAllLocations returns locations with null availableBytes when queryAvailableBytes fails`() =
+            runTest {
+                // Arrange
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My documents",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                val mockTreeUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockTreeUri
+                every { mockTreeUri.authority } returns "com.test.provider"
+
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+
+                val mockRootsUri = mockk<Uri>()
+                every { DocumentsContract.buildRootsUri("com.test.provider") } returns mockRootsUri
+
+                every {
+                    mockContentResolver.query(eq(mockRootsUri), any(), any(), any(), any())
+                } returns null
+
+                // Act
+                val result = provider.getAllLocations()
+
+                // Assert
+                assertEquals(1, result.size)
+                val location = result[0]
+                assertEquals("com.test.provider/primary:Documents", location.id)
+                assertEquals("Documents", location.name)
+                assertNull(location.availableBytes)
+
+                unmockkStatic(Uri::class)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // authorizeLocation
+    // addLocation
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("authorizeLocation")
-    inner class AuthorizeLocation {
+    @DisplayName("AddLocation")
+    inner class AddLocation {
         @Test
-        fun `authorizeLocation persists tree URI and takes permission`() =
+        fun `addLocation persists location, takes permission, and returns Unit`() =
             runTest {
                 // Arrange
-                val locationId = "com.test.provider/primary"
-                val treeUriString = "content://com.test.provider/tree/primary%3A"
                 val mockTreeUri = mockk<Uri>()
-                every { mockTreeUri.toString() } returns treeUriString
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every { DocumentsContract.getTreeDocumentId(mockTreeUri) } returns "primary:Documents"
                 every {
                     mockContentResolver.takePersistableUriPermission(any(), any())
                 } just Runs
-                coEvery {
-                    mockSettingsRepository.addAuthorizedLocation(any(), any())
-                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Documents"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
 
                 // Act
-                provider.authorizeLocation(locationId, mockTreeUri)
+                provider.addLocation(mockTreeUri, "My documents")
 
                 // Assert
                 verify {
@@ -200,27 +241,346 @@ class StorageLocationProviderTest {
                     )
                 }
                 coVerify {
-                    mockSettingsRepository.addAuthorizedLocation(locationId, treeUriString)
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.id == "com.test.provider/primary:Documents" &&
+                                stored.name == "Documents" &&
+                                stored.path == "/Documents" &&
+                                stored.description == "My documents" &&
+                                stored.treeUri == "content://com.test.provider/tree/primary%3ADocuments"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation derives path from physical storage document ID`() =
+            runTest {
+                // Arrange — document ID "primary:Documents/MyProject" → path "/Documents/MyProject"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments%2FMyProject"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents/MyProject"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "MyProject"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, "Project folder")
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.path == "/Documents/MyProject"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation derives root path for storage root`() =
+            runTest {
+                // Arrange — document ID "primary:" → path "/"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3A"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every { DocumentsContract.getTreeDocumentId(mockTreeUri) } returns "primary:"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Internal Storage"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, "Root storage")
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.path == "/"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation derives root path for virtual provider with opaque document ID`() =
+            runTest {
+                // Arrange — document ID with no colon (opaque) → path "/"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.google.drive.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.google.drive.provider/tree/abc123def456"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "abc123def456"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "My Drive"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, "Google Drive")
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.path == "/"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation falls back to document ID when DocumentFile getName() returns null`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns null
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, "Test location")
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.name == "primary:Documents"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation truncates description to MAX_DESCRIPTION_LENGTH`() =
+            runTest {
+                // Arrange
+                val longDescription = "A".repeat(StorageLocationProvider.MAX_DESCRIPTION_LENGTH + 100)
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Documents"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, longDescription)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.description.length == StorageLocationProvider.MAX_DESCRIPTION_LENGTH
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation rejects non-content URI scheme`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "file"
+
+                // Act & Assert
+                val exception =
+                    assertThrows<IllegalArgumentException> {
+                        provider.addLocation(mockTreeUri, "Test")
+                    }
+                assertTrue(exception.message!!.contains("Invalid URI scheme"))
+            }
+
+        @Test
+        fun `addLocation rejects non-tree URI`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<IllegalArgumentException> {
+                        provider.addLocation(mockTreeUri, "Test")
+                    }
+                assertTrue(exception.message!!.contains("not a valid document tree URI"))
+            }
+
+        @Test
+        fun `addLocation rejects URI with null authority`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every { mockTreeUri.authority } returns null
+
+                // Act & Assert
+                val exception =
+                    assertThrows<IllegalArgumentException> {
+                        provider.addLocation(mockTreeUri, "Test")
+                    }
+                assertTrue(exception.message!!.contains("no authority"))
+            }
+
+        @Test
+        fun `addLocation rejects duplicate tree URI`() =
+            runTest {
+                // Arrange
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns treeUriString
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+
+                val existingLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "Existing",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(existingLocation)
+
+                // Act & Assert
+                val exception =
+                    assertThrows<IllegalStateException> {
+                        provider.addLocation(mockTreeUri, "Duplicate")
+                    }
+                assertTrue(exception.message!!.contains("already exists"))
+            }
+
+        @Test
+        fun `addLocation releases permission if persistence fails after takePersistableUriPermission`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+                every {
+                    mockContentResolver.releasePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Documents"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery {
+                    mockSettingsRepository.addStoredLocation(any())
+                } throws RuntimeException("Persistence failed")
+
+                // Act & Assert
+                assertThrows<RuntimeException> {
+                    provider.addLocation(mockTreeUri, "Test")
+                }
+
+                verify {
+                    mockContentResolver.releasePersistableUriPermission(
+                        mockTreeUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
                 }
             }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // deauthorizeLocation
+    // removeLocation
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("deauthorizeLocation")
-    inner class DeauthorizeLocation {
+    @DisplayName("RemoveLocation")
+    inner class RemoveLocation {
         @Test
-        fun `deauthorizeLocation removes entry and releases permission`() =
+        fun `removeLocation removes entry and releases permission`() =
             runTest {
                 // Arrange
-                val locationId = "com.test.provider/primary"
-                val treeUriString = "content://com.test.provider/tree/primary%3A"
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                    mapOf(locationId to treeUriString)
-                coEvery { mockSettingsRepository.removeAuthorizedLocation(any()) } just Runs
+                val locationId = "com.test.provider/primary:Documents"
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = locationId,
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My documents",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+                coEvery { mockSettingsRepository.removeStoredLocation(any()) } just Runs
 
                 val mockParsedUri = mockk<Uri>()
                 mockkStatic(Uri::class)
@@ -230,7 +590,7 @@ class StorageLocationProviderTest {
                 } just Runs
 
                 // Act
-                provider.deauthorizeLocation(locationId)
+                provider.removeLocation(locationId)
 
                 // Assert
                 verify {
@@ -240,9 +600,88 @@ class StorageLocationProviderTest {
                             Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
                 }
-                coVerify { mockSettingsRepository.removeAuthorizedLocation(locationId) }
+                coVerify { mockSettingsRepository.removeStoredLocation(locationId) }
 
                 unmockkStatic(Uri::class)
+            }
+
+        @Test
+        fun `removeLocation handles already-revoked permission gracefully`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary:Documents"
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = locationId,
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My documents",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+                coEvery { mockSettingsRepository.removeStoredLocation(any()) } just Runs
+
+                val mockParsedUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockParsedUri
+                every {
+                    mockContentResolver.releasePersistableUriPermission(any(), any())
+                } throws SecurityException("Permission already revoked")
+
+                // Act — should not throw
+                provider.removeLocation(locationId)
+
+                // Assert — removeStoredLocation is still called despite permission release failure
+                coVerify { mockSettingsRepository.removeStoredLocation(locationId) }
+
+                unmockkStatic(Uri::class)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // updateLocationDescription
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("UpdateLocationDescription")
+    inner class UpdateLocationDescription {
+        @Test
+        fun `updateLocationDescription delegates to settings repository`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary:Documents"
+                val newDescription = "Updated description"
+                coEvery {
+                    mockSettingsRepository.updateLocationDescription(any(), any())
+                } just Runs
+
+                // Act
+                provider.updateLocationDescription(locationId, newDescription)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.updateLocationDescription(locationId, newDescription)
+                }
+            }
+
+        @Test
+        fun `updateLocationDescription with non-existent locationId is a no-op`() =
+            runTest {
+                // Arrange
+                val locationId = "nonexistent/location"
+                val description = "Some description"
+                coEvery {
+                    mockSettingsRepository.updateLocationDescription(any(), any())
+                } just Runs
+
+                // Act — should not throw
+                provider.updateLocationDescription(locationId, description)
+
+                // Assert — delegates regardless; repository handles the no-op
+                coVerify {
+                    mockSettingsRepository.updateLocationDescription(locationId, description)
+                }
             }
     }
 
@@ -251,30 +690,37 @@ class StorageLocationProviderTest {
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("isLocationAuthorized")
+    @DisplayName("IsLocationAuthorized")
     inner class IsLocationAuthorized {
         @Test
-        fun `isLocationAuthorized returns true for authorized locations`() =
+        fun `isLocationAuthorized returns true for existing locations`() =
             runTest {
                 // Arrange
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns
-                    mapOf("loc1" to "content://tree/loc1")
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
                 // Act
-                val result = provider.isLocationAuthorized("loc1")
+                val result = provider.isLocationAuthorized("com.test.provider/primary:Documents")
 
                 // Assert
                 assertTrue(result)
             }
 
         @Test
-        fun `isLocationAuthorized returns false for unauthorized locations`() =
+        fun `isLocationAuthorized returns false for unknown locations`() =
             runTest {
                 // Arrange
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
 
                 // Act
-                val result = provider.isLocationAuthorized("loc1")
+                val result = provider.isLocationAuthorized("unknown/location")
 
                 // Assert
                 assertFalse(result)
@@ -286,16 +732,59 @@ class StorageLocationProviderTest {
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("getLocationById")
+    @DisplayName("GetLocationById")
     inner class GetLocationById {
         @Test
-        fun `getLocationById returns null for unknown location`() =
+        fun `getLocationById returns location for known ID`() =
             runTest {
-                // Arrange — set up getAvailableLocations to return an empty list
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+                // Arrange
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                val mockTreeUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockTreeUri
+                every { mockTreeUri.authority } returns "com.test.provider"
+
                 every {
-                    mockPackageManager.queryIntentContentProviders(any<Intent>(), any<Int>())
-                } returns emptyList()
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+
+                val mockRootsUri = mockk<Uri>()
+                every { DocumentsContract.buildRootsUri("com.test.provider") } returns mockRootsUri
+
+                every {
+                    mockContentResolver.query(eq(mockRootsUri), any(), any(), any(), any())
+                } returns null
+
+                // Act
+                val result = provider.getLocationById("com.test.provider/primary:Documents")
+
+                // Assert
+                assertNotNull(result)
+                assertEquals("com.test.provider/primary:Documents", result!!.id)
+                assertEquals("Documents", result.name)
+                assertEquals("/Documents", result.path)
+                assertEquals("My docs", result.description)
+                assertEquals(treeUriString, result.treeUri)
+                assertNull(result.availableBytes)
+
+                unmockkStatic(Uri::class)
+            }
+
+        @Test
+        fun `getLocationById returns null for unknown ID`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
 
                 // Act
                 val result = provider.getLocationById("nonexistent/location")
@@ -310,19 +799,98 @@ class StorageLocationProviderTest {
     // ─────────────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("getTreeUriForLocation")
+    @DisplayName("GetTreeUriForLocation")
     inner class GetTreeUriForLocation {
         @Test
-        fun `getTreeUriForLocation returns null for unauthorized location`() =
+        fun `getTreeUriForLocation returns URI for known location`() =
             runTest {
                 // Arrange
-                coEvery { mockSettingsRepository.getAuthorizedLocations() } returns emptyMap()
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                val mockParsedUri = mockk<Uri>()
+                mockkStatic(Uri::class)
+                every { Uri.parse(treeUriString) } returns mockParsedUri
+
+                // Act
+                val result = provider.getTreeUriForLocation("com.test.provider/primary:Documents")
+
+                // Assert
+                assertNotNull(result)
+                assertEquals(mockParsedUri, result)
+
+                unmockkStatic(Uri::class)
+            }
+
+        @Test
+        fun `getTreeUriForLocation returns null for unknown location`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
 
                 // Act
                 val result = provider.getTreeUriForLocation("unknown/location")
 
                 // Assert
                 assertNull(result)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // isDuplicateTreeUri
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("IsDuplicateTreeUri")
+    inner class IsDuplicateTreeUri {
+        @Test
+        fun `isDuplicateTreeUri returns true for existing tree URI`() =
+            runTest {
+                // Arrange
+                val treeUriString = "content://com.test.provider/tree/primary%3ADocuments"
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = treeUriString,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.toString() } returns treeUriString
+
+                // Act
+                val result = provider.isDuplicateTreeUri(mockTreeUri)
+
+                // Assert
+                assertTrue(result)
+            }
+
+        @Test
+        fun `isDuplicateTreeUri returns false for new tree URI`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ANewFolder"
+
+                // Act
+                val result = provider.isDuplicateTreeUri(mockTreeUri)
+
+                // Assert
+                assertFalse(result)
             }
     }
 }
