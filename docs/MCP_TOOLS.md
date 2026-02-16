@@ -1638,11 +1638,11 @@ If an element ID is not found in the current accessibility tree, the row shows `
 
 ## 8. File Tools
 
-File operations on authorized storage locations. Storage locations must be authorized in the app settings before file operations can be performed. Text file operations are subject to a configurable file size limit. All file paths are relative to the storage location root.
+File operations on user-added storage locations. Storage locations must be added by the user in the app settings before file operations can be performed. Text file operations are subject to a configurable file size limit. All file paths are relative to the storage location root.
 
 ### `android_list_storage_locations`
 
-Lists available storage locations on the device with their authorization status. Locations must be authorized in the app settings before file operations can be performed on them.
+Lists user-added storage locations with their metadata. Each location represents a directory the user granted access to via the app settings. Use the location ID from this list for all file operations.
 
 **Input Schema**:
 ```json
@@ -1675,7 +1675,7 @@ Lists available storage locations on the device with their authorization status.
     "content": [
       {
         "type": "text",
-        "text": "[{\"id\":\"com.android.providers.downloads.documents/downloads\",\"name\":\"Downloads\",\"provider\":\"Downloads\",\"authorized\":true,\"available_bytes\":52428800000}]"
+        "text": "[{\"id\":\"com.android.externalstorage.documents/primary:\",\"name\":\"Internal Storage\",\"path\":\"/\",\"description\":\"Main device storage\",\"available_bytes\":52428800000}]"
       }
     ]
   }
@@ -1739,7 +1739,7 @@ Lists files and directories in a storage location. Results are sorted directorie
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, invalid `offset` or `limit`
-- **Action failed**: Storage location not authorized or not found, path not found
+- **Action failed**: Storage location not found, path not found
 
 ---
 
@@ -1796,7 +1796,7 @@ Reads a text file with line-based pagination. Returns content with line numbers.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id` or `path`, invalid `offset` or `limit`
-- **Action failed**: Storage location not authorized, file not found, file exceeds size limit, file is not a text file
+- **Action failed**: Storage location not found, file not found, file exceeds size limit, file is not a text file
 
 ---
 
@@ -1850,7 +1850,7 @@ Writes text content to a file. Creates the file if it doesn't exist, creates par
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `content`
-- **Action failed**: Storage location not authorized, content exceeds file size limit, write operation failed
+- **Action failed**: Storage location not found, content exceeds file size limit, write operation failed
 
 ---
 
@@ -1904,7 +1904,7 @@ Appends text content to an existing file. If the storage provider does not suppo
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `content`
-- **Action failed**: Storage location not authorized, file not found, append mode not supported by provider, content exceeds file size limit
+- **Action failed**: Storage location not found, file not found, append mode not supported by provider, content exceeds file size limit
 
 ---
 
@@ -1963,13 +1963,13 @@ Performs literal string replacement in a text file. Uses advisory file locking w
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, `old_string`, or `new_string`; `old_string` is empty
-- **Action failed**: Storage location not authorized, file not found, `old_string` not found in file, file exceeds size limit
+- **Action failed**: Storage location not found, file not found, `old_string` not found in file, file exceeds size limit
 
 ---
 
 ### `android_download_from_url`
 
-Downloads a file from a URL and saves it to an authorized storage location.
+Downloads a file from a URL and saves it to a storage location.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -2019,13 +2019,13 @@ Downloads a file from a URL and saves it to an authorized storage location.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `url`; invalid URL format
-- **Action failed**: Storage location not authorized, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed
+- **Action failed**: Storage location not found, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed
 
 ---
 
 ### `android_delete_file`
 
-Deletes a single file from an authorized storage location. Cannot delete directories.
+Deletes a single file from a storage location. Cannot delete directories.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -2067,7 +2067,7 @@ Deletes a single file from an authorized storage location. Cannot delete directo
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id` or `path`
-- **Action failed**: Storage location not authorized, file not found, target is a directory (not a file), delete operation failed
+- **Action failed**: Storage location not found, file not found, target is a directory (not a file), delete operation failed
 
 ---
 

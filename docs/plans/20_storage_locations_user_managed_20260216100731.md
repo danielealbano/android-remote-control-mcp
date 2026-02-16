@@ -1336,7 +1336,7 @@ Remove the `pendingAuthorizationLocationId` import/usage if it was referenced.
 
 **Definition of Done**: `list_storage_locations` section reflects new output format.
 
-- [ ] **Action 4.1.1**: Update `list_storage_locations` section
+- [x] **Action 4.1.1**: Update `list_storage_locations` section
 
 **File**: `docs/MCP_TOOLS.md`
 
@@ -1371,7 +1371,7 @@ Also update the error messages section for all file tools (lines 1740-2071): cha
 
 **Definition of Done**: SAF section and file tools section reflect user-managed model.
 
-- [ ] **Action 4.2.1**: Update SAF authorization section
+- [x] **Action 4.2.1**: Update SAF authorization section
 
 **File**: `docs/PROJECT.md`
 
@@ -1406,7 +1406,7 @@ The application uses Android's Storage Access Framework (SAF) for unified, secur
 **Known constraint — Android URI permission limit**: Android enforces a limit on the number of persistable URI permissions per app (typically 128-512 depending on OEM/version). Once the limit is reached, oldest permissions may be silently evicted. In practice, users will have far fewer storage locations than this limit, but it is a known platform constraint.
 ```
 
-- [ ] **Action 4.2.2**: Update file tools section
+- [x] **Action 4.2.2**: Update file tools section
 
 **File**: `docs/PROJECT.md`
 
