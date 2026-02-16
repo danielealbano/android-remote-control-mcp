@@ -1,7 +1,7 @@
 # Plan 20 — Storage Locations: User-Managed Flow
 
 **Created**: 2026-02-16  
-**Status**: Draft  
+**Status**: Implemented  
 **Summary**: Replace the SAF discovery-based storage location flow with a fully user-managed model. Users add locations manually via an "Add" modal + SAF picker, can edit descriptions, and can delete locations with confirmation. Drop the discovery mechanism entirely.
 
 ---
@@ -57,18 +57,18 @@ The current flow discovers SAF document providers via `queryIntentContentProvide
 **As a developer**, I need the data model and storage layer to support user-managed storage locations (add/remove/edit description, no discovery) so the rest of the app can be built on top.
 
 ### Acceptance Criteria
-- [ ] `StorageLocation` data class uses new field set: `id`, `name`, `path`, `description`, `treeUri`, `availableBytes`
-- [ ] `StorageLocationProvider` interface has methods: `getAllLocations`, `addLocation`, `removeLocation`, `updateLocationDescription`, `isLocationAuthorized`, `getTreeUriForLocation`, `getLocationById`, `isDuplicateTreeUri`, `MAX_DESCRIPTION_LENGTH`
-- [ ] `SettingsRepository` stores full location objects (not just `id → treeUri` map)
-- [ ] `StorageLocationProviderImpl` does not use SAF discovery; manages a user-driven list
-- [ ] `addLocation` validates URI (scheme, isTreeUri, authority), checks duplicates, truncates description, releases permission on failure
-- [ ] `available_bytes` is fetched dynamically when listing locations
-- [ ] `getLocationById` only enriches the target location (not all)
-- [ ] Migration from old JSON format works (old `{"id": "treeUri"}` → new array format)
-- [ ] All existing tests rewritten/updated and passing
-- [ ] New `SettingsRepositoryImplTest` covering storage methods and migration
-- [ ] Linting passes (`./gradlew ktlintCheck`, `./gradlew detekt`)
-- [ ] Targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.StorageLocationProviderTest"` and `./gradlew :app:testDebugUnitTest --tests "*.SettingsRepositoryImplTest"`
+- [x] `StorageLocation` data class uses new field set: `id`, `name`, `path`, `description`, `treeUri`, `availableBytes`
+- [x] `StorageLocationProvider` interface has methods: `getAllLocations`, `addLocation`, `removeLocation`, `updateLocationDescription`, `isLocationAuthorized`, `getTreeUriForLocation`, `getLocationById`, `isDuplicateTreeUri`, `MAX_DESCRIPTION_LENGTH`
+- [x] `SettingsRepository` stores full location objects (not just `id → treeUri` map)
+- [x] `StorageLocationProviderImpl` does not use SAF discovery; manages a user-driven list
+- [x] `addLocation` validates URI (scheme, isTreeUri, authority), checks duplicates, truncates description, releases permission on failure
+- [x] `available_bytes` is fetched dynamically when listing locations
+- [x] `getLocationById` only enriches the target location (not all)
+- [x] Migration from old JSON format works (old `{"id": "treeUri"}` → new array format)
+- [x] All existing tests rewritten/updated and passing
+- [x] New `SettingsRepositoryImplTest` covering storage methods and migration
+- [x] Linting passes (`./gradlew ktlintCheck`, `./gradlew detekt`)
+- [x] Targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.StorageLocationProviderTest"` and `./gradlew :app:testDebugUnitTest --tests "*.SettingsRepositoryImplTest"`
 
 ---
 
@@ -742,7 +742,7 @@ Each test follows Arrange-Act-Assert pattern with MockK. Key mock setup notes:
 - `DocumentsContract.isTreeUri()` and `DocumentsContract.getTreeDocumentId()` require `mockkStatic(DocumentsContract::class)`
 - Permission leak test: mock `settingsRepository.addStoredLocation()` to throw, verify `releasePersistableUriPermission` is called
 
-- [ ] **Action 1.5.2**: Run targeted tests
+- [x] **Action 1.5.2**: Run targeted tests
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProviderTest"
@@ -787,7 +787,7 @@ SettingsRepositoryImpl — Storage Location Methods
 - Or use the approach from existing `SettingsRepositoryTest` if one exists (it doesn't currently — this is a new file)
 - Follow JUnit 5 + `runTest` pattern consistent with the rest of the test suite
 
-- [ ] **Action 1.6.2**: Run targeted tests
+- [x] **Action 1.6.2**: Run targeted tests
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImplTest"
@@ -800,12 +800,12 @@ SettingsRepositoryImpl — Storage Location Methods
 **As an MCP client**, I need `list_storage_locations` to return the new format (with `path`, `description`, no `authorized`) and file operations to work with the new storage model.
 
 ### Acceptance Criteria
-- [ ] `list_storage_locations` returns JSON: `[{"id": "...", "name": "...", "path": "...", "description": "...", "available_bytes": ...}]`
-- [ ] `list_storage_locations` tool description updated
-- [ ] `FileOperationProviderImpl.checkAuthorization` error message updated (says "add it in the app settings" instead of "authorize")
-- [ ] Integration test updated and passing
-- [ ] Linting passes
-- [ ] Targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileToolsIntegrationTest"` and `./gradlew :app:testDebugUnitTest --tests "*.FileOperationProviderTest"`
+- [x] `list_storage_locations` returns JSON: `[{"id": "...", "name": "...", "path": "...", "description": "...", "available_bytes": ...}]`
+- [x] `list_storage_locations` tool description updated
+- [x] `FileOperationProviderImpl.checkAuthorization` error message updated (says "add it in the app settings" instead of "authorize")
+- [x] Integration test updated and passing
+- [x] Linting passes
+- [x] Targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileToolsIntegrationTest"` and `./gradlew :app:testDebugUnitTest --tests "*.FileOperationProviderTest"`
 
 ---
 
@@ -964,7 +964,7 @@ assertFalse(text.contains("provider"))
 
 2. Verify `McpIntegrationTestHelper.createMockDependencies()` — it creates a `relaxed = true` mock for `storageLocationProvider`. Since it's relaxed, calls to the old `getAvailableLocations()` would return a default value without error. However, the method no longer exists in the interface after Task 1.3, so any test calling it would fail at compile time. No explicit change needed in the helper — the relaxed mock will automatically support the new `getAllLocations()` method. Verify no other integration test files call `getAvailableLocations()` on the mocked provider.
 
-- [ ] **Action 2.3.3**: Run targeted tests
+- [x] **Action 2.3.3**: Run targeted tests
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.FileToolsIntegrationTest"
@@ -984,7 +984,7 @@ assertFalse(text.contains("provider"))
 - Line 181: `assertTrue(exception.message!!.contains("not authorized"))` → `assertTrue(exception.message!!.contains("not found"))`
 - Line 362: `assertTrue(exception.message!!.contains("not authorized"))` → `assertTrue(exception.message!!.contains("not found"))`
 
-- [ ] **Action 2.4.2**: Run targeted tests
+- [x] **Action 2.4.2**: Run targeted tests
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderTest"
@@ -997,22 +997,22 @@ assertFalse(text.contains("provider"))
 **As a user**, I need to add storage locations via a modal + SAF picker, edit their descriptions, and delete them with confirmation, so I can manage which directories the MCP server can access.
 
 ### Acceptance Criteria
-- [ ] "Add Storage Location" button visible in the storage section (always, even when list is empty)
-- [ ] Tapping "Add" opens a modal with: description text field, "Browse" button, Cancel/Add buttons
-- [ ] "Browse" launches `ACTION_OPEN_DOCUMENT_TREE`, result appears in modal
-- [ ] "Add" button disabled until a directory is picked
-- [ ] Duplicate tree URIs are rejected with a message
-- [ ] Each location row shows: name, path, description, edit and delete icons
-- [ ] Edit taps open a modal with pre-filled description
-- [ ] Delete taps show confirmation dialog
-- [ ] Empty state shows "No storage locations added. Tap + to add one."
-- [ ] `MainViewModel` has methods: `addLocation`, `removeLocation`, `updateLocationDescription`, `isDuplicateTreeUri`
-- [ ] `MainViewModel` exposes `storageError: SharedFlow<String>` for error feedback to the UI
-- [ ] `HomeScreen` collects `storageError` and shows `Snackbar` messages
-- [ ] Storage location Add/Edit/Delete buttons remain enabled when MCP server is running (locations are looked up dynamically)
-- [ ] Old discovery-related methods removed from `MainViewModel`
-- [ ] Linting passes
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
+- [x] "Add Storage Location" button visible in the storage section (always, even when list is empty)
+- [x] Tapping "Add" opens a modal with: description text field, "Browse" button, Cancel/Add buttons
+- [x] "Browse" launches `ACTION_OPEN_DOCUMENT_TREE`, result appears in modal
+- [x] "Add" button disabled until a directory is picked
+- [x] Duplicate tree URIs are rejected with a message
+- [x] Each location row shows: name, path, description, edit and delete icons
+- [x] Edit taps open a modal with pre-filled description
+- [x] Delete taps show confirmation dialog
+- [x] Empty state shows "No storage locations added. Tap + to add one."
+- [x] `MainViewModel` has methods: `addLocation`, `removeLocation`, `updateLocationDescription`, `isDuplicateTreeUri`
+- [x] `MainViewModel` exposes `storageError: SharedFlow<String>` for error feedback to the UI
+- [x] `HomeScreen` collects `storageError` and shows `Snackbar` messages
+- [x] Storage location Add/Edit/Delete buttons remain enabled when MCP server is running (locations are looked up dynamically)
+- [x] Old discovery-related methods removed from `MainViewModel`
+- [x] Linting passes
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest --tests "*.MainViewModelTest"`
 
 ---
 
@@ -1312,7 +1312,7 @@ Update `StorageLocation` constructor calls in the test to match the new data cla
 
 Remove the `pendingAuthorizationLocationId` import/usage if it was referenced.
 
-- [ ] **Action 3.5.2**: Run targeted tests
+- [x] **Action 3.5.2**: Run targeted tests
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModelTest"
@@ -1325,10 +1325,10 @@ Remove the `pendingAuthorizationLocationId` import/usage if it was referenced.
 **As a developer/user**, I need the documentation to accurately reflect the new storage location model.
 
 ### Acceptance Criteria
-- [ ] `docs/MCP_TOOLS.md` `list_storage_locations` section updated with new output format
-- [ ] `docs/PROJECT.md` SAF section updated, file tools section updated
-- [ ] Linting passes
-- [ ] All tests pass: `./gradlew :app:test`
+- [x] `docs/MCP_TOOLS.md` `list_storage_locations` section updated with new output format
+- [x] `docs/PROJECT.md` SAF section updated, file tools section updated
+- [x] Linting passes
+- [x] All tests pass: `./gradlew :app:test`
 
 ---
 
@@ -1434,28 +1434,28 @@ The application uses Android's Storage Access Framework (SAF) for unified, secur
 **As a developer**, I need to verify the entire implementation is correct, consistent, and passing all quality gates.
 
 ### Acceptance Criteria
-- [ ] Full lint passes: `make lint`
-- [ ] Full build passes: `./gradlew build`
-- [ ] Full test suite passes (unit + integration): `make test`
-- [ ] Code review: every changed file reviewed for consistency with the plan
-- [ ] No TODOs, no commented-out dead code, no stubs
-- [ ] All documentation is consistent with the implementation
+- [x] Full lint passes: `make lint`
+- [x] Full build passes: `./gradlew build`
+- [x] Full test suite passes (unit + integration): `make test`
+- [x] Code review: every changed file reviewed for consistency with the plan
+- [x] No TODOs, no commented-out dead code, no stubs
+- [x] All documentation is consistent with the implementation
 
 ---
 
 ### Task 5.1: Run full quality gates
 
-- [ ] **Action 5.1.1**: Run linting
+- [x] **Action 5.1.1**: Run linting
 ```bash
 make lint
 ```
 
-- [ ] **Action 5.1.2**: Run full test suite
+- [x] **Action 5.1.2**: Run full test suite
 ```bash
 make test
 ```
 
-- [ ] **Action 5.1.3**: Run build
+- [x] **Action 5.1.3**: Run build
 ```bash
 ./gradlew build
 ```
@@ -1464,7 +1464,7 @@ make test
 
 ### Task 5.2: Full implementation review from the ground up
 
-- [ ] **Action 5.2.1**: Review every changed file against this plan
+- [x] **Action 5.2.1**: Review every changed file against this plan
 
 Systematically verify each file changed in the plan:
 1. `StorageLocation.kt` — all fields match plan, no old fields remain
@@ -1482,7 +1482,7 @@ Systematically verify each file changed in the plan:
 13. `docs/MCP_TOOLS.md` — `list_storage_locations` section matches new output
 14. `docs/PROJECT.md` — SAF section matches new model
 
-- [ ] **Action 5.2.2**: Verify no references to old methods/fields remain in the codebase
+- [x] **Action 5.2.2**: Verify no references to old methods/fields remain in the codebase
 
 Search for stale references:
 - `getAvailableLocations` — should NOT appear anywhere except possibly in comments/docs
