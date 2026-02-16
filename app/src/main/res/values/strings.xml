@@ -91,11 +91,26 @@
 
     <!-- Storage Locations -->
     <string name="storage_locations_title">Storage Locations</string>
-    <string name="storage_locations_description">Authorize storage locations for file operations via MCP tools. Each location requires confirmation through the system file picker.</string>
-    <string name="storage_location_authorize">Authorize</string>
-    <string name="storage_location_authorized">Authorized</string>
-    <string name="storage_location_provider_label">Provider: %1$s</string>
-    <string name="storage_location_no_locations">No storage locations found on this device</string>
+    <string name="storage_locations_description">Add storage locations to enable file operations via MCP tools. Each location grants access to a directory you choose.</string>
+    <string name="storage_location_no_locations">No storage locations added. Tap + to add one.</string>
+    <string name="storage_location_path_label">Path: %1$s</string>
+    <string name="storage_location_add_button">Add Storage Location</string>
+    <string name="storage_location_add_dialog_title">Add Storage Location</string>
+    <string name="storage_location_add_dialog_description_label">Description (optional)</string>
+    <string name="storage_location_add_dialog_description_hint">e.g., Project files, Downloads</string>
+    <string name="storage_location_add_dialog_browse">Browse</string>
+    <string name="storage_location_add_dialog_selected">Selected: %1$s</string>
+    <string name="storage_location_add_dialog_no_selection">No directory selected</string>
+    <string name="storage_location_add_dialog_add">Add</string>
+    <string name="storage_location_add_dialog_cancel">Cancel</string>
+    <string name="storage_location_add_dialog_duplicate">This directory is already added.</string>
+    <string name="storage_location_description_counter">%1$d / %2$d</string>
+    <string name="storage_location_edit_dialog_title">Edit Description</string>
+    <string name="storage_location_edit_dialog_save">Save</string>
+    <string name="storage_location_delete_dialog_title">Remove Storage Location</string>
+    <string name="storage_location_delete_dialog_message">Remove \"%1$s\"? The MCP server will no longer be able to access files in this location.</string>
+    <string name="storage_location_delete_dialog_confirm">Remove</string>
+    <string name="storage_location_delete_dialog_cancel">Cancel</string>
     <string name="storage_file_size_limit_label">File Size Limit (MB)</string>
     <string name="storage_file_size_limit_error">Must be between %1$d and %2$d MB</string>
     <string name="storage_download_timeout_label">Download Timeout (seconds)</string>

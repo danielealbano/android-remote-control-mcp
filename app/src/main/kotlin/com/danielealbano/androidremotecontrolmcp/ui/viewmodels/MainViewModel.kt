@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,8 +27,11 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -100,8 +102,8 @@ class MainViewModel
         private val _deviceSlugError = MutableStateFlow<String?>(null)
         val deviceSlugError: StateFlow<String?> = _deviceSlugError.asStateFlow()
 
-        private val _pendingAuthorizationLocationId = MutableStateFlow<String?>(null)
-        val pendingAuthorizationLocationId: StateFlow<String?> = _pendingAuthorizationLocationId.asStateFlow()
+        private val _storageError = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val storageError: SharedFlow<String> = _storageError.asSharedFlow()
 
         init {
             viewModelScope.launch(ioDispatcher) {
@@ -285,50 +287,54 @@ class MainViewModel
         fun refreshStorageLocations() {
             viewModelScope.launch(ioDispatcher) {
                 try {
-                    _storageLocations.value = storageLocationProvider.getAvailableLocations()
+                    _storageLocations.value = storageLocationProvider.getAllLocations()
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to refresh storage locations", e)
                 }
             }
         }
 
-        fun requestLocationAuthorization(locationId: String) {
-            _pendingAuthorizationLocationId.value = locationId
-        }
-
         @Suppress("TooGenericExceptionCaught")
-        fun onLocationAuthorized(treeUri: Uri) {
-            val locationId = _pendingAuthorizationLocationId.value
-            _pendingAuthorizationLocationId.value = null
-            if (locationId == null) {
-                Log.w(TAG, "onLocationAuthorized called but no pending location ID")
-                return
-            }
+        fun addLocation(treeUri: Uri, description: String) {
             viewModelScope.launch(ioDispatcher) {
                 try {
-                    storageLocationProvider.authorizeLocation(locationId, treeUri)
+                    storageLocationProvider.addLocation(treeUri, description)
                     refreshStorageLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to authorize location $locationId", e)
+                    Log.e(TAG, "Failed to add storage location", e)
+                    _storageError.tryEmit("Failed to add storage location: ${e.message}")
                 }
             }
         }
 
-        fun onLocationAuthorizationCancelled() {
-            _pendingAuthorizationLocationId.value = null
-        }
-
         @Suppress("TooGenericExceptionCaught")
-        fun deauthorizeLocation(locationId: String) {
+        fun removeLocation(locationId: String) {
             viewModelScope.launch(ioDispatcher) {
                 try {
-                    storageLocationProvider.deauthorizeLocation(locationId)
+                    storageLocationProvider.removeLocation(locationId)
                     refreshStorageLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to deauthorize location $locationId", e)
+                    Log.e(TAG, "Failed to remove storage location $locationId", e)
+                    _storageError.tryEmit("Failed to remove storage location: ${e.message}")
                 }
             }
         }
+
+        @Suppress("TooGenericExceptionCaught")
+        fun updateLocationDescription(locationId: String, description: String) {
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    storageLocationProvider.updateLocationDescription(locationId, description)
+                    refreshStorageLocations()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to update description for $locationId", e)
+                    _storageError.tryEmit("Failed to update description: ${e.message}")
+                }
+            }
+        }
+
+        suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean =
+            storageLocationProvider.isDuplicateTreeUri(treeUri)
 
         @Suppress("ReturnCount")
         fun updateFileSizeLimit(limitString: String) {
@@ -408,17 +414,6 @@ class MainViewModel
             _deviceSlugError.value = null
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateDeviceSlug(slug)
-            }
-        }
-
-        @Suppress("TooGenericExceptionCaught")
-        fun getInitialPickerUri(locationId: String): Uri? {
-            val location = _storageLocations.value.find { it.id == locationId } ?: return null
-            return try {
-                DocumentsContract.buildDocumentUri(location.authority, location.rootDocumentId)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to build picker URI for $locationId", e)
-                null
             }
         }
 
