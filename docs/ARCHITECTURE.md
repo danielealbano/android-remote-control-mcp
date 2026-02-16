@@ -8,55 +8,52 @@ It focuses on **how** components interact at runtime rather than **what** they a
 
 ## Component Diagram
 
-```
-+------------------------------------------------------------+
-|                    Android Device                           |
-|                                                            |
-|  +------------------+    +---------------------------+     |
-|  |   MainActivity   |    |  McpAccessibilityService  |     |
-|  |  (Compose UI)    |    |  (System-managed)         |     |
-|  |                  |    |                           |     |
-|  |  MainViewModel   |    |  - TreeParser             |     |
-|  |  - Settings      |    |  - ElementFinder          |     |
-|  |  - Status        |    |  - ActionExecutor         |     |
-|  +-------+----------+    +----------+----------------+     |
-|          |                           |                     |
-|          | StateFlow                 | Singleton            |
-|          | (status)                  | (companion object)   |
-|          |                           |                     |
-|  +-------v---------------------------v----------------+    |
-|  |              McpServerService                      |    |
-|  |              (Foreground Service)                   |    |
-|  |                                                    |    |
-|  |  +--------------------------------------------+   |    |
-|  |  |            McpServer (Ktor)                 |   |    |
-|  |  |  HTTP :8080 (HTTPS optional)                |   |    |
-|  |  |                                            |   |    |
-|  |  |  Streamable HTTP /mcp                      |   |    |
-|  |  |  (POST, DELETE; JSON-only, no SSE)         |   |    |
-|  |  |                                            |   |    |
-|  |  |  BearerTokenAuth (global) -> SDK Server    |   |    |
-|  |  |                    -> Server.addTool()      |   |    |
-|  |  +--------------------------------------------+   |    |
-|  |                                                    |    |
-|  |  +--------------------------------------------+   |    |
-|  |  |         TunnelManager (optional)            |   |    |
-|  |  |  CloudflareTunnelProvider (process-based)   |   |    |
-|  |  |  NgrokTunnelProvider (in-process JNI)       |   |    |
-|  |  |  -> Public HTTPS URL (*.trycloudflare.com) |   |    |
-|  |  +--------------------------------------------+   |    |
-|  |                                                    |    |
-|  +----------------------------------------------------+    |
-|                                                            |
-+------------------------------------------------------------+
-         |
-         | HTTP (or HTTPS/TLS 1.2+ if enabled)
-         |
-    +----v----+
-    |  MCP    |
-    |  Client |
-    |  (AI)   |
-    +---------+
+```mermaid
+graph TB
+    Client["MCP Client (AI)"]
+    Client -->|"HTTP or HTTPS/TLS 1.2+"| McpServerSvc
+
+    subgraph Device["Android Device"]
+        subgraph MainAct["MainActivity (Compose UI)"]
+            VM["MainViewModel"]
+            VM --- Settings["Settings"]
+            VM --- Status["Status"]
+        end
+
+        subgraph AccSvc["McpAccessibilityService (System-managed)"]
+            TreeParser["AccessibilityTreeParser"]
+            ElemFinder["ElementFinder"]
+            ActionExec["ActionExecutor"]
+            ScreenEnc["ScreenshotEncoder"]
+        end
+
+        subgraph StorageSvc["Storage & App Services"]
+            StorageProv["StorageLocationProvider"]
+            FileOps["FileOperationProvider"]
+            AppMgr["AppManager"]
+        end
+
+        subgraph McpServerSvc["McpServerService (Foreground Service)"]
+            subgraph Ktor["McpServer (Ktor)"]
+                HTTP["HTTP :8080 (HTTPS optional)"]
+                StreamHTTP["Streamable HTTP /mcp\n(POST, DELETE; JSON-only, no SSE)"]
+                Auth["BearerTokenAuth (global)"]
+                SDK["SDK Server → Server.addTool()"]
+                HTTP --> StreamHTTP --> Auth --> SDK
+            end
+            subgraph Tunnel["TunnelManager (optional)"]
+                CF["CloudflareTunnelProvider\n(process-based)"]
+                Ngrok["NgrokTunnelProvider\n(in-process JNI)"]
+                PubURL["Public HTTPS URL\n(*.trycloudflare.com / ngrok)"]
+                CF --> PubURL
+                Ngrok --> PubURL
+            end
+        end
+
+        MainAct -->|"StateFlow (status)"| McpServerSvc
+        SDK -->|"Singleton\n(companion object)"| AccSvc
+        SDK --> StorageSvc
+    end
 ```
 
 ---
@@ -111,7 +108,7 @@ It focuses on **how** components interact at runtime rather than **what** they a
 |-----------------------|---------------------------------------------------------|
 | Main Thread           | Compose UI, Activity lifecycle, AccessibilityService    |
 |                       | node operations, `onAccessibilityEvent()`               |
-| Dispatchers.IO        | DataStore reads/writes, Ktor server startup, network I/O|
+| Dispatchers.IO        | DataStore reads/writes, Ktor server startup, network I/O, file operations (SAF) |
 | Dispatchers.Default   | Screenshot JPEG encoding, accessibility tree parsing    |
 | Ktor Netty threads    | HTTP request handling (NIO event loop)                  |
 
@@ -134,56 +131,32 @@ It focuses on **how** components interact at runtime rather than **what** they a
 
 ## Data Flow: MCP Request
 
-```
-MCP Client
-    |
-    | HTTP(S) POST /mcp
-    | Authorization: Bearer <token>
-    | { "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    |   "params": { "name": "tap", "arguments": { "x": 500, "y": 1000 } } }
-    v
-Ktor Netty (IO threads)
-    |
-    v
-BearerTokenAuth Plugin (Application-level, global)
-    |
-    | Extract "Authorization: Bearer <token>" header
-    | Constant-time compare with stored token
-    | If invalid -> respond 401, stop pipeline
-    v
-McpStreamableHttp route handler (/mcp)
-    |
-    | StreamableHttpServerTransport (JSON-only, no SSE)
-    v
-SDK Server (MCP Kotlin SDK)
-    |
-    | Route by method ("tools/call")
-    | Extract tool name ("tap") and arguments
-    | Look up registered tool (Server.addTool)
-    v
-Tool lambda  [e.g., TapHandler.execute(params)]
-    |
-    | withContext(Dispatchers.Main) {
-    |     McpAccessibilityService.instance?.dispatchGesture(...)
-    | }
-    v
-AccessibilityService (Main Thread)
-    |
-    | Performs gesture on Android UI
-    | Returns success/failure
-    v
-Tool returns CallToolResult (TextContent or ImageContent)
-    |
-    v
-SDK Server wraps in JSON-RPC response
-    |
-    v
-Ktor Netty
-    |
-    | Serialize JSON response via StreamableHttpServerTransport
-    | Respond with HTTP 200
-    v
-MCP Client receives response
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Ktor as Ktor Netty (IO threads)
+    participant Auth as BearerTokenAuth Plugin
+    participant Route as McpStreamableHttp (/mcp)
+    participant SDK as SDK Server (MCP Kotlin SDK)
+    participant Tool as Tool Handler
+    participant Acc as AccessibilityService (Main Thread)
+
+    Client->>Ktor: HTTP(S) POST /mcp<br/>Authorization: Bearer <token><br/>{"method":"tools/call","params":{"name":"android_tap",...}}
+    Ktor->>Auth: Forward request
+    Auth->>Auth: Extract Bearer token<br/>Constant-time compare
+    alt Invalid token
+        Auth-->>Client: 401 Unauthorized
+    end
+    Auth->>Route: Authenticated request
+    Route->>SDK: StreamableHttpServerTransport<br/>(JSON-only, no SSE)
+    SDK->>SDK: Route by method ("tools/call")<br/>Extract tool name + arguments<br/>Look up registered tool
+    SDK->>Tool: Execute tool lambda
+    Tool->>Acc: withContext(Dispatchers.Main)<br/>dispatchGesture / performAction / ...
+    Acc->>Acc: Perform action on Android UI
+    Acc-->>Tool: Success / Failure
+    Tool-->>SDK: CallToolResult<br/>(TextContent or ImageContent)
+    SDK-->>Ktor: JSON-RPC response via transport
+    Ktor-->>Client: HTTP 200 + JSON body
 ```
 
 ---
@@ -214,27 +187,15 @@ MCP Client receives response
 
 ## Configuration Flow
 
-```
-User (UI)
-    |
-    v
-MainViewModel
-    |
-    | updatePort(), updateBindingAddress(), etc.
-    v
-SettingsRepository (interface)
-    |
-    v
-SettingsRepositoryImpl (DataStore<Preferences>)
-    |
-    | Persists to DataStore file
-    | Emits via serverConfig: Flow<ServerConfig>
-    v
-McpServerService (reads on start)
-    |
-    | config = settingsRepository.serverConfig.first()
-    v
-McpServer (uses config for Ktor setup)
+```mermaid
+flowchart TB
+    User["User (UI)"]
+    User --> VM["MainViewModel"]
+    VM -->|"updatePort(), updateBindingAddress(), etc."| Repo["SettingsRepository (interface)"]
+    Repo --> Impl["SettingsRepositoryImpl\n(DataStore&lt;Preferences&gt;)"]
+    Impl -->|"Persists to DataStore file\nEmits via serverConfig: Flow&lt;ServerConfig&gt;"| DS[(DataStore)]
+    DS -->|"config = serverConfig.first()"| SvcRead["McpServerService\n(reads on start)"]
+    SvcRead --> McpServer["McpServer\n(uses config for Ktor setup)"]
 ```
 
 Settings are read at server start time. Changing settings while the server is
@@ -249,9 +210,12 @@ running requires a restart (UI disables config editing when server is running).
 | INTERNET                 | Normal        | Auto-granted (manifest)            | HTTP server               |
 | FOREGROUND_SERVICE       | Normal        | Auto-granted (manifest)            | Foreground services       |
 | RECEIVE_BOOT_COMPLETED   | Normal        | Auto-granted (manifest)            | Auto-start on boot        |
+| QUERY_ALL_PACKAGES       | Normal        | Auto-granted (manifest)            | Listing installed apps    |
+| KILL_BACKGROUND_PROCESSES| Normal        | Auto-granted (manifest)            | Closing background apps   |
 | POST_NOTIFICATIONS       | Runtime (13+) | System dialog                      | Foreground notifications  |
 | Accessibility Service    | Special       | User enables in Settings           | UI introspection/actions  |
 | AccessibilityService takeScreenshot | Special | User enables in Settings | Screenshots (Android 11+) |
+| SAF tree URI permissions | Special       | User grants via system file picker | File operations per storage location |
 
 ---
 
