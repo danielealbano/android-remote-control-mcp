@@ -5,7 +5,7 @@
 
 An Android application that runs as an **MCP (Model Context Protocol) server**, enabling AI models to **fully control an Android device** remotely using accessibility services and screenshot capture.
 
-The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device — reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, and more.
+The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device — reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
 
 ---
 
@@ -18,27 +18,34 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1) or network (0.0.0.0)
 - Auto-start on boot
+- Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 29 MCP Tools across 7 Categories
+### 38 MCP Tools across 9 Categories
+
+All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full naming convention.
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Screen Introspection** (4) | `get_accessibility_tree`, `capture_screenshot`, `get_current_app`, `get_screen_info` | Read UI state and capture screenshots |
-| **System Actions** (6) | `press_back`, `press_home`, `press_recents`, `open_notifications`, `open_quick_settings`, `get_device_logs` | Global device actions and log retrieval |
-| **Touch Actions** (5) | `tap`, `long_press`, `double_tap`, `swipe`, `scroll` | Coordinate-based touch interactions |
-| **Gestures** (2) | `pinch`, `custom_gesture` | Multi-touch and complex gestures |
-| **Element Actions** (5) | `find_elements`, `click_element`, `long_click_element`, `set_text`, `scroll_to_element` | Accessibility node-based interactions |
-| **Text Input** (3) | `input_text`, `clear_text`, `press_key` | Keyboard input and text manipulation |
-| **Utilities** (4) | `get_clipboard`, `set_clipboard`, `wait_for_element`, `wait_for_idle` | Helper tools for automation |
+| **Screen Introspection** (1) | `android_get_screen_state` | Consolidated screen state: app info, screen dimensions, filtered UI element list (TSV), optional low-res screenshot |
+| **System Actions** (6) | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | Global device actions and log retrieval |
+| **Touch Actions** (5) | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | Coordinate-based touch interactions |
+| **Gestures** (2) | `android_pinch`, `android_custom_gesture` | Multi-touch and complex gestures |
+| **Element Actions** (5) | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_set_text`, `android_scroll_to_element` | Accessibility node-based interactions |
+| **Text Input** (3) | `android_input_text`, `android_clear_text`, `android_press_key` | Keyboard input and text manipulation |
+| **Utilities** (5) | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | Helper tools for automation and element inspection |
+| **File Operations** (8) | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | File system access via Storage Access Framework (SAF) |
+| **App Management** (3) | `android_open_app`, `android_list_apps`, `android_close_app` | Launch, list, and close applications |
 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with input/output schemas and examples.
 
 ### Android App
 - Material Design 3 configuration UI with dark mode
 - Server status monitoring (running/stopped)
-- Connection info display (IP, port, token)
+- Connection info display (IP, port, token, tunnel URL)
 - Permission management (Accessibility, Notifications)
-- Server log viewer
+- Remote access tunnel configuration (Cloudflare / ngrok)
+- Storage location management (SAF authorization for file tools)
+- Server log viewer (MCP tool calls, tunnel events)
 
 ---
 
@@ -118,17 +125,17 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
-# Get the accessibility tree
+# Get the current screen state (UI elements + optional screenshot)
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_accessibility_tree","arguments":{}}}'
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"android_get_screen_state","arguments":{}}}'
 
 # Tap at coordinates
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tap","arguments":{"x":540,"y":1200}}}'
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"android_tap","arguments":{"x":540,"y":1200}}}'
 ```
 
 The bearer token is displayed in the app's connection info section. You can copy it directly from the app.
@@ -175,7 +182,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 29 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 38 MCP tool handlers.
 
 ### Integration Tests
 
@@ -183,7 +190,9 @@ Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree p
 make test-integration
 ```
 
-Requires a connected device or running emulator. Tests cover MainActivity UI interactions, Compose rendering, ViewModel-repository integration, and service binding.
+Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 9 tool categories, and error handling.
+
+> **Note**: Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables. Copy `.env.example` to `.env` and fill in the required values. The Makefile sources `.env` automatically.
 
 ### E2E Tests
 
@@ -216,26 +225,43 @@ Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/htm
 
 The application is a **service-based Android app** with three main components:
 
-1. **AccessibilityService** - UI introspection, action execution, and screenshot capture via Android Accessibility APIs (`takeScreenshot()` on Android 11+)
+1. **McpAccessibilityService** - UI introspection, action execution, and screenshot capture via Android Accessibility APIs (`takeScreenshot()` on Android 11+)
 2. **McpServerService** - Foreground service running the Ktor HTTP/HTTPS server
 3. **MainActivity** - Jetpack Compose UI for configuration and control
 
-```
-MCP Client (AI Model)
-    |
-    | HTTP/HTTPS POST /mcp + Bearer Token
-    v
-McpServerService (Ktor)
-    |
-    |--- Streamable HTTP /mcp (JSON-only, no SSE)
-    |       |
-    |       |--- SDK Server (MCP Kotlin SDK) -> 29 MCP Tools
-    |
-    |--- AccessibilityService
-            |--- AccessibilityTreeParser
-            |--- ElementFinder
-            |--- ActionExecutor
-            |--- ScreenshotEncoder (via takeScreenshot API)
+```mermaid
+graph TB
+    Client["MCP Client (AI Model)"]
+    Client -->|"HTTP/HTTPS POST /mcp + Bearer Token"| McpServer
+
+    subgraph Device["Android Device"]
+        subgraph McpServerService["McpServerService (Foreground Service)"]
+            McpServer["McpServer (Ktor)"]
+            McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
+            SDK -->|"38 MCP Tools"| Tools["Tool Handlers"]
+            TunnelMgr["TunnelManager (optional)"]
+            TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
+        end
+
+        subgraph Accessibility["McpAccessibilityService"]
+            TreeParser["AccessibilityTreeParser"]
+            ElemFinder["ElementFinder"]
+            ActionExec["ActionExecutor"]
+            ScreenEnc["ScreenshotEncoder"]
+        end
+
+        subgraph Storage["Storage & App Services"]
+            StorageProv["StorageLocationProvider"]
+            FileOps["FileOperationProvider"]
+            AppMgr["AppManager"]
+        end
+
+        MainActivity["MainActivity (Compose UI)"]
+
+        Tools --> Accessibility
+        Tools --> Storage
+        MainActivity -->|"StateFlow (status)"| McpServerService
+    end
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
@@ -253,6 +279,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docum
 | Bearer Token | Auto-generated UUID | Authentication token for MCP requests |
 | HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
+| Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
+| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (Cloudflare Quick Tunnels or ngrok) |
+| File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
+| Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
+| Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
 
 ### Using with adb Port Forwarding (Recommended)
 
@@ -277,6 +308,15 @@ When the server is bound to `0.0.0.0`:
 2. Connect directly via `POST http://DEVICE_IP:8080/mcp` with bearer token
 
 **Warning**: Binding to `0.0.0.0` exposes the server to all devices on the same network. Only use on trusted private networks.
+
+### Using Remote Access Tunnels
+
+For connecting from outside the local network without port forwarding:
+
+1. **Cloudflare Quick Tunnels** (default, no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
+2. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Only available on ARM64 devices.
+
+Enable the tunnel in the app's "Remote Access" section. The public URL is displayed in the connection info and server logs.
 
 ---
 
@@ -303,6 +343,10 @@ When the server is bound to `0.0.0.0`:
 - **Accessibility Service**: Required for UI introspection, actions, and screenshots (user must enable manually)
 - **Internet**: For running the HTTP/HTTPS server
 - **Foreground Service**: For keeping services alive in background
+- **Receive Boot Completed**: For auto-start on boot
+- **Query All Packages**: For listing installed applications (`android_list_apps`)
+- **Kill Background Processes**: For closing background applications (`android_close_app`)
+- **Storage Access Framework**: Per-location authorization via system file picker (for file tools)
 - No root access required
 
 ---
@@ -334,7 +378,7 @@ Uses ktlint for code style and detekt for static analysis.
 
 - **Language**: Kotlin with Android (Jetpack Compose, Ktor)
 - **Architecture**: Service-based with SOLID principles
-- **Testing**: JUnit 5 + MockK (unit), AndroidX Test (integration), Testcontainers (E2E)
+- **Testing**: JUnit 5 + MockK (unit), Ktor testApplication (JVM integration), Testcontainers (E2E)
 - **Linting**: ktlint + detekt
 - **DI**: Hilt (Dagger-based)
 
