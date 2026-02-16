@@ -168,6 +168,7 @@ class FileOperationProviderImpl
             }
 
             checkAuthorization(locationId)
+            checkWritePermission(locationId)
             val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
 
             context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
@@ -188,6 +189,8 @@ class FileOperationProviderImpl
             path: String,
             content: String,
         ) {
+            checkAuthorization(locationId)
+            checkWritePermission(locationId)
             val config = settingsRepository.getServerConfig()
             val documentFile =
                 resolveDocumentFile(locationId, path)
@@ -251,6 +254,8 @@ class FileOperationProviderImpl
             newString: String,
             replaceAll: Boolean,
         ): FileReplaceResult {
+            checkAuthorization(locationId)
+            checkWritePermission(locationId)
             val documentFile =
                 resolveDocumentFile(locationId, path)
                     ?: throw McpToolException.ActionFailed(
@@ -306,6 +311,7 @@ class FileOperationProviderImpl
             url: String,
         ): Long {
             checkAuthorization(locationId)
+            checkWritePermission(locationId)
             val config = settingsRepository.getServerConfig()
 
             // Validate URL and open connection
@@ -406,6 +412,8 @@ class FileOperationProviderImpl
             locationId: String,
             path: String,
         ) {
+            checkAuthorization(locationId)
+            checkDeletePermission(locationId)
             val documentFile =
                 resolveDocumentFile(locationId, path)
                     ?: throw McpToolException.ActionFailed(
@@ -443,6 +451,28 @@ class FileOperationProviderImpl
                     "Storage location '$locationId' not found. " +
                         "Please add it in the app settings.",
                 )
+            }
+        }
+
+        /**
+         * Checks that write operations are allowed for the given location.
+         * Throws [McpToolException.PermissionDenied] if not.
+         */
+        private suspend fun checkWritePermission(locationId: String) {
+            if (!storageLocationProvider.isWriteAllowed(locationId)) {
+                Log.w(TAG, "Write permission denied for location: $locationId")
+                throw McpToolException.PermissionDenied("Write not allowed")
+            }
+        }
+
+        /**
+         * Checks that delete operations are allowed for the given location.
+         * Throws [McpToolException.PermissionDenied] if not.
+         */
+        private suspend fun checkDeletePermission(locationId: String) {
+            if (!storageLocationProvider.isDeleteAllowed(locationId)) {
+                Log.w(TAG, "Delete permission denied for location: $locationId")
+                throw McpToolException.PermissionDenied("Delete not allowed")
             }
         }
 
