@@ -12,16 +12,16 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -476,9 +476,10 @@ class MainViewModelTest {
             } throws RuntimeException("Test error")
 
             val errors = mutableListOf<String>()
-            val job = launch {
-                viewModel.storageError.collect { errors.add(it) }
-            }
+            val job =
+                launch {
+                    viewModel.storageError.collect { errors.add(it) }
+                }
 
             viewModel.addLocation(mockUri, "desc")
             advanceUntilIdle()
@@ -511,9 +512,10 @@ class MainViewModelTest {
             } throws RuntimeException("Remove error")
 
             val errors = mutableListOf<String>()
-            val job = launch {
-                viewModel.storageError.collect { errors.add(it) }
-            }
+            val job =
+                launch {
+                    viewModel.storageError.collect { errors.add(it) }
+                }
 
             viewModel.removeLocation("loc1")
             advanceUntilIdle()
@@ -550,9 +552,10 @@ class MainViewModelTest {
             } throws RuntimeException("Update error")
 
             val errors = mutableListOf<String>()
-            val job = launch {
-                viewModel.storageError.collect { errors.add(it) }
-            }
+            val job =
+                launch {
+                    viewModel.storageError.collect { errors.add(it) }
+                }
 
             viewModel.updateLocationDescription("loc1", "desc")
             advanceUntilIdle()
