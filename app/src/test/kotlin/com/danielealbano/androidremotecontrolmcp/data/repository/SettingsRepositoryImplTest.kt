@@ -901,6 +901,7 @@ class SettingsRepositoryImplTest {
                 }
 
             @Test
+            @Suppress("MaxLineLength")
             fun `migration from stored location without permission fields defaults to allowWrite=true and allowDelete=true`() =
                 testScope.runTest {
                     val json =
@@ -919,6 +920,7 @@ class SettingsRepositoryImplTest {
                 }
 
             @Test
+            @Suppress("MaxLineLength")
             fun `migration from stored location with corrupted permission fields defaults to allowWrite=false and allowDelete=false`() =
                 testScope.runTest {
                     val json =

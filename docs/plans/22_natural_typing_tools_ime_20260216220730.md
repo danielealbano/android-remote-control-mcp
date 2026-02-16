@@ -36,8 +36,8 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 - Max text length: 2000 characters
 - Max search text length: 10000 characters (bounded by `getSurroundingText` buffer)
 - Focus flow: always click element → poll-retry for InputConnection readiness (max 500ms, 50ms interval) → use `setSelection()` to position cursor
-- All typing operations serialized via `Mutex` — concurrent MCP requests are queued, not interleaved
-- `AccessibilityInputConnection` methods dispatched on `Dispatchers.Main` (Android framework threading requirement)
+- All typing operations serialized via file-level `Mutex` (`typeOperationMutex`) — concurrent MCP requests are queued, not interleaved
+- `AccessibilityInputConnection` is an IPC proxy — methods called directly on caller's thread (not a View-bound InputConnection, so no main-thread requirement). If runtime testing reveals issues, wrap in `withContext(Dispatchers.Main)`.
 - Unicode: text iteration uses code points (not `Char`), so emoji and supplementary characters are handled correctly
 - Raise `minSdk` from 26 to 33 (Android 13 Tiramisu)
 
@@ -59,7 +59,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 2. Get current text length via `getSurroundingText()`
 3. `setSelection(textLength, textLength)` — cursor at end
 4. Type `text` code point by code point via `commitText(codePoint, 1, null)` with timing delays
-5. Return success
+5. Read field content via `getSurroundingText()` and return success with field content
 
 ### `android_type_insert_text`
 
@@ -77,7 +77,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 3. Validate `offset` is in range `[0, textLength]` — error if out of range
 4. `setSelection(offset, offset)` — cursor at specified position
 5. Type `text` code point by code point via `commitText(codePoint, 1, null)` with timing delays
-6. Return success
+6. Read field content via `getSurroundingText()` and return success with field content
 
 ### `android_type_replace_text`
 
@@ -96,7 +96,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 4. `setSelection(startIndex, endIndex)` to select the found text
 5. Send DELETE key event (`KeyEvent(ACTION_DOWN, KEYCODE_DEL)` + `KeyEvent(ACTION_UP, KEYCODE_DEL)`) to delete selection
 6. Type `new_text` code point by code point via `commitText(codePoint, 1, null)` with timing delays (if `new_text` is non-empty)
-7. Return success
+7. Read field content via `getSurroundingText()` and return success with field content
 
 ### `android_type_clear_text`
 
@@ -109,7 +109,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 2. Check if field has text via `getSurroundingText()` — if empty, return success immediately
 3. `performContextMenuAction(android.R.id.selectAll)` to select all text — check return value
 4. Send DELETE key event (`KeyEvent(ACTION_DOWN, KEYCODE_DEL)` + `KeyEvent(ACTION_UP, KEYCODE_DEL)`) to delete selection — check return values
-5. Return success
+5. Read field content via `getSurroundingText()` and return success with field content
 
 ---
 
@@ -867,6 +867,8 @@ Note: `typeInputController` is added as an additional parameter to `registerText
 - [ ] Variance clamped to `[0, typing_speed]`
 - [ ] Cancellation supported via structured concurrency (coroutine cancellation stops typing loop)
 - [ ] Mid-typing failure stops immediately and returns error
+- [ ] All four tools return field content in the response (via `readFieldContent()` after operation)
+- [ ] Field content read-back is best-effort — failure to read does not fail the tool
 - [ ] Unit tests for all four tools pass
 - [ ] Integration tests for all four tools pass
 - [ ] PressKeyTool unit tests still pass
@@ -1102,6 +1104,26 @@ internal suspend fun awaitInputConnectionReady(
             "The element may not be an editable text field.",
     )
 }
+
+/**
+ * Reads the current field content after an operation completes.
+ * Used to include the field content in the tool response so the model
+ * can verify the result.
+ *
+ * Returns the field text as a String, or a fallback message if the
+ * content could not be read (e.g., input connection lost after the operation).
+ * This is best-effort — a read failure does NOT cause the tool to fail,
+ * since the operation itself already succeeded.
+ *
+ * @param typeInputController The controller to read from.
+ * @return The field content as a String.
+ */
+internal fun readFieldContent(typeInputController: TypeInputController): String {
+    val surroundingText = typeInputController.getSurroundingText(
+        MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0,
+    ) ?: return "(unable to read field content)"
+    return surroundingText.text.toString()
+}
 ```
 
 The click-to-focus pattern used by each tool's `execute()`:
@@ -1186,7 +1208,7 @@ class TypeAppendTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            typeOperationMutex.withLock {
+            val fieldContent = typeOperationMutex.withLock {
                 // Click to focus
                 val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val clickResult = actionExecutor.clickNode(elementId, tree)
@@ -1206,15 +1228,23 @@ class TypeAppendTextTool
                 val textLength = surroundingText?.let {
                     it.offset + it.text.length
                 } ?: 0
-                typeInputController.setSelection(textLength, textLength)
+                if (!typeInputController.setSelection(textLength, textLength)) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to position cursor in element '$elementId' — input connection lost",
+                    )
+                }
 
                 // Type code point by code point
                 typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
+
+                // Read field content after operation for verification
+                readFieldContent(typeInputController)
             }
 
             Log.d(TAG, "type_append_text: typed ${text.length} chars on element '$elementId'")
             return McpToolUtils.textResult(
-                "Typed ${text.length} characters at end of element '$elementId'",
+                "Typed ${text.length} characters at end of element '$elementId'.\n" +
+                    "Field content: $fieldContent",
             )
         }
 
@@ -1225,7 +1255,8 @@ class TypeAppendTextTool
                     "Uses natural InputConnection typing (indistinguishable from keyboard input). " +
                     "Maximum text length: $MAX_TEXT_LENGTH characters. " +
                     "For text longer than $MAX_TEXT_LENGTH chars, call this tool multiple times — " +
-                    "subsequent calls continue typing at the current cursor position.",
+                    "subsequent calls continue typing at the current cursor position. " +
+                    "Returns the field content after the operation for verification.",
                 inputSchema = ToolSchema(
                     properties = buildJsonObject {
                         putJsonObject("element_id") {
@@ -1299,7 +1330,7 @@ class TypeInsertTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            typeOperationMutex.withLock {
+            val fieldContent = typeOperationMutex.withLock {
                 // Click to focus
                 val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val clickResult = actionExecutor.clickNode(elementId, tree)
@@ -1322,16 +1353,24 @@ class TypeInsertTextTool
                     )
                 }
 
-                // Position cursor at offset
-                typeInputController.setSelection(offset, offset)
+                // Position cursor at offset — check return value
+                if (!typeInputController.setSelection(offset, offset)) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to position cursor at offset $offset in element '$elementId' — input connection lost",
+                    )
+                }
 
                 // Type code point by code point
                 typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
+
+                // Read field content after operation for verification
+                readFieldContent(typeInputController)
             }
 
             Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$elementId'")
             return McpToolUtils.textResult(
-                "Typed ${text.length} characters at offset $offset in element '$elementId'",
+                "Typed ${text.length} characters at offset $offset in element '$elementId'.\n" +
+                    "Field content: $fieldContent",
             )
         }
 
@@ -1340,7 +1379,8 @@ class TypeInsertTextTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description = "Type text character by character at a specific position in a text field. " +
                     "Uses natural InputConnection typing (indistinguishable from keyboard input). " +
-                    "Maximum text length: $MAX_TEXT_LENGTH characters.",
+                    "Maximum text length: $MAX_TEXT_LENGTH characters. " +
+                    "Returns the field content after the operation for verification.",
                 inputSchema = ToolSchema(
                     properties = buildJsonObject {
                         putJsonObject("element_id") {
@@ -1446,7 +1486,7 @@ class TypeReplaceTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            typeOperationMutex.withLock {
+            val fieldContent = typeOperationMutex.withLock {
                 // Click to focus
                 val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val clickResult = actionExecutor.clickNode(elementId, tree)
@@ -1474,27 +1514,45 @@ class TypeReplaceTextTool
                 val absoluteStart = surroundingText.offset + searchIndex
                 val absoluteEnd = absoluteStart + search.length
 
-                // Select the found text
-                typeInputController.setSelection(absoluteStart, absoluteEnd)
+                // Select the found text — check return value
+                if (!typeInputController.setSelection(absoluteStart, absoluteEnd)) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to select text in element '$elementId' — input connection lost",
+                    )
+                }
 
-                // Delete the selection via DELETE key event
-                typeInputController.sendKeyEvent(
-                    android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL),
-                )
-                typeInputController.sendKeyEvent(
-                    android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL),
-                )
+                // Delete the selection via DELETE key event — check return values
+                if (!typeInputController.sendKeyEvent(
+                        android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL),
+                    )
+                ) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to send DELETE key (ACTION_DOWN) on element '$elementId' — input connection lost",
+                    )
+                }
+                if (!typeInputController.sendKeyEvent(
+                        android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL),
+                    )
+                ) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to send DELETE key (ACTION_UP) on element '$elementId' — input connection lost",
+                    )
+                }
 
                 // Type replacement text code point by code point (if non-empty)
                 if (newText.isNotEmpty()) {
                     typeCharByChar(newText, typingSpeed, typingSpeedVariance, typeInputController)
                 }
+
+                // Read field content after operation for verification
+                readFieldContent(typeInputController)
             }
 
             // Log only lengths, never actual text content (security: prevent sensitive data leaking)
             Log.d(TAG, "type_replace_text: replaced ${search.length} chars with ${newText.length} chars on '$elementId'")
             return McpToolUtils.textResult(
-                "Replaced ${search.length} characters with ${newText.length} characters in element '$elementId'",
+                "Replaced ${search.length} characters with ${newText.length} characters in element '$elementId'.\n" +
+                    "Field content: $fieldContent",
             )
         }
 
@@ -1505,7 +1563,8 @@ class TypeReplaceTextTool
                     "Finds the first occurrence of search text, deletes it, then types new_text " +
                     "character by character via InputConnection. " +
                     "Maximum new_text length: $MAX_TEXT_LENGTH characters. " +
-                    "Returns error if search text is not found.",
+                    "Returns error if search text is not found. " +
+                    "Returns the field content after the operation for verification.",
                 inputSchema = ToolSchema(
                     properties = buildJsonObject {
                         putJsonObject("element_id") {
@@ -1580,7 +1639,7 @@ class TypeClearTextTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            typeOperationMutex.withLock {
+            val fieldContent = typeOperationMutex.withLock {
                 // Click to focus
                 val tree = getFreshTree(treeParser, accessibilityServiceProvider)
                 val clickResult = actionExecutor.clickNode(elementId, tree)
@@ -1596,7 +1655,9 @@ class TypeClearTextTool
                 val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
                 if (textLength == 0) {
                     Log.d(TAG, "type_clear_text: field already empty on '$elementId'")
-                    return McpToolUtils.textResult("Text cleared from element '$elementId'")
+                    return McpToolUtils.textResult(
+                        "Text cleared from element '$elementId'.\nField content: ",
+                    )
                 }
 
                 // Select all text — check return value
@@ -1623,17 +1684,23 @@ class TypeClearTextTool
                         "Failed to send DELETE key (ACTION_UP) on element '$elementId' — input connection lost",
                     )
                 }
+
+                // Read field content after operation for verification
+                readFieldContent(typeInputController)
             }
 
             Log.d(TAG, "type_clear_text: cleared text on element '$elementId'")
-            return McpToolUtils.textResult("Text cleared from element '$elementId'")
+            return McpToolUtils.textResult(
+                "Text cleared from element '$elementId'.\nField content: $fieldContent",
+            )
         }
 
         fun register(server: Server, toolNamePrefix: String) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description = "Clear all text from a field naturally using select-all + delete. " +
-                    "Uses InputConnection operations (indistinguishable from user action).",
+                    "Uses InputConnection operations (indistinguishable from user action). " +
+                    "Returns the field content after the operation for verification.",
                 inputSchema = ToolSchema(
                     properties = buildJsonObject {
                         putJsonObject("element_id") {
@@ -1707,9 +1774,11 @@ class TypeClearTextTool
 - `awaitInputConnectionReady succeeds when ready immediately` — `isReady()` returns true first call
 - `awaitInputConnectionReady succeeds after retry` — `isReady()` returns false, false, true
 - `awaitInputConnectionReady fails after timeout` — `isReady()` always false, verify ActionFailed
+- `readFieldContent returns text when available` — `getSurroundingText()` returns "Hello", verify returns "Hello"
+- `readFieldContent returns fallback when unavailable` — `getSurroundingText()` returns null, verify returns "(unable to read field content)"
 
 **`TypeAppendTextToolTests`**:
-- `appends text to element` — clicks element, verifies `setSelection` at end, verifies `commitText` called for each code point
+- `appends text to element` — clicks element, verifies `setSelection` at end, verifies `commitText` called for each code point, verifies response contains field content
 - `throws error when text is missing` — validates required parameter
 - `throws error when element_id is missing` — validates required parameter
 - `throws error when text exceeds max length` — validates 2000 char limit
@@ -1718,25 +1787,28 @@ class TypeClearTextTool
 - `throws error when input connection not ready after poll timeout` — verifies error after poll-retry exhausted
 - `uses default typing speed and variance` — verifies defaults 70/15 when not provided
 - `handles emoji text correctly` — types "Hi😀" → 3 commitText calls, not 4
+- `returns field content in response` — verifies response text includes "Field content:" followed by actual field text
 
 **`TypeInsertTextToolTests`**:
-- `inserts text at offset` — clicks element, verifies `setSelection` at specified offset
+- `inserts text at offset` — clicks element, verifies `setSelection` at specified offset, verifies response contains field content
 - `throws error when offset is missing` — validates required parameter
 - `throws error when offset exceeds text length` — validates range
 - `throws error when offset is negative` — validates >= 0
+- `returns field content in response` — verifies response text includes "Field content:" followed by actual field text
 
 **`TypeReplaceTextToolTests`**:
-- `replaces first occurrence of search text` — verifies find, select, delete, type flow
+- `replaces first occurrence of search text` — verifies find, select, delete, type flow, verifies response contains field content
 - `throws error when search text not found` — verifies ElementNotFound error
 - `throws error when search is empty` — validates non-empty
 - `throws error when search exceeds max length` — validates search length limit
-- `handles empty new_text (delete only)` — verifies delete without typing
+- `handles empty new_text (delete only)` — verifies delete without typing, response still contains field content
 - `replaces only first occurrence when multiple exist` — verifies first match behavior
 - `log does not contain search or new_text content` — verify sanitized logging
+- `returns field content in response` — verifies response text includes "Field content:" followed by actual field text
 
 **`TypeClearTextToolTests`**:
-- `clears text from element` — verifies select all + DELETE key events, checks return values
-- `returns success for already empty field without sending keys` — `getSurroundingText` returns empty text, verify `performContextMenuAction` and `sendKeyEvent` NOT called
+- `clears text from element` — verifies select all + DELETE key events, checks return values, verifies response contains field content
+- `returns success for already empty field without sending keys` — `getSurroundingText` returns empty text, verify `performContextMenuAction` and `sendKeyEvent` NOT called, response contains "Field content: "
 - `throws error when element_id is missing` — validates required parameter
 - `throws error when input connection not ready after poll timeout` — verifies error after poll-retry
 - `throws error when performContextMenuAction fails` — `performContextMenuAction` returns false, verify ActionFailed
@@ -1775,34 +1847,34 @@ This works because the project has `unitTests.isReturnDefaultValues = true` in `
 
 **What changes**: Remove old `input_text` tests. Add integration tests that go through the full MCP HTTP → SDK → tool dispatch → mock execution path:
 
-**`type_append_text with element_id returns success`**:
-- Set up mock: `clickNode` returns success, `typeInputController.isReady()` returns true, `getSurroundingText()` returns text
+**`type_append_text with element_id returns success with field content`**:
+- Set up mock: `clickNode` returns success, `typeInputController.isReady()` returns true, `getSurroundingText()` returns text "existing" before typing and "existingHello" after typing (two separate mock responses)
 - Call `client.callTool(name = "android_type_append_text", arguments = mapOf("element_id" to "node_edit", "text" to "Hello"))`
-- Assert `isError != true`, response contains "Typed 5 characters"
+- Assert `isError != true`, response contains "Typed 5 characters" AND "Field content:"
 
 **`type_append_text with missing text returns error`**:
 - Call with empty arguments
 - Assert `isError == true`
 
-**`type_insert_text with valid offset returns success`**:
-- Set up mock with text "Hello"
+**`type_insert_text with valid offset returns success with field content`**:
+- Set up mock with text "Hello", `getSurroundingText()` returns "Hel Worldlo" after operation
 - Call with offset = 3, text = " World"
-- Assert success
+- Assert success, response contains "Field content:"
 
-**`type_replace_text with found search text returns success`**:
-- Set up mock with text containing "Hello"
+**`type_replace_text with found search text returns success with field content`**:
+- Set up mock with text containing "Hello", `getSurroundingText()` returns "World" after operation
 - Call with search = "Hello", new_text = "World"
-- Assert success
+- Assert success, response contains "Field content:"
 
 **`type_replace_text with missing search text returns error`**:
 - Set up mock with text "Something"
 - Call with search = "NotFound", new_text = "X"
 - Assert `isError == true`
 
-**`type_clear_text returns success`**:
-- Set up mock
+**`type_clear_text returns success with field content`**:
+- Set up mock, `getSurroundingText()` returns text before and empty after
 - Call with element_id
-- Assert success
+- Assert success, response contains "Field content:"
 
 **`press_key still works after tool changes`**:
 - Keep or add a test for `android_press_key` to ensure it wasn't broken
@@ -1915,10 +1987,11 @@ For each tool, include:
 - Notes about natural InputConnection typing, max text length, typing speed
 
 Document:
-- `android_type_append_text`: types text at end, max 2000 chars, continuation across multiple calls
-- `android_type_insert_text`: types text at offset, offset validation
-- `android_type_replace_text`: find and replace first occurrence, DELETE + type flow, empty new_text for delete-only
-- `android_type_clear_text`: select all + DELETE, no typing parameters
+- `android_type_append_text`: types text at end, max 2000 chars, continuation across multiple calls, returns field content
+- `android_type_insert_text`: types text at offset, offset validation, returns field content
+- `android_type_replace_text`: find and replace first occurrence, DELETE + type flow, empty new_text for delete-only, returns field content
+- `android_type_clear_text`: select all + DELETE, no typing parameters, returns field content
+- All tools return field content after operation for verification by the model
 
 ---
 
@@ -1968,7 +2041,7 @@ Fix any stale references found.
 - [ ] `accessibility_service_config.xml` has `isInputMethodEditor="true"` and `flagInputMethodEditor`
 - [ ] `McpAccessibilityService` has `FLAG_INPUT_METHOD_EDITOR`, `onCreateInputMethod()`, `McpInputMethod` inner class
 - [ ] `TypeInputController` interface has all required methods **returning Boolean** (except `isReady` and `getSurroundingText`)
-- [ ] `TypeInputControllerImpl` correctly delegates to `AccessibilityInputConnection`, returns Boolean success/failure
+- [ ] `TypeInputControllerImpl` correctly delegates to `AccessibilityInputConnection`, returns Boolean success/failure, has no unused imports or fields
 - [ ] `TypeInputController` is bound in Hilt `ServiceModule`
 - [ ] `McpServerService` injects and passes `TypeInputController`
 - [ ] Four new tools are registered: `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`
@@ -1983,7 +2056,15 @@ Fix any stale references found.
 - [ ] All type tool `execute()` methods wrap body in `typeOperationMutex.withLock { }`
 - [ ] Focus readiness uses poll-retry loop (max 500ms, 50ms interval), NOT fixed delay
 - [ ] `commitText` return value checked — `false` throws `ActionFailed`
-- [ ] Logs never contain actual text content — only lengths and element IDs
+- [ ] `setSelection`, `performContextMenuAction`, `sendKeyEvent` return values checked in all tools
+- [ ] `type_clear_text` checks for empty field before clearing (skips if empty)
+- [ ] `type_replace_text` TOCTOU race documented as known limitation in code comment
+- [ ] `awaitInputConnectionReady` uses wall-clock time (`System.currentTimeMillis()`) for accurate timeout
+- [ ] `@SuppressLint("NewApi")` removed from `ScreenCaptureProviderImpl`
+- [ ] `@file:Suppress("TooManyFunctions")` preserved in `TextInputTools.kt`
+- [ ] All four tools return field content in the response via `readFieldContent()` (best-effort: fallback message if IC unavailable)
+- [ ] `readFieldContent` utility tested for both available and unavailable cases
+- [ ] Logs never contain actual text content — only lengths and element IDs (note: field content IS returned in the MCP response, NOT in logs)
 - [ ] Parameter parsing uses `McpToolUtils.requireString()` and `McpToolUtils.optionalInt()`
 - [ ] `listTools` integration test verifies new tools present and old tools absent
 - [ ] Dedicated unit tests exist for shared utilities (`typeCharByChar`, `extractTypingParams`, `validateTextLength`, `awaitInputConnectionReady`)
