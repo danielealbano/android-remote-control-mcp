@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import io.mockk.Runs
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -439,6 +440,8 @@ class MainViewModelTest {
                         description = "Test location",
                         treeUri = "content://auth/tree/root1",
                         availableBytes = null,
+                        allowWrite = true,
+                        allowDelete = true,
                     ),
                 )
             coEvery { storageLocationProvider.getAllLocations() } returns locations
@@ -576,6 +579,162 @@ class MainViewModelTest {
 
             assertTrue(result)
             coVerify { storageLocationProvider.isDuplicateTreeUri(mockUri) }
+        }
+
+    // ─── Allow Write / Allow Delete Tests ─────────────────────────────
+
+    @Test
+    fun `updateLocationAllowWrite calls provider and optimistically updates state`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://auth/tree/root1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowWrite("loc1", true) } just Runs
+
+            viewModel.updateLocationAllowWrite("loc1", true)
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.updateLocationAllowWrite("loc1", true) }
+            assertEquals(true, viewModel.storageLocations.value[0].allowWrite)
+            coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
+        }
+
+    @Test
+    fun `updateLocationAllowWrite emits error and refreshes on failure`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://auth/tree/root1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery {
+                storageLocationProvider.updateLocationAllowWrite("loc1", true)
+            } throws RuntimeException("test error")
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            val errors = mutableListOf<String>()
+            val job =
+                launch {
+                    viewModel.storageError.collect { errors.add(it) }
+                }
+
+            viewModel.updateLocationAllowWrite("loc1", true)
+            advanceUntilIdle()
+
+            assertTrue(errors.any { it.contains("Failed to update write permission") })
+            coVerify(exactly = 1) { storageLocationProvider.getAllLocations() }
+            job.cancel()
+        }
+
+    @Test
+    fun `updateLocationAllowDelete calls provider and optimistically updates state`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://auth/tree/root1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowDelete("loc1", true) } just Runs
+
+            viewModel.updateLocationAllowDelete("loc1", true)
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.updateLocationAllowDelete("loc1", true) }
+            assertEquals(true, viewModel.storageLocations.value[0].allowDelete)
+            coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
+        }
+
+    @Test
+    fun `updateLocationAllowDelete emits error and refreshes on failure`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://auth/tree/root1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery {
+                storageLocationProvider.updateLocationAllowDelete("loc1", true)
+            } throws RuntimeException("test error")
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            val errors = mutableListOf<String>()
+            val job =
+                launch {
+                    viewModel.storageError.collect { errors.add(it) }
+                }
+
+            viewModel.updateLocationAllowDelete("loc1", true)
+            advanceUntilIdle()
+
+            assertTrue(errors.any { it.contains("Failed to update delete permission") })
+            coVerify(exactly = 1) { storageLocationProvider.getAllLocations() }
+            job.cancel()
         }
 
     @Test
