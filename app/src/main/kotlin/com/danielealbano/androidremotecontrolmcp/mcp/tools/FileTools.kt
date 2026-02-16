@@ -25,7 +25,7 @@ import javax.inject.Inject
 /**
  * MCP tool handler for `list_storage_locations`.
  *
- * Lists available storage locations on the device with their authorization status.
+ * Lists user-added storage locations with their metadata.
  *
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "[{\"id\":\"...\", ...}]" }] }`
@@ -40,7 +40,7 @@ class ListStorageLocationsHandler
         @Suppress("UnusedParameter", "TooGenericExceptionCaught", "SwallowedException")
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
-                val locations = storageLocationProvider.getAvailableLocations()
+                val locations = storageLocationProvider.getAllLocations()
                 val jsonArray =
                     buildJsonArray {
                         for (location in locations) {
@@ -48,8 +48,8 @@ class ListStorageLocationsHandler
                                 buildJsonObject {
                                     put("id", location.id)
                                     put("name", location.name)
-                                    put("provider", location.providerName)
-                                    put("authorized", location.isAuthorized)
+                                    put("path", location.path)
+                                    put("description", location.description)
                                     if (location.availableBytes != null) {
                                         put("available_bytes", location.availableBytes)
                                     } else {
@@ -75,9 +75,9 @@ class ListStorageLocationsHandler
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Lists available storage locations on the device with their authorization status. " +
-                        "Locations must be authorized in the app settings before file operations " +
-                        "can be performed on them.",
+                    "Lists storage locations that the user has added in the app. " +
+                        "Each location represents a directory the user granted access to. " +
+                        "Use the location ID from this list for all file operations.",
                 inputSchema =
                     ToolSchema(
                         properties = buildJsonObject {},
