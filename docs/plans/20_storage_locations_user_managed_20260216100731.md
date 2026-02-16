@@ -1020,7 +1020,7 @@ assertFalse(text.contains("provider"))
 
 **Definition of Done**: Discovery-related methods removed. New methods for add/remove/edit description. `refreshStorageLocations` updated to use `getAllLocations()`.
 
-- [ ] **Action 3.1.1**: Remove old methods and state, add new methods
+- [x] **Action 3.1.1**: Remove old methods and state, add new methods
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/viewmodels/MainViewModel.kt`
 
@@ -1094,7 +1094,7 @@ suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean =
 
 **Definition of Done**: All new strings added, outdated strings updated.
 
-- [ ] **Action 3.2.1**: Update `strings.xml`
+- [x] **Action 3.2.1**: Update `strings.xml`
 
 **File**: `app/src/main/res/values/strings.xml`
 
@@ -1148,7 +1148,7 @@ Remove the now-unused strings:
 
 **Definition of Done**: Section shows "Add" button, location rows with edit/delete icons, new empty state. No toggle switches.
 
-- [ ] **Action 3.3.1**: Rewrite `StorageLocationsSection` composable
+- [x] **Action 3.3.1**: Rewrite `StorageLocationsSection` composable
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/components/StorageLocationsSection.kt`
 
@@ -1183,7 +1183,7 @@ Update imports: add `Icons.Default.Edit`, `Icons.Default.Delete`, `Icons.Default
 
 **Definition of Done**: HomeScreen uses new modal-based add flow, passes edit/delete callbacks. Old discovery-toggle flow removed.
 
-- [ ] **Action 3.4.1**: Rewrite storage location interaction in `HomeScreen`
+- [x] **Action 3.4.1**: Rewrite storage location interaction in `HomeScreen`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/screens/HomeScreen.kt`
 
@@ -1294,7 +1294,7 @@ StorageLocationsSection(
 
 **Definition of Done**: Old tests for `requestLocationAuthorization`, `onLocationAuthorized`, `onLocationAuthorizationCancelled`, `deauthorizeLocation` removed. New tests for `addLocation`, `removeLocation`, `updateLocationDescription`, `isDuplicateTreeUri` added. All pass.
 
-- [ ] **Action 3.5.1**: Rewrite storage location tests in `MainViewModelTest.kt`
+- [x] **Action 3.5.1**: Rewrite storage location tests in `MainViewModelTest.kt`
 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/ui/viewmodels/MainViewModelTest.kt`
 
