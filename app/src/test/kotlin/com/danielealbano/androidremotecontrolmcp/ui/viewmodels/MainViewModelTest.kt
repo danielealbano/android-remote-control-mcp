@@ -585,7 +585,7 @@ class MainViewModelTest {
     // ─── Allow Write / Allow Delete Tests ─────────────────────────────
 
     @Test
-    fun `updateLocationAllowWrite calls provider and optimistically updates state`() =
+    fun `updateLocationAllowWrite calls provider and updates state in-place`() =
         runTest {
             advanceUntilIdle()
 
@@ -615,6 +615,7 @@ class MainViewModelTest {
 
             coVerify { storageLocationProvider.updateLocationAllowWrite("loc1", true) }
             assertEquals(true, viewModel.storageLocations.value[0].allowWrite)
+            assertEquals(false, viewModel.storageLocations.value[0].allowDelete)
             coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
         }
 
@@ -662,7 +663,7 @@ class MainViewModelTest {
         }
 
     @Test
-    fun `updateLocationAllowDelete calls provider and optimistically updates state`() =
+    fun `updateLocationAllowDelete calls provider and updates state in-place`() =
         runTest {
             advanceUntilIdle()
 
@@ -692,6 +693,7 @@ class MainViewModelTest {
 
             coVerify { storageLocationProvider.updateLocationAllowDelete("loc1", true) }
             assertEquals(true, viewModel.storageLocations.value[0].allowDelete)
+            assertEquals(false, viewModel.storageLocations.value[0].allowWrite)
             coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
         }
 
@@ -736,6 +738,38 @@ class MainViewModelTest {
             assertTrue(errors.any { it.contains("Failed to update delete permission") })
             coVerify(exactly = 1) { storageLocationProvider.getAllLocations() }
             job.cancel()
+        }
+
+    @Test
+    fun `updateLocationAllowWrite with non-existent locationId is a no-op`() =
+        runTest {
+            // Arrange - populate state
+            coEvery { storageLocationProvider.getAllLocations() } returns
+                listOf(
+                    StorageLocation(
+                        id = "loc1",
+                        name = "Test",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://test/tree/loc1",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowWrite("nonexistent", true) } just Runs
+
+            // Act
+            viewModel.updateLocationAllowWrite("nonexistent", true)
+            advanceUntilIdle()
+
+            // Assert - state unchanged
+            assertEquals(1, viewModel.storageLocations.value.size)
+            assertEquals(false, viewModel.storageLocations.value[0].allowWrite)
+            assertEquals(false, viewModel.storageLocations.value[0].allowDelete)
         }
 
     @Test

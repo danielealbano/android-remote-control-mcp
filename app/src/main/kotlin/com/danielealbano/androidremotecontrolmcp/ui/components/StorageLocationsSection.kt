@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -256,6 +258,12 @@ private fun StorageLocationRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowWrite,
+                        role = Role.Switch,
+                        onValueChange = onAllowWriteChange,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -266,11 +274,16 @@ private fun StorageLocationRow(
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(
                     checked = location.allowWrite,
-                    onCheckedChange = onAllowWriteChange,
-                    modifier = Modifier.height(24.dp),
+                    onCheckedChange = null,
                 )
             }
             Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowDelete,
+                        role = Role.Switch,
+                        onValueChange = onAllowDeleteChange,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -281,8 +294,7 @@ private fun StorageLocationRow(
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(
                     checked = location.allowDelete,
-                    onCheckedChange = onAllowDeleteChange,
-                    modifier = Modifier.height(24.dp),
+                    onCheckedChange = null,
                 )
             }
         }
