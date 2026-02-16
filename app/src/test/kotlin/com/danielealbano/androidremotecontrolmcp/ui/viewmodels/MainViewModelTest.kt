@@ -15,8 +15,11 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.Runs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,6 +31,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -431,17 +435,13 @@ class MainViewModelTest {
                     StorageLocation(
                         id = "auth/root1",
                         name = "Downloads",
-                        providerName = "Provider",
-                        authority = "auth",
-                        rootId = "root1",
-                        rootDocumentId = "doc1",
-                        treeUri = null,
-                        isAuthorized = false,
+                        path = "/",
+                        description = "Test location",
+                        treeUri = "content://auth/tree/root1",
                         availableBytes = null,
-                        iconUri = null,
                     ),
                 )
-            coEvery { storageLocationProvider.getAvailableLocations() } returns locations
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
 
             viewModel.refreshStorageLocations()
             advanceUntilIdle()
@@ -451,51 +451,128 @@ class MainViewModelTest {
         }
 
     @Test
-    fun `requestLocationAuthorization sets pendingAuthorizationLocationId`() =
-        runTest {
-            advanceUntilIdle()
-
-            viewModel.requestLocationAuthorization("auth/root1")
-
-            assertEquals("auth/root1", viewModel.pendingAuthorizationLocationId.value)
-        }
-
-    @Test
-    fun `onLocationAuthorized calls authorizeLocation and refreshes`() =
+    fun `addLocation calls provider and refreshes`() =
         runTest {
             advanceUntilIdle()
 
             val mockUri = mockk<Uri>()
-            viewModel.requestLocationAuthorization("auth/root1")
-            viewModel.onLocationAuthorized(mockUri)
+            coEvery { storageLocationProvider.addLocation(mockUri, "desc") } just Runs
+            coEvery { storageLocationProvider.getAllLocations() } returns emptyList()
+
+            viewModel.addLocation(mockUri, "desc")
             advanceUntilIdle()
 
-            coVerify { storageLocationProvider.authorizeLocation("auth/root1", mockUri) }
-            assertNull(viewModel.pendingAuthorizationLocationId.value)
+            coVerify { storageLocationProvider.addLocation(mockUri, "desc") }
         }
 
     @Test
-    fun `onLocationAuthorizationCancelled clears pendingAuthorizationLocationId`() =
+    fun `addLocation emits storageError on failure`() =
         runTest {
             advanceUntilIdle()
 
-            viewModel.requestLocationAuthorization("auth/root1")
-            assertEquals("auth/root1", viewModel.pendingAuthorizationLocationId.value)
+            val mockUri = mockk<Uri>()
+            coEvery {
+                storageLocationProvider.addLocation(mockUri, "desc")
+            } throws RuntimeException("Test error")
 
-            viewModel.onLocationAuthorizationCancelled()
+            val errors = mutableListOf<String>()
+            val job = launch {
+                viewModel.storageError.collect { errors.add(it) }
+            }
 
-            assertNull(viewModel.pendingAuthorizationLocationId.value)
+            viewModel.addLocation(mockUri, "desc")
+            advanceUntilIdle()
+
+            assertTrue(errors.any { it.contains("Test error") })
+            job.cancel()
         }
 
     @Test
-    fun `deauthorizeLocation calls deauthorizeLocation and refreshes`() =
+    fun `removeLocation calls provider and refreshes`() =
         runTest {
             advanceUntilIdle()
 
-            viewModel.deauthorizeLocation("auth/root1")
+            coEvery { storageLocationProvider.removeLocation("loc1") } just Runs
+            coEvery { storageLocationProvider.getAllLocations() } returns emptyList()
+
+            viewModel.removeLocation("loc1")
             advanceUntilIdle()
 
-            coVerify { storageLocationProvider.deauthorizeLocation("auth/root1") }
+            coVerify { storageLocationProvider.removeLocation("loc1") }
+        }
+
+    @Test
+    fun `removeLocation emits storageError on failure`() =
+        runTest {
+            advanceUntilIdle()
+
+            coEvery {
+                storageLocationProvider.removeLocation("loc1")
+            } throws RuntimeException("Remove error")
+
+            val errors = mutableListOf<String>()
+            val job = launch {
+                viewModel.storageError.collect { errors.add(it) }
+            }
+
+            viewModel.removeLocation("loc1")
+            advanceUntilIdle()
+
+            assertTrue(errors.any { it.contains("Remove error") })
+            job.cancel()
+        }
+
+    @Test
+    fun `updateLocationDescription calls provider and refreshes`() =
+        runTest {
+            advanceUntilIdle()
+
+            coEvery {
+                storageLocationProvider.updateLocationDescription("loc1", "new desc")
+            } just Runs
+            coEvery { storageLocationProvider.getAllLocations() } returns emptyList()
+
+            viewModel.updateLocationDescription("loc1", "new desc")
+            advanceUntilIdle()
+
+            coVerify {
+                storageLocationProvider.updateLocationDescription("loc1", "new desc")
+            }
+        }
+
+    @Test
+    fun `updateLocationDescription emits storageError on failure`() =
+        runTest {
+            advanceUntilIdle()
+
+            coEvery {
+                storageLocationProvider.updateLocationDescription("loc1", "desc")
+            } throws RuntimeException("Update error")
+
+            val errors = mutableListOf<String>()
+            val job = launch {
+                viewModel.storageError.collect { errors.add(it) }
+            }
+
+            viewModel.updateLocationDescription("loc1", "desc")
+            advanceUntilIdle()
+
+            assertTrue(errors.any { it.contains("Update error") })
+            job.cancel()
+        }
+
+    @Test
+    fun `isDuplicateTreeUri delegates to provider`() =
+        runTest {
+            advanceUntilIdle()
+
+            val mockUri = mockk<Uri>()
+            coEvery { storageLocationProvider.isDuplicateTreeUri(mockUri) } returns true
+
+            val result = viewModel.isDuplicateTreeUri(mockUri)
+
+            assertTrue(result)
+            coVerify { storageLocationProvider.isDuplicateTreeUri(mockUri) }
         }
 
     @Test
