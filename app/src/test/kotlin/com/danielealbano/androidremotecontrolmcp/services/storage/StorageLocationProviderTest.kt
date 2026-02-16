@@ -92,6 +92,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My documents",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -136,6 +138,8 @@ class StorageLocationProviderTest {
                 assertEquals("My documents", location.description)
                 assertEquals(treeUriString, location.treeUri)
                 assertEquals(5_000_000_000L, location.availableBytes)
+                assertTrue(location.allowWrite)
+                assertTrue(location.allowDelete)
 
                 verify { mockCursor.close() }
                 unmockkStatic(Uri::class)
@@ -166,6 +170,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My documents",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -247,6 +253,41 @@ class StorageLocationProviderTest {
                                 stored.path == "/Documents" &&
                                 stored.description == "My documents" &&
                                 stored.treeUri == "content://com.test.provider/tree/primary%3ADocuments"
+                        },
+                    )
+                }
+            }
+
+        @Test
+        fun `addLocation creates StoredLocation with allowWrite=false and allowDelete=false`() =
+            runTest {
+                // Arrange
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every { DocumentsContract.getTreeDocumentId(mockTreeUri) } returns "primary:Documents"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Documents"
+
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, "test description")
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.allowWrite == false && stored.allowDelete == false
                         },
                     )
                 }
@@ -502,6 +543,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "Existing",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(existingLocation)
 
@@ -577,6 +620,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My documents",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
                 coEvery { mockSettingsRepository.removeStoredLocation(any()) } just Runs
@@ -617,6 +662,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My documents",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
                 coEvery { mockSettingsRepository.removeStoredLocation(any()) } just Runs
@@ -702,6 +749,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My docs",
                         treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -745,6 +794,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My docs",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -775,6 +826,8 @@ class StorageLocationProviderTest {
                 assertEquals("My docs", result.description)
                 assertEquals(treeUriString, result.treeUri)
                 assertNull(result.availableBytes)
+                assertTrue(result.allowWrite)
+                assertTrue(result.allowDelete)
 
                 unmockkStatic(Uri::class)
             }
@@ -790,6 +843,192 @@ class StorageLocationProviderTest {
 
                 // Assert
                 assertNull(result)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // isWriteAllowed
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("IsWriteAllowed")
+    inner class IsWriteAllowed {
+        @Test
+        fun `returns true when location exists and allowWrite is true`() =
+            runTest {
+                // Arrange
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                        allowWrite = true,
+                        allowDelete = false,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                // Act
+                val result = provider.isWriteAllowed("com.test.provider/primary:Documents")
+
+                // Assert
+                assertTrue(result)
+            }
+
+        @Test
+        fun `returns false when location exists and allowWrite is false`() =
+            runTest {
+                // Arrange
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                        allowWrite = false,
+                        allowDelete = true,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                // Act
+                val result = provider.isWriteAllowed("com.test.provider/primary:Documents")
+
+                // Assert
+                assertFalse(result)
+            }
+
+        @Test
+        fun `returns false when location does not exist`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+
+                // Act
+                val result = provider.isWriteAllowed("nonexistent/location")
+
+                // Assert
+                assertFalse(result)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // isDeleteAllowed
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("IsDeleteAllowed")
+    inner class IsDeleteAllowed {
+        @Test
+        fun `returns true when location exists and allowDelete is true`() =
+            runTest {
+                // Arrange
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                        allowWrite = false,
+                        allowDelete = true,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                // Act
+                val result = provider.isDeleteAllowed("com.test.provider/primary:Documents")
+
+                // Assert
+                assertTrue(result)
+            }
+
+        @Test
+        fun `returns false when location exists and allowDelete is false`() =
+            runTest {
+                // Arrange
+                val storedLocation =
+                    SettingsRepository.StoredLocation(
+                        id = "com.test.provider/primary:Documents",
+                        name = "Documents",
+                        path = "/Documents",
+                        description = "My docs",
+                        treeUri = "content://com.test.provider/tree/primary%3ADocuments",
+                        allowWrite = true,
+                        allowDelete = false,
+                    )
+                coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
+
+                // Act
+                val result = provider.isDeleteAllowed("com.test.provider/primary:Documents")
+
+                // Assert
+                assertFalse(result)
+            }
+
+        @Test
+        fun `returns false when location does not exist`() =
+            runTest {
+                // Arrange
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+
+                // Act
+                val result = provider.isDeleteAllowed("nonexistent/location")
+
+                // Assert
+                assertFalse(result)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // updateLocationAllowWrite
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("UpdateLocationAllowWrite")
+    inner class UpdateLocationAllowWrite {
+        @Test
+        fun `updateLocationAllowWrite delegates to settings repository`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary:Documents"
+                coEvery {
+                    mockSettingsRepository.updateLocationAllowWrite(any(), any())
+                } just Runs
+
+                // Act
+                provider.updateLocationAllowWrite(locationId, true)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.updateLocationAllowWrite(locationId, true)
+                }
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // updateLocationAllowDelete
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("UpdateLocationAllowDelete")
+    inner class UpdateLocationAllowDelete {
+        @Test
+        fun `updateLocationAllowDelete delegates to settings repository`() =
+            runTest {
+                // Arrange
+                val locationId = "com.test.provider/primary:Documents"
+                coEvery {
+                    mockSettingsRepository.updateLocationAllowDelete(any(), any())
+                } just Runs
+
+                // Act
+                provider.updateLocationAllowDelete(locationId, false)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.updateLocationAllowDelete(locationId, false)
+                }
             }
     }
 
@@ -812,6 +1051,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My docs",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -862,6 +1103,8 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My docs",
                         treeUri = treeUriString,
+                        allowWrite = true,
+                        allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 

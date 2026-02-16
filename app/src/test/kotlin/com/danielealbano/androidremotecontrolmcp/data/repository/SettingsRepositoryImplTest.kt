@@ -641,6 +641,8 @@ class SettingsRepositoryImplTest {
                         "content://com.android.externalstorage.documents/tree/primary%3ADownloads",
                         result[0].treeUri,
                     )
+                    assertTrue(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
                 }
 
             @Test
@@ -673,17 +675,23 @@ class SettingsRepositoryImplTest {
                             path = "/Documents",
                             description = "Work docs",
                             treeUri = "content://test/tree/2",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(newLocation)
 
                     val result = repository.getStoredLocations()
                     assertEquals(2, result.size)
                     assertEquals("loc1", result[0].id)
+                    assertTrue(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
                     assertEquals("loc2", result[1].id)
                     assertEquals("Documents", result[1].name)
                     assertEquals("/Documents", result[1].path)
                     assertEquals("Work docs", result[1].description)
                     assertEquals("content://test/tree/2", result[1].treeUri)
+                    assertTrue(result[1].allowWrite)
+                    assertTrue(result[1].allowDelete)
                 }
 
             @Test
@@ -696,6 +704,8 @@ class SettingsRepositoryImplTest {
                             path = "/Downloads",
                             description = "First location",
                             treeUri = "content://test/tree/1",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(location)
 
@@ -704,6 +714,8 @@ class SettingsRepositoryImplTest {
                     assertEquals("loc1", result[0].id)
                     assertEquals("Downloads", result[0].name)
                     assertEquals("First location", result[0].description)
+                    assertTrue(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
                 }
         }
 
@@ -720,6 +732,8 @@ class SettingsRepositoryImplTest {
                             path = "/",
                             description = "",
                             treeUri = "content://test/tree/1",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     val loc2 =
                         SettingsRepository.StoredLocation(
@@ -728,6 +742,8 @@ class SettingsRepositoryImplTest {
                             path = "/",
                             description = "",
                             treeUri = "content://test/tree/2",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(loc1)
                     repository.addStoredLocation(loc2)
@@ -749,6 +765,8 @@ class SettingsRepositoryImplTest {
                             path = "/",
                             description = "",
                             treeUri = "content://test/tree/1",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(location)
 
@@ -773,6 +791,8 @@ class SettingsRepositoryImplTest {
                             path = "/",
                             description = "Old description",
                             treeUri = "content://test/tree/1",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(location)
 
@@ -796,6 +816,8 @@ class SettingsRepositoryImplTest {
                             path = "/",
                             description = "Original",
                             treeUri = "content://test/tree/1",
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     repository.addStoredLocation(location)
 
@@ -830,6 +852,8 @@ class SettingsRepositoryImplTest {
                         "content://com.android.externalstorage.documents/tree/primary%3A",
                         result[0].treeUri,
                     )
+                    assertTrue(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
                 }
 
             @Test
@@ -854,12 +878,16 @@ class SettingsRepositoryImplTest {
                     assertEquals("primary", loc1.name)
                     assertEquals("/", loc1.path)
                     assertEquals("", loc1.description)
+                    assertTrue(loc1.allowWrite)
+                    assertTrue(loc1.allowDelete)
 
                     assertTrue(loc2 != null)
                     assertEquals("content://com.test/tree/secondary%3A", loc2!!.treeUri)
                     assertEquals("secondary", loc2.name)
                     assertEquals("/", loc2.path)
                     assertEquals("", loc2.description)
+                    assertTrue(loc2.allowWrite)
+                    assertTrue(loc2.allowDelete)
                 }
 
             @Test
@@ -870,6 +898,195 @@ class SettingsRepositoryImplTest {
                     val result = repository.getStoredLocations()
 
                     assertTrue(result.isEmpty())
+                }
+
+            @Test
+            fun `migration from stored location without permission fields defaults to allowWrite=true and allowDelete=true`() =
+                testScope.runTest {
+                    val json =
+                        "[{\"id\":\"loc1\",\"name\":\"Downloads\"," +
+                            "\"path\":\"/Downloads\",\"description\":\"My downloads\"," +
+                            "\"treeUri\":\"content://com.android.externalstorage.documents" +
+                            "/tree/primary%3ADownloads\"}]"
+                    dataStore.edit { prefs -> prefs[locationsKey] = json }
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertTrue(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
+                }
+
+            @Test
+            fun `migration from stored location with corrupted permission fields defaults to allowWrite=false and allowDelete=false`() =
+                testScope.runTest {
+                    val json =
+                        "[{\"id\":\"loc1\",\"name\":\"Downloads\"," +
+                            "\"path\":\"/Downloads\",\"description\":\"My downloads\"," +
+                            "\"treeUri\":\"content://com.android.externalstorage.documents" +
+                            "/tree/primary%3ADownloads\"," +
+                            "\"allowWrite\":\"invalid\",\"allowDelete\":123}]"
+                    dataStore.edit { prefs -> prefs[locationsKey] = json }
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertFalse(result[0].allowWrite)
+                    assertFalse(result[0].allowDelete)
+                }
+        }
+
+        @Nested
+        @DisplayName("Permission Serialization")
+        inner class PermissionSerialization {
+            @Test
+            fun `stored location with permissions serializes and deserializes correctly`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/Downloads",
+                            description = "Test location",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = true,
+                        )
+                    repository.addStoredLocation(location)
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertFalse(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
+                }
+
+            @Test
+            fun `stored location with both permissions false serializes correctly`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/Downloads",
+                            description = "Test location",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = false,
+                        )
+                    repository.addStoredLocation(location)
+
+                    val result = repository.getStoredLocations()
+
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertFalse(result[0].allowWrite)
+                    assertFalse(result[0].allowDelete)
+                }
+        }
+
+        @Nested
+        @DisplayName("updateLocationAllowWrite")
+        inner class UpdateLocationAllowWrite {
+            @Test
+            fun `updateLocationAllowWrite updates the flag`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = false,
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationAllowWrite("loc1", true)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertTrue(result[0].allowWrite)
+                    assertFalse(result[0].allowDelete)
+                }
+
+            @Test
+            fun `updateLocationAllowWrite for non-existent location does nothing`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = false,
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationAllowWrite("non-existent", true)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertFalse(result[0].allowWrite)
+                    assertFalse(result[0].allowDelete)
+                }
+        }
+
+        @Nested
+        @DisplayName("updateLocationAllowDelete")
+        inner class UpdateLocationAllowDelete {
+            @Test
+            fun `updateLocationAllowDelete updates the flag`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = false,
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationAllowDelete("loc1", true)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertFalse(result[0].allowWrite)
+                    assertTrue(result[0].allowDelete)
+                }
+
+            @Test
+            fun `updateLocationAllowDelete for non-existent location does nothing`() =
+                testScope.runTest {
+                    val location =
+                        SettingsRepository.StoredLocation(
+                            id = "loc1",
+                            name = "Downloads",
+                            path = "/",
+                            description = "",
+                            treeUri = "content://test/tree/1",
+                            allowWrite = false,
+                            allowDelete = false,
+                        )
+                    repository.addStoredLocation(location)
+
+                    repository.updateLocationAllowDelete("non-existent", true)
+
+                    val result = repository.getStoredLocations()
+                    assertEquals(1, result.size)
+                    assertEquals("loc1", result[0].id)
+                    assertFalse(result[0].allowWrite)
+                    assertFalse(result[0].allowDelete)
                 }
         }
     }

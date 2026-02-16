@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -231,6 +232,38 @@ class SettingsRepositoryImpl
             }
         }
 
+        override suspend fun updateLocationAllowWrite(
+            locationId: String,
+            allowWrite: Boolean,
+        ) {
+            dataStore.edit { prefs ->
+                val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
+                val index = existing.indexOfFirst { it.id == locationId }
+                if (index >= 0) {
+                    existing[index] = existing[index].copy(allowWrite = allowWrite)
+                    prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
+                } else {
+                    Log.w(TAG, "updateLocationAllowWrite: location $locationId not found, no-op")
+                }
+            }
+        }
+
+        override suspend fun updateLocationAllowDelete(
+            locationId: String,
+            allowDelete: Boolean,
+        ) {
+            dataStore.edit { prefs ->
+                val existing = parseStoredLocationsJson(prefs[AUTHORIZED_LOCATIONS_KEY]).toMutableList()
+                val index = existing.indexOfFirst { it.id == locationId }
+                if (index >= 0) {
+                    existing[index] = existing[index].copy(allowDelete = allowDelete)
+                    prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
+                } else {
+                    Log.w(TAG, "updateLocationAllowDelete: location $locationId not found, no-op")
+                }
+            }
+        }
+
         override fun validatePort(port: Int): Result<Int> =
             if (port in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
                 Result.success(port)
@@ -321,12 +354,18 @@ class SettingsRepositoryImpl
                         val path = obj["path"]?.jsonPrimitive?.content ?: return@mapNotNull null
                         val treeUri = obj["treeUri"]?.jsonPrimitive?.content ?: return@mapNotNull null
                         val description = obj["description"]?.jsonPrimitive?.content ?: ""
+                        val allowWriteElement = obj["allowWrite"]
+                        val allowWrite = if (allowWriteElement == null) true else allowWriteElement.jsonPrimitive.booleanOrNull ?: false
+                        val allowDeleteElement = obj["allowDelete"]
+                        val allowDelete = if (allowDeleteElement == null) true else allowDeleteElement.jsonPrimitive.booleanOrNull ?: false
                         SettingsRepository.StoredLocation(
                             id = id,
                             name = name,
                             path = path,
                             description = description,
                             treeUri = treeUri,
+                            allowWrite = allowWrite,
+                            allowDelete = allowDelete,
                         )
                     } catch (e: Exception) {
                         Log.w(TAG, "Skipping malformed stored location entry", e)
@@ -344,6 +383,8 @@ class SettingsRepositoryImpl
                             path = "/",
                             description = "",
                             treeUri = value.jsonPrimitive.content,
+                            allowWrite = true,
+                            allowDelete = true,
                         )
                     }
                 } catch (e: Exception) {
@@ -364,6 +405,8 @@ class SettingsRepositoryImpl
                                 put("path", loc.path)
                                 put("description", loc.description)
                                 put("treeUri", loc.treeUri)
+                                put("allowWrite", loc.allowWrite)
+                                put("allowDelete", loc.allowDelete)
                             },
                         )
                     }
