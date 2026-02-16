@@ -440,8 +440,8 @@ class FileOperationProviderImpl
         private suspend fun checkAuthorization(locationId: String) {
             if (!storageLocationProvider.isLocationAuthorized(locationId)) {
                 throw McpToolException.PermissionDenied(
-                    "Storage location '$locationId' is not authorized. " +
-                        "Please authorize it in the app settings.",
+                    "Storage location '$locationId' not found. " +
+                        "Please add it in the app settings.",
                 )
             }
         }
