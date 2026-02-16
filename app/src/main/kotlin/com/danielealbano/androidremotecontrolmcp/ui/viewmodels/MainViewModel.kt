@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -347,10 +348,11 @@ class MainViewModel
             viewModelScope.launch(ioDispatcher) {
                 try {
                     storageLocationProvider.updateLocationAllowWrite(locationId, allowWrite)
-                    _storageLocations.value =
-                        _storageLocations.value.map { loc ->
+                    _storageLocations.update { locations ->
+                        locations.map { loc ->
                             if (loc.id == locationId) loc.copy(allowWrite = allowWrite) else loc
                         }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to update allowWrite for $locationId", e)
                     refreshStorageLocations()
@@ -367,10 +369,11 @@ class MainViewModel
             viewModelScope.launch(ioDispatcher) {
                 try {
                     storageLocationProvider.updateLocationAllowDelete(locationId, allowDelete)
-                    _storageLocations.value =
-                        _storageLocations.value.map { loc ->
+                    _storageLocations.update { locations ->
+                        locations.map { loc ->
                             if (loc.id == locationId) loc.copy(allowDelete = allowDelete) else loc
                         }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to update allowDelete for $locationId", e)
                     refreshStorageLocations()

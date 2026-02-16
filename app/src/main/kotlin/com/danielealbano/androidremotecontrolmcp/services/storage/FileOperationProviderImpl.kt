@@ -460,7 +460,7 @@ class FileOperationProviderImpl
          */
         private suspend fun checkWritePermission(locationId: String) {
             if (!storageLocationProvider.isWriteAllowed(locationId)) {
-                Log.w(TAG, "Write permission denied for location: $locationId")
+                Log.w(TAG, "Write permission denied for location: ${sanitizeLocationId(locationId)}")
                 throw McpToolException.PermissionDenied("Write not allowed")
             }
         }
@@ -471,7 +471,7 @@ class FileOperationProviderImpl
          */
         private suspend fun checkDeletePermission(locationId: String) {
             if (!storageLocationProvider.isDeleteAllowed(locationId)) {
-                Log.w(TAG, "Delete permission denied for location: $locationId")
+                Log.w(TAG, "Delete permission denied for location: ${sanitizeLocationId(locationId)}")
                 throw McpToolException.PermissionDenied("Delete not allowed")
             }
         }
@@ -715,6 +715,12 @@ class FileOperationProviderImpl
 
         companion object {
             private const val TAG = "MCP:FileOpsProvider"
+            private const val MAX_LOCATION_ID_LOG_LENGTH = 200
+            private val CONTROL_CHAR_REGEX = Regex("[\\p{Cntrl}]")
+
+            private fun sanitizeLocationId(locationId: String): String =
+                locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")
+
             private const val BYTES_PER_MB = 1024L * 1024L
             private const val MILLIS_PER_SECOND = 1000
             private const val DOWNLOAD_BUFFER_SIZE = 8192

@@ -93,7 +93,7 @@ class StorageLocationProviderTest {
                         description = "My documents",
                         treeUri = treeUriString,
                         allowWrite = true,
-                        allowDelete = true,
+                        allowDelete = false,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
 
@@ -139,7 +139,7 @@ class StorageLocationProviderTest {
                 assertEquals(treeUriString, location.treeUri)
                 assertEquals(5_000_000_000L, location.availableBytes)
                 assertTrue(location.allowWrite)
-                assertTrue(location.allowDelete)
+                assertFalse(location.allowDelete)
 
                 verify { mockCursor.close() }
                 unmockkStatic(Uri::class)
@@ -794,7 +794,7 @@ class StorageLocationProviderTest {
                         path = "/Documents",
                         description = "My docs",
                         treeUri = treeUriString,
-                        allowWrite = true,
+                        allowWrite = false,
                         allowDelete = true,
                     )
                 coEvery { mockSettingsRepository.getStoredLocations() } returns listOf(storedLocation)
@@ -826,7 +826,7 @@ class StorageLocationProviderTest {
                 assertEquals("My docs", result.description)
                 assertEquals(treeUriString, result.treeUri)
                 assertNull(result.availableBytes)
-                assertTrue(result.allowWrite)
+                assertFalse(result.allowWrite)
                 assertTrue(result.allowDelete)
 
                 unmockkStatic(Uri::class)

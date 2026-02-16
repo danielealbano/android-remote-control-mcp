@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -228,6 +229,8 @@ class SettingsRepositoryImpl
                 if (index >= 0) {
                     existing[index] = existing[index].copy(description = description)
                     prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
+                } else {
+                    Log.w(TAG, "updateLocationDescription: location ${sanitizeLocationId(locationId)} not found, no-op")
                 }
             }
         }
@@ -243,7 +246,7 @@ class SettingsRepositoryImpl
                     existing[index] = existing[index].copy(allowWrite = allowWrite)
                     prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
                 } else {
-                    Log.w(TAG, "updateLocationAllowWrite: location $locationId not found, no-op")
+                    Log.w(TAG, "updateLocationAllowWrite: location ${sanitizeLocationId(locationId)} not found, no-op")
                 }
             }
         }
@@ -259,7 +262,7 @@ class SettingsRepositoryImpl
                     existing[index] = existing[index].copy(allowDelete = allowDelete)
                     prefs[AUTHORIZED_LOCATIONS_KEY] = serializeStoredLocationsJson(existing)
                 } else {
-                    Log.w(TAG, "updateLocationAllowDelete: location $locationId not found, no-op")
+                    Log.w(TAG, "updateLocationAllowDelete: location ${sanitizeLocationId(locationId)} not found, no-op")
                 }
             }
         }
@@ -341,7 +344,7 @@ class SettingsRepositoryImpl
          */
         private fun generateTokenString(): String = UUID.randomUUID().toString()
 
-        @Suppress("SwallowedException", "TooGenericExceptionCaught", "LongMethod")
+        @Suppress("SwallowedException", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
         private fun parseStoredLocationsJson(json: String?): List<SettingsRepository.StoredLocation> {
             if (json == null) return emptyList()
             return try {
@@ -356,14 +359,14 @@ class SettingsRepositoryImpl
                         val description = obj["description"]?.jsonPrimitive?.content ?: ""
                         val allowWriteElement = obj["allowWrite"]
                         val allowWrite =
-                            if (allowWriteElement == null) {
+                            if (allowWriteElement == null || allowWriteElement is JsonNull) {
                                 true
                             } else {
                                 allowWriteElement.jsonPrimitive.booleanOrNull ?: false
                             }
                         val allowDeleteElement = obj["allowDelete"]
                         val allowDelete =
-                            if (allowDeleteElement == null) {
+                            if (allowDeleteElement == null || allowDeleteElement is JsonNull) {
                                 true
                             } else {
                                 allowDeleteElement.jsonPrimitive.booleanOrNull ?: false
@@ -425,6 +428,12 @@ class SettingsRepositoryImpl
 
         companion object {
             private const val TAG = "MCP:SettingsRepo"
+            private const val MAX_LOCATION_ID_LOG_LENGTH = 200
+            private val CONTROL_CHAR_REGEX = Regex("[\\p{Cntrl}]")
+
+            private fun sanitizeLocationId(locationId: String): String =
+                locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")
+
             private val PORT_KEY = intPreferencesKey("port")
             private val BINDING_ADDRESS_KEY = stringPreferencesKey("binding_address")
             private val BEARER_TOKEN_KEY = stringPreferencesKey("bearer_token")
