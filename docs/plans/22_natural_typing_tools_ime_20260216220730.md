@@ -29,6 +29,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 - Four new tools: `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`
 - Remove three old tools: `android_input_text`, `android_clear_text`, `android_set_text`
 - Keep `android_press_key` (key events, different purpose)
+  - **Known limitation**: `PressKeyTool.pressDelete()` and `appendCharToFocused()` still use `ACTION_SET_TEXT` internally for DEL, TAB, and SPACE keys. These operations remain detectable as non-human input. Migrating `PressKeyTool` to the `InputConnection` pipeline is out of scope for this plan and can be addressed in a future iteration.
 - `element_id` is mandatory on all four tools
 - Typing speed: default 70ms, min 10ms, max 5000ms
 - Typing speed variance: default 15ms, clamped to `[0, typing_speed]`
@@ -105,9 +106,10 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 
 **Flow:**
 1. Click `element_id` to focus
-2. `performContextMenuAction(android.R.id.selectAll)` to select all text
-3. Send DELETE key event (`KeyEvent(ACTION_DOWN, KEYCODE_DEL)` + `KeyEvent(ACTION_UP, KEYCODE_DEL)`) to delete selection
-4. Return success
+2. Check if field has text via `getSurroundingText()` — if empty, return success immediately
+3. `performContextMenuAction(android.R.id.selectAll)` to select all text — check return value
+4. Send DELETE key event (`KeyEvent(ACTION_DOWN, KEYCODE_DEL)` + `KeyEvent(ACTION_UP, KEYCODE_DEL)`) to delete selection — check return values
+5. Return success
 
 ---
 
@@ -118,20 +120,18 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 | `app/build.gradle.kts` | Modify: raise `minSdk` from 26 to 33 |
 | `app/src/main/res/xml/accessibility_service_config.xml` | Modify: add `android:isInputMethodEditor="true"` and `flagInputMethodEditor` to flags |
 | `app/src/main/kotlin/.../services/accessibility/McpAccessibilityService.kt` | Modify: add `FLAG_INPUT_METHOD_EDITOR` to flags, override `onCreateInputMethod()`, add `InputMethod` subclass, expose input connection access |
-| `app/src/main/kotlin/.../services/accessibility/AccessibilityServiceProvider.kt` | Modify: add `TypeInputController`-related methods |
-| `app/src/main/kotlin/.../services/accessibility/AccessibilityServiceProviderImpl.kt` | Modify: implement new methods |
 | `app/src/main/kotlin/.../services/accessibility/TypeInputController.kt` | **Create**: interface wrapping `AccessibilityInputConnection` operations |
 | `app/src/main/kotlin/.../services/accessibility/TypeInputControllerImpl.kt` | **Create**: implementation of `TypeInputController` |
 | `app/src/main/kotlin/.../di/AppModule.kt` | Modify: add `TypeInputController` binding |
 | `app/src/main/kotlin/.../mcp/tools/McpToolUtils.kt` | Modify: add `requireInt()` helper method |
 | `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt` | **Rewrite**: remove `InputTextTool`, `ClearTextTool`; keep `PressKeyTool`; add four new type tools + shared utilities (Mutex, poll-retry, code point iteration) |
 | `app/src/main/kotlin/.../mcp/tools/ElementActionTools.kt` | Modify: remove `SetTextTool` and its registration |
-| `app/src/main/kotlin/.../services/mcp/McpServerService.kt` | Modify: update `registerTextInputTools` call to pass `TypeInputController`; remove unused `ActionExecutor`/`TreeParser` params from text input registration |
+| `app/src/main/kotlin/.../services/mcp/McpServerService.kt` | Modify: inject `TypeInputController`, add it as parameter to `registerTextInputTools` call (keep existing params) |
 | `app/src/test/kotlin/.../mcp/tools/TextInputToolsTest.kt` | **Rewrite**: remove `InputTextTool`/`ClearTextTool` tests; add tests for four new tools |
 | `app/src/test/kotlin/.../mcp/tools/ElementActionToolsTest.kt` | Modify: remove `SetTextToolTests` nested class |
 | `app/src/test/kotlin/.../integration/TextInputIntegrationTest.kt` | **Rewrite**: remove old integration tests; add integration tests for four new tools |
 | `app/src/test/kotlin/.../integration/McpIntegrationTestHelper.kt` | Modify: add `TypeInputController` to `MockDependencies`; update `registerAllTools` and `registerTextInputTools` |
-| `app/src/main/kotlin/.../services/screencapture/ScreenCaptureProviderImpl.kt` | Modify: remove API < 33 check (dead code after minSdk raise) |
+| `app/src/main/kotlin/.../services/screencapture/ScreenCaptureProviderImpl.kt` | Modify: remove API < 33 check (dead code after minSdk raise); remove stale `@SuppressLint("NewApi")` annotation |
 | `app/src/main/kotlin/.../services/accessibility/McpAccessibilityService.kt` | Modify: remove API < 33 compat code in `getScreenInfo()` and `canTakeScreenshot()` |
 | `app/src/main/kotlin/.../utils/PermissionUtils.kt` | Modify: remove API < 33 check (notification permission) |
 | `app/src/main/kotlin/.../ui/MainActivity.kt` | Modify: remove API < 33 guard on `requestNotificationPermission()` |
@@ -273,6 +273,19 @@ Also remove the `import androidx.annotation.RequiresApi` import if no other usag
 -    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && service.canTakeScreenshot()
 +    return service.canTakeScreenshot()
 ```
+
+- [ ] **Action 1.3.3**: Remove stale `@SuppressLint("NewApi")` annotation
+
+**File**: `app/src/main/kotlin/.../services/screencapture/ScreenCaptureProviderImpl.kt`
+
+**What changes**: The class-level `@SuppressLint("NewApi")` annotation (around line 35) was originally needed because `validateService()` had an API 30 guard. After removing that guard in Action 1.3.1 and raising `minSdk` to 33, this annotation is stale and misleading. Remove it along with its comment.
+
+```diff
+-@SuppressLint("NewApi") // API 30 guard in validateService()
+ class ScreenCaptureProviderImpl
+```
+
+Also remove the `import android.annotation.SuppressLint` if no other usages remain in the file.
 
 ---
 
@@ -547,12 +560,15 @@ import android.view.inputmethod.SurroundingText
  * Implementations access the real AccessibilityInputConnection via
  * McpAccessibilityService's InputMethod instance.
  *
- * **Threading**: All methods that call AccessibilityInputConnection must be
- * dispatched on Dispatchers.Main (Android framework requirement for InputConnection).
- * The implementation handles this internally — callers can invoke from any dispatcher.
+ * **Threading**: The AccessibilityInputConnection obtained from InputMethod is an
+ * IPC proxy managed by the accessibility framework — it is NOT a View-bound
+ * InputConnection. Methods can be called from any thread safely.
+ * If runtime testing reveals issues, the implementation should wrap calls
+ * in `withContext(Dispatchers.Main)`.
  *
- * **Concurrency**: All mutating operations are serialized via an internal Mutex
- * to prevent concurrent MCP requests from interleaving character commits.
+ * **Concurrency**: All mutating operations are serialized via a file-level Mutex
+ * (`typeOperationMutex` in TextInputTools.kt) at the tool layer, preventing
+ * concurrent MCP requests from interleaving character commits.
  */
 interface TypeInputController {
     /**
@@ -636,13 +652,9 @@ interface TypeInputController {
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.inputmethod.SurroundingText
 import javax.inject.Inject
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Implementation of [TypeInputController] that delegates to the
@@ -652,18 +664,18 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * All methods access the singleton [McpAccessibilityService.inputMethodInstance]
  * to get the current [AccessibilityInputConnection].
  *
- * **Threading**: All AccessibilityInputConnection calls are dispatched to the
- * main thread via [Handler(Looper.getMainLooper())] as required by the
- * Android InputConnection framework contract.
+ * **Threading**: The AccessibilityInputConnection is an IPC proxy managed by
+ * the accessibility framework — NOT a View-bound InputConnection. Methods can
+ * be called safely from any thread. If runtime testing reveals thread-safety
+ * issues, wrap calls in `withContext(Dispatchers.Main)`.
  *
- * **Concurrency**: Callers must use the Mutex in the typing tools to serialize
- * operations. This class is stateless and safe to call from any thread.
+ * **Concurrency**: This class is stateless and safe to call from any thread.
+ * Callers must use the file-level `typeOperationMutex` in the typing tools
+ * to serialize operations and prevent interleaved character commits.
  */
 class TypeInputControllerImpl
     @Inject
     constructor() : TypeInputController {
-        private val mainHandler = Handler(Looper.getMainLooper())
-
         private fun getInputConnection() =
             McpAccessibilityService.inputMethodInstance?.getCurrentInputConnection()
 
@@ -708,8 +720,6 @@ class TypeInputControllerImpl
         }
     }
 ```
-
-> **Note on Dispatchers.Main**: The `AccessibilityInputConnection` obtained from `InputMethod.getCurrentInputConnection()` is a proxy managed by the accessibility framework. Per Android documentation, `InputConnection` methods should be called from the main thread. If testing reveals that calls from background coroutine threads fail, wrap each IC call in `mainHandler.post { ... }` or use `withContext(Dispatchers.Main)` at the call site. This should be verified during implementation and adjusted if needed.
 
 ---
 
@@ -968,11 +978,17 @@ internal val typeOperationMutex = Mutex()
  * Supports cancellation via structured concurrency — if the parent coroutine
  * is cancelled, the typing loop stops immediately at the next `delay()`.
  *
+ * **Input connection loss detection**: Instead of checking `isReady()` before
+ * every character (which can cause false negatives during brief framework state
+ * transitions), this function relies solely on the `commitText()` return value.
+ * If `commitText` returns `false`, the input connection has been lost and typing
+ * stops immediately with an error.
+ *
  * @param text The text to type.
  * @param typingSpeed Base delay between characters in ms.
  * @param typingSpeedVariance Variance in ms.
  * @param typeInputController The input controller to commit characters through.
- * @throws McpToolException.ActionFailed if the input connection becomes unavailable mid-typing.
+ * @throws McpToolException.ActionFailed if commitText fails (input connection lost mid-typing).
  */
 internal suspend fun typeCharByChar(
     text: String,
@@ -986,12 +1002,6 @@ internal suspend fun typeCharByChar(
     var offset = 0
 
     while (offset < text.length) {
-        if (!typeInputController.isReady()) {
-            throw McpToolException.ActionFailed(
-                "Input connection lost during typing. Typed $codePointIndex of $codePointCount characters.",
-            )
-        }
-
         val codePoint = text.codePointAt(offset)
         val charCount = Character.charCount(codePoint)
         val codePointStr = text.substring(offset, offset + charCount)
@@ -999,7 +1009,8 @@ internal suspend fun typeCharByChar(
         val committed = typeInputController.commitText(codePointStr, 1)
         if (!committed) {
             throw McpToolException.ActionFailed(
-                "Failed to commit character at position $codePointIndex of $codePointCount.",
+                "Input connection lost during typing at position $codePointIndex of $codePointCount. " +
+                    "commitText returned false.",
             )
         }
 
@@ -1067,6 +1078,10 @@ internal fun validateTextLength(text: String, paramName: String = "text") {
  * Uses a poll-retry loop instead of a fixed delay to minimize unnecessary waiting
  * while still giving the framework time to establish the InputConnection.
  *
+ * Uses wall-clock time (`System.currentTimeMillis()`) for accurate timeout
+ * tracking, since `delay()` is a suspension point and may resume later than
+ * the requested interval.
+ *
  * @param typeInputController The controller to check.
  * @param elementId The element ID (for error message).
  * @throws McpToolException.ActionFailed if not ready after FOCUS_POLL_MAX_MS.
@@ -1075,11 +1090,10 @@ internal suspend fun awaitInputConnectionReady(
     typeInputController: TypeInputController,
     elementId: String,
 ) {
-    var elapsed = 0L
-    while (elapsed < FOCUS_POLL_MAX_MS) {
+    val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
+    while (System.currentTimeMillis() < deadline) {
         if (typeInputController.isReady()) return
         kotlinx.coroutines.delay(FOCUS_POLL_INTERVAL_MS)
-        elapsed += FOCUS_POLL_INTERVAL_MS
     }
     throw McpToolException.ActionFailed(
         "Input connection not available after focusing element '$elementId'. " +
@@ -1180,6 +1194,10 @@ class TypeAppendTextTool
                 awaitInputConnectionReady(typeInputController, elementId)
 
                 // Position cursor at end
+                // Note: offset + text.length gives the total text length only if
+                // getSurroundingText returns the complete field content. For fields
+                // with >2*MAX_SURROUNDING_TEXT_LENGTH chars, this may undercount.
+                // Given the 2000-char tool limit, this is not a practical concern.
                 val surroundingText = typeInputController.getSurroundingText(
                     MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0,
                 )
@@ -1188,7 +1206,7 @@ class TypeAppendTextTool
                 } ?: 0
                 typeInputController.setSelection(textLength, textLength)
 
-                // Type character by character (code point aware)
+                // Type code point by code point
                 typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
             }
 
@@ -1247,19 +1265,7 @@ class TypeAppendTextTool
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
-**What changes**: Add the following class. Key differences: `McpToolUtils.requireString()` for strings, `McpToolUtils.optionalInt()` with custom required handling for `offset`, Mutex, poll-retry, sanitized log.
-
-Note: There is no `McpToolUtils.requireInt()` method yet. For `offset`, use raw parsing with proper type checking matching the style of `McpToolUtils.optionalInt()`:
-```kotlin
-val offsetElement = arguments?.get("offset")
-    ?: throw McpToolException.InvalidParams("Missing required parameter: 'offset'")
-val offsetPrimitive = offsetElement as? JsonPrimitive
-    ?: throw McpToolException.InvalidParams("Parameter 'offset' must be a number")
-val offset = offsetPrimitive.content.toIntOrNull()
-    ?: throw McpToolException.InvalidParams("Parameter 'offset' must be an integer, got: '${offsetPrimitive.content}'")
-```
-
-Or alternatively, add a `McpToolUtils.requireInt()` helper method in the same style as `requireFloat()` — the implementor should choose whichever is cleanest and consistent with the existing pattern. If `requireInt()` is added, place it in `McpToolUtils.kt` alongside `requireFloat()`.
+**What changes**: Add the following class. Uses `McpToolUtils.requireString()` for strings, `McpToolUtils.requireInt()` (added in Action 3.1.0) for the mandatory `offset` parameter, Mutex, poll-retry, sanitized log.
 
 ```kotlin
 class TypeInsertTextTool
@@ -1368,8 +1374,6 @@ class TypeInsertTextTool
     }
 ```
 
-**Note**: If `McpToolUtils.requireInt()` does not exist, add it to `McpToolUtils.kt` following the same pattern as `requireFloat()` but returning `Int` and rejecting non-integer values. This is a small prerequisite action to add before implementing this tool.
-
 ---
 
 ### Task 3.4: Implement TypeReplaceTextTool
@@ -1389,6 +1393,15 @@ class TypeInsertTextTool
  * Finds the first occurrence of search text in a field, selects it,
  * deletes it via DELETE key event, then types the replacement text
  * character by character using the InputConnection pipeline.
+ *
+ * **Known limitation (TOCTOU race)**: There is an inherent time-of-check to
+ * time-of-use race between `getSurroundingText()` (read) and `setSelection()`
+ * (write). If the target app modifies the text field between these two calls
+ * (e.g., via autocomplete, autofill, or background updates), the selection
+ * indices may be wrong. The `typeOperationMutex` prevents concurrent MCP
+ * requests from racing, but cannot prevent the target app itself from
+ * modifying its own text. This is inherent to the approach and unavoidable
+ * without framework-level atomic read-select operations.
  *
  * Flow:
  * 1. Click element_id to focus
@@ -1546,6 +1559,9 @@ class TypeReplaceTextTool
  * select all via context menu + DELETE key event.
  *
  * This is indistinguishable from a user performing select-all + backspace.
+ *
+ * If the field is already empty, returns success without performing any action.
+ * All InputConnection return values are checked for robustness.
  */
 class TypeClearTextTool
     @Inject
@@ -1555,6 +1571,7 @@ class TypeClearTextTool
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val typeInputController: TypeInputController,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId = McpToolUtils.requireString(arguments, "element_id")
             if (elementId.isEmpty()) {
@@ -1570,16 +1587,40 @@ class TypeClearTextTool
                 // Poll-retry for InputConnection readiness
                 awaitInputConnectionReady(typeInputController, elementId)
 
-                // Select all text
-                typeInputController.performContextMenuAction(android.R.id.selectAll)
+                // Check if field has text — skip clear if already empty
+                val surroundingText = typeInputController.getSurroundingText(
+                    MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0,
+                )
+                val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
+                if (textLength == 0) {
+                    Log.d(TAG, "type_clear_text: field already empty on '$elementId'")
+                    return McpToolUtils.textResult("Text cleared from element '$elementId'")
+                }
 
-                // Delete selection via DELETE key event
-                typeInputController.sendKeyEvent(
-                    android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL),
-                )
-                typeInputController.sendKeyEvent(
-                    android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL),
-                )
+                // Select all text — check return value
+                if (!typeInputController.performContextMenuAction(android.R.id.selectAll)) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to select all text in element '$elementId' — input connection lost",
+                    )
+                }
+
+                // Delete selection via DELETE key event — check return values
+                if (!typeInputController.sendKeyEvent(
+                        android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL),
+                    )
+                ) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to send DELETE key (ACTION_DOWN) on element '$elementId' — input connection lost",
+                    )
+                }
+                if (!typeInputController.sendKeyEvent(
+                        android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL),
+                    )
+                ) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to send DELETE key (ACTION_UP) on element '$elementId' — input connection lost",
+                    )
+                }
             }
 
             Log.d(TAG, "type_clear_text: cleared text on element '$elementId'")
@@ -1653,7 +1694,7 @@ class TypeClearTextTool
 
 **`SharedUtilitiesTests`** (new nested class for shared functions):
 - `typeCharByChar iterates by code points not chars` — provide emoji text (e.g., "A😀B"), verify `commitText` called 3 times (not 4)
-- `typeCharByChar stops when input connection lost` — `isReady()` returns false after N chars, verify ActionFailed thrown with correct count
+- `typeCharByChar stops when commitText returns false` — `commitText()` returns false after N chars, verify ActionFailed thrown with correct count
 - `typeCharByChar respects coroutine cancellation` — cancel parent scope mid-typing, verify loop stops
 - `extractTypingParams uses defaults when not provided` — verify 70/15
 - `extractTypingParams rejects typing_speed below minimum` — verify InvalidParams for 5ms
@@ -1692,9 +1733,12 @@ class TypeClearTextTool
 - `log does not contain search or new_text content` — verify sanitized logging
 
 **`TypeClearTextToolTests`**:
-- `clears text from element` — verifies select all + DELETE key events
+- `clears text from element` — verifies select all + DELETE key events, checks return values
+- `returns success for already empty field without sending keys` — `getSurroundingText` returns empty text, verify `performContextMenuAction` and `sendKeyEvent` NOT called
 - `throws error when element_id is missing` — validates required parameter
 - `throws error when input connection not ready after poll timeout` — verifies error after poll-retry
+- `throws error when performContextMenuAction fails` — `performContextMenuAction` returns false, verify ActionFailed
+- `throws error when sendKeyEvent fails` — `sendKeyEvent` returns false, verify ActionFailed
 
 All tests mock `TypeInputController`, `ActionExecutor`, `AccessibilityTreeParser`, `AccessibilityServiceProvider`. Use `coEvery`/`every` from MockK. Verify calls with `verify {}`.
 
@@ -1900,7 +1944,7 @@ Document:
 
 - [ ] **Action 4.5.1**: Search for stale references
 
-Search the entire `docs/` directory for:
+Search the entire `docs/` directory (including `ARCHITECTURE.md`, `MCP_TOOLS.md`, `PROJECT.md`, and any other docs) for:
 - `input_text` (should only appear in commit history context, not as a current tool)
 - `clear_text` (same)
 - `set_text` (same)

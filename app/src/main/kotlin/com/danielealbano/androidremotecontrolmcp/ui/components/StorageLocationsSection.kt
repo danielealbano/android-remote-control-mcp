@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,8 @@ fun StorageLocationsSection(
     onAddLocation: () -> Unit,
     onEditDescription: (StorageLocation) -> Unit,
     onDeleteLocation: (StorageLocation) -> Unit,
+    onAllowWriteChange: (StorageLocation, Boolean) -> Unit,
+    onAllowDeleteChange: (StorageLocation, Boolean) -> Unit,
     onFileSizeLimitChange: (String) -> Unit,
     onDownloadTimeoutChange: (String) -> Unit,
     onAllowHttpDownloadsChange: (Boolean) -> Unit,
@@ -98,6 +101,8 @@ fun StorageLocationsSection(
                         location = location,
                         onEdit = { onEditDescription(location) },
                         onDelete = { onDeleteLocation(location) },
+                        onAllowWriteChange = { enabled -> onAllowWriteChange(location, enabled) },
+                        onAllowDeleteChange = { enabled -> onAllowDeleteChange(location, enabled) },
                     )
                 }
             }
@@ -188,52 +193,98 @@ fun StorageLocationsSection(
     }
 }
 
+@Suppress("LongMethod")
 @Composable
 private fun StorageLocationRow(
     location: StorageLocation,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onAllowWriteChange: (Boolean) -> Unit,
+    onAllowDeleteChange: (Boolean) -> Unit,
 ) {
-    Row(
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = location.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = location.path,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (location.description.isNotEmpty()) {
+            Column(
+                modifier = Modifier.weight(1f),
+            ) {
                 Text(
-                    text = location.description,
+                    text = location.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = location.path,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontStyle = FontStyle.Italic,
+                )
+                if (location.description.isNotEmpty()) {
+                    Text(
+                        text = location.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontStyle = FontStyle.Italic,
+                    )
+                }
+            }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.storage_location_edit_dialog_title),
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.storage_location_delete_dialog_title),
                 )
             }
         }
-        IconButton(onClick = onEdit) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = stringResource(R.string.storage_location_edit_dialog_title),
-            )
-        }
-        IconButton(onClick = onDelete) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(R.string.storage_location_delete_dialog_title),
-            )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 0.dp, top = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_write_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowWrite,
+                    onCheckedChange = onAllowWriteChange,
+                    modifier = Modifier.height(24.dp),
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_delete_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowDelete,
+                    onCheckedChange = onAllowDeleteChange,
+                    modifier = Modifier.height(24.dp),
+                )
+            }
         }
     }
 }
@@ -253,6 +304,8 @@ private fun StorageLocationsSectionPreview() {
                         description = "",
                         treeUri = "content://com.android.externalstorage.documents/tree/primary%3A",
                         availableBytes = null,
+                        allowWrite = true,
+                        allowDelete = false,
                     ),
                     StorageLocation(
                         id = "com.android.providers.downloads.documents/downloads",
@@ -261,6 +314,8 @@ private fun StorageLocationsSectionPreview() {
                         description = "Downloaded files",
                         treeUri = "content://com.android.providers.downloads.documents/tree/downloads",
                         availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
                     ),
                 ),
             fileSizeLimitInput = "50",
@@ -273,6 +328,8 @@ private fun StorageLocationsSectionPreview() {
             onAddLocation = {},
             onEditDescription = {},
             onDeleteLocation = {},
+            onAllowWriteChange = { _, _ -> },
+            onAllowDeleteChange = { _, _ -> },
             onFileSizeLimitChange = {},
             onDownloadTimeoutChange = {},
             onAllowHttpDownloadsChange = {},

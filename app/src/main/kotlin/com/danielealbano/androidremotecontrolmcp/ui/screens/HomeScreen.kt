@@ -228,6 +228,12 @@ fun HomeScreen(
                     deleteDialogLocation = location
                     showDeleteDialog = true
                 },
+                onAllowWriteChange = { location, enabled ->
+                    viewModel.updateLocationAllowWrite(location.id, enabled)
+                },
+                onAllowDeleteChange = { location, enabled ->
+                    viewModel.updateLocationAllowDelete(location.id, enabled)
+                },
                 onFileSizeLimitChange = viewModel::updateFileSizeLimit,
                 onDownloadTimeoutChange = viewModel::updateDownloadTimeout,
                 onAllowHttpDownloadsChange = viewModel::updateAllowHttpDownloads,

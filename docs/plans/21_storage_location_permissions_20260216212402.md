@@ -705,12 +705,12 @@ Test: `deleteFile throws PermissionDenied when delete not allowed`
 **Description**: Update the `list_storage_locations` MCP tool output to include `allow_read`, `allow_write`, `allow_delete` fields. Add integration tests for permission enforcement error propagation.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `list_storage_locations` MCP output includes `allow_read: true`, `allow_write: true/false`, `allow_delete: true/false` for each location
-- [ ] Existing `list_storage_locations` integration test updated to verify new fields
-- [ ] Integration tests added for write permission denial (all 4 write tools)
-- [ ] Integration test added for delete permission denial
-- [ ] All targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileToolsIntegrationTest"`
-- [ ] Lint clean on changed files
+- [x] `list_storage_locations` MCP output includes `allow_read: true`, `allow_write: true/false`, `allow_delete: true/false` for each location
+- [x] Existing `list_storage_locations` integration test updated to verify new fields
+- [x] Integration tests added for write permission denial (all 4 write tools)
+- [x] Integration test added for delete permission denial
+- [x] All targeted tests pass: `./gradlew :app:testDebugUnitTest --tests "*.FileToolsIntegrationTest"`
+- [x] Lint clean on changed files
 
 ---
 
@@ -808,15 +808,15 @@ Test: `delete_file returns error when delete not allowed`
 **Description**: Add inline permission toggles (Allow Write, Allow Delete) to each storage location row in the UI. Users can toggle these while the server is running. Permissions are NOT set in the Add Location dialog — only editable from the location row.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] Each storage location row shows "Allow Write" and "Allow Delete" toggles (Switch composables)
-- [ ] Toggles reflect the current permission state from `StorageLocation`
-- [ ] Toggling calls `MainViewModel.updateLocationAllowWrite()` / `updateLocationAllowDelete()`
-- [ ] Toggles are always enabled (no dependency on server running state)
-- [ ] String resources added for toggle labels
-- [ ] `MainViewModel` has `updateLocationAllowWrite()` and `updateLocationAllowDelete()` methods
-- [ ] `HomeScreen` wires up the new callbacks
-- [ ] `MainViewModelTest` updated with tests for the new ViewModel methods
-- [ ] Lint clean on changed files
+- [x] Each storage location row shows "Allow Write" and "Allow Delete" toggles (Switch composables)
+- [x] Toggles reflect the current permission state from `StorageLocation`
+- [x] Toggling calls `MainViewModel.updateLocationAllowWrite()` / `updateLocationAllowDelete()`
+- [x] Toggles are always enabled (no dependency on server running state)
+- [x] String resources added for toggle labels
+- [x] `MainViewModel` has `updateLocationAllowWrite()` and `updateLocationAllowDelete()` methods
+- [x] `HomeScreen` wires up the new callbacks
+- [x] `MainViewModelTest` updated with tests for the new ViewModel methods
+- [x] Lint clean on changed files
 
 ---
 
