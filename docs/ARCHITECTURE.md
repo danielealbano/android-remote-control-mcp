@@ -34,6 +34,12 @@ graph TB
             AppMgr["AppManager"]
         end
 
+        subgraph CameraSvc["Camera Services"]
+            CamProv["CameraProvider\n(CameraX)"]
+            SvcLifecycle["ServiceLifecycleOwner"]
+            CamProv --> SvcLifecycle
+        end
+
         subgraph McpServerSvc["McpServerService (Foreground Service)"]
             subgraph Ktor["McpServer (Ktor)"]
                 HTTP["HTTP :8080 (HTTPS optional)"]
@@ -54,6 +60,7 @@ graph TB
         MainAct -->|"StateFlow (status)"| McpServerSvc
         SDK -->|"Singleton\n(companion object)"| AccSvc
         SDK --> StorageSvc
+        SDK --> CameraSvc
     end
 ```
 
@@ -216,6 +223,8 @@ running requires a restart (UI disables config editing when server is running).
 | POST_NOTIFICATIONS       | Runtime (13+) | System dialog                      | Foreground notifications  |
 | Accessibility Service    | Special       | User enables in Settings           | UI introspection/actions  |
 | AccessibilityService takeScreenshot | Special | User enables in Settings | Screenshots (Android 11+) |
+| CAMERA                   | Runtime       | System dialog                      | Camera photo/video tools  |
+| RECORD_AUDIO             | Runtime       | System dialog                      | Video recording with audio|
 | SAF tree URI permissions | Special       | User grants via system file picker | File operations per storage location |
 
 ---

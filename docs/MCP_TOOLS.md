@@ -24,12 +24,13 @@ This document provides a comprehensive reference for all MCP tools available in 
 11. [Utility Tools](#7-utility-tools)
 12. [File Tools](#8-file-tools)
 13. [App Management Tools](#9-app-management-tools)
+14. [Camera Tools](#10-camera-tools)
 
 ---
 
 ## Overview
 
-The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized into 9 categories:
+The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized into 10 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -42,6 +43,7 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
+| Camera | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | 27 |
 
 ## Tool Naming Convention
 
@@ -2369,3 +2371,368 @@ Kills a background application process.
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing or empty `package_id`
 - **Action failed**: App not installed, failed to kill process
+
+---
+
+## 10. Camera Tools
+
+Camera tools provide access to the device's cameras for photo capture and video recording. Photos can be returned as base64-encoded JPEG images or saved to storage locations. Videos are always saved to storage locations and return a thumbnail.
+
+**Prerequisites**:
+- CAMERA runtime permission must be granted (check via UI Permissions section)
+- RECORD_AUDIO runtime permission must be granted for video recording with audio
+- Storage location with write permission must be configured for save tools
+
+### `android_list_cameras`
+
+Lists all available cameras on the device with their capabilities (facing direction, flash support, photo/video support).
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {},
+  "required": []
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_list_cameras",
+    "arguments": {}
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"camera_id\":\"0\",\"facing\":\"back\",\"has_flash\":true,\"supports_photo\":true,\"supports_video\":true},{\"camera_id\":\"1\",\"facing\":\"front\",\"has_flash\":false,\"supports_photo\":true,\"supports_video\":true}]"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Permission denied**: CAMERA permission not granted
+
+### `android_list_camera_photo_resolutions`
+
+Lists supported photo resolutions for a specific camera.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `camera_id` | string | Yes | Camera identifier from `list_cameras` |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "camera_id": { "type": "string", "description": "Camera identifier from list_cameras" }
+  },
+  "required": ["camera_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_list_camera_photo_resolutions",
+    "arguments": { "camera_id": "0" }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"width\":4032,\"height\":3024,\"megapixels\":12.2,\"aspect_ratio\":\"4:3\"},{\"width\":1920,\"height\":1080,\"megapixels\":2.1,\"aspect_ratio\":\"16:9\"},{\"width\":1280,\"height\":720,\"megapixels\":0.9,\"aspect_ratio\":\"16:9\"}]"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `camera_id`
+- **Permission denied**: CAMERA permission not granted
+- **Action failed**: Camera not found
+
+### `android_list_camera_video_resolutions`
+
+Lists supported video resolutions for a specific camera.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `camera_id` | string | Yes | Camera identifier from `list_cameras` |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "camera_id": { "type": "string", "description": "Camera identifier from list_cameras" }
+  },
+  "required": ["camera_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_list_camera_video_resolutions",
+    "arguments": { "camera_id": "0" }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"width\":1920,\"height\":1080,\"aspect_ratio\":\"16:9\",\"quality_label\":\"FHD\"},{\"width\":1280,\"height\":720,\"aspect_ratio\":\"16:9\",\"quality_label\":\"HD\"}]"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `camera_id`
+- **Permission denied**: CAMERA permission not granted
+- **Action failed**: Camera not found
+
+### `android_take_camera_photo`
+
+Captures a photo from the specified camera and returns it as a base64-encoded JPEG image. Default resolution is 720p (closest available match). Maximum resolution is capped at 1920x1080 to prevent excessively large responses. Use `save_camera_photo` for higher resolutions.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `camera_id` | string | Yes | Camera identifier from `list_cameras` |
+| `resolution` | string | No | Resolution as WIDTHxHEIGHT (e.g., "1280x720"). Default: 720p closest match. Max: 1920x1080 |
+| `quality` | integer | No | JPEG quality (1-100). Default: 80 |
+| `flash_mode` | string | No | Flash mode: "off", "on", or "auto". Default: "auto" |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "camera_id": { "type": "string", "description": "Camera identifier from list_cameras" },
+    "resolution": { "type": "string", "description": "Resolution as WIDTHxHEIGHT (e.g., '1280x720'). Default: 720p closest match. Max: 1920x1080." },
+    "quality": { "type": "integer", "description": "JPEG quality (1-100). Default: 80." },
+    "flash_mode": { "type": "string", "description": "Flash mode: 'off', 'on', or 'auto'. Default: 'auto'." }
+  },
+  "required": ["camera_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_take_camera_photo",
+    "arguments": { "camera_id": "0", "quality": 90, "flash_mode": "off" }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "image",
+        "data": "/9j/4AAQSkZJRg...(base64 JPEG data)...",
+        "mimeType": "image/jpeg"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `camera_id`, invalid resolution format, quality out of range (1-100), invalid flash mode
+- **Permission denied**: CAMERA permission not granted
+- **Action failed**: Camera not found, capture failed
+
+### `android_save_camera_photo`
+
+Captures a photo from the specified camera and saves it to a storage location. Requires write permission on the storage location. Default resolution is 720p (closest available match).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `camera_id` | string | Yes | Camera identifier from `list_cameras` |
+| `location_id` | string | Yes | Storage location identifier |
+| `path` | string | Yes | Relative file path (e.g., "photos/photo.jpg") |
+| `resolution` | string | No | Resolution as WIDTHxHEIGHT (e.g., "1280x720"). Default: 720p closest match |
+| `quality` | integer | No | JPEG quality (1-100). Default: 80 |
+| `flash_mode` | string | No | Flash mode: "off", "on", or "auto". Default: "auto" |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "camera_id": { "type": "string", "description": "Camera identifier from list_cameras" },
+    "location_id": { "type": "string", "description": "Storage location identifier" },
+    "path": { "type": "string", "description": "Relative file path (e.g., 'photos/photo.jpg')" },
+    "resolution": { "type": "string", "description": "Resolution as WIDTHxHEIGHT (e.g., '1280x720'). Default: 720p closest match." },
+    "quality": { "type": "integer", "description": "JPEG quality (1-100). Default: 80." },
+    "flash_mode": { "type": "string", "description": "Flash mode: 'off', 'on', or 'auto'. Default: 'auto'." }
+  },
+  "required": ["camera_id", "location_id", "path"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_save_camera_photo",
+    "arguments": {
+      "camera_id": "0",
+      "location_id": "com.android.externalstorage.documents/primary:DCIM",
+      "path": "photos/photo_001.jpg",
+      "resolution": "1920x1080"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Photo saved successfully: photos/photo_001.jpg (245760 bytes)"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `camera_id`, `location_id`, or `path`; invalid resolution format; quality out of range; invalid flash mode
+- **Permission denied**: CAMERA permission not granted; storage location not authorized; write not permitted
+- **Action failed**: Camera not found, capture failed
+
+### `android_save_camera_video`
+
+Records a video from the specified camera and saves it to a storage location. Maximum duration is 30 seconds. Includes audio by default. Requires write permission on the storage location. Returns a thumbnail of the first frame. Default resolution is 720p (closest available match).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `camera_id` | string | Yes | Camera identifier from `list_cameras` |
+| `location_id` | string | Yes | Storage location identifier |
+| `path` | string | Yes | Relative file path (e.g., "videos/video.mp4") |
+| `duration` | integer | Yes | Recording duration in seconds (1-30) |
+| `resolution` | string | No | Resolution as WIDTHxHEIGHT (e.g., "1280x720"). Default: 720p closest match |
+| `audio` | boolean | No | Whether to record audio. Default: true. Requires RECORD_AUDIO permission |
+| `flash_mode` | string | No | Flash mode: "off", "on", or "auto". Default: "auto" |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "camera_id": { "type": "string", "description": "Camera identifier from list_cameras" },
+    "location_id": { "type": "string", "description": "Storage location identifier" },
+    "path": { "type": "string", "description": "Relative file path (e.g., 'videos/video.mp4')" },
+    "duration": { "type": "integer", "description": "Recording duration in seconds (1-30)." },
+    "resolution": { "type": "string", "description": "Resolution as WIDTHxHEIGHT (e.g., '1280x720'). Default: 720p closest match." },
+    "audio": { "type": "boolean", "description": "Whether to record audio. Default: true. Requires RECORD_AUDIO permission." },
+    "flash_mode": { "type": "string", "description": "Flash mode: 'off', 'on', or 'auto'. Default: 'auto'." }
+  },
+  "required": ["camera_id", "location_id", "path", "duration"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_save_camera_video",
+    "arguments": {
+      "camera_id": "0",
+      "location_id": "com.android.externalstorage.documents/primary:DCIM",
+      "path": "videos/recording_001.mp4",
+      "duration": 10
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Video saved successfully: videos/recording_001.mp4 (5242880 bytes, 10000ms)"
+      },
+      {
+        "type": "image",
+        "data": "/9j/4AAQSkZJRg...(base64 JPEG thumbnail of first frame)...",
+        "mimeType": "image/jpeg"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `camera_id`, `location_id`, `path`, or `duration`; duration out of range (1-30); invalid resolution format; invalid flash mode
+- **Permission denied**: CAMERA permission not granted; RECORD_AUDIO permission not granted (when audio=true); storage location not authorized; write not permitted
+- **Action failed**: Camera not found, recording failed
