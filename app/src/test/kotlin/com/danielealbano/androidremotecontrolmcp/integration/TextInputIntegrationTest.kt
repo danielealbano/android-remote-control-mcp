@@ -2,10 +2,12 @@
 
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +46,28 @@ class TextInputIntegrationTest {
                 ),
         )
 
+    private val sampleScreenInfo =
+        ScreenInfo(
+            width = 1080,
+            height = 2400,
+            densityDpi = 420,
+            orientation = "portrait",
+        )
+
+    private val sampleWindows =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                activityName = ".Main",
+                layer = 0,
+                focused = true,
+                tree = sampleTree,
+            ),
+        )
+
     private fun createMockSurroundingText(
         text: String,
         offset: Int = 0,
@@ -70,14 +94,9 @@ class TextInputIntegrationTest {
     fun `type_append_text with element_id returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
-
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_edit", sampleTree)
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             // Explicitly configure TypeInputController mock returns
@@ -126,14 +145,9 @@ class TextInputIntegrationTest {
     fun `type_insert_text with valid offset returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
-
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_edit", sampleTree)
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true
@@ -170,14 +184,9 @@ class TextInputIntegrationTest {
     fun `type_replace_text with found search text returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
-
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_edit", sampleTree)
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true
@@ -215,14 +224,9 @@ class TextInputIntegrationTest {
     fun `type_replace_text with missing search text returns error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
-
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_edit", sampleTree)
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true
@@ -250,14 +254,9 @@ class TextInputIntegrationTest {
     fun `type_clear_text returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.isReady() } returns true
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
-
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_edit", sampleTree)
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true

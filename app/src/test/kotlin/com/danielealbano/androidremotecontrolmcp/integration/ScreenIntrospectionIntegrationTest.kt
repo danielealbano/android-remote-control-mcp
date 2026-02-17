@@ -3,7 +3,6 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
 import android.graphics.Bitmap
-import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
@@ -68,14 +67,13 @@ class ScreenIntrospectionIntegrationTest {
     }
 
     private fun MockDependencies.setupReadyService() {
-        val mockRootNode = mockk<AccessibilityNodeInfo>()
-        every { accessibilityServiceProvider.isReady() } returns true
-        every { accessibilityServiceProvider.getRootNode() } returns mockRootNode
-        every { treeParser.parseTree(mockRootNode) } returns sampleTree
-        every { accessibilityServiceProvider.getCurrentPackageName() } returns "com.example.app"
-        every { accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
-        every { accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
-        every { mockRootNode.recycle() } returns Unit
+        McpIntegrationTestHelper.setupMultiWindowMock(
+            deps = this,
+            tree = sampleTree,
+            screenInfo = sampleScreenInfo,
+            packageName = "com.example.app",
+            activityName = ".MainActivity",
+        )
     }
 
     @Test
@@ -98,14 +96,19 @@ class ScreenIntrospectionIntegrationTest {
                 assertTrue(textContent.contains("note:certain elements are custom and will not be properly reported"))
                 assertTrue(textContent.contains("note:flags: on=onscreen off=offscreen"))
                 assertTrue(textContent.contains("note:offscreen items require scroll_to_element before interaction"))
-                assertTrue(textContent.contains("app:com.example.app activity:.MainActivity"))
                 assertTrue(textContent.contains("screen:1080x2400 density:420 orientation:portrait"))
+                // Multi-window format: per-window header instead of global app line
+                assertTrue(textContent.contains("--- window:0 type:APPLICATION"))
+                assertTrue(textContent.contains("pkg:com.example.app"))
+                assertTrue(textContent.contains("activity:.MainActivity"))
                 assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
                 assertTrue(textContent.contains("node_btn"))
                 assertTrue(textContent.contains("on,clk,ena"))
                 // Negative assertions: ensure old single-char flag format is gone
                 assertFalse(textContent.contains("\tvcn"))
                 assertFalse(textContent.contains("\tvclfsen"))
+                // Negative assertions: old global app: line should not be present
+                assertFalse(textContent.contains("app:com.example.app activity:.MainActivity"))
             }
         }
 
@@ -146,7 +149,7 @@ class ScreenIntrospectionIntegrationTest {
                 assertTrue(textContent.contains("note:"))
                 assertTrue(textContent.contains("note:flags:"))
                 assertTrue(textContent.contains("note:offscreen items"))
-                assertTrue(textContent.contains("app:"))
+                assertTrue(textContent.contains("--- window:0 type:APPLICATION"))
 
                 val imageContent = result.content[1] as ImageContent
                 assertEquals("image/jpeg", imageContent.mimeType)

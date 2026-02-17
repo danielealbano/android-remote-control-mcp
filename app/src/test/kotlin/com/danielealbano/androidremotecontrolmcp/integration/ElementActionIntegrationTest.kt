@@ -2,14 +2,15 @@
 
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.every
-import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -56,16 +57,21 @@ class ElementActionIntegrationTest {
         McpIntegrationTestHelper.unmockAndroidLog()
     }
 
+    private val sampleScreenInfo =
+        ScreenInfo(
+            width = 1080,
+            height = 2400,
+            densityDpi = 420,
+            orientation = "portrait",
+        )
+
     @Test
     fun `find_elements returns matching elements from mocked tree`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             every {
-                deps.elementFinder.findElements(sampleTree, FindBy.TEXT, "OK", false)
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.TEXT, "OK", false)
             } returns
                 listOf(
                     ElementInfo(
@@ -102,12 +108,9 @@ class ElementActionIntegrationTest {
     fun `click_element with valid node_id calls actionExecutor and returns success`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_btn", sampleTree)
+                deps.actionExecutor.clickNode("node_btn", any<List<WindowData>>())
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
@@ -125,12 +128,9 @@ class ElementActionIntegrationTest {
     fun `click_element with non-existent node_id returns element not found error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_xyz", sampleTree)
+                deps.actionExecutor.clickNode("node_xyz", any<List<WindowData>>())
             } returns Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
