@@ -84,6 +84,29 @@ class ElementFinder
         }
 
         /**
+         * Searches all windows' trees for elements matching the criteria.
+         * Delegates to [findElements] for each window's tree and aggregates results.
+         *
+         * @param windows The list of parsed windows to search.
+         * @param by The criteria to search by.
+         * @param value The value to search for.
+         * @param exactMatch If true, exact match. If false, case-insensitive contains.
+         * @return Aggregated list of [ElementInfo] across all windows.
+         */
+        fun findElements(
+            windows: List<WindowData>,
+            by: FindBy,
+            value: String,
+            exactMatch: Boolean = false,
+        ): List<ElementInfo> {
+            val results = mutableListOf<ElementInfo>()
+            for (windowData in windows) {
+                results.addAll(findElements(windowData.tree, by, value, exactMatch))
+            }
+            return results
+        }
+
+        /**
          * Finds a specific [AccessibilityNodeData] by its node [nodeId].
          *
          * @param tree The root of the parsed accessibility tree to search.
@@ -98,6 +121,25 @@ class ElementFinder
             if (tree.id == nodeId) return tree
             for (child in tree.children) {
                 val found = findNodeById(child, nodeId)
+                if (found != null) return found
+            }
+            return null
+        }
+
+        /**
+         * Searches all windows' trees for a node with the given [nodeId].
+         * Returns the first match found (searches in window order).
+         *
+         * @param windows The list of parsed windows to search.
+         * @param nodeId The node ID to find.
+         * @return The matching [AccessibilityNodeData], or null if not found in any window.
+         */
+        fun findNodeById(
+            windows: List<WindowData>,
+            nodeId: String,
+        ): AccessibilityNodeData? {
+            for (windowData in windows) {
+                val found = findNodeById(windowData.tree, nodeId)
                 if (found != null) return found
             }
             return null

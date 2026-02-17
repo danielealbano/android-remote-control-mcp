@@ -739,20 +739,20 @@ fun buildWindowHeaderWithActivity() {
 **Goal**: Update `ElementFinder` to search for elements across multiple window trees.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `findElements()` overload accepts `List<WindowData>` and searches all trees
-- [ ] `findNodeById()` overload accepts `List<WindowData>` and searches all trees
-- [ ] Original single-tree methods unchanged (used internally)
-- [ ] Lint passes
-- [ ] Unit tests pass
+- [x] `findElements()` overload accepts `List<WindowData>` and searches all trees
+- [x] `findNodeById()` overload accepts `List<WindowData>` and searches all trees
+- [x] Original single-tree methods unchanged (used internally)
+- [x] Lint passes
+- [x] Unit tests pass
 
 ### Task 4.1: Add multi-window overloads to `ElementFinder`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ElementFinder.kt`
 
 **Definition of Done**:
-- [ ] `findElements(windows, by, value, exactMatch)` delegates to single-tree version for each window
-- [ ] `findNodeById(windows, nodeId)` searches each window's tree, returns first match
-- [ ] Both return results consistent with single-tree behavior
+- [x] `findElements(windows, by, value, exactMatch)` delegates to single-tree version for each window
+- [x] `findNodeById(windows, nodeId)` searches each window's tree, returns first match
+- [x] Both return results consistent with single-tree behavior
 
 **Action 4.1.1**: Add multi-window `findElements()` overload
 
@@ -815,12 +815,12 @@ fun findNodeById(
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ElementFinderTest.kt`
 
 **Definition of Done**:
-- [ ] Test: `findElements` across two windows finds elements from both
-- [ ] Test: `findElements` with no matches returns empty list
-- [ ] Test: `findNodeById` finds node in first window
-- [ ] Test: `findNodeById` finds node in second window
-- [ ] Test: `findNodeById` returns null when not found in any window
-- [ ] Existing single-tree tests still pass
+- [x] Test: `findElements` across two windows finds elements from both
+- [x] Test: `findElements` with no matches returns empty list
+- [x] Test: `findNodeById` finds node in first window
+- [x] Test: `findNodeById` finds node in second window
+- [x] Test: `findNodeById` returns null when not found in any window
+- [x] Existing single-tree tests still pass
 
 **Action 4.2.1**: Add multi-window test class
 
