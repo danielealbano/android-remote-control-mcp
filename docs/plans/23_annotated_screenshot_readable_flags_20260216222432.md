@@ -2297,7 +2297,7 @@ Update the note below the table:
 - [x] All unit + integration tests pass: `make test-unit`
 - [x] Lint passes: `make lint`
 - [ ] E2E tests pass: `make test-e2e` (if Docker environment is available; skip if not) — SKIPPED: Docker not available
-- [ ] Final review: re-read every changed file against this plan to verify nothing was missed or diverged
+- [x] Final review: re-read every changed file against this plan to verify nothing was missed or diverged
 
 ---
 
