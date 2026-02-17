@@ -2010,8 +2010,8 @@ A window appearing or disappearing means the UI is NOT idle — the fingerprint 
 - [x] New integration test: `click_element` clicks element in non-primary window
 - [x] `docs/MCP_TOOLS.md` updated with new TSV format
 - [x] `docs/ARCHITECTURE.md` updated with multi-window architecture
-- [ ] All tests pass
-- [ ] Build succeeds
+- [x] All tests pass
+- [x] Build succeeds
 
 ### Task 7.1: Update `McpIntegrationTestHelper`
 
@@ -2095,54 +2095,54 @@ Add a section on multi-window support: how `getWindows()` is used, the `WindowDa
 **Goal**: Comprehensive verification that all changes are correct, consistent, and complete.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] All linters pass (`make lint`)
-- [ ] All unit tests pass (`make test-unit`)
-- [ ] All integration tests pass (`make test-integration`)
-- [ ] Full build succeeds (`make build`)
-- [ ] Ground-up review of every changed file confirms consistency with this plan
+- [x] All linters pass (`make lint`)
+- [x] All unit tests pass (`make test-unit`)
+- [x] All integration tests pass (`make test-integration`)
+- [x] Full build succeeds (`make build`)
+- [x] Ground-up review of every changed file confirms consistency with this plan
 
 ### Task 8.1: Run all linters
 
-- [ ] `./gradlew ktlintCheck` — no errors
-- [ ] `./gradlew detekt` — no errors
+- [x] `./gradlew ktlintCheck` — no errors
+- [x] `./gradlew detekt` — no errors
 
 ### Task 8.2: Run all tests
 
-- [ ] `make test-unit` — all pass
-- [ ] `make test-integration` — all pass
-- [ ] `make test` — all pass
+- [x] `make test-unit` — all pass
+- [x] `make test-integration` — all pass
+- [x] `make test` — all pass
 
 ### Task 8.3: Build verification
 
-- [ ] `make build` — succeeds without warnings
+- [x] `make build` — succeeds without warnings
 
 ### Task 8.4: Ground-up implementation review
 
 **Definition of Done**:
-- [ ] Re-read every changed source file top-to-bottom
-- [ ] Verify `WindowData` fields match the agreed design
-- [ ] Verify `isReady()` only checks `instance != null`
-- [ ] Verify `getAccessibilityWindows()` is used everywhere that previously used `getRootNode()` for tree parsing
-- [ ] Verify `getRootNode()` is ONLY used in fallback paths
-- [ ] Verify node IDs use `"root_w$windowId"` parent ID (using `AccessibilityWindowInfo.getId()`) in multi-window mode
-- [ ] Verify node IDs use `"root_w$windowId"` parent ID (using `rootNode.windowId`) in fallback (degraded) mode
-- [ ] Verify `CompactTreeFormatter.formatMultiWindow()` output matches the agreed TSV format exactly
-- [ ] Verify window header includes `activity:` only when available
-- [ ] Verify degradation note appears only when `degraded = true`
-- [ ] Verify `ElementFinder` multi-window methods search all windows
-- [ ] Verify `ActionExecutorImpl.performNodeAction()` matches windows by `AccessibilityWindowInfo.getId()` (not positional index)
-- [ ] Verify `ActionExecutorImpl.performNodeAction()` has degraded-mode fallback via `getRootNode()` when `getAccessibilityWindows()` is empty
-- [ ] Verify `AccessibilityWindowInfo` objects are recycled in `performNodeAction()` after use
-- [ ] Verify `AccessibilityWindowInfo` objects are recycled in `getFreshWindows()` after use (top-level `finally` block)
-- [ ] Verify `AccessibilityWindowInfo` objects are recycled in `findFocusedEditableNode()` after use (`finally` block)
-- [ ] Verify `ActionExecutorImpl.scroll()` uses `getScreenInfo()` not `getRootNode()`
-- [ ] Verify `findFocusedEditableNode()` searches all window roots
-- [ ] Verify `getFreshWindows()` fallback sets `degraded = true`
-- [ ] Verify `collectOnScreenElements()` collects from all windows for screenshot annotation
-- [ ] Verify no TODOs, no commented-out code, no stubs remain
-- [ ] Verify all new code has KDoc comments
-- [ ] Verify all test assertions are meaningful (not just `assertTrue(true)`)
-- [ ] Verify documentation matches implementation
+- [x] Re-read every changed source file top-to-bottom
+- [x] Verify `WindowData` fields match the agreed design
+- [x] Verify `isReady()` only checks `instance != null`
+- [x] Verify `getAccessibilityWindows()` is used everywhere that previously used `getRootNode()` for tree parsing
+- [x] Verify `getRootNode()` is ONLY used in fallback paths
+- [x] Verify node IDs use `"root_w$windowId"` parent ID (using `AccessibilityWindowInfo.getId()`) in multi-window mode
+- [x] Verify node IDs use `"root_w$windowId"` parent ID (using `rootNode.windowId`) in fallback (degraded) mode
+- [x] Verify `CompactTreeFormatter.formatMultiWindow()` output matches the agreed TSV format exactly
+- [x] Verify window header includes `activity:` only when available
+- [x] Verify degradation note appears only when `degraded = true`
+- [x] Verify `ElementFinder` multi-window methods search all windows
+- [x] Verify `ActionExecutorImpl.performNodeAction()` matches windows by `AccessibilityWindowInfo.getId()` (not positional index)
+- [x] Verify `ActionExecutorImpl.performNodeAction()` has degraded-mode fallback via `getRootNode()` when `getAccessibilityWindows()` is empty
+- [x] Verify `AccessibilityWindowInfo` objects are recycled in `performNodeAction()` after use
+- [x] Verify `AccessibilityWindowInfo` objects are recycled in `getFreshWindows()` after use (top-level `finally` block)
+- [x] Verify `AccessibilityWindowInfo` objects are recycled in `findFocusedEditableNode()` after use (`finally` block)
+- [x] Verify `ActionExecutorImpl.scroll()` uses `getScreenInfo()` not `getRootNode()`
+- [x] Verify `findFocusedEditableNode()` searches all window roots
+- [x] Verify `getFreshWindows()` fallback sets `degraded = true`
+- [x] Verify `collectOnScreenElements()` collects from all windows for screenshot annotation
+- [x] Verify no TODOs, no commented-out code, no stubs remain
+- [x] Verify all new code has KDoc comments
+- [x] Verify all test assertions are meaningful (not just `assertTrue(true)`)
+- [x] Verify documentation matches implementation
 
 ---
 
