@@ -223,7 +223,7 @@ Attached APKs follow this naming convention:
 
 ### Pipeline Behavior
 
-1. **CI Gate**: The workflow waits for the CI pipeline (`Build Release` check) to pass on the tagged commit before proceeding. If CI hasn't run yet, it polls until complete.
+1. **CI Gate**: The workflow waits for the CI pipeline (`Build Release` check) to pass on the tagged commit before proceeding. If CI hasn't completed yet, it polls until it finishes or the job timeout (150 minutes) is reached.
 2. **Build**: APKs are built with `VERSION_NAME` and `VERSION_CODE` injected from the tag.
 3. **Release Notes**: AI-generated summary + auto-generated PR list + changelog link. If AI generation fails, the release is created without the summary section.
 4. **Draft Release**: Created as draft — you must manually review and publish.

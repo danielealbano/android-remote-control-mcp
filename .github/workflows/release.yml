@@ -27,7 +27,14 @@ jobs:
           fetch-depth: 0
           submodules: true
 
-      # ── 2. Wait for CI to pass on this commit ──
+      # ── 2. Warn if tagged commit is not on main ──
+      - name: Verify tagged commit is on main
+        run: |
+          if ! git branch -r --contains HEAD | grep -q 'origin/main'; then
+            echo "::warning::The tagged commit does not appear to be on the main branch. CI may not have run for this commit, and the release workflow will wait until timeout."
+          fi
+
+      # ── 3. Wait for CI to pass on this commit (gates on existing CI results) ──
       - name: Wait for CI to pass
         uses: lewagon/wait-on-check-action@a499964d3917700d29a2a8baf3f16b078d609410 # v1.5.0
         with:
@@ -38,7 +45,7 @@ jobs:
           allowed-conclusions: success
           running-workflow-name: 'Create Draft Release'
 
-      # ── 3. Parse tag → VERSION_NAME, VERSION_CODE, pre-release flag ──
+      # ── 4. Parse tag → VERSION_NAME, VERSION_CODE, pre-release flag ──
       - name: Parse tag
         id: parse-tag
         env:
@@ -70,7 +77,11 @@ jobs:
             OFFSET=10
             IS_PRERELEASE="true"
           elif [[ "$PRERELEASE" =~ ^rc([0-9]+)$ ]]; then
-            RC_NUM="${BASH_REMATCH[1]}"
+            RC_NUM=$((10#${BASH_REMATCH[1]}))
+            if [ "$RC_NUM" -lt 1 ]; then
+              echo "::error::RC number must be >= 1 (got rc${RC_NUM})"
+              exit 1
+            fi
             OFFSET=$(( 20 + RC_NUM ))
             if [ "$OFFSET" -ge 99 ]; then
               echo "::error::RC number too high: rc${RC_NUM} (max rc78)"
@@ -83,6 +94,12 @@ jobs:
           fi
 
           VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 + OFFSET ))
+
+          # Android versionCode must fit in a signed 32-bit integer (max 2147483647)
+          if [ "$VERSION_CODE" -gt 2147483647 ]; then
+            echo "::error::VERSION_CODE overflow: $VERSION_CODE exceeds Android maximum (2147483647)"
+            exit 1
+          fi
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -97,7 +114,7 @@ jobs:
           echo "| Version Code | \`$VERSION_CODE\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Pre-release | $IS_PRERELEASE |" >> "$GITHUB_STEP_SUMMARY"
 
-      # ── 4. Setup build toolchains (same as CI build-release job) ──
+      # ── 5. Setup build toolchains (same as CI build-release job) ──
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -115,9 +132,9 @@ jobs:
           targets: aarch64-linux-android,x86_64-linux-android
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
-      # ── 5. Compile native dependencies ──
+      # ── 6. Compile native dependencies ──
       - name: Compile cloudflared for Android
         run: make compile-cloudflared
 
@@ -127,20 +144,25 @@ jobs:
           JAVA_11_HOME: ${{ env.JAVA_HOME }}
           JAVA_17_HOME: ${{ env.JAVA_HOME }}
 
-      # ── 6. Build APKs with version from tag ──
+      # ── 7. Build APKs with version from tag ──
       - name: Build APKs
         env:
           VERSION_NAME: ${{ steps.parse-tag.outputs.version }}
           VERSION_CODE: ${{ steps.parse-tag.outputs.version-code }}
         run: ./gradlew assembleDebug assembleRelease -PVERSION_NAME="$VERSION_NAME" -PVERSION_CODE="$VERSION_CODE"
 
-      # ── 7. Rename APKs with proper names ──
+      # ── 8. Rename APKs with proper names ──
       - name: Rename APKs
         env:
           TAG: ${{ steps.parse-tag.outputs.tag }}
         run: |
           mkdir -p release-assets
 
+          # Debug APK
+          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "::error::Debug APK not found at app/build/outputs/apk/debug/app-debug.apk"
+            exit 1
+          fi
           cp app/build/outputs/apk/debug/app-debug.apk \
             "release-assets/android-remote-control-mcp-${TAG}-debug.apk"
 
@@ -159,14 +181,17 @@ jobs:
           ls -lh release-assets/ >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      # ── 8. Find previous tag for release notes context ──
+      # ── 9. Find previous tag for release notes context ──
       - name: Find previous tag
         id: prev-tag
         env:
           CURRENT_TAG: ${{ steps.parse-tag.outputs.tag }}
         run: |
-          # Get the tag before the current one, sorted by version (v* tags only)
-          PREV_TAG=$(git tag --list 'v*' --sort=-version:refname \
+          # Get the tag before the current one, sorted by version
+          # -c versionsort.suffix=- ensures pre-release tags sort before their base version (semver ordering)
+          # grep -E filters to strict semver tags only (prevents non-version v* tags from being picked)
+          PREV_TAG=$(git -c versionsort.suffix=- tag --list 'v*' --sort=-version:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' \
             | grep -vxF "${CURRENT_TAG}" \
             | head -1)
 
@@ -180,7 +205,7 @@ jobs:
             echo "Previous tag: $PREV_TAG"
           fi
 
-      # ── 9. Generate auto release notes via GitHub API ──
+      # ── 10. Generate auto release notes via GitHub API ──
       - name: Generate auto release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -201,7 +226,7 @@ jobs:
 
           echo "Auto-generated release notes saved to auto-notes.md"
 
-      # ── 10. Gather PR details (titles + bodies) for AI context ──
+      # ── 11. Gather PR details (titles + bodies) for AI context ──
       - name: Gather PR details for AI context
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -229,7 +254,7 @@ jobs:
 
           echo "Gathered details for $(echo "$PR_NUMBERS" | wc -w | tr -d ' ') PRs"
 
-      # ── 11. Generate AI summary via GitHub Models ──
+      # ── 12. Generate AI summary via GitHub Models ──
       - name: Generate AI summary
         id: ai-summary
         continue-on-error: true
@@ -241,7 +266,7 @@ jobs:
           file_input: |
             pr_details: ./pr-details.txt
 
-      # ── 12. Compose release body ──
+      # ── 13. Compose release body ──
       - name: Compose release body
         env:
           TAG: ${{ steps.parse-tag.outputs.tag }}
@@ -287,7 +312,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           cat release-body.md >> "$GITHUB_STEP_SUMMARY"
 
-      # ── 13. Create draft release with APK attachments ──
+      # ── 14. Create draft release with APK attachments ──
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

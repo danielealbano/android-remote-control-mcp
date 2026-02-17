@@ -476,7 +476,7 @@ jobs:
 - [x] Tag parsing rejects: `v1.0`, `v1.0.0-gamma`, `v1.0.0-`, `v1.0.0-rc79` (overflow), `v1.0.0-rc99` (overflow)
 - [x] VERSION_CODE formula produces correct values for all examples in Design Decisions
 - [x] RC number overflow check (`rc78` max → offset 98, `rc79+` → error before colliding with release offset 99)
-- [x] Build setup (JDK, Go, Rust, Gradle, native deps) matches CI `build-release` job exactly
+- [x] Build setup (JDK, Go, Rust, Gradle, native deps) matches CI `build-release` job (Rust and Gradle are SHA-pinned in release for supply chain security)
 - [x] APKs built with single Gradle invocation (`assembleDebug assembleRelease`)
 - [x] APK rename handles both `app-release.apk` (signed) and `app-release-unsigned.apk` (unsigned)
 - [x] Step summary `ls` output wrapped in code block (triple backticks)
