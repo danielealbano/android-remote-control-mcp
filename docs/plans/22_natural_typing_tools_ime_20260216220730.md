@@ -119,7 +119,7 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 | File | Action |
 |------|--------|
 | `app/build.gradle.kts` | Modify: raise `minSdk` from 26 to 33 |
-| `app/src/main/res/xml/accessibility_service_config.xml` | Modify: add `android:isInputMethodEditor="true"` and `flagInputMethodEditor` to flags |
+| `app/src/main/res/xml/accessibility_service_config.xml` | Modify: add `flagInputMethodEditor` to `accessibilityFlags` (note: `android:isInputMethodEditor` XML attribute does not exist in the SDK) |
 | `app/src/main/kotlin/.../services/accessibility/McpAccessibilityService.kt` | Modify: add `FLAG_INPUT_METHOD_EDITOR` to flags, override `onCreateInputMethod()`, add `InputMethod` subclass, expose input connection access |
 | `app/src/main/kotlin/.../services/accessibility/TypeInputController.kt` | **Create**: interface wrapping `AccessibilityInputConnection` operations |
 | `app/src/main/kotlin/.../services/accessibility/TypeInputControllerImpl.kt` | **Create**: implementation of `TypeInputController` |
@@ -231,8 +231,11 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 
 ```diff
 -    fun canTakeScreenshot(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
++    @Suppress("FunctionOnlyReturningConstant")
 +    fun canTakeScreenshot(): Boolean = true
 ```
+
+Note: `@Suppress("FunctionOnlyReturningConstant")` is required because detekt flags functions that always return a constant. The function is kept as-is (rather than inlined as `true`) to maintain API stability for callers like `ScreenCaptureProviderImpl`.
 
 - [x] **Action 1.2.3**: Remove `@RequiresApi` from `takeScreenshotBitmap()`
 
@@ -497,11 +500,11 @@ Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are de
 
 **Definition of Done**: Config XML declares IME capability.
 
-- [x] **Action 2.1.1**: Add `isInputMethodEditor` attribute
+- [x] **Action 2.1.1**: Add `flagInputMethodEditor` to accessibility flags
 
 **File**: `app/src/main/res/xml/accessibility_service_config.xml`
 
-**What changes**: Add `android:isInputMethodEditor="true"` attribute to the `<accessibility-service>` element. This attribute is `R.styleable.AccessibilityService_isInputMethodEditor`, added in API 33.
+**What changes**: Add `flagInputMethodEditor` to the `android:accessibilityFlags` attribute. Note: the plan originally also specified adding `android:isInputMethodEditor="true"` as a separate XML attribute, but this attribute does NOT exist in the Android SDK (not in API 33, 34, 35, or 36). The IME capability is configured entirely via the `flagInputMethodEditor` flag in `accessibilityFlags`.
 
 ```diff
  <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
@@ -512,7 +515,6 @@ Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are de
      android:canPerformGestures="true"
      android:canRetrieveWindowContent="true"
      android:canTakeScreenshot="true"
-+    android:isInputMethodEditor="true"
      android:description="@string/accessibility_service_description"
      android:notificationTimeout="100"
      android:settingsActivity="com.danielealbano.androidremotecontrolmcp.ui.MainActivity" />
@@ -2250,7 +2252,7 @@ Fix any stale references found.
 - [x] All files modified/created in this plan are reviewed for correctness
 - [x] minSdk is 33 in `build.gradle.kts`
 - [x] No API < 33 compat code remains anywhere in the codebase (including Theme.kt)
-- [x] `accessibility_service_config.xml` has `isInputMethodEditor="true"` and `flagInputMethodEditor`
+- [x] `accessibility_service_config.xml` has `flagInputMethodEditor` in `accessibilityFlags` (note: `android:isInputMethodEditor` XML attribute does not exist in the SDK)
 - [x] `McpAccessibilityService` has `FLAG_INPUT_METHOD_EDITOR`, `onCreateInputMethod()`, `McpInputMethod` nested class (not `inner`)
 - [x] `TypeInputController` interface has all required methods **returning Boolean** (except `isReady` and `getSurroundingText`)
 - [x] `TypeInputControllerImpl` correctly delegates to `AccessibilityInputConnection`, returns Boolean for IC availability (not operation success — underlying methods return `void`), has no unused imports or fields, no instance-level `inputMethod` property
