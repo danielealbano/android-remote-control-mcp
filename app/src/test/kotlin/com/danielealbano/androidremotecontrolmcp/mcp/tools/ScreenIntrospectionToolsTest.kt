@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.graphics.Bitmap
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -10,6 +11,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -36,6 +39,8 @@ class ScreenIntrospectionToolsTest {
     private lateinit var mockScreenCaptureProvider: ScreenCaptureProvider
     private lateinit var mockTreeParser: AccessibilityTreeParser
     private lateinit var mockCompactTreeFormatter: CompactTreeFormatter
+    private lateinit var mockScreenshotAnnotator: ScreenshotAnnotator
+    private lateinit var mockScreenshotEncoder: ScreenshotEncoder
     private lateinit var mockRootNode: AccessibilityNodeInfo
 
     @BeforeEach
@@ -44,6 +49,8 @@ class ScreenIntrospectionToolsTest {
         mockScreenCaptureProvider = mockk<ScreenCaptureProvider>()
         mockTreeParser = mockk<AccessibilityTreeParser>()
         mockCompactTreeFormatter = mockk<CompactTreeFormatter>()
+        mockScreenshotAnnotator = mockk(relaxed = true)
+        mockScreenshotEncoder = mockk(relaxed = true)
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
     }
 
@@ -104,6 +111,7 @@ class ScreenIntrospectionToolsTest {
         every {
             mockCompactTreeFormatter.format(sampleTree, "com.example", ".Main", sampleScreenInfo)
         } returns sampleCompactOutput
+        every { mockCompactTreeFormatter.shouldKeepNode(any()) } returns true
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -123,6 +131,8 @@ class ScreenIntrospectionToolsTest {
                     mockAccessibilityServiceProvider,
                     mockScreenCaptureProvider,
                     mockCompactTreeFormatter,
+                    mockScreenshotAnnotator,
+                    mockScreenshotEncoder,
                 )
         }
 
@@ -145,13 +155,20 @@ class ScreenIntrospectionToolsTest {
             runTest {
                 setupReadyService()
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+                val mockBitmap = mockk<Bitmap>(relaxed = true)
+                val mockAnnotatedBitmap = mockk<Bitmap>(relaxed = true)
                 coEvery {
-                    mockScreenCaptureProvider.captureScreenshot(
-                        ScreenCaptureProvider.DEFAULT_QUALITY,
+                    mockScreenCaptureProvider.captureScreenshotBitmap(
                         GetScreenStateHandler.SCREENSHOT_MAX_SIZE,
                         GetScreenStateHandler.SCREENSHOT_MAX_SIZE,
                     )
-                } returns Result.success(ScreenshotData(data = "base64data", width = 700, height = 500))
+                } returns Result.success(mockBitmap)
+                every {
+                    mockScreenshotAnnotator.annotate(any(), any(), any(), any())
+                } returns mockAnnotatedBitmap
+                every {
+                    mockScreenshotEncoder.bitmapToScreenshotData(any(), any())
+                } returns ScreenshotData(data = "base64data", width = 700, height = 500)
 
                 val params = buildJsonObject { put("include_screenshot", true) }
                 val result = handler.execute(params)
@@ -170,16 +187,23 @@ class ScreenIntrospectionToolsTest {
             runTest {
                 setupReadyService()
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+                val mockBitmap = mockk<Bitmap>(relaxed = true)
+                val mockAnnotatedBitmap = mockk<Bitmap>(relaxed = true)
                 coEvery {
-                    mockScreenCaptureProvider.captureScreenshot(any(), any(), any())
-                } returns Result.success(ScreenshotData(data = "base64data", width = 700, height = 500))
+                    mockScreenCaptureProvider.captureScreenshotBitmap(any(), any())
+                } returns Result.success(mockBitmap)
+                every {
+                    mockScreenshotAnnotator.annotate(any(), any(), any(), any())
+                } returns mockAnnotatedBitmap
+                every {
+                    mockScreenshotEncoder.bitmapToScreenshotData(any(), any())
+                } returns ScreenshotData(data = "base64data", width = 700, height = 500)
 
                 val params = buildJsonObject { put("include_screenshot", true) }
                 handler.execute(params)
 
                 coVerify(exactly = 1) {
-                    mockScreenCaptureProvider.captureScreenshot(
-                        ScreenCaptureProvider.DEFAULT_QUALITY,
+                    mockScreenCaptureProvider.captureScreenshotBitmap(
                         GetScreenStateHandler.SCREENSHOT_MAX_SIZE,
                         GetScreenStateHandler.SCREENSHOT_MAX_SIZE,
                     )
@@ -197,7 +221,7 @@ class ScreenIntrospectionToolsTest {
                 assertEquals(1, result.content.size)
                 assertTrue(result.content[0] is TextContent)
                 coVerify(exactly = 0) {
-                    mockScreenCaptureProvider.captureScreenshot(any(), any(), any())
+                    mockScreenCaptureProvider.captureScreenshotBitmap(any(), any())
                 }
             }
 
@@ -213,7 +237,7 @@ class ScreenIntrospectionToolsTest {
                 assertEquals(1, result.content.size)
                 assertTrue(result.content[0] is TextContent)
                 coVerify(exactly = 0) {
-                    mockScreenCaptureProvider.captureScreenshot(any(), any(), any())
+                    mockScreenCaptureProvider.captureScreenshotBitmap(any(), any())
                 }
             }
 
@@ -264,15 +288,15 @@ class ScreenIntrospectionToolsTest {
                 setupReadyService()
                 every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
                 coEvery {
-                    mockScreenCaptureProvider.captureScreenshot(any(), any(), any())
-                } returns Result.failure(RuntimeException("Capture timeout"))
+                    mockScreenCaptureProvider.captureScreenshotBitmap(any(), any())
+                } returns Result.failure(RuntimeException("Screenshot capture failed"))
 
                 val params = buildJsonObject { put("include_screenshot", true) }
                 val exception =
                     assertThrows<McpToolException.ActionFailed> {
                         handler.execute(params)
                     }
-                assertTrue(exception.message!!.contains("Capture timeout"))
+                assertTrue(exception.message!!.contains("Screenshot capture failed"))
             }
 
         @Test
