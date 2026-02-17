@@ -1,8 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.os.Build
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
@@ -10,7 +8,7 @@ import javax.inject.Inject
 
 /**
  * Production implementation of [ScreenCaptureProvider] that uses
- * AccessibilityService.takeScreenshot() (Android 11+) for capturing screenshots.
+ * AccessibilityService.takeScreenshot() for capturing screenshots.
  *
  * This approach does NOT require user consent or additional permissions beyond
  * the accessibility service being enabled with canTakeScreenshot="true".
@@ -32,7 +30,6 @@ class ScreenCaptureProviderImpl
             ) : ServiceValidation()
         }
 
-        @SuppressLint("NewApi") // API 30 guard in validateService()
         @Suppress("ReturnCount")
         override suspend fun captureScreenshot(
             quality: Int,
@@ -69,13 +66,6 @@ class ScreenCaptureProviderImpl
 
         @Suppress("ReturnCount")
         private fun validateService(): ServiceValidation {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                return ServiceValidation.Invalid(
-                    McpToolException.PermissionDenied(
-                        "Screenshot capture requires Android 11 (API 30) or higher",
-                    ),
-                )
-            }
             val service =
                 McpAccessibilityService.instance
                     ?: return ServiceValidation.Invalid(
@@ -95,6 +85,6 @@ class ScreenCaptureProviderImpl
 
         override fun isScreenCaptureAvailable(): Boolean {
             val service = McpAccessibilityService.instance ?: return false
-            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && service.canTakeScreenshot()
+            return service.canTakeScreenshot()
         }
     }

@@ -6,13 +6,11 @@ import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.os.Build
 import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -136,24 +134,12 @@ class McpAccessibilityService : AccessibilityService() {
      *
      * @return [ScreenInfo] with width, height, densityDpi, and orientation.
      */
-    @Suppress("DEPRECATION")
     fun getScreenInfo(): ScreenInfo {
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val width: Int
-        val height: Int
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val metrics = windowManager.currentWindowMetrics
-            val bounds = metrics.bounds
-            width = bounds.width()
-            height = bounds.height()
-        } else {
-            val display = windowManager.defaultDisplay
-            val displayMetrics = android.util.DisplayMetrics()
-            display.getRealMetrics(displayMetrics)
-            width = displayMetrics.widthPixels
-            height = displayMetrics.heightPixels
-        }
+        val metrics = windowManager.currentWindowMetrics
+        val bounds = metrics.bounds
+        val width = bounds.width()
+        val height = bounds.height()
 
         val displayMetrics = resources.displayMetrics
         val densityDpi = displayMetrics.densityDpi
@@ -186,12 +172,11 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Takes a screenshot using AccessibilityService.takeScreenshot() API.
-     * Available on Android 11+ (API 30+). Does NOT require user consent.
+     * Does NOT require user consent.
      *
      * @param timeoutMs Maximum time to wait for screenshot capture.
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
-    @RequiresApi(Build.VERSION_CODES.R)
     suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
@@ -223,9 +208,10 @@ class McpAccessibilityService : AccessibilityService() {
         }
 
     /**
-     * Returns true if screenshot capability is available (Android 11+).
+     * Returns true if screenshot capability is available. Always true on minSdk 33+.
      */
-    fun canTakeScreenshot(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+    @Suppress("FunctionOnlyReturningConstant")
+    fun canTakeScreenshot(): Boolean = true
 
     companion object {
         private const val TAG = "MCP:AccessibilityService"
