@@ -30,6 +30,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
@@ -95,6 +96,8 @@ class McpServerService : Service() {
     @Inject lateinit var fileOperationProvider: FileOperationProvider
 
     @Inject lateinit var appManager: AppManager
+
+    @Inject lateinit var typeInputController: TypeInputController
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -269,7 +272,14 @@ class McpServerService : Service() {
             accessibilityServiceProvider,
             toolNamePrefix,
         )
-        registerTextInputTools(server, treeParser, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
+        registerTextInputTools(
+            server,
+            treeParser,
+            actionExecutor,
+            accessibilityServiceProvider,
+            typeInputController,
+            toolNamePrefix,
+        )
         registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, toolNamePrefix)
         registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
         registerAppManagementTools(server, appManager, toolNamePrefix)

@@ -269,77 +269,6 @@ class LongClickElementTool
     }
 
 /**
- * MCP tool: set_text
- *
- * Sets text on an editable accessibility node. Text can be empty to clear the field.
- */
-class SetTextTool
-    @Inject
-    constructor(
-        private val treeParser: AccessibilityTreeParser,
-        private val actionExecutor: ActionExecutor,
-        private val accessibilityServiceProvider: AccessibilityServiceProvider,
-    ) {
-        @Suppress("ThrowsCount")
-        suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId =
-                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
-
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
-            }
-
-            // text is required but can be empty string (to clear field)
-            val textElement =
-                arguments["text"]
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
-            val textPrimitive =
-                textElement as? JsonPrimitive
-                    ?: throw McpToolException.InvalidParams("Parameter 'text' must be a string")
-            val text = textPrimitive.contentOrNull ?: ""
-
-            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-
-            val result = actionExecutor.setTextOnNode(elementId, text, tree)
-            result.onFailure { e -> mapNodeActionException(e, elementId) }
-
-            Log.d(TAG, "set_text: elementId=$elementId, textLength=${text.length} succeeded")
-            return McpToolUtils.textResult("Text set on element '$elementId'")
-        }
-
-        fun register(
-            server: Server,
-            toolNamePrefix: String,
-        ) {
-            server.addTool(
-                name = "$toolNamePrefix$TOOL_NAME",
-                description = "Set text on an editable accessibility node (empty string to clear)",
-                inputSchema =
-                    ToolSchema(
-                        properties =
-                            buildJsonObject {
-                                putJsonObject("element_id") {
-                                    put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
-                                }
-                                putJsonObject("text") {
-                                    put("type", "string")
-                                    put("description", "Text to set (empty string to clear)")
-                                }
-                            },
-                        required = listOf("element_id", "text"),
-                    ),
-            ) { request -> execute(request.arguments) }
-        }
-
-        companion object {
-            private const val TAG = "MCP:SetTextTool"
-            private const val TOOL_NAME = "set_text"
-        }
-    }
-
-/**
  * MCP tool: scroll_to_element
  *
  * Scrolls to make the specified element visible by finding its nearest
@@ -535,7 +464,6 @@ fun registerElementActionTools(
     FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
     ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
     LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    SetTextTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
     ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
         .register(server, toolNamePrefix)
 }

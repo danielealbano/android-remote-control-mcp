@@ -55,6 +55,44 @@ internal object McpToolUtils {
     }
 
     /**
+     * Extracts a required integer value from [params].
+     *
+     * Accepts JSON numbers only (not string-encoded). Rejects floats (e.g. 3.5).
+     *
+     * @throws McpToolException.InvalidParams if the parameter is missing, not a number,
+     *   or not an integer.
+     */
+    @Suppress("ThrowsCount")
+    fun requireInt(
+        params: JsonObject?,
+        name: String,
+    ): Int {
+        val element =
+            params?.get(name)
+                ?: throw McpToolException.InvalidParams("Missing required parameter: '$name'")
+        val primitive =
+            element as? JsonPrimitive
+                ?: throw McpToolException.InvalidParams("Parameter '$name' must be a number")
+        if (primitive.isString) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be a number, got string: '${primitive.content}'",
+            )
+        }
+        val doubleVal =
+            primitive.content.toDoubleOrNull()
+                ?: throw McpToolException.InvalidParams(
+                    "Parameter '$name' must be a number, got: '${primitive.content}'",
+                )
+        val intVal = doubleVal.toInt()
+        if (doubleVal != intVal.toDouble()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be an integer, got: '${primitive.content}'",
+            )
+        }
+        return intVal
+    }
+
+    /**
      * Extracts an optional numeric value from [params] as a [Float],
      * returning [default] if not present.
      *
