@@ -2292,11 +2292,11 @@ Update the note below the table:
 **Goal**: Update E2E tests for the new format, then verify everything works end-to-end.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] E2E tests updated with new flag format and note line assertions (`E2ECalculatorTest.kt`, `E2EScreenshotTest.kt`)
-- [ ] Project compiles without errors or warnings: `./gradlew assembleDebug`
-- [ ] All unit + integration tests pass: `make test-unit`
-- [ ] Lint passes: `make lint`
-- [ ] E2E tests pass: `make test-e2e` (if Docker environment is available; skip if not)
+- [x] E2E tests updated with new flag format and note line assertions (`E2ECalculatorTest.kt`, `E2EScreenshotTest.kt`)
+- [x] Project compiles without errors or warnings: `./gradlew assembleDebug`
+- [x] All unit + integration tests pass: `make test-unit`
+- [x] Lint passes: `make lint`
+- [ ] E2E tests pass: `make test-e2e` (if Docker environment is available; skip if not) — SKIPPED: Docker not available
 - [ ] Final review: re-read every changed file against this plan to verify nothing was missed or diverged
 
 ---
@@ -2381,10 +2381,10 @@ Update the note below the table:
 ### Task 4.2: Build, lint, and run full test suite
 
 **Acceptance Criteria**:
-- [ ] Project compiles without errors or warnings
-- [ ] All unit + integration tests pass
-- [ ] Lint passes with no new warnings/errors
-- [ ] E2E tests pass (if Docker available)
+- [x] Project compiles without errors or warnings
+- [x] All unit + integration tests pass
+- [x] Lint passes with no new warnings/errors
+- [ ] E2E tests pass (if Docker available) — SKIPPED: Docker not available
 
 #### Action 4.2.1: Compile the project
 
