@@ -80,6 +80,25 @@ class E2ECalculatorTest {
                 treeStr.contains(CALCULATOR_PACKAGE, ignoreCase = true),
             "Screen state should contain Calculator app. Excerpt: ${treeStr.take(500)}",
         )
+        // Verify new note lines
+        assertTrue(
+            treeStr.contains("note:flags: on=onscreen off=offscreen"),
+            "Screen state should contain flags legend note line",
+        )
+        assertTrue(
+            treeStr.contains("note:offscreen items require scroll_to_element before interaction"),
+            "Screen state should contain offscreen hint note line",
+        )
+        // Verify new comma-separated flag format (at least one element should be on-screen + clickable + enabled)
+        assertTrue(
+            treeStr.contains("on,clk") || treeStr.contains("on,ena"),
+            "Screen state flags should use comma-separated abbreviations",
+        )
+        // Negative assertions: old single-char format must not appear
+        assertFalse(
+            treeStr.contains("\tvcn") || treeStr.contains("\tvclfsen") || treeStr.contains("\tvn"),
+            "Screen state should NOT contain old single-char flag format",
+        )
 
         // Step 4: Find and click "7" button
         val button7 = findElementWithRetry("text", "7")

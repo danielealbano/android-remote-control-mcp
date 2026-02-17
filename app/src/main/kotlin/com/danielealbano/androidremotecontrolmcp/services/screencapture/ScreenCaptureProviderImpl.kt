@@ -68,7 +68,7 @@ class ScreenCaptureProviderImpl
         }
 
         @SuppressLint("NewApi")
-        @Suppress("ReturnCount")
+        @Suppress("ReturnCount", "TooGenericExceptionCaught")
         override suspend fun captureScreenshotBitmap(
             maxWidth: Int?,
             maxHeight: Int?,
