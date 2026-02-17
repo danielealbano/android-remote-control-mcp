@@ -26,7 +26,7 @@ All tool names use the `android_` prefix by default (e.g., `android_tap`). When 
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Screen Introspection** (1) | `android_get_screen_state` | Consolidated screen state: app info, screen dimensions, filtered UI element list (TSV), optional low-res screenshot |
+| **Screen Introspection** (1) | `android_get_screen_state` | Consolidated screen state: app info, screen dimensions, filtered UI element list (TSV), optional annotated low-res screenshot with bounding boxes and element ID labels |
 | **System Actions** (6) | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | Global device actions and log retrieval |
 | **Touch Actions** (5) | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | Coordinate-based touch interactions |
 | **Gestures** (2) | `android_pinch`, `android_custom_gesture` | Multi-touch and complex gestures |
