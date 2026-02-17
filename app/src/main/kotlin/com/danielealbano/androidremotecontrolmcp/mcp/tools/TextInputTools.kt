@@ -2,7 +2,6 @@
 
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
@@ -263,20 +262,9 @@ class PressKeyTool
 
             try {
                 val success =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        focusedNode.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
-                    } else {
-                        // Fallback for API < 30: append newline character
-                        val currentText = focusedNode.text?.toString() ?: ""
-                        val arguments =
-                            Bundle().apply {
-                                putCharSequence(
-                                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                                    currentText + "\n",
-                                )
-                            }
-                        focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
-                    }
+                    focusedNode.performAction(
+                        AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id,
+                    )
                 if (!success) {
                     throw McpToolException.ActionFailed("ENTER key action failed")
                 }
