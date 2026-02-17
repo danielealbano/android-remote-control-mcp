@@ -5,7 +5,6 @@ import android.graphics.Path
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import kotlin.coroutines.resume
@@ -528,7 +527,13 @@ class ActionExecutorImpl
         // Internal Helpers
         // ─────────────────────────────────────────────────────────────────────────
 
-        @Suppress("ReturnCount", "LongMethod")
+        @Suppress(
+            "ReturnCount",
+            "LongMethod",
+            "CyclomaticComplexMethod",
+            "NestedBlockDepth",
+            "LoopWithTooManyJumpStatements",
+        )
         private suspend fun performNodeAction(
             nodeId: String,
             windows: List<WindowData>,

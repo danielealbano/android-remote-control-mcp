@@ -9,7 +9,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
-import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

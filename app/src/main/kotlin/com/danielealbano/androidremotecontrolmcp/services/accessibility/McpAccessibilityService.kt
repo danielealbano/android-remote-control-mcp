@@ -119,7 +119,9 @@ class McpAccessibilityService : AccessibilityService() {
     fun getAccessibilityWindows(): List<AccessibilityWindowInfo> =
         try {
             windows ?: emptyList()
-        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
             Log.w(TAG, "getWindows() failed: ${e.message}")
             emptyList()
         }

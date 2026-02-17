@@ -7,9 +7,9 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -137,9 +137,7 @@ class GetScreenStateHandler
          * Collects elements from all windows that should be annotated on the screenshot:
          * nodes that pass the formatter's keep filter AND are visible (on-screen).
          */
-        private fun collectOnScreenElements(
-            windows: List<WindowData>,
-        ): List<AccessibilityNodeData> {
+        private fun collectOnScreenElements(windows: List<WindowData>): List<AccessibilityNodeData> {
             val result = mutableListOf<AccessibilityNodeData>()
             for (windowData in windows) {
                 collectOnScreenElementsFromTree(windowData.tree, result)

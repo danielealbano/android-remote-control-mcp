@@ -17,8 +17,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
-import io.mockk.any
-import io.mockk.eq
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -290,7 +288,12 @@ class UtilityToolsTest {
                     var clockMs = 0L
                     every { SystemClock.elapsedRealtime() } answers { clockMs }
                     every {
-                        mockElementFinder.findElements(any<List<WindowData>>(), eq(FindBy.TEXT), eq("Missing"), eq(false))
+                        mockElementFinder.findElements(
+                            any<List<WindowData>>(),
+                            eq(FindBy.TEXT),
+                            eq("Missing"),
+                            eq(false),
+                        )
                     } answers {
                         clockMs += 600L
                         emptyList()

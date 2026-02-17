@@ -1022,10 +1022,8 @@ fun registerTextInputTools(
  * @return The focused [AccessibilityNodeInfo], or null if no editable node is focused.
  *         The caller is responsible for recycling the returned node.
  */
-@Suppress("ReturnCount")
-internal fun findFocusedEditableNode(
-    accessibilityServiceProvider: AccessibilityServiceProvider,
-): AccessibilityNodeInfo? {
+@Suppress("ReturnCount", "NestedBlockDepth")
+internal fun findFocusedEditableNode(accessibilityServiceProvider: AccessibilityServiceProvider): AccessibilityNodeInfo? {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service is not enabled",

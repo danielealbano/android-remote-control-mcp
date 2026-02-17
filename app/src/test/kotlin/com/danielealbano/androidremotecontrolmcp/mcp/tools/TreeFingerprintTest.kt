@@ -301,9 +301,10 @@ class TreeFingerprintTest {
             val singleFp1 = fingerprint.generate(tree1)
             val singleFp2 = fingerprint.generate(tree2)
 
-            val combinedFp = fingerprint.generate(
-                listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
-            )
+            val combinedFp =
+                fingerprint.generate(
+                    listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
+                )
 
             // Combined should have sum == sum(fp1) + sum(fp2)
             assertEquals(singleFp1.sum() + singleFp2.sum(), combinedFp.sum())
@@ -315,9 +316,10 @@ class TreeFingerprintTest {
             val tree2 = node(text = "Dialog")
 
             val fpBefore = fingerprint.generate(listOf(windowData(windowId = 0, tree = tree1)))
-            val fpAfter = fingerprint.generate(
-                listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
-            )
+            val fpAfter =
+                fingerprint.generate(
+                    listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
+                )
 
             assertFalse(fpBefore.contentEquals(fpAfter))
         }

@@ -1,5 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
@@ -12,8 +14,6 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
-import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser

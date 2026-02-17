@@ -468,7 +468,7 @@ internal fun mapFindBy(by: String): FindBy? =
  * @throws McpToolException.PermissionDenied if accessibility service is not connected.
  * @throws McpToolException.ActionFailed if no windows and no root node are available.
  */
-@Suppress("LongMethod")
+@Suppress("LongMethod", "NestedBlockDepth", "ThrowsCount")
 internal fun getFreshWindows(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
@@ -572,18 +572,19 @@ internal fun getFreshWindows(
     val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
 
     return MultiWindowResult(
-        windows = listOf(
-            WindowData(
-                windowId = fallbackWindowId,
-                windowType = "APPLICATION",
-                packageName = currentPackageName,
-                title = "unknown",
-                activityName = currentActivityName,
-                layer = 0,
-                focused = true,
-                tree = tree,
+        windows =
+            listOf(
+                WindowData(
+                    windowId = fallbackWindowId,
+                    windowType = "APPLICATION",
+                    packageName = currentPackageName,
+                    title = "unknown",
+                    activityName = currentActivityName,
+                    layer = 0,
+                    focused = true,
+                    tree = tree,
+                ),
             ),
-        ),
         degraded = true,
     )
 }

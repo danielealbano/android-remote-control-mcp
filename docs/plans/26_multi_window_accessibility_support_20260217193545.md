@@ -2003,13 +2003,13 @@ A window appearing or disappearing means the UI is NOT idle — the fingerprint 
 **Goal**: Update integration tests and documentation to reflect multi-window support.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `McpIntegrationTestHelper` updated for multi-window mocking
-- [ ] Existing integration tests updated and passing
-- [ ] New integration test: multi-window `get_screen_state` returns window sections
-- [ ] New integration test: `find_elements` finds elements across windows
-- [ ] New integration test: `click_element` clicks element in non-primary window
-- [ ] `docs/MCP_TOOLS.md` updated with new TSV format
-- [ ] `docs/ARCHITECTURE.md` updated with multi-window architecture
+- [x] `McpIntegrationTestHelper` updated for multi-window mocking
+- [x] Existing integration tests updated and passing
+- [x] New integration test: multi-window `get_screen_state` returns window sections
+- [x] New integration test: `find_elements` finds elements across windows
+- [x] New integration test: `click_element` clicks element in non-primary window
+- [x] `docs/MCP_TOOLS.md` updated with new TSV format
+- [x] `docs/ARCHITECTURE.md` updated with multi-window architecture
 - [ ] All tests pass
 - [ ] Build succeeds
 
@@ -2018,8 +2018,8 @@ A window appearing or disappearing means the UI is NOT idle — the fingerprint 
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/integration/McpIntegrationTestHelper.kt`
 
 **Definition of Done**:
-- [ ] Mock dependencies support multi-window mocking
-- [ ] Helper method to set up multi-window mock state
+- [x] Mock dependencies support multi-window mocking
+- [x] Helper method to set up multi-window mock state
 
 **Action 7.1.1**: Update mock setup for multi-window
 
@@ -2030,9 +2030,9 @@ Add a helper method to `McpIntegrationTestHelper` that configures the mock `acce
 ### Task 7.2: Update existing integration tests
 
 **Definition of Done**:
-- [ ] All existing integration tests updated to mock `getAccessibilityWindows()` where they previously mocked `getRootNode()` + `parseTree()`
-- [ ] Tests that verify TSV output format updated for new multi-window format
-- [ ] All tests pass
+- [x] All existing integration tests updated to mock `getAccessibilityWindows()` where they previously mocked `getRootNode()` + `parseTree()`
+- [x] Tests that verify TSV output format updated for new multi-window format
+- [x] All tests pass
 
 **Action 7.2.1**: Update `ScreenIntrospectionIntegrationTest`
 
@@ -2063,10 +2063,10 @@ Check and update: `SystemActionIntegrationTest`, `TouchActionIntegrationTest`, `
 ### Task 7.3: Add new multi-window integration tests
 
 **Definition of Done**:
-- [ ] Test: `get_screen_state` with two windows returns both window sections in TSV
-- [ ] Test: `find_elements` finds element in system dialog window
-- [ ] Test: `click_element` clicks element in non-primary window
-- [ ] Test: `get_screen_state` in degraded mode includes degradation note
+- [x] Test: `get_screen_state` with two windows returns both window sections in TSV
+- [x] Test: `find_elements` finds element in system dialog window
+- [x] Test: `click_element` clicks element in non-primary window
+- [x] Test: `get_screen_state` in degraded mode includes degradation note
 
 **Action 7.3.1**: Add multi-window scenarios to `ScreenIntrospectionIntegrationTest`
 
@@ -2077,8 +2077,8 @@ Check and update: `SystemActionIntegrationTest`, `TouchActionIntegrationTest`, `
 ### Task 7.4: Update documentation
 
 **Definition of Done**:
-- [ ] `docs/MCP_TOOLS.md`: `get_screen_state` tool documentation updated with new TSV format, window headers, degraded mode
-- [ ] `docs/ARCHITECTURE.md`: multi-window architecture described (data flow, `getWindows()` API, fallback)
+- [x] `docs/MCP_TOOLS.md`: `get_screen_state` tool documentation updated with new TSV format, window headers, degraded mode
+- [x] `docs/ARCHITECTURE.md`: multi-window architecture described (data flow, `getWindows()` API, fallback)
 
 **Action 7.4.1**: Update `docs/MCP_TOOLS.md`
 

@@ -7,7 +7,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
-import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -52,20 +51,6 @@ class TextInputIntegrationTest {
             height = 2400,
             densityDpi = 420,
             orientation = "portrait",
-        )
-
-    private val sampleWindows =
-        listOf(
-            WindowData(
-                windowId = 0,
-                windowType = "APPLICATION",
-                packageName = "com.example",
-                title = "Test",
-                activityName = ".Main",
-                layer = 0,
-                focused = true,
-                tree = sampleTree,
-            ),
         )
 
     private fun createMockSurroundingText(

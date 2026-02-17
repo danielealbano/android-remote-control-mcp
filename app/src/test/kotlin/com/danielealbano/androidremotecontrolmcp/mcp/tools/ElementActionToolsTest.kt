@@ -14,9 +14,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
-import io.mockk.any
 import io.mockk.coEvery
-import io.mockk.eq
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -303,25 +301,29 @@ class ElementActionToolsTest {
         @Test
         fun `scrolls to element in non-primary window`() =
             runTest {
-                val secondWindowTree =
+                val invisibleNode =
+                    AccessibilityNodeData(
+                        id = "node_dialog_btn",
+                        className = "android.widget.Button",
+                        text = "Allow",
+                        bounds = BoundsData(100, 3000, 300, 3060),
+                        clickable = true,
+                        visible = false,
+                    )
+                val visibleNode = invisibleNode.copy(visible = true)
+
+                val secondWindowTreeBefore =
                     AccessibilityNodeData(
                         id = "node_dialog_root",
                         className = "android.widget.FrameLayout",
                         bounds = BoundsData(0, 0, 1080, 2400),
                         scrollable = true,
                         visible = true,
-                        children =
-                            listOf(
-                                AccessibilityNodeData(
-                                    id = "node_dialog_btn",
-                                    className = "android.widget.Button",
-                                    text = "Allow",
-                                    bounds = BoundsData(100, 3000, 300, 3060),
-                                    clickable = true,
-                                    visible = false,
-                                ),
-                            ),
+                        children = listOf(invisibleNode),
                     )
+                val secondWindowTreeAfter =
+                    secondWindowTreeBefore.copy(children = listOf(visibleNode))
+
                 val secondMockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
                 val secondMockWindow = mockk<AccessibilityWindowInfo>(relaxed = true)
                 every { secondMockWindow.id } returns 5
@@ -331,27 +333,35 @@ class ElementActionToolsTest {
                 every { secondMockWindow.layer } returns 1
                 every { secondMockWindow.isFocused } returns false
                 every { secondMockRootNode.packageName } returns "android"
-                every { mockTreeParser.parseTree(secondMockRootNode, "root_w5") } returns secondWindowTree
                 every {
                     mockAccessibilityServiceProvider.getAccessibilityWindows()
                 } returns listOf(mockWindowInfo, secondMockWindow)
 
-                val multiWindows =
-                    listOf(
-                        sampleWindows[0],
-                        WindowData(
-                            windowId = 5,
-                            windowType = "SYSTEM",
-                            packageName = "android",
-                            title = "Dialog",
-                            layer = 1,
-                            tree = secondWindowTree,
-                        ),
-                    )
+                // First call returns invisible node, after scroll returns visible
+                var callCount = 0
+                every { mockTreeParser.parseTree(secondMockRootNode, "root_w5") } answers {
+                    callCount++
+                    if (callCount <= 1) secondWindowTreeBefore else secondWindowTreeAfter
+                }
 
+                // Multi-window findNodeById: first call invisible, after scroll visible
+                var findCount = 0
                 every {
                     mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_dialog_btn"))
-                } returns secondWindowTree.children[0]
+                } answers {
+                    findCount++
+                    if (findCount <= 1) invisibleNode else visibleNode
+                }
+                // findContainingTree calls single-tree overload per window
+                every {
+                    mockElementFinder.findNodeById(sampleTree, "node_dialog_btn")
+                } returns null
+                every {
+                    mockElementFinder.findNodeById(secondWindowTreeBefore, "node_dialog_btn")
+                } returns invisibleNode
+                every {
+                    mockElementFinder.findNodeById(secondWindowTreeAfter, "node_dialog_btn")
+                } returns visibleNode
                 coEvery {
                     mockActionExecutor.scrollNode(any(), any(), any())
                 } returns Result.success(Unit)
@@ -360,7 +370,8 @@ class ElementActionToolsTest {
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 assertTrue(
-                    text.contains("Scrolling") || text.contains("already visible") || text.contains("scroll"),
+                    text.contains("Scrolled") || text.contains("scroll"),
+                    "Expected scroll result but got: $text",
                 )
             }
     }
