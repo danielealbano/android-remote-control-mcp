@@ -9,10 +9,12 @@ import javax.inject.Inject
  * Output format:
  * - Line 1: `note:structural-only nodes are omitted from the tree`
  * - Line 2: `note:certain elements are custom and will not be properly reported, ...`
- * - Line 3: `app:<package> activity:<activity>`
- * - Line 4: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
- * - Line 5: TSV header: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
- * - Lines 6+: one TSV row per kept node (flat, no depth)
+ * - Line 3: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+ * - Line 4: `note:offscreen items require scroll_to_element before interaction`
+ * - Line 5: `app:<package> activity:<activity>`
+ * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
+ * - Line 7: TSV header: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+ * - Lines 8+: one TSV row per kept node (flat, no depth)
  *
  * Nodes are filtered: a node is KEPT if ANY of:
  * - has non-null, non-empty text
@@ -46,19 +48,25 @@ class CompactTreeFormatter
             // Line 2: note about custom elements
             sb.appendLine(NOTE_LINE_CUSTOM_ELEMENTS)
 
-            // Line 3: app metadata
+            // Line 3: flags legend
+            sb.appendLine(NOTE_LINE_FLAGS_LEGEND)
+
+            // Line 4: offscreen hint
+            sb.appendLine(NOTE_LINE_OFFSCREEN_HINT)
+
+            // Line 5: app metadata
             sb.appendLine("app:$packageName activity:$activityName")
 
-            // Line 4: screen info
+            // Line 6: screen info
             sb.appendLine(
                 "screen:${screenInfo.width}x${screenInfo.height} " +
                     "density:${screenInfo.densityDpi} orientation:${screenInfo.orientation}",
             )
 
-            // Line 5: header
+            // Line 7: header
             sb.appendLine(HEADER)
 
-            // Lines 6+: walk tree and append kept nodes
+            // Lines 8+: walk tree and append kept nodes
             walkNode(sb, tree)
 
             return sb.toString().trimEnd('\n')
@@ -152,24 +160,42 @@ class CompactTreeFormatter
         }
 
         /**
-         * Builds the flags string for a node.
-         * Order: v, c, l, f, s, e, n
+         * Builds the comma-separated flags string for a node.
+         * The first flag is always `on` (onscreen) or `off` (offscreen).
+         * Subsequent flags are appended only when `true`.
+         * Order: on/off, clk, lclk, foc, scr, edt, ena
          */
-        internal fun buildFlags(node: AccessibilityNodeData): String {
-            val sb = StringBuilder(FLAG_COUNT)
-            if (node.visible) sb.append('v')
-            if (node.clickable) sb.append('c')
-            if (node.longClickable) sb.append('l')
-            if (node.focusable) sb.append('f')
-            if (node.scrollable) sb.append('s')
-            if (node.editable) sb.append('e')
-            if (node.enabled) sb.append('n')
-            return sb.toString()
-        }
+        internal fun buildFlags(node: AccessibilityNodeData): String =
+            buildString {
+                append(if (node.visible) FLAG_ONSCREEN else FLAG_OFFSCREEN)
+                if (node.clickable) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_CLICKABLE)
+                }
+                if (node.longClickable) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_LONG_CLICKABLE)
+                }
+                if (node.focusable) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_FOCUSABLE)
+                }
+                if (node.scrollable) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_SCROLLABLE)
+                }
+                if (node.editable) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_EDITABLE)
+                }
+                if (node.enabled) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_ENABLED)
+                }
+            }
 
         companion object {
             private const val SEP = "\t"
-            private const val FLAG_COUNT = 7
             const val COLUMN_SEPARATOR = "\t"
             const val NULL_VALUE = "-"
             const val MAX_TEXT_LENGTH = 100
@@ -179,6 +205,20 @@ class CompactTreeFormatter
                 "note:certain elements are custom and will not be properly reported, " +
                     "if needed or if tools are not working as expected set " +
                     "include_screenshot=true to see the screen and take what you see into account"
+            const val NOTE_LINE_FLAGS_LEGEND =
+                "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
+                    "foc=focusable scr=scrollable edt=editable ena=enabled"
+            const val NOTE_LINE_OFFSCREEN_HINT =
+                "note:offscreen items require scroll_to_element before interaction"
+            const val FLAG_ONSCREEN = "on"
+            const val FLAG_OFFSCREEN = "off"
+            const val FLAG_CLICKABLE = "clk"
+            const val FLAG_LONG_CLICKABLE = "lclk"
+            const val FLAG_FOCUSABLE = "foc"
+            const val FLAG_SCROLLABLE = "scr"
+            const val FLAG_EDITABLE = "edt"
+            const val FLAG_ENABLED = "ena"
+            private const val FLAG_SEPARATOR = ","
             const val HEADER =
                 "id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
                     "desc${COLUMN_SEPARATOR}res_id${COLUMN_SEPARATOR}bounds${COLUMN_SEPARATOR}flags"
