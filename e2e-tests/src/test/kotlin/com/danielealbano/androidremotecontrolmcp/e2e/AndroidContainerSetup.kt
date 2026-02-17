@@ -46,6 +46,20 @@ object AndroidContainerSetup {
     const val E2E_BEARER_TOKEN = "e2e-test-token-12345"
 
     /**
+     * MCP tool name prefix used by E2E tests.
+     *
+     * The MCP server builds tool name prefixes via `McpToolUtils.buildToolNamePrefix(deviceSlug)`.
+     * With an empty device slug (the default — E2E tests do not configure a device slug in
+     * [configureServerSettings]), the prefix is `"android_"`. For example, the base tool name
+     * `"press_home"` is registered as `"android_press_home"`.
+     *
+     * **IMPORTANT**: If the default `device_slug` in `ServerConfig` ever changes, or if
+     * [configureServerSettings] starts configuring one, this constant MUST be updated to
+     * match. Otherwise all E2E tool calls will fail with "Tool not found" errors.
+     */
+    const val TOOL_NAME_PREFIX = "android_"
+
+    /**
      * Create a configured Docker Android container.
      *
      * The container runs a full Android emulator (API 34, x86) with:

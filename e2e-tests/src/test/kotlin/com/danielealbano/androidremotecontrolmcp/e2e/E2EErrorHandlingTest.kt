@@ -26,6 +26,14 @@ import java.net.URI
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class E2EErrorHandlingTest {
 
+    companion object {
+        /**
+         * Tool name prefix for E2E tests. Centralized from [AndroidContainerSetup.TOOL_NAME_PREFIX]
+         * to document the empty device_slug assumption.
+         */
+        private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+    }
+
     private val mcpClient = SharedAndroidContainer.mcpClient
     private val baseUrl = SharedAndroidContainer.mcpServerUrl
 
@@ -75,7 +83,7 @@ class E2EErrorHandlingTest {
 
     @Test
     fun `correct bearer token returns successful response`() = runBlocking {
-        val result = mcpClient.callTool("android_press_home")
+        val result = mcpClient.callTool("${TOOL_PREFIX}press_home")
         assertNotEquals(true, result.isError)
     }
 
@@ -90,14 +98,20 @@ class E2EErrorHandlingTest {
     @Test
     fun `invalid params returns error result`() = runBlocking {
         // Call tap without required x,y coordinates
-        val result = mcpClient.callTool("android_tap", emptyMap())
+        val result = mcpClient.callTool("${TOOL_PREFIX}tap", emptyMap())
         assertEquals(true, result.isError)
+        val text = (result.content[0] as TextContent).text
+        assertTrue(
+            text.contains("Missing required parameter", ignoreCase = true) ||
+                text.contains("'x'") || text.contains("\"x\""),
+            "Error should mention missing parameter, got: $text",
+        )
     }
 
     @Test
     fun `click on non-existent element returns error result`() = runBlocking {
         val result = mcpClient.callTool(
-            "android_click_element",
+            "${TOOL_PREFIX}click_element",
             mapOf("element_id" to "nonexistent_element_id_12345"),
         )
         assertEquals(true, result.isError)
