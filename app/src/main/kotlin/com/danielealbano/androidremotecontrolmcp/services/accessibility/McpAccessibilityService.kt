@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.InputMethod
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -74,6 +75,7 @@ class McpAccessibilityService : AccessibilityService() {
         serviceScope = null
         currentPackageName = null
         currentActivityName = null
+        inputMethodInstance = null
         instance = null
 
         super.onDestroy()
@@ -158,6 +160,12 @@ class McpAccessibilityService : AccessibilityService() {
         )
     }
 
+    override fun onCreateInputMethod(): InputMethod {
+        val method = McpInputMethod(this)
+        inputMethodInstance = method
+        return method
+    }
+
     private fun configureServiceInfo() {
         serviceInfo =
             serviceInfo?.apply {
@@ -165,7 +173,8 @@ class McpAccessibilityService : AccessibilityService() {
                     AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                 feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
                 flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                    AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR
                 notificationTimeout = NOTIFICATION_TIMEOUT_MS
             }
     }
@@ -213,6 +222,10 @@ class McpAccessibilityService : AccessibilityService() {
     @Suppress("FunctionOnlyReturningConstant")
     fun canTakeScreenshot(): Boolean = true
 
+    class McpInputMethod(
+        service: AccessibilityService,
+    ) : InputMethod(service)
+
     companion object {
         private const val TAG = "MCP:AccessibilityService"
         private const val NOTIFICATION_TIMEOUT_MS = 100L
@@ -225,6 +238,10 @@ class McpAccessibilityService : AccessibilityService() {
          */
         @Volatile
         var instance: McpAccessibilityService? = null
+            private set
+
+        @Volatile
+        var inputMethodInstance: McpInputMethod? = null
             private set
     }
 }

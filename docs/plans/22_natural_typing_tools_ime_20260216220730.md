@@ -152,14 +152,14 @@ The AccessibilityService sets `FLAG_INPUT_METHOD_EDITOR` and overrides `onCreate
 **As a developer**, I need the minimum SDK raised to 33 so the new `FLAG_INPUT_METHOD_EDITOR` APIs are guaranteed available, and I need dead compat code removed to keep the codebase clean.
 
 ### Acceptance Criteria
-- [ ] `minSdk` is 33 in `app/build.gradle.kts`
-- [ ] All `Build.VERSION.SDK_INT` / `Build.VERSION_CODES` checks for API < 33 are removed (dead code)
-- [ ] `@RequiresApi` annotations for API < 33 are removed where now redundant
-- [ ] KDoc comments referencing API-level conditional behavior are updated to reflect the new minSdk 33 reality
-- [ ] `import android.os.Build` removed from all files where it is no longer used
-- [ ] Project builds without errors or warnings: `./gradlew assembleDebug`
-- [ ] All existing tests pass: `./gradlew :app:testDebugUnitTest`
-- [ ] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
+- [x] `minSdk` is 33 in `app/build.gradle.kts`
+- [x] All `Build.VERSION.SDK_INT` / `Build.VERSION_CODES` checks for API < 33 are removed (dead code)
+- [x] `@RequiresApi` annotations for API < 33 are removed where now redundant
+- [x] KDoc comments referencing API-level conditional behavior are updated to reflect the new minSdk 33 reality
+- [x] `import android.os.Build` removed from all files where it is no longer used
+- [x] Project builds without errors or warnings: `./gradlew assembleDebug`
+- [x] All existing tests pass: `./gradlew :app:testDebugUnitTest`
+- [x] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
 
 ---
 
@@ -480,14 +480,14 @@ All must pass with zero errors and zero warnings.
 **As a developer**, I need the AccessibilityService configured with `FLAG_INPUT_METHOD_EDITOR` and a `TypeInputController` interface so the new typing tools have a testable, injectable way to call `commitText()`, `setSelection()`, `getSurroundingText()`, `performContextMenuAction()`, `sendKeyEvent()`, and `deleteSurroundingText()` on the `AccessibilityInputConnection`.
 
 ### Acceptance Criteria
-- [ ] `accessibility_service_config.xml` has `android:isInputMethodEditor="true"` attribute
-- [ ] `McpAccessibilityService.configureServiceInfo()` includes `FLAG_INPUT_METHOD_EDITOR` in flags
-- [ ] `McpAccessibilityService` overrides `onCreateInputMethod()` returning a custom `InputMethod` subclass
-- [ ] `TypeInputController` interface exists with all needed `AccessibilityInputConnection` operations
-- [ ] `TypeInputControllerImpl` implementation wraps the real `AccessibilityInputConnection` via the `McpAccessibilityService` singleton
-- [ ] `TypeInputController` is bound in Hilt `ServiceModule`
-- [ ] Project builds without errors: `./gradlew assembleDebug`
-- [ ] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
+- [x] `accessibility_service_config.xml` has `flagInputMethodEditor` in `accessibilityFlags` (note: `android:isInputMethodEditor` attribute does not exist in the SDK — the flag achieves the same effect)
+- [x] `McpAccessibilityService.configureServiceInfo()` includes `FLAG_INPUT_METHOD_EDITOR` in flags
+- [x] `McpAccessibilityService` overrides `onCreateInputMethod()` returning a custom `InputMethod` subclass
+- [x] `TypeInputController` interface exists with all needed `AccessibilityInputConnection` operations
+- [x] `TypeInputControllerImpl` implementation wraps the real `AccessibilityInputConnection` via the `McpAccessibilityService` singleton
+- [x] `TypeInputController` is bound in Hilt `ServiceModule`
+- [x] Project builds without errors: `./gradlew assembleDebug`
+- [x] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
 
 Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are deferred to User Story 3 to avoid a forward dependency on the `registerTextInputTools()` signature change.
 
@@ -497,7 +497,7 @@ Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are de
 
 **Definition of Done**: Config XML declares IME capability.
 
-- [ ] **Action 2.1.1**: Add `isInputMethodEditor` attribute
+- [x] **Action 2.1.1**: Add `isInputMethodEditor` attribute
 
 **File**: `app/src/main/res/xml/accessibility_service_config.xml`
 
@@ -524,7 +524,7 @@ Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are de
 
 **Definition of Done**: Service creates a custom `InputMethod`, exposes access to it. Compiles.
 
-- [ ] **Action 2.2.1**: Add `FLAG_INPUT_METHOD_EDITOR` to `configureServiceInfo()` and override `onCreateInputMethod()`
+- [x] **Action 2.2.1**: Add `FLAG_INPUT_METHOD_EDITOR` to `configureServiceInfo()` and override `onCreateInputMethod()`
 
 **File**: `app/src/main/kotlin/.../services/accessibility/McpAccessibilityService.kt`
 
@@ -577,7 +577,7 @@ In `onDestroy()`, add `inputMethodInstance = null`.
 
 **Definition of Done**: Interface compiles with all needed methods.
 
-- [ ] **Action 2.3.1**: Create `TypeInputController.kt`
+- [x] **Action 2.3.1**: Create `TypeInputController.kt`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/TypeInputController.kt`
 
@@ -689,7 +689,7 @@ interface TypeInputController {
 
 **Definition of Done**: Implementation compiles, accesses `McpAccessibilityService.inputMethodInstance`.
 
-- [ ] **Action 2.4.1**: Create `TypeInputControllerImpl.kt`
+- [x] **Action 2.4.1**: Create `TypeInputControllerImpl.kt`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/TypeInputControllerImpl.kt`
 
@@ -778,7 +778,7 @@ class TypeInputControllerImpl
 
 **Definition of Done**: `TypeInputController` is injectable via Hilt.
 
-- [ ] **Action 2.5.1**: Add binding in `ServiceModule`
+- [x] **Action 2.5.1**: Add binding in `ServiceModule`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/di/AppModule.kt`
 
@@ -805,7 +805,7 @@ Add necessary imports for `TypeInputController` and `TypeInputControllerImpl`.
 
 Note: `McpServerService` injection and `McpIntegrationTestHelper` updates are deferred to User Story 3 (Task 3.1.3) to avoid a forward dependency on the `registerTextInputTools()` signature change. At this point, the new files (`TypeInputController`, `TypeInputControllerImpl`, `McpInputMethod`) are self-contained and don't affect existing call sites.
 
-- [ ] **Action 2.6.1**: Run build and tests
+- [x] **Action 2.6.1**: Run build and tests
 
 ```bash
 ./gradlew assembleDebug
