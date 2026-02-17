@@ -78,13 +78,31 @@ class CompactTreeFormatterTest {
         }
 
         @Test
+        @DisplayName("produces flags legend note as third line")
+        fun producesFlagsLegendNoteAsThirdLine() {
+            val tree = makeNode(text = "hello")
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val lines = output.lines()
+            assertEquals(CompactTreeFormatter.NOTE_LINE_FLAGS_LEGEND, lines[2])
+        }
+
+        @Test
+        @DisplayName("produces offscreen hint note as fourth line")
+        fun producesOffscreenHintNoteAsFourthLine() {
+            val tree = makeNode(text = "hello")
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val lines = output.lines()
+            assertEquals(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_HINT, lines[3])
+        }
+
+        @Test
         @DisplayName("produces correct metadata lines")
         fun producesCorrectMetadataLines() {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example.app", ".MainActivity", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("app:com.example.app activity:.MainActivity", lines[2])
-            assertEquals("screen:1080x2400 density:420 orientation:portrait", lines[3])
+            assertEquals("app:com.example.app activity:.MainActivity", lines[4])
+            assertEquals("screen:1080x2400 density:420 orientation:portrait", lines[5])
         }
 
         @Test
@@ -93,7 +111,7 @@ class CompactTreeFormatterTest {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[4])
+            assertEquals("id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[6])
         }
 
         @Test
@@ -112,8 +130,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Data rows start at line 5 (0-indexed)
-            assertEquals("node_btn\tButton\tOK\t-\tbtn_ok\t100,200,300,260\tvcn", lines[5])
+            // Data rows start at line 7 (0-indexed)
+            assertEquals("node_btn\tButton\tOK\t-\tbtn_ok\t100,200,300,260\ton,clk,ena", lines[7])
         }
 
         @Test
@@ -127,8 +145,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only notes + metadata + header = 5 lines, no data rows
-            assertEquals(5, lines.size)
+            // Only notes + metadata + header = 7 lines, no data rows
+            assertEquals(7, lines.size)
         }
 
         @Test
@@ -152,8 +170,8 @@ class CompactTreeFormatterTest {
             val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
             // Parent is filtered, child appears
-            assertEquals(6, lines.size)
-            assertTrue(lines[5].startsWith("node_child\t"))
+            assertEquals(8, lines.size)
+            assertTrue(lines[7].startsWith("node_child\t"))
         }
 
         @Test
@@ -169,11 +187,12 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals(6, lines.size)
-            // No 'v' flag since not visible
-            assertTrue(lines[5].contains("node_hidden"))
-            assertTrue(lines[5].endsWith("n"))
-            assertFalse(lines[5].endsWith("vn"))
+            assertEquals(8, lines.size)
+            assertTrue(lines[7].contains("node_hidden"))
+            // Check the flags column (last tab-separated field) starts with "off"
+            val flags = lines[7].split("\t").last()
+            assertTrue(flags.startsWith("off"), "Flags should start with 'off' but was: $flags")
+            assertFalse(flags.startsWith("on"), "Flags should not start with 'on' but was: $flags")
         }
 
         @Test
@@ -193,8 +212,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only notes + metadata + header = 5 lines
-            assertEquals(5, lines.size)
+            // Only notes + metadata + header = 7 lines
+            assertEquals(7, lines.size)
         }
 
         @Test
@@ -208,7 +227,7 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertTrue(lines[5].contains("10,20,300,400"))
+            assertTrue(lines[7].contains("10,20,300,400"))
         }
     }
 
@@ -414,7 +433,7 @@ class CompactTreeFormatterTest {
                     editable = true,
                     enabled = true,
                 )
-            assertEquals("vclfsen", formatter.buildFlags(node))
+            assertEquals("on,clk,lclk,foc,scr,edt,ena", formatter.buildFlags(node))
         }
 
         @Test
@@ -426,13 +445,60 @@ class CompactTreeFormatterTest {
                     clickable = true,
                     enabled = true,
                 )
-            assertEquals("vcn", formatter.buildFlags(node))
+            assertEquals("on,clk,ena", formatter.buildFlags(node))
         }
 
         @Test
-        @DisplayName("returns empty string when no flags set")
-        fun returnsEmptyStringWhenNoFlagsSet() {
-            assertEquals("", formatter.buildFlags(makeNode()))
+        @DisplayName("returns off when no flags set except visibility")
+        fun returnsOffWhenNoFlagsSet() {
+            assertEquals("off", formatter.buildFlags(makeNode()))
+        }
+
+        @Test
+        @DisplayName("includes off flag for non-visible nodes")
+        fun includesOffFlagForNonVisibleNodes() {
+            val node =
+                makeNode(
+                    visible = false,
+                    clickable = true,
+                    enabled = true,
+                )
+            assertEquals("off,clk,ena", formatter.buildFlags(node))
+        }
+
+        @Test
+        @DisplayName("on is always first flag")
+        fun onIsAlwaysFirstFlag() {
+            val node =
+                makeNode(
+                    visible = true,
+                    enabled = true,
+                )
+            val flags = formatter.buildFlags(node)
+            assertTrue(flags.startsWith("on,") || flags == "on")
+        }
+
+        @Test
+        @DisplayName("returns only on when visible and no other flags set")
+        fun returnsOnlyOnWhenVisibleAndNoOtherFlags() {
+            val node = makeNode(visible = true)
+            assertEquals("on", formatter.buildFlags(node))
+        }
+
+        @Test
+        @DisplayName("includes off flag with all other flags set")
+        fun includesOffFlagWithAllOtherFlagsSet() {
+            val node =
+                makeNode(
+                    visible = false,
+                    clickable = true,
+                    longClickable = true,
+                    focusable = true,
+                    scrollable = true,
+                    editable = true,
+                    enabled = true,
+                )
+            assertEquals("off,clk,lclk,foc,scr,edt,ena", formatter.buildFlags(node))
         }
     }
 }

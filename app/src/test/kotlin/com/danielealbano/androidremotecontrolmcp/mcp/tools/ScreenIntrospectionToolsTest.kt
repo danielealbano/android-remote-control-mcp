@@ -86,10 +86,13 @@ class ScreenIntrospectionToolsTest {
             "note:certain elements are custom and will not be properly reported, " +
             "if needed or if tools are not working as expected set " +
             "include_screenshot=true to see the screen and take what you see into account\n" +
+            "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
+            "foc=focusable scr=scrollable edt=editable ena=enabled\n" +
+            "note:offscreen items require scroll_to_element before interaction\n" +
             "app:com.example activity:.Main\n" +
             "screen:1080x2400 density:420 orientation:portrait\n" +
             "id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
-            "node_btn\tButton\tOK\t-\t-\t100,200,300,260\tvcn"
+            "node_btn\tButton\tOK\t-\t-\t100,200,300,260\ton,clk,ena"
 
     private fun setupReadyService() {
         every { mockAccessibilityServiceProvider.isReady() } returns true
