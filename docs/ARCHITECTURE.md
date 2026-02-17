@@ -25,6 +25,7 @@ graph TB
             ElemFinder["ElementFinder"]
             ActionExec["ActionExecutor"]
             ScreenEnc["ScreenshotEncoder"]
+            TypeInputCtrl["TypeInputController"]
         end
 
         subgraph StorageSvc["Storage & App Services"]

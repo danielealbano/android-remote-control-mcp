@@ -42,7 +42,7 @@ The application is a **service-based Android app** that exposes an MCP server ov
 - **Type**: Android `AccessibilityService`
 - **Purpose**: Introspect UI hierarchy of all apps and perform actions
 - **Lifecycle**: Runs as long as enabled in Android Settings (Accessibility)
-- **Capabilities**: Traverse accessibility tree (full depth), find elements by text/content description/resource ID/class name, perform actions (click, long-click, scroll, swipe, set text), execute global actions (back, home, recents, notifications, quick settings)
+- **Capabilities**: Traverse accessibility tree (full depth), find elements by text/content description/resource ID/class name, perform actions (click, long-click, scroll, swipe, type text via InputConnection), execute global actions (back, home, recents, notifications, quick settings)
 - **Implementation**: Extends `android.accessibilityservice.AccessibilityService`, registers for all event types and all packages, stores singleton instance for inter-service communication, uses coroutines for non-blocking operations
 
 #### 2. McpServerService
@@ -89,7 +89,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **Android Gradle Plugin (AGP)**: 8.13 (latest stable 8.x)
 - **Gradle**: 8.14.4 (latest stable 8.x)
 - **KSP**: 2.3.5 (Kotlin Symbol Processing, decoupled from Kotlin since 2.3.0)
-- **Android SDK**: Target API 34 (Android 14), Minimum API 26 (Android 8.0)
+- **Android SDK**: Target API 34 (Android 14), Minimum API 33 (Android 13 Tiramisu)
 - **JDK**: Java 17 (standard for Android development)
 
 ### Frameworks & Libraries
@@ -127,7 +127,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
-  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `ScreenInfo.kt`
+  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`
   - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
@@ -188,7 +188,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 39 tools across 9 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -214,24 +214,25 @@ The MCP server exposes 38 tools across 9 categories. For full JSON-RPC schemas, 
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
-### 3. Element Action Tools (5 tools)
+### 3. Element Action Tools (4 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
 | `android_find_elements` | Find UI elements by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
 | `android_click_element` | Click an accessibility node | `element_id` (string) | — |
 | `android_long_click_element` | Long-click an accessibility node | `element_id` (string) | — |
-| `android_set_text` | Set text on editable node | `element_id` (string), `text` (string) | — |
 | `android_scroll_to_element` | Scroll to make element visible | `element_id` (string) | — |
 
-**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable/editable. `android_find_elements` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable. `android_find_elements` returns empty array (not error) when no matches found.
 
-### 4. Text Input Tools (3 tools)
+### 4. Text Input Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_input_text` | Type text into focused/target input | `text` (string) | `element_id` (string) |
-| `android_clear_text` | Clear text from focused/target input | — | `element_id` (string) |
+| `android_type_append_text` | Type text at end of field via InputConnection | `element_id` (string), `text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_insert_text` | Type text at specific position via InputConnection | `element_id` (string), `text` (string), `offset` (int) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_replace_text` | Find and replace text in field via InputConnection | `element_id` (string), `search` (string), `new_text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_clear_text` | Clear all text from field via select-all + delete | `element_id` (string) | — |
 | `android_press_key` | Press a specific key | `key` (string: ENTER/BACK/DEL/HOME/TAB/SPACE) | — |
 
 ### 5. System Action Tools (6 tools)
@@ -460,7 +461,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Framework**: Ktor `testApplication`, JUnit 5, MockK
 - **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 9 tool categories, error code propagation
-- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
+- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `TypeInputController`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
 - **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; uses SDK `Client` + `StreamableHttpClientTransport` for type-safe MCP communication
 - **Run**: `make test-integration` or `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
 - **Note**: JVM-based, no emulator or device required. Runs as part of `make test-unit` since both are under `app/src/test/`
@@ -614,7 +615,7 @@ Per-location read/write/delete permissions are enforced by `FileOperationProvide
 
 - **Event Types**: TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOW_CONTENT_CHANGED
 - **Feedback Type**: FEEDBACK_GENERIC
-- **Flags**: FLAG_REPORT_VIEW_IDS, FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+- **Flags**: FLAG_REPORT_VIEW_IDS, FLAG_RETRIEVE_INTERACTIVE_WINDOWS, FLAG_INPUT_METHOD_EDITOR
 - **Capabilities**: CAPABILITY_CAN_PERFORM_GESTURES, CAPABILITY_CAN_RETRIEVE_WINDOW_CONTENT
 
 ### UI Defaults
@@ -691,7 +692,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 38 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 39 tools
 
 ---
 

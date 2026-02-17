@@ -37,8 +37,8 @@ The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized 
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | 7 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_set_text`, `android_scroll_to_element` | 9 |
-| Text Input | `android_input_text`, `android_clear_text`, `android_press_key` | 9 |
+| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_scroll_to_element` | 9 |
+| Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
@@ -1174,43 +1174,6 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `android_set_text`
-
-Set text on an editable accessibility node. Empty string clears the field.
-
-**Input Schema**:
-```json
-{
-  "type": "object",
-  "properties": {
-    "element_id": { "type": "string", "description": "Node ID from find_elements" },
-    "text": { "type": "string", "description": "Text to set (empty string to clear)" }
-  },
-  "required": ["element_id", "text"]
-}
-```
-
-**Output**: `"Text set on element '<element_id>'"`
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_set_text", "arguments": { "element_id": "node_abc123", "text": "Hello World" } }
-  }'
-```
-
-**Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing `element_id` or `text` parameter
-- **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found
-- **Action failed**: Element is not editable or set text action failed
-
----
-
 ### `android_scroll_to_element`
 
 Scroll to make the specified element visible by scrolling its nearest scrollable ancestor.
@@ -1249,75 +1212,223 @@ curl -X POST http://localhost:8080/mcp \
 
 ## 6. Text Input Tools
 
-### `android_input_text`
+Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools require `element_id` (mandatory), click the element to focus it, and return the field content after the operation for verification.
 
-Type text into the focused input field or a specified element. When `element_id` is provided, the tool clicks the element to focus it before setting text.
+All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
+
+### `android_type_append_text`
+
+Type text character by character at the end of a text field. Uses natural InputConnection typing (indistinguishable from keyboard input). For text longer than 2000 characters, call this tool multiple times — subsequent calls continue typing at the current cursor position.
 
 **Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `element_id` | string | Yes | - | Target element ID to type into |
+| `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
+| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+
+**Output**: `"Typed N characters at end of element '<element_id>'.\nField content: <content>"`
+
+**Request Example**:
 ```json
 {
-  "type": "object",
-  "properties": {
-    "text": { "type": "string", "description": "Text to type" },
-    "element_id": { "type": "string", "description": "Optional: target element ID to focus and type into" }
-  },
-  "required": ["text"]
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_type_append_text",
+    "arguments": {
+      "element_id": "node_abc123",
+      "text": "Hello World"
+    }
+  }
 }
 ```
 
-**Output**: `"Text input completed (N characters)"`
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_input_text", "arguments": { "text": "Hello World" } }
-  }'
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Typed 11 characters at end of element 'node_abc123'.\nField content: Hello World"
+      }
+    ]
+  }
+}
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing `text` parameter
+- **Invalid params**: Missing or empty `element_id` or `text`, text exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: No focused editable element found (when `element_id` not provided) or element not found
-- **Action failed**: Text input action failed
+- **Element not found**: Element not found in accessibility tree
+- **Action failed**: Click failed, input connection not ready (element may not be editable), cursor positioning failed, typing failed (input connection lost)
 
 ---
 
-### `android_clear_text`
+### `android_type_insert_text`
 
-Clear text from the focused input field or a specified element.
+Type text character by character at a specific position in a text field. Uses natural InputConnection typing (indistinguishable from keyboard input).
 
 **Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `element_id` | string | Yes | - | Target element ID to type into |
+| `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
+| `offset` | integer | Yes | - | 0-based character offset for cursor position. Must be within [0, current text length] |
+| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+
+**Output**: `"Typed N characters at offset M in element '<element_id>'.\nField content: <content>"`
+
+**Request Example**:
 ```json
 {
-  "type": "object",
-  "properties": {
-    "element_id": { "type": "string", "description": "Optional: target element ID to clear" }
-  },
-  "required": []
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_type_insert_text",
+    "arguments": {
+      "element_id": "node_abc123",
+      "text": "inserted ",
+      "offset": 5
+    }
+  }
 }
 ```
 
-**Output**: `"Text cleared successfully"`
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_clear_text", "arguments": {} }
-  }'
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Typed 9 characters at offset 5 in element 'node_abc123'.\nField content: Helloinserted  World"
+      }
+    ]
+  }
+}
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id` or `text`, text exceeds 2000 characters, missing `offset`, `offset` negative, `offset` exceeds current text length, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: No focused editable element found (when `element_id` not provided)
-- **Action failed**: Clear text action failed
+- **Element not found**: Element not found in accessibility tree
+- **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
+
+---
+
+### `android_type_replace_text`
+
+Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it, then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `element_id` | string | Yes | - | Target element ID |
+| `search` | string | Yes | - | Text to find in the field (first occurrence, max 10000 characters) |
+| `new_text` | string | Yes | - | Replacement text to type (max 2000 characters). Can be empty to just delete the found text |
+| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+
+**Output**: `"Replaced N characters with M characters in element '<element_id>'.\nField content: <content>"`
+
+**Request Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_type_replace_text",
+    "arguments": {
+      "element_id": "node_abc123",
+      "search": "World",
+      "new_text": "Android"
+    }
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Replaced 5 characters with 7 characters in element 'node_abc123'.\nField content: Hello Android"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id` or `search`, `search` exceeds 10000 characters, `new_text` exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found in accessibility tree, or search text not found in the field
+- **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
+
+---
+
+### `android_type_clear_text`
+
+Clear all text from a field naturally using select-all + delete. Uses InputConnection operations (indistinguishable from user action). If the field is already empty, returns success without performing any action.
+
+**Input Schema**:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `element_id` | string | Yes | - | Target element ID to clear |
+
+**Output**: `"Text cleared from element '<element_id>'.\nField content: <content>"`
+
+**Request Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_type_clear_text",
+    "arguments": {
+      "element_id": "node_abc123"
+    }
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Text cleared from element 'node_abc123'.\nField content: "
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id`
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found in accessibility tree
+- **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
 
 ---
 
@@ -1344,7 +1455,7 @@ Press a specific key. Supported keys: ENTER, BACK, DEL, HOME, TAB, SPACE.
 
 **Key Behavior**:
 - **BACK**, **HOME**: Delegate to global accessibility actions
-- **ENTER**: Uses `ACTION_IME_ENTER` on API 30+, fallback to newline append
+- **ENTER**: Uses `ACTION_IME_ENTER`
 - **DEL**: Removes last character from focused field (no-op if empty)
 - **TAB**, **SPACE**: Appends the character to focused field text
 
