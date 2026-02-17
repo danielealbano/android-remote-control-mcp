@@ -64,6 +64,19 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust/Cargo artifacts (ngrok-java native)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/ngrok-java/ngrok-java-native -> target
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('vendor/ngrok-java/**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
