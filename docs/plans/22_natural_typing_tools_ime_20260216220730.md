@@ -2247,68 +2247,68 @@ Fix any stale references found.
 **As a developer**, I need to verify the entire implementation from the ground up to ensure everything is correct, consistent, and complete.
 
 ### Acceptance Criteria
-- [ ] All files modified/created in this plan are reviewed for correctness
-- [ ] minSdk is 33 in `build.gradle.kts`
-- [ ] No API < 33 compat code remains anywhere in the codebase (including Theme.kt)
-- [ ] `accessibility_service_config.xml` has `isInputMethodEditor="true"` and `flagInputMethodEditor`
-- [ ] `McpAccessibilityService` has `FLAG_INPUT_METHOD_EDITOR`, `onCreateInputMethod()`, `McpInputMethod` nested class (not `inner`)
-- [ ] `TypeInputController` interface has all required methods **returning Boolean** (except `isReady` and `getSurroundingText`)
-- [ ] `TypeInputControllerImpl` correctly delegates to `AccessibilityInputConnection`, returns Boolean for IC availability (not operation success — underlying methods return `void`), has no unused imports or fields, no instance-level `inputMethod` property
-- [ ] `TypeInputController` is bound in Hilt `ServiceModule`
-- [ ] `McpServerService` injects and passes `TypeInputController`
-- [ ] Four new tools are registered: `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`
-- [ ] Three old tools are completely removed: `input_text`, `clear_text`, `set_text`
-- [ ] `PressKeyTool` is preserved and functional
-- [ ] All tool parameter validation works (missing params, out of range, etc.)
-- [ ] Typing speed defaults are 70ms/15ms
-- [ ] Typing speed minimum is 10ms, maximum is 5000ms
-- [ ] Max text length is 2000; search text bounded by `MAX_SURROUNDING_TEXT_LENGTH` (10000)
-- [ ] Variance is clamped to `[0, typing_speed]`
-- [ ] `typeCharByChar` iterates by Unicode code points, not `Char` (handles emoji/supplementary)
-- [ ] All type tool `execute()` methods wrap body in `typeOperationMutex.withLock { }`
-- [ ] Focus readiness uses poll-retry loop (max 500ms, 50ms interval), NOT fixed delay
-- [ ] `commitText` return value checked — `false` throws `ActionFailed` (note: this checks IC availability, not operation acceptance — see void-return clarification)
-- [ ] `setSelection`, `performContextMenuAction`, `sendKeyEvent` return values checked in all tools
-- [ ] `type_clear_text` checks for empty field before clearing (skips if empty)
-- [ ] `type_replace_text` TOCTOU race documented as known limitation in code comment
-- [ ] `awaitInputConnectionReady` uses wall-clock time (`System.currentTimeMillis()`) for accurate timeout
-- [ ] `@SuppressLint("NewApi")` removed from `ScreenCaptureProviderImpl`
-- [ ] `@file:Suppress("TooManyFunctions")` preserved in `TextInputTools.kt`
-- [ ] All four tools return field content in the response via `readFieldContent()` (best-effort: fallback message if IC unavailable)
-- [ ] `readFieldContent` utility tested for both available and unavailable cases
-- [ ] Logs never contain actual text content — only lengths and element IDs (note: field content IS returned in the MCP response, NOT in logs)
-- [ ] Parameter parsing uses `McpToolUtils.requireString()`, `McpToolUtils.requireInt()`, and `McpToolUtils.optionalInt()`
-- [ ] `McpProtocolIntegrationTest.kt` `EXPECTED_TOOL_NAMES` updated (3 old removed, 4 new added)
-- [ ] `listTools` integration test verifies new tools present and old tools absent
-- [ ] KDoc comments in `PermissionUtils.kt` and `MainActivity.kt` updated (no "Android 12 and below" references)
-- [ ] `import android.os.Build` removed from all files where no longer used
-- [ ] `registerTextInputTools()` has `@Suppress("LongParameterList")`
-- [ ] `typeCharByChar` skips delay after last character
-- [ ] `deleteSurroundingText()` in TypeInputController has "future extensibility" note
-- [ ] Boundary tests for `extractTypingParams` at 10ms and 5000ms
-- [ ] Tests for `getSurroundingText()` returning null in append/insert/replace tools
-- [ ] Integration tests explicitly configure `TypeInputController` mock returns
-- [ ] `AuthIntegrationTest.kt` `EXPECTED_TOOL_COUNT` updated to 39
-- [ ] `PermissionUtilsTest.kt` stale test updated (name, comment, assertions)
-- [ ] `ARCHITECTURE.md` component diagram includes `TypeInputController`
-- [ ] KDoc for `takeScreenshotBitmap()` and `ScreenCaptureProviderImpl` class no longer reference "Android 11+"
-- [ ] Tool code uses short-form `KeyEvent(...)` not FQN `android.view.KeyEvent(...)` to avoid unused import
-- [ ] Dedicated unit tests exist for shared utilities (`typeCharByChar`, `extractTypingParams`, `validateTextLength`, `awaitInputConnectionReady`)
-- [ ] Cancellation test exists for `typeCharByChar`
-- [ ] Boundary test exists for exactly 2000 characters
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] No stale references in documentation (including `README.md` at repo root)
-- [ ] `README.md` tool count is 39, category table has Element Actions (4) and Text Input (5) with correct tool names, minSdk is "Android 13+", Mermaid diagram says "39 MCP Tools"
-- [ ] Full build succeeds: `./gradlew assembleDebug`
-- [ ] Full test suite passes: `./gradlew :app:testDebugUnitTest`
-- [ ] Full lint passes: `./gradlew ktlintCheck && ./gradlew detekt`
+- [x] All files modified/created in this plan are reviewed for correctness
+- [x] minSdk is 33 in `build.gradle.kts`
+- [x] No API < 33 compat code remains anywhere in the codebase (including Theme.kt)
+- [x] `accessibility_service_config.xml` has `isInputMethodEditor="true"` and `flagInputMethodEditor`
+- [x] `McpAccessibilityService` has `FLAG_INPUT_METHOD_EDITOR`, `onCreateInputMethod()`, `McpInputMethod` nested class (not `inner`)
+- [x] `TypeInputController` interface has all required methods **returning Boolean** (except `isReady` and `getSurroundingText`)
+- [x] `TypeInputControllerImpl` correctly delegates to `AccessibilityInputConnection`, returns Boolean for IC availability (not operation success — underlying methods return `void`), has no unused imports or fields, no instance-level `inputMethod` property
+- [x] `TypeInputController` is bound in Hilt `ServiceModule`
+- [x] `McpServerService` injects and passes `TypeInputController`
+- [x] Four new tools are registered: `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`
+- [x] Three old tools are completely removed: `input_text`, `clear_text`, `set_text`
+- [x] `PressKeyTool` is preserved and functional
+- [x] All tool parameter validation works (missing params, out of range, etc.)
+- [x] Typing speed defaults are 70ms/15ms
+- [x] Typing speed minimum is 10ms, maximum is 5000ms
+- [x] Max text length is 2000; search text bounded by `MAX_SURROUNDING_TEXT_LENGTH` (10000)
+- [x] Variance is clamped to `[0, typing_speed]`
+- [x] `typeCharByChar` iterates by Unicode code points, not `Char` (handles emoji/supplementary)
+- [x] All type tool `execute()` methods wrap body in `typeOperationMutex.withLock { }`
+- [x] Focus readiness uses poll-retry loop (max 500ms, 50ms interval), NOT fixed delay
+- [x] `commitText` return value checked — `false` throws `ActionFailed` (note: this checks IC availability, not operation acceptance — see void-return clarification)
+- [x] `setSelection`, `performContextMenuAction`, `sendKeyEvent` return values checked in all tools
+- [x] `type_clear_text` checks for empty field before clearing (skips if empty)
+- [x] `type_replace_text` TOCTOU race documented as known limitation in code comment
+- [x] `awaitInputConnectionReady` uses wall-clock time (`System.currentTimeMillis()`) for accurate timeout
+- [x] `@SuppressLint("NewApi")` removed from `ScreenCaptureProviderImpl`
+- [x] `@file:Suppress("TooManyFunctions")` preserved in `TextInputTools.kt`
+- [x] All four tools return field content in the response via `readFieldContent()` (best-effort: fallback message if IC unavailable)
+- [x] `readFieldContent` utility tested for both available and unavailable cases
+- [x] Logs never contain actual text content — only lengths and element IDs (note: field content IS returned in the MCP response, NOT in logs)
+- [x] Parameter parsing uses `McpToolUtils.requireString()`, `McpToolUtils.requireInt()`, and `McpToolUtils.optionalInt()`
+- [x] `McpProtocolIntegrationTest.kt` `EXPECTED_TOOL_NAMES` updated (3 old removed, 4 new added)
+- [x] `listTools` integration test verifies new tools present and old tools absent
+- [x] KDoc comments in `PermissionUtils.kt` and `MainActivity.kt` updated (no "Android 12 and below" references)
+- [x] `import android.os.Build` removed from all files where no longer used
+- [x] `registerTextInputTools()` has `@Suppress("LongParameterList")`
+- [x] `typeCharByChar` skips delay after last character
+- [x] `deleteSurroundingText()` in TypeInputController has "future extensibility" note
+- [x] Boundary tests for `extractTypingParams` at 10ms and 5000ms
+- [x] Tests for `getSurroundingText()` returning null in append/insert/replace tools
+- [x] Integration tests explicitly configure `TypeInputController` mock returns
+- [x] `AuthIntegrationTest.kt` `EXPECTED_TOOL_COUNT` updated to 39
+- [x] `PermissionUtilsTest.kt` stale test updated (name, comment, assertions)
+- [x] `ARCHITECTURE.md` component diagram includes `TypeInputController`
+- [x] KDoc for `takeScreenshotBitmap()` and `ScreenCaptureProviderImpl` class no longer reference "Android 11+"
+- [x] Tool code uses short-form `KeyEvent(...)` not FQN `android.view.KeyEvent(...)` to avoid unused import
+- [x] Dedicated unit tests exist for shared utilities (`typeCharByChar`, `extractTypingParams`, `validateTextLength`, `awaitInputConnectionReady`)
+- [x] Cancellation test exists for `typeCharByChar`
+- [x] Boundary test exists for exactly 2000 characters
+- [x] All unit tests pass
+- [x] All integration tests pass
+- [x] No stale references in documentation (including `README.md` at repo root)
+- [x] `README.md` tool count is 39, category table has Element Actions (4) and Text Input (5) with correct tool names, minSdk is "Android 13+", Mermaid diagram says "39 MCP Tools"
+- [x] Full build succeeds: `./gradlew assembleDebug`
+- [x] Full test suite passes: `./gradlew :app:testDebugUnitTest`
+- [x] Full lint passes: `./gradlew ktlintCheck && ./gradlew detekt`
 
 ---
 
 ### Task 5.1: Full code review
 
-- [ ] **Action 5.1.1**: Review every file changed in this plan
+- [x] **Action 5.1.1**: Review every file changed in this plan
 
 Read each file listed in the "Files Impacted" table. Verify:
 1. No TODO or placeholder code
@@ -2322,7 +2322,7 @@ Read each file listed in the "Files Impacted" table. Verify:
 
 ### Task 5.2: Full test run
 
-- [ ] **Action 5.2.1**: Run complete build and test pipeline
+- [x] **Action 5.2.1**: Run complete build and test pipeline
 
 ```bash
 ./gradlew clean
@@ -2338,7 +2338,7 @@ All five commands must complete with zero errors and zero warnings.
 
 ### Task 5.3: Verify tool registration end-to-end
 
-- [ ] **Action 5.3.1**: Verify via integration tests that all expected tools are available
+- [x] **Action 5.3.1**: Verify via integration tests that all expected tools are available
 
 Run the integration test suite. Verify that the MCP client can discover and call:
 - `android_type_append_text`
@@ -2358,10 +2358,10 @@ This can be verified by calling `client.listTools()` in an integration test and 
 
 ### Task 5.4: Verify documentation completeness
 
-- [ ] **Action 5.4.1**: Cross-check MCP_TOOLS.md against actual registered tools
+- [x] **Action 5.4.1**: Cross-check MCP_TOOLS.md against actual registered tools
 
 Read `docs/MCP_TOOLS.md` and verify every documented tool exists in the code, and every registered tool is documented. No mismatches.
 
-- [ ] **Action 5.4.2**: Cross-check PROJECT.md for consistency
+- [x] **Action 5.4.2**: Cross-check PROJECT.md for consistency
 
 Verify minSdk, tool references, and architecture descriptions match the implementation.
