@@ -150,6 +150,26 @@ jobs:
       - name: Build debug APK (required by E2E tests)
         run: ./gradlew assembleDebug
 
+      # Cache the Docker Android image to avoid re-pulling ~4-6 GB on every run.
+      # The cache is shared across branches/PRs via GitHub Actions cache scoping.
+      # NOTE: The image tag must match DOCKER_IMAGE in AndroidContainerSetup.kt.
+      - name: Cache Docker Android image
+        id: docker-android-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-android-image.tar.zst
+          key: docker-android-emulator-14-0
+
+      - name: Load cached Docker Android image
+        if: steps.docker-android-cache.outputs.cache-hit == 'true'
+        run: zstd -d /tmp/docker-android-image.tar.zst --stdout | docker load
+
+      - name: Pre-pull and cache Docker Android image
+        if: steps.docker-android-cache.outputs.cache-hit != 'true'
+        run: |
+          docker pull budtmo/docker-android:emulator_14.0
+          docker save budtmo/docker-android:emulator_14.0 | zstd -T0 -3 > /tmp/docker-android-image.tar.zst
+
       - name: Run E2E tests
         run: ./gradlew :e2e-tests:test
 
