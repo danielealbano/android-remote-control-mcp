@@ -73,6 +73,12 @@ class MainViewModel
         private val _isNotificationPermissionGranted = MutableStateFlow(false)
         val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
 
+        private val _isCameraPermissionGranted = MutableStateFlow(false)
+        val isCameraPermissionGranted: StateFlow<Boolean> = _isCameraPermissionGranted.asStateFlow()
+
+        private val _isMicrophonePermissionGranted = MutableStateFlow(false)
+        val isMicrophonePermissionGranted: StateFlow<Boolean> = _isMicrophonePermissionGranted.asStateFlow()
+
         private val _tunnelStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
         val tunnelStatus: StateFlow<TunnelStatus> = _tunnelStatus.asStateFlow()
 
@@ -255,6 +261,10 @@ class MainViewModel
                 )
             _isNotificationPermissionGranted.value =
                 PermissionUtils.isNotificationPermissionGranted(context)
+            _isCameraPermissionGranted.value =
+                PermissionUtils.isCameraPermissionGranted(context)
+            _isMicrophonePermissionGranted.value =
+                PermissionUtils.isMicrophonePermissionGranted(context)
             refreshStorageLocations()
         }
 

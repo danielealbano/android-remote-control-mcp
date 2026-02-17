@@ -31,12 +31,17 @@ import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMc
 private val EnabledColor = Color(0xFF4CAF50)
 private val DisabledColor = Color(0xFFF44336)
 
+@Suppress("LongMethod")
 @Composable
 fun PermissionsSection(
     isAccessibilityEnabled: Boolean,
     isNotificationPermissionGranted: Boolean,
+    isCameraPermissionGranted: Boolean,
+    isMicrophonePermissionGranted: Boolean,
     onOpenAccessibilitySettings: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
+    onRequestCameraPermission: () -> Unit,
+    onRequestMicrophonePermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
@@ -78,6 +83,36 @@ fun PermissionsSection(
                     },
                 onAction = onRequestNotificationPermission,
                 actionEnabled = !isNotificationPermissionGranted,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PermissionRow(
+                label = stringResource(R.string.permission_camera),
+                isEnabled = isCameraPermissionGranted,
+                buttonText =
+                    if (isCameraPermissionGranted) {
+                        stringResource(R.string.permission_granted)
+                    } else {
+                        stringResource(R.string.permission_grant)
+                    },
+                onAction = onRequestCameraPermission,
+                actionEnabled = !isCameraPermissionGranted,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PermissionRow(
+                label = stringResource(R.string.permission_microphone),
+                isEnabled = isMicrophonePermissionGranted,
+                buttonText =
+                    if (isMicrophonePermissionGranted) {
+                        stringResource(R.string.permission_granted)
+                    } else {
+                        stringResource(R.string.permission_grant)
+                    },
+                onAction = onRequestMicrophonePermission,
+                actionEnabled = !isMicrophonePermissionGranted,
             )
         }
     }
@@ -131,8 +166,12 @@ private fun PermissionsSectionPreview() {
         PermissionsSection(
             isAccessibilityEnabled = false,
             isNotificationPermissionGranted = false,
+            isCameraPermissionGranted = false,
+            isMicrophonePermissionGranted = false,
             onOpenAccessibilitySettings = {},
             onRequestNotificationPermission = {},
+            onRequestCameraPermission = {},
+            onRequestMicrophonePermission = {},
         )
     }
 }

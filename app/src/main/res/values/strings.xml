@@ -57,6 +57,8 @@
     <string name="permission_enabled">Enabled</string>
     <string name="permission_granted">Granted</string>
     <string name="permission_grant">Grant</string>
+    <string name="permission_camera">Camera</string>
+    <string name="permission_microphone">Microphone</string>
 
     <!-- Server Logs -->
     <string name="server_logs_title">Server Logs</string>

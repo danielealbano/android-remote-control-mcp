@@ -66,6 +66,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onRequestNotificationPermission: () -> Unit = {},
+    onRequestCameraPermission: () -> Unit = {},
+    onRequestMicrophonePermission: () -> Unit = {},
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -81,6 +83,8 @@ fun HomeScreen(
     val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
+    val isCameraPermissionGranted by viewModel.isCameraPermissionGranted.collectAsStateWithLifecycle()
+    val isMicrophonePermissionGranted by viewModel.isMicrophonePermissionGranted.collectAsStateWithLifecycle()
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
     val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
@@ -256,12 +260,16 @@ fun HomeScreen(
             PermissionsSection(
                 isAccessibilityEnabled = isAccessibilityEnabled,
                 isNotificationPermissionGranted = isNotificationPermissionGranted,
+                isCameraPermissionGranted = isCameraPermissionGranted,
+                isMicrophonePermissionGranted = isMicrophonePermissionGranted,
                 onOpenAccessibilitySettings = {
                     context.startActivity(
                         Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
                     )
                 },
                 onRequestNotificationPermission = onRequestNotificationPermission,
+                onRequestCameraPermission = onRequestCameraPermission,
+                onRequestMicrophonePermission = onRequestMicrophonePermission,
             )
 
             ServerLogsSection(
