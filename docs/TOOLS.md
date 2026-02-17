@@ -9,9 +9,10 @@ This document defines the git, GitHub CLI (`gh`), and local CI (`act`) commands 
 1. [Branching Convention](#branching-convention)
 2. [Commit Convention](#commit-convention)
 3. [Pull Request Convention](#pull-request-convention)
-4. [Git Commands Reference](#git-commands-reference)
-5. [GitHub CLI Commands Reference](#github-cli-commands-reference)
-6. [Local CI with act](#local-ci-with-act)
+4. [Release Workflow](#release-workflow)
+5. [Git Commands Reference](#git-commands-reference)
+6. [GitHub CLI Commands Reference](#github-cli-commands-reference)
+7. [Local CI with act](#local-ci-with-act)
 
 ---
 
@@ -158,6 +159,82 @@ Plan <N>: <Short descriptive title>
 - `Plan 1: Project scaffolding and build system`
 - `Plan 2: Data layer, settings repository, and utilities`
 - `Plan 7: Screen introspection and system action MCP tools`
+
+---
+
+## Release Workflow
+
+### Overview
+
+Releases are created automatically via GitHub Actions when a semantic version tag is pushed. The workflow creates a **draft** release (never auto-published) with:
+- Debug and release APKs attached with proper names
+- AI-generated release note summary (via GitHub Models)
+- Auto-generated list of merged PRs
+- Link to the full changelog diff
+
+### Creating a Release
+
+```bash
+# 1. Ensure you are on main with latest changes
+git checkout main
+git pull origin main
+
+# 2. Create and push a tag
+git tag v1.2.3
+git push origin v1.2.3
+
+# 3. The release workflow triggers automatically
+# 4. Check the Actions tab for progress
+# 5. Find the draft release under Releases when done
+```
+
+### Tag Format
+
+Tags MUST follow semantic versioning with a `v` prefix:
+
+| Tag | Type | GitHub Release |
+|-----|------|---------------|
+| `v1.0.0` | Stable release | Draft |
+| `v1.0.0-alpha` | Pre-release (alpha) | Draft + Pre-release |
+| `v1.0.0-beta` | Pre-release (beta) | Draft + Pre-release |
+| `v1.0.0-rc1` | Release candidate | Draft + Pre-release |
+| `v1.0.0-rc2` | Release candidate | Draft + Pre-release |
+
+### VERSION_CODE Derivation
+
+The `VERSION_CODE` (Android integer version) is automatically computed from the tag:
+
+**Formula**: `MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + OFFSET`
+
+| Pre-release type | Offset | Example tag | VERSION_CODE |
+|-----------------|--------|-------------|-------------|
+| `alpha` | 01 | `v1.2.3-alpha` | `1020301` |
+| `beta` | 10 | `v1.2.3-beta` | `1020310` |
+| `rc{N}` | 20+N | `v1.2.3-rc1` | `1020321` |
+| stable (no suffix) | 99 | `v1.2.3` | `1020399` |
+
+This ensures correct ordering: `alpha < beta < rc1 < rc2 < ... < release`.
+
+### APK Naming
+
+Attached APKs follow this naming convention:
+- `android-remote-control-mcp-{tag}-debug.apk`
+- `android-remote-control-mcp-{tag}-release.apk`
+
+### Pipeline Behavior
+
+1. **CI Gate**: The workflow waits for the CI pipeline (`Build Release` check) to pass on the tagged commit before proceeding. If CI hasn't completed yet, it polls until it finishes or the job timeout (150 minutes) is reached.
+2. **Build**: APKs are built with `VERSION_NAME` and `VERSION_CODE` injected from the tag.
+3. **Release Notes**: AI-generated summary + auto-generated PR list + changelog link. If AI generation fails, the release is created without the summary section.
+4. **Draft Release**: Created as draft — you must manually review and publish.
+
+### Prerequisites and Limitations
+
+- **CI must have already run**: The tagged commit must have CI results from a prior push or PR merge to `main`. The release workflow does **not** trigger CI — it only waits for existing check results. If CI never ran for the commit, the workflow will poll until the job timeout (150 minutes) and then fail.
+- **Re-tagging**: If you need to re-tag a release (e.g., to fix the build), you must:
+  1. Delete the existing draft release on GitHub (Releases → draft → Delete)
+  2. Delete the tag: `git tag -d v1.2.3 && git push origin :refs/tags/v1.2.3`
+  3. Recreate and push the tag: `git tag v1.2.3 && git push origin v1.2.3`
 
 ---
 
@@ -430,6 +507,8 @@ gh act --secret-file .secrets
 | Add Copilot reviewer | `gh pr edit <n> --add-reviewer copilot` |
 | Reply to PR comment | `gh api repos/.../pulls/<n>/comments -f body="..." -F in_reply_to=<id>` |
 | Resolve PR thread | `gh api graphql -f query='mutation { resolveReviewThread(...) }'` |
+| Create release tag | `git tag v1.2.3 && git push origin v1.2.3` |
+| Create pre-release tag | `git tag v1.2.3-rc1 && git push origin v1.2.3-rc1` |
 | Validate CI | `gh act --validate` |
 | Dry-run CI | `gh act -n` |
 | Run CI job | `gh act -j <job-id>` |

@@ -1,0 +1,340 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  models: read
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      # ── 1. Checkout with full history (needed for tag comparison) ──
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      # ── 2. Warn if tagged commit is not on main ──
+      - name: Verify tagged commit is on main
+        run: |
+          if ! git branch -r --contains HEAD | grep -q 'origin/main'; then
+            echo "::warning::The tagged commit does not appear to be on the main branch. CI may not have run for this commit, and the release workflow will wait until timeout."
+          fi
+
+      # ── 3. Wait for CI to pass on this commit (gates on existing CI results) ──
+      - name: Wait for CI to pass
+        uses: lewagon/wait-on-check-action@a499964d3917700d29a2a8baf3f16b078d609410 # v1.5.0
+        with:
+          ref: ${{ github.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Build Release'
+          wait-interval: 30
+          allowed-conclusions: success
+          running-workflow-name: 'Create Draft Release'
+
+      # ── 4. Parse tag → VERSION_NAME, VERSION_CODE, pre-release flag ──
+      - name: Parse tag
+        id: parse-tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Strip 'v' prefix to get version
+          VERSION="${TAG#v}"
+
+          # Parse: MAJOR.MINOR.PATCH[-PRERELEASE]
+          if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-(.+))?$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            PRERELEASE="${BASH_REMATCH[5]}"
+          else
+            echo "::error::Invalid version format: $VERSION (expected: MAJOR.MINOR.PATCH[-PRERELEASE])"
+            exit 1
+          fi
+
+          # Compute VERSION_CODE offset based on pre-release type
+          # alpha=01, beta=10, rc{N}=20+N, release=99
+          if [ -z "$PRERELEASE" ]; then
+            OFFSET=99
+            IS_PRERELEASE="false"
+          elif [ "$PRERELEASE" = "alpha" ]; then
+            OFFSET=1
+            IS_PRERELEASE="true"
+          elif [ "$PRERELEASE" = "beta" ]; then
+            OFFSET=10
+            IS_PRERELEASE="true"
+          elif [[ "$PRERELEASE" =~ ^rc([0-9]+)$ ]]; then
+            RC_NUM=$((10#${BASH_REMATCH[1]}))
+            if [ "$RC_NUM" -lt 1 ]; then
+              echo "::error::RC number must be >= 1 (got rc${RC_NUM})"
+              exit 1
+            fi
+            OFFSET=$(( 20 + RC_NUM ))
+            if [ "$OFFSET" -ge 99 ]; then
+              echo "::error::RC number too high: rc${RC_NUM} (max rc78)"
+              exit 1
+            fi
+            IS_PRERELEASE="true"
+          else
+            echo "::error::Unknown pre-release type: $PRERELEASE (expected: alpha, beta, or rcN)"
+            exit 1
+          fi
+
+          VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 + OFFSET ))
+
+          # Android versionCode must fit in a signed 32-bit integer (max 2147483647)
+          if [ "$VERSION_CODE" -gt 2147483647 ]; then
+            echo "::error::VERSION_CODE overflow: $VERSION_CODE exceeds Android maximum (2147483647)"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version-code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "is-prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+
+          echo "### Parsed Tag" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tag | \`$TAG\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version Name | \`$VERSION\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version Code | \`$VERSION_CODE\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Pre-release | $IS_PRERELEASE |" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 5. Setup build toolchains (same as CI build-release job) ──
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.6'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+
+      # ── 6. Compile native dependencies ──
+      - name: Compile cloudflared for Android
+        run: make compile-cloudflared
+
+      - name: Compile ngrok-java native for Android
+        run: make compile-ngrok-native
+        env:
+          JAVA_11_HOME: ${{ env.JAVA_HOME }}
+          JAVA_17_HOME: ${{ env.JAVA_HOME }}
+
+      # ── 7. Build APKs with version from tag ──
+      - name: Build APKs
+        env:
+          VERSION_NAME: ${{ steps.parse-tag.outputs.version }}
+          VERSION_CODE: ${{ steps.parse-tag.outputs.version-code }}
+        run: ./gradlew assembleDebug assembleRelease -PVERSION_NAME="$VERSION_NAME" -PVERSION_CODE="$VERSION_CODE"
+
+      # ── 8. Rename APKs with proper names ──
+      - name: Rename APKs
+        env:
+          TAG: ${{ steps.parse-tag.outputs.tag }}
+        run: |
+          mkdir -p release-assets
+
+          # Debug APK
+          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "::error::Debug APK not found at app/build/outputs/apk/debug/app-debug.apk"
+            exit 1
+          fi
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "release-assets/android-remote-control-mcp-${TAG}-debug.apk"
+
+          # Release APK may be signed or unsigned depending on keystore config
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk \
+              "release-assets/android-remote-control-mcp-${TAG}-release.apk"
+          else
+            cp app/build/outputs/apk/release/app-release-unsigned.apk \
+              "release-assets/android-remote-control-mcp-${TAG}-release.apk"
+          fi
+
+          echo "### Release Assets" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ls -lh release-assets/ >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 9. Find previous tag for release notes context ──
+      - name: Find previous tag
+        id: prev-tag
+        env:
+          CURRENT_TAG: ${{ steps.parse-tag.outputs.tag }}
+        run: |
+          # Get the tag before the current one, sorted by version
+          # -c versionsort.suffix=- ensures pre-release tags sort before their base version (semver ordering)
+          # grep -E filters to strict semver tags only (prevents non-version v* tags from being picked)
+          PREV_TAG=$(git -c versionsort.suffix=- tag --list 'v*' --sort=-version:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' \
+            | grep -vxF "${CURRENT_TAG}" \
+            | head -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "prev-tag=" >> "$GITHUB_OUTPUT"
+            echo "is-first-release=true" >> "$GITHUB_OUTPUT"
+            echo "First release — no previous tag found"
+          else
+            echo "prev-tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+            echo "is-first-release=false" >> "$GITHUB_OUTPUT"
+            echo "Previous tag: $PREV_TAG"
+          fi
+
+      # ── 10. Generate auto release notes via GitHub API ──
+      - name: Generate auto release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.parse-tag.outputs.tag }}
+          PREV_TAG: ${{ steps.prev-tag.outputs.prev-tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -n "$PREV_TAG" ]; then
+            gh api "repos/${REPO}/releases/generate-notes" \
+              -f tag_name="$TAG" \
+              -f previous_tag_name="$PREV_TAG" \
+              --jq '.body' > auto-notes.md
+          else
+            gh api "repos/${REPO}/releases/generate-notes" \
+              -f tag_name="$TAG" \
+              --jq '.body' > auto-notes.md
+          fi
+
+          echo "Auto-generated release notes saved to auto-notes.md"
+
+      # ── 11. Gather PR details (titles + bodies) for AI context ──
+      - name: Gather PR details for AI context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract PR numbers from auto-generated notes (capped at 100)
+          PR_NUMBERS=$(grep -oE '#[0-9]+' auto-notes.md | sed 's/#//' | sort -un | head -100)
+
+          if [ -z "$PR_NUMBERS" ]; then
+            echo "No PRs found in auto-generated notes"
+            echo "No pull requests found for this release." > pr-details.txt
+            exit 0
+          fi
+
+          # Fetch full details (title + body) for each PR
+          # Bodies are truncated to 500 chars to keep AI input focused
+          > pr-details.txt
+          for NUM in $PR_NUMBERS; do
+            echo "Fetching PR #${NUM}..."
+            PR_JSON=$(gh pr view "$NUM" --json title,body 2>/dev/null || echo '{}')
+            PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title // "(title unavailable)"')
+            PR_BODY=$(printf '%s' "$PR_JSON" | jq -r '.body // "No description"')
+            PR_BODY_TRUNCATED=$(printf '%.500s' "$PR_BODY")
+            printf 'PR #%s: %s\n%s\n---\n\n' "$NUM" "$PR_TITLE" "$PR_BODY_TRUNCATED" >> pr-details.txt
+          done
+
+          echo "Gathered details for $(echo "$PR_NUMBERS" | wc -w | tr -d ' ') PRs"
+
+      # ── 12. Generate AI summary via GitHub Models ──
+      - name: Generate AI summary
+        id: ai-summary
+        continue-on-error: true
+        uses: actions/ai-inference@v1
+        with:
+          model: openai/gpt-4o
+          max-tokens: 1500
+          prompt-file: '.github/prompts/release-notes.prompt.yml'
+          file_input: |
+            pr_details: ./pr-details.txt
+
+      # ── 13. Compose release body ──
+      - name: Compose release body
+        env:
+          TAG: ${{ steps.parse-tag.outputs.tag }}
+          PREV_TAG: ${{ steps.prev-tag.outputs.prev-tag }}
+          REPO: ${{ github.repository }}
+          AI_OUTCOME: ${{ steps.ai-summary.outcome }}
+          AI_RESPONSE_FILE: ${{ steps.ai-summary.outputs.response-file }}
+        run: |
+          # Build compare URL
+          if [ -n "$PREV_TAG" ]; then
+            COMPARE_URL="https://github.com/${REPO}/compare/${PREV_TAG}...${TAG}"
+          else
+            COMPARE_URL="https://github.com/${REPO}/commits/${TAG}"
+          fi
+
+          # Compose body into file
+          {
+            # AI summary section (only if AI succeeded)
+            if [ "$AI_OUTCOME" = "success" ] && \
+               [ -n "$AI_RESPONSE_FILE" ] && \
+               [ -f "$AI_RESPONSE_FILE" ] && \
+               [ -s "$AI_RESPONSE_FILE" ]; then
+              echo "## Summary"
+              echo ""
+              cat "$AI_RESPONSE_FILE"
+              echo ""
+              echo ""
+            fi
+
+            # Auto-generated PR list
+            echo "## What's Changed"
+            echo ""
+            cat auto-notes.md
+            echo ""
+
+            # Full changelog link
+            echo "**Full Changelog**: ${COMPARE_URL}"
+          } > release-body.md
+
+          echo "Release body composed"
+          echo ""
+          echo "### Release Body Preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat release-body.md >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 14. Create draft release with APK attachments ──
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.parse-tag.outputs.tag }}
+          IS_PRERELEASE: ${{ steps.parse-tag.outputs.is-prerelease }}
+          REPO: ${{ github.repository }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --draft \
+            --title "$TAG" \
+            --notes-file release-body.md \
+            $PRERELEASE_FLAG \
+            release-assets/*.apk
+
+          echo "### Draft Release Created" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tag: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pre-release: $IS_PRERELEASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[View release](https://github.com/${REPO}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
