@@ -16,6 +16,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -92,10 +93,16 @@ class ScreenIntrospectionIntegrationTest {
                 val textContent = (result.content[0] as TextContent).text
                 assertTrue(textContent.contains("note:structural-only nodes are omitted from the tree"))
                 assertTrue(textContent.contains("note:certain elements are custom and will not be properly reported"))
+                assertTrue(textContent.contains("note:flags: on=onscreen off=offscreen"))
+                assertTrue(textContent.contains("note:offscreen items require scroll_to_element before interaction"))
                 assertTrue(textContent.contains("app:com.example.app activity:.MainActivity"))
                 assertTrue(textContent.contains("screen:1080x2400 density:420 orientation:portrait"))
                 assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
                 assertTrue(textContent.contains("node_btn"))
+                assertTrue(textContent.contains("on,clk,ena"))
+                // Negative assertions: ensure old single-char flag format is gone
+                assertFalse(textContent.contains("\tvcn"))
+                assertFalse(textContent.contains("\tvclfsen"))
             }
         }
 
