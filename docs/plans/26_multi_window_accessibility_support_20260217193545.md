@@ -56,6 +56,10 @@ node_g7h8	Button	Deny	-	btn_deny	300,500,500,548	on,clk,ena
 
 ### Degraded mode (fallback to single window)
 
+> **Note**: The `type:` field is dynamically detected from `rootNode.window?.type` (not hardcoded).
+> It could be `APPLICATION`, `SYSTEM`, `INPUT_METHOD`, etc., depending on which window is active.
+> If `rootNode.window` is null, it defaults to `APPLICATION`.
+
 ```
 note:DEGRADED — multi-window unavailable, only active window reported
 note:structural-only nodes are omitted from the tree
@@ -1029,7 +1033,13 @@ Apply the same pattern to `longClickNode`, `setTextOnNode`, `scrollNode` — cha
 Replace the existing `performNodeAction()` method with:
 
 ```kotlin
-@Suppress("ReturnCount", "LongMethod")
+@Suppress(
+    "ReturnCount",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "NestedBlockDepth",
+    "LoopWithTooManyJumpStatements",
+)
 private suspend fun performNodeAction(
     nodeId: String,
     windows: List<WindowData>,
@@ -1046,10 +1056,11 @@ private suspend fun performNodeAction(
 
     // Multi-window path: match by AccessibilityWindowInfo.getId()
     if (realWindows.isNotEmpty()) {
+        // Build a lookup map for O(1) window matching instead of O(n²) scanning
+        val realWindowById = realWindows.associateBy { it.id }
         try {
             for (windowData in windows) {
-                val realWindow =
-                    realWindows.firstOrNull { it.id == windowData.windowId } ?: continue
+                val realWindow = realWindowById[windowData.windowId] ?: continue
                 val realRootNode = realWindow.root ?: continue
 
                 val realNode =
@@ -1072,8 +1083,12 @@ private suspend fun performNodeAction(
                         }
                         result
                     } finally {
-                        @Suppress("DEPRECATION")
-                        realNode.recycle()
+                        // Guard against double-recycle: findAccessibilityNodeByNodeId
+                        // can return the root node itself if the target is the root
+                        if (realNode !== realRootNode) {
+                            @Suppress("DEPRECATION")
+                            realNode.recycle()
+                        }
                         @Suppress("DEPRECATION")
                         realRootNode.recycle()
                     }
@@ -1125,8 +1140,11 @@ private suspend fun performNodeAction(
                 }
                 result
             } finally {
-                @Suppress("DEPRECATION")
-                realNode.recycle()
+                // Guard against double-recycle: the matched node can be the root itself
+                if (realNode !== rootNode) {
+                    @Suppress("DEPRECATION")
+                    realNode.recycle()
+                }
                 @Suppress("DEPRECATION")
                 rootNode.recycle()
             }
@@ -1252,29 +1270,44 @@ internal fun findFocusedEditableNode(accessibilityServiceProvider: Accessibility
 With:
 
 ```kotlin
-@Suppress("ReturnCount")
-internal fun findFocusedEditableNode(
-    accessibilityServiceProvider: AccessibilityServiceProvider,
-): AccessibilityNodeInfo? {
+@Suppress(
+    "ReturnCount",
+    "NestedBlockDepth",
+    "CyclomaticComplexMethod",
+    "LoopWithTooManyJumpStatements",
+    "MaxLineLength",
+)
+internal fun findFocusedEditableNode(accessibilityServiceProvider: AccessibilityServiceProvider): AccessibilityNodeInfo? {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service is not enabled",
         )
     }
 
-    // Search across all windows for the focused editable node
+    // Search across all windows for the focused editable node.
+    // Uses a found-node variable to avoid returning from inside the try/finally block,
+    // ensuring all AccessibilityWindowInfo objects are properly recycled before the
+    // caller receives the result.
     val windows = accessibilityServiceProvider.getAccessibilityWindows()
+    var foundNode: AccessibilityNodeInfo? = null
     try {
         for (window in windows) {
             val rootNode = window.root ?: continue
             val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+
+            if (focusedNode != null && focusedNode.isEditable) {
+                // Recycle root AFTER confirming focusedNode is valid and editable.
+                // On API 34+ recycle() is a no-op, but ordering is correct for safety.
+                @Suppress("DEPRECATION")
+                rootNode.recycle()
+                foundNode = focusedNode
+                break
+            }
+
+            // Not the node we want — recycle both
             @Suppress("DEPRECATION")
             rootNode.recycle()
-
             if (focusedNode != null) {
-                if (focusedNode.isEditable) {
-                    return focusedNode
-                }
                 @Suppress("DEPRECATION")
                 focusedNode.recycle()
             }
@@ -1287,6 +1320,8 @@ internal fun findFocusedEditableNode(
             w.recycle()
         }
     }
+
+    if (foundNode != null) return foundNode
 
     // Fallback: try rootInActiveWindow if getWindows() returned empty
     if (windows.isEmpty()) {
@@ -1411,7 +1446,7 @@ Add after the existing `getFreshTree()` function. Once all tools are migrated to
  * @throws McpToolException.PermissionDenied if accessibility service is not connected.
  * @throws McpToolException.ActionFailed if no windows and no root node are available.
  */
-@Suppress("LongMethod")
+@Suppress("LongMethod", "NestedBlockDepth", "ThrowsCount")
 internal fun getFreshWindows(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
@@ -1500,8 +1535,20 @@ internal fun getFreshWindows(
                     "The screen may be transitioning.",
             )
 
-    // Extract windowId from the root node before recycling
+    // Extract metadata from the root node before recycling.
+    // Use rootNode.window (available API 21+) to detect the actual window type
+    // instead of hardcoding APPLICATION — the active window could be SYSTEM, INPUT_METHOD, etc.
     val fallbackWindowId = rootNode.windowId
+    val windowInfo = rootNode.window
+    val fallbackWindowType =
+        if (windowInfo != null) {
+            val type = AccessibilityTreeParser.mapWindowType(windowInfo.type)
+            @Suppress("DEPRECATION")
+            windowInfo.recycle()
+            type
+        } else {
+            "APPLICATION"
+        }
 
     val tree =
         try {
@@ -1515,18 +1562,19 @@ internal fun getFreshWindows(
     val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
 
     return MultiWindowResult(
-        windows = listOf(
-            WindowData(
-                windowId = fallbackWindowId,
-                windowType = "APPLICATION",
-                packageName = currentPackageName,
-                title = "unknown",
-                activityName = currentActivityName,
-                layer = 0,
-                focused = true,
-                tree = tree,
+        windows =
+            listOf(
+                WindowData(
+                    windowId = fallbackWindowId,
+                    windowType = fallbackWindowType,
+                    packageName = currentPackageName,
+                    title = "unknown",
+                    activityName = currentActivityName,
+                    layer = 0,
+                    focused = true,
+                    tree = tree,
+                ),
             ),
-        ),
         degraded = true,
     )
 }
@@ -1719,7 +1767,7 @@ The key insight: `findScrollableAncestor()` and `findPathToNode()` walk within a
 Replace `execute()` with:
 
 ```kotlin
-@Suppress("ThrowsCount")
+@Suppress("ThrowsCount", "LongMethod")
 suspend fun execute(arguments: JsonObject?): CallToolResult {
     val elementId =
         arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
@@ -1755,33 +1803,45 @@ suspend fun execute(arguments: JsonObject?): CallToolResult {
                 "No scrollable container found for element '$elementId'",
             )
 
-    // Attempt to scroll into view
-    for (attempt in 1..MAX_SCROLL_ATTEMPTS) {
-        val scrollResult =
-            actionExecutor.scrollNode(scrollableAncestorId, ScrollDirection.DOWN, result.windows)
-        if (scrollResult.isFailure) {
-            throw McpToolException.ActionFailed(
-                "Scroll failed on ancestor '$scrollableAncestorId': " +
-                    "${scrollResult.exceptionOrNull()?.message}",
-            )
-        }
+    // Determine initial scroll direction from the element's position relative to
+    // the screen. Elements above the viewport (bounds.bottom <= 0) need UP scrolling;
+    // elements below or at unknown positions default to DOWN.
+    val screenInfo = accessibilityServiceProvider.getScreenInfo()
+    val primaryDirection = determineScrollDirection(node, screenInfo)
+    val oppositeDirection =
+        if (primaryDirection == ScrollDirection.DOWN) ScrollDirection.UP else ScrollDirection.DOWN
 
-        // Small delay to let UI settle after scroll
-        kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
+    // Try primary direction first, then opposite if element not found
+    var totalAttempts = 0
+    for (direction in listOf(primaryDirection, oppositeDirection)) {
+        while (totalAttempts < MAX_SCROLL_ATTEMPTS) {
+            totalAttempts++
+            val scrollResult =
+                actionExecutor.scrollNode(scrollableAncestorId, direction, result.windows)
+            if (scrollResult.isFailure) {
+                throw McpToolException.ActionFailed(
+                    "Scroll failed on ancestor '$scrollableAncestorId': " +
+                        "${scrollResult.exceptionOrNull()?.message}",
+                )
+            }
 
-        // Re-parse and check visibility
-        result = getFreshWindows(treeParser, accessibilityServiceProvider)
-        node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+            // Small delay to let UI settle after scroll
+            kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
 
-        if (node.visible) {
-            Log.d(
-                TAG,
-                "scroll_to_element: element '$elementId' became visible " +
-                    "after $attempt scroll(s)",
-            )
-            return McpToolUtils.textResult(
-                "Scrolled to element '$elementId' ($attempt scroll(s))",
-            )
+            // Re-parse and check visibility
+            result = getFreshWindows(treeParser, accessibilityServiceProvider)
+            node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+
+            if (node.visible) {
+                Log.d(
+                    TAG,
+                    "scroll_to_element: element '$elementId' became visible " +
+                        "after $totalAttempts scroll(s) (direction=$direction)",
+                )
+                return McpToolUtils.textResult(
+                    "Scrolled to element '$elementId' ($totalAttempts scroll(s))",
+                )
+            }
         }
     }
 
@@ -1789,6 +1849,27 @@ suspend fun execute(arguments: JsonObject?): CallToolResult {
         "Element '$elementId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
     )
 }
+```
+
+Also add the `determineScrollDirection()` helper after the `findContainingTree()` function:
+
+```kotlin
+/**
+ * Determines the best initial scroll direction based on the element's position
+ * relative to the screen viewport.
+ *
+ * - If the element's bottom edge is at or above the top of the screen → UP
+ * - Otherwise (below viewport or unknown) → DOWN (most common case)
+ */
+internal fun determineScrollDirection(
+    node: AccessibilityNodeData,
+    screenInfo: ScreenInfo,
+): ScrollDirection =
+    when {
+        node.bounds.bottom <= 0 -> ScrollDirection.UP
+        node.bounds.top >= screenInfo.height -> ScrollDirection.DOWN
+        else -> ScrollDirection.DOWN
+    }
 ```
 
 Add helper `findContainingTree()` after `findPathToNode()`:
@@ -2164,7 +2245,7 @@ Add a section on multi-window support: how `getWindows()` is used, the `WindowDa
 | `mcp/tools/ScreenIntrospectionTools.kt` | Use `getFreshWindows()` + `formatMultiWindow()`; update `collectOnScreenElements()` |
 | `mcp/tools/TextInputTools.kt` | Update type tools to use `getFreshWindows()`; rewrite `findFocusedEditableNode()` |
 | `mcp/tools/UtilityTools.kt` | Update `GetElementDetailsTool`, `WaitForElementTool`, `WaitForIdleTool` |
-| `services/accessibility/TreeFingerprint.kt` | Add `generate(windows: List<WindowData>)` overload |
+| `mcp/tools/TreeFingerprint.kt` | Add `generate(windows: List<WindowData>)` overload |
 | `mcp/tools/SystemActionTools.kt` | No changes needed (isReady semantics handled by US1) |
 
 ### Test files
