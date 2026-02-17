@@ -1,5 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
@@ -12,11 +14,13 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
@@ -51,6 +55,51 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
  */
 object McpIntegrationTestHelper {
     const val TEST_BEARER_TOKEN = "test-integration-token"
+
+    /**
+     * Configures multi-window mocking on the given [MockDependencies].
+     *
+     * Sets up [AccessibilityServiceProvider.getAccessibilityWindows] to return
+     * a single mock [AccessibilityWindowInfo] whose root node parses to the given tree.
+     *
+     * @param deps The mock dependencies to configure.
+     * @param tree The parsed accessibility tree to return.
+     * @param screenInfo Screen dimensions for getScreenInfo().
+     * @param packageName Package name for the window and tracked package.
+     * @param activityName Activity name for the focused window.
+     * @param windowId The window ID for the mock window.
+     */
+    @Suppress("LongParameterList")
+    fun setupMultiWindowMock(
+        deps: MockDependencies,
+        tree: AccessibilityNodeData,
+        screenInfo: ScreenInfo,
+        packageName: String = "com.example.app",
+        activityName: String = ".MainActivity",
+        windowId: Int = 0,
+    ) {
+        val mockRootNode = mockk<AccessibilityNodeInfo>()
+        val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+
+        every { deps.accessibilityServiceProvider.isReady() } returns true
+        every { mockWindowInfo.id } returns windowId
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockRootNode.packageName } returns packageName
+        every {
+            deps.accessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
+        every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns packageName
+        every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns activityName
+        every { deps.accessibilityServiceProvider.getScreenInfo() } returns screenInfo
+        @Suppress("DEPRECATION")
+        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId") } returns tree
+        @Suppress("DEPRECATION")
+        every { mockRootNode.recycle() } returns Unit
+    }
 
     /**
      * Creates mocked service dependencies used by all tool handlers.

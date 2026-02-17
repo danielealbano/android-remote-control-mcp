@@ -3,6 +3,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -10,7 +11,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
@@ -62,11 +66,11 @@ class FindElementsTool
                         "Invalid 'by' value: '$byStr'. Must be one of: text, content_desc, resource_id, class_name",
                     )
 
-            // Get fresh accessibility tree
-            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
+            // Get fresh multi-window accessibility snapshot
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider)
 
-            // Search
-            val elements = elementFinder.findElements(tree, findBy, value, exactMatch)
+            // Search across all windows
+            val elements = elementFinder.findElements(result.windows, findBy, value, exactMatch)
 
             Log.d(TAG, "find_elements: by=$byStr, value='$value', exactMatch=$exactMatch, found=${elements.size}")
 
@@ -175,9 +179,9 @@ class ClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
 
-            val result = actionExecutor.clickNode(elementId, tree)
+            val result = actionExecutor.clickNode(elementId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
 
             Log.d(TAG, "click_element: elementId=$elementId succeeded")
@@ -232,9 +236,9 @@ class LongClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
 
-            val result = actionExecutor.longClickNode(elementId, tree)
+            val result = actionExecutor.longClickNode(elementId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
 
             Log.d(TAG, "long_click_element: elementId=$elementId succeeded")
@@ -282,7 +286,7 @@ class ScrollToElementTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
-        @Suppress("ThrowsCount")
+        @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
                 arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
@@ -292,10 +296,10 @@ class ScrollToElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            // Parse tree and find the element
-            var tree = getFreshTree(treeParser, accessibilityServiceProvider)
+            // Parse multi-window trees and find the element
+            var result = getFreshWindows(treeParser, accessibilityServiceProvider)
             var node =
-                elementFinder.findNodeById(tree, elementId)
+                elementFinder.findNodeById(result.windows, elementId)
                     ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
 
             // If already visible, return immediately
@@ -304,32 +308,59 @@ class ScrollToElementTool
                 return McpToolUtils.textResult("Element '$elementId' is already visible")
             }
 
-            // Find nearest scrollable ancestor
+            // Find the window tree containing the target node
+            val containingTree =
+                findContainingTree(result.windows, elementId)
+                    ?: throw McpToolException.ActionFailed(
+                        "Element '$elementId' not found in any window tree",
+                    )
+
+            // Find nearest scrollable ancestor within the same window tree
             val scrollableAncestorId =
-                findScrollableAncestor(tree, elementId)
+                findScrollableAncestor(containingTree, elementId)
                     ?: throw McpToolException.ActionFailed(
                         "No scrollable container found for element '$elementId'",
                     )
 
-            // Attempt to scroll into view
-            for (attempt in 1..MAX_SCROLL_ATTEMPTS) {
-                val scrollResult = actionExecutor.scrollNode(scrollableAncestorId, ScrollDirection.DOWN, tree)
-                if (scrollResult.isFailure) {
-                    throw McpToolException.ActionFailed(
-                        "Scroll failed on ancestor '$scrollableAncestorId': ${scrollResult.exceptionOrNull()?.message}",
-                    )
-                }
+            // Determine initial scroll direction from the element's position relative to
+            // the screen. Elements above the viewport (bounds.bottom <= 0) need UP scrolling;
+            // elements below or at unknown positions default to DOWN.
+            val screenInfo = accessibilityServiceProvider.getScreenInfo()
+            val primaryDirection = determineScrollDirection(node, screenInfo)
+            val oppositeDirection =
+                if (primaryDirection == ScrollDirection.DOWN) ScrollDirection.UP else ScrollDirection.DOWN
 
-                // Small delay to let UI settle after scroll
-                kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
+            // Try primary direction first, then opposite if element not found
+            var totalAttempts = 0
+            for (direction in listOf(primaryDirection, oppositeDirection)) {
+                while (totalAttempts < MAX_SCROLL_ATTEMPTS) {
+                    totalAttempts++
+                    val scrollResult =
+                        actionExecutor.scrollNode(scrollableAncestorId, direction, result.windows)
+                    if (scrollResult.isFailure) {
+                        throw McpToolException.ActionFailed(
+                            "Scroll failed on ancestor '$scrollableAncestorId': " +
+                                "${scrollResult.exceptionOrNull()?.message}",
+                        )
+                    }
 
-                // Re-parse and check visibility
-                tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                node = elementFinder.findNodeById(tree, elementId) ?: continue
+                    // Small delay to let UI settle after scroll
+                    kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
 
-                if (node.visible) {
-                    Log.d(TAG, "scroll_to_element: element '$elementId' became visible after $attempt scroll(s)")
-                    return McpToolUtils.textResult("Scrolled to element '$elementId' ($attempt scroll(s))")
+                    // Re-parse and check visibility
+                    result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+
+                    if (node.visible) {
+                        Log.d(
+                            TAG,
+                            "scroll_to_element: element '$elementId' became visible " +
+                                "after $totalAttempts scroll(s) (direction=$direction)",
+                        )
+                        return McpToolUtils.textResult(
+                            "Scrolled to element '$elementId' ($totalAttempts scroll(s))",
+                        )
+                    }
                 }
             }
 
@@ -337,6 +368,23 @@ class ScrollToElementTool
                 "Element '$elementId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
             )
         }
+
+        /**
+         * Determines the best initial scroll direction based on the element's position
+         * relative to the screen viewport.
+         *
+         * - If the element's bottom edge is at or above the top of the screen → UP
+         * - Otherwise (below viewport or unknown) → DOWN (most common case)
+         */
+        internal fun determineScrollDirection(
+            node: AccessibilityNodeData,
+            screenInfo: ScreenInfo,
+        ): ScrollDirection =
+            when {
+                node.bounds.bottom <= 0 -> ScrollDirection.UP
+                node.bounds.top >= screenInfo.height -> ScrollDirection.DOWN
+                else -> ScrollDirection.DOWN
+            }
 
         /**
          * Walks up the tree from [targetNodeId] to find the nearest scrollable ancestor.
@@ -376,6 +424,22 @@ class ScrollToElementTool
             }
             path.removeAt(path.size - 1)
             return false
+        }
+
+        /**
+         * Finds the window tree that contains the node with [targetNodeId].
+         * Returns the tree's root [AccessibilityNodeData], or null if not found.
+         */
+        private fun findContainingTree(
+            windows: List<WindowData>,
+            targetNodeId: String,
+        ): AccessibilityNodeData? {
+            for (windowData in windows) {
+                if (elementFinder.findNodeById(windowData.tree, targetNodeId) != null) {
+                    return windowData.tree
+                }
+            }
+            return null
         }
 
         fun register(
@@ -425,28 +489,153 @@ internal fun mapFindBy(by: String): FindBy? =
     }
 
 /**
- * Gets a fresh accessibility tree by obtaining the root node from the
- * accessibility service and parsing it.
+ * Gets a fresh multi-window accessibility snapshot by enumerating all on-screen windows
+ * and parsing each window's accessibility tree.
  *
- * @throws McpToolException with PermissionDenied if accessibility service is not available.
- * @throws McpToolException with PermissionDenied if no root node is available.
+ * Falls back to single-window mode via [AccessibilityServiceProvider.getRootNode] if
+ * [AccessibilityServiceProvider.getAccessibilityWindows] returns an empty list.
+ *
+ * **Performance note**: This function re-parses ALL window trees on every invocation.
+ * No caching is used because the accessibility tree can change between calls (UI updates,
+ * window transitions, user interactions). Callers that invoke this in a loop (e.g.,
+ * [ScrollToElementTool] with up to [ScrollToElementTool.MAX_SCROLL_ATTEMPTS] iterations)
+ * accept this cost to ensure correctness — stale tree data would cause actions to target
+ * the wrong nodes or miss UI changes.
+ *
+ * @throws McpToolException.PermissionDenied if accessibility service is not connected.
+ * @throws McpToolException.ActionFailed if no windows and no root node are available.
  */
-internal fun getFreshTree(
+@Suppress("LongMethod", "NestedBlockDepth", "ThrowsCount")
+internal fun getFreshWindows(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
-): AccessibilityNodeData {
+): MultiWindowResult {
+    if (!accessibilityServiceProvider.isReady()) {
+        throw McpToolException.PermissionDenied(
+            "Accessibility service not enabled or not ready. " +
+                "Please enable it in Android Settings > Accessibility.",
+        )
+    }
+
+    val accessibilityWindows = accessibilityServiceProvider.getAccessibilityWindows()
+
+    if (accessibilityWindows.isNotEmpty()) {
+        try {
+            val currentPackageName = accessibilityServiceProvider.getCurrentPackageName()
+            val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
+            val windowDataList = mutableListOf<WindowData>()
+
+            for (window in accessibilityWindows) {
+                val rootNode = window.root ?: continue
+
+                // Extract metadata BEFORE recycling rootNode
+                val wId = window.id
+                val windowPackage = rootNode.packageName?.toString()
+                val windowTitle = window.title?.toString()
+                val windowType = window.type
+                val windowLayer = window.layer
+                val windowFocused = window.isFocused
+
+                val tree =
+                    try {
+                        treeParser.parseTree(rootNode, "root_w$wId")
+                    } finally {
+                        @Suppress("DEPRECATION")
+                        rootNode.recycle()
+                    }
+
+                // Best-effort activity name: only for focused APPLICATION window matching tracked package
+                val activityName =
+                    if (windowFocused &&
+                        windowType == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                        windowPackage == currentPackageName
+                    ) {
+                        currentActivityName
+                    } else {
+                        null
+                    }
+
+                windowDataList.add(
+                    WindowData(
+                        windowId = wId,
+                        windowType = AccessibilityTreeParser.mapWindowType(windowType),
+                        packageName = windowPackage,
+                        title = windowTitle,
+                        activityName = activityName,
+                        layer = windowLayer,
+                        focused = windowFocused,
+                        tree = tree,
+                    ),
+                )
+            }
+
+            if (windowDataList.isEmpty()) {
+                throw McpToolException.ActionFailed(
+                    "All windows returned null root nodes.",
+                )
+            }
+
+            return MultiWindowResult(windows = windowDataList, degraded = false)
+        } finally {
+            // Recycle all AccessibilityWindowInfo objects for consistency
+            // (no-op on API 34+, but follows the codebase's recycling convention)
+            for (w in accessibilityWindows) {
+                @Suppress("DEPRECATION")
+                w.recycle()
+            }
+        }
+    }
+
+    // Fallback to single-window mode
     val rootNode =
         accessibilityServiceProvider.getRootNode()
-            ?: throw McpToolException.PermissionDenied(
-                "Accessibility service is not enabled or no active window available.",
+            ?: throw McpToolException.ActionFailed(
+                "No windows available and no active window root node. " +
+                    "The screen may be transitioning.",
             )
 
-    return try {
-        treeParser.parseTree(rootNode)
-    } finally {
-        @Suppress("DEPRECATION")
-        rootNode.recycle()
-    }
+    // Extract metadata from the root node before recycling.
+    // Use rootNode.window (available API 21+) to detect the actual window type
+    // instead of hardcoding APPLICATION — the active window could be SYSTEM, INPUT_METHOD, etc.
+    val fallbackWindowId = rootNode.windowId
+    val windowInfo = rootNode.window
+    val fallbackWindowType =
+        if (windowInfo != null) {
+            val type = AccessibilityTreeParser.mapWindowType(windowInfo.type)
+            @Suppress("DEPRECATION")
+            windowInfo.recycle()
+            type
+        } else {
+            "APPLICATION"
+        }
+
+    val tree =
+        try {
+            treeParser.parseTree(rootNode, "root_w$fallbackWindowId")
+        } finally {
+            @Suppress("DEPRECATION")
+            rootNode.recycle()
+        }
+
+    val currentPackageName = accessibilityServiceProvider.getCurrentPackageName()
+    val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
+
+    return MultiWindowResult(
+        windows =
+            listOf(
+                WindowData(
+                    windowId = fallbackWindowId,
+                    windowType = fallbackWindowType,
+                    packageName = currentPackageName,
+                    title = "unknown",
+                    activityName = currentActivityName,
+                    layer = 0,
+                    focused = true,
+                    tree = tree,
+                ),
+            ),
+        degraded = true,
+    )
 }
 
 /**

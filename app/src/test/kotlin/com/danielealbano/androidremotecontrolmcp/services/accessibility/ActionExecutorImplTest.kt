@@ -1,11 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
-import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -43,6 +42,16 @@ class ActionExecutorImplTest {
         instanceField.isAccessible = true
         instanceField.set(null, service)
     }
+
+    private fun wrapInWindows(tree: AccessibilityNodeData): List<WindowData> =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                tree = tree,
+                focused = true,
+            ),
+        )
 
     @Nested
     @DisplayName("Service availability")
@@ -94,7 +103,7 @@ class ActionExecutorImplTest {
                     )
 
                 // Act
-                val result = executor.clickNode("node_test", tree)
+                val result = executor.clickNode("node_test", wrapInWindows(tree))
 
                 // Assert
                 assertTrue(result.isFailure)
@@ -235,16 +244,12 @@ class ActionExecutorImplTest {
                 // Arrange
                 setServiceInstance(mockService)
                 val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
-                every { mockService.getRootNode() } returns mockRootNode
                 every { mockRootNode.childCount } returns 0
 
-                val rectSlot = slot<Rect>()
-                every { mockRootNode.getBoundsInScreen(capture(rectSlot)) } answers {
-                    rectSlot.captured.left = 0
-                    rectSlot.captured.top = 0
-                    rectSlot.captured.right = 1080
-                    rectSlot.captured.bottom = 2400
-                }
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 0
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
 
                 val tree =
                     AccessibilityNodeData(
@@ -253,11 +258,224 @@ class ActionExecutorImplTest {
                     )
 
                 // Act
-                val result = executor.clickNode("node_nonexistent", tree)
+                val result = executor.clickNode("node_nonexistent", wrapInWindows(tree))
 
                 // Assert
                 assertTrue(result.isFailure)
                 assertTrue(result.exceptionOrNull() is NoSuchElementException)
+            }
+    }
+
+    @Nested
+    @DisplayName("Multi-window node actions")
+    inner class MultiWindowNodeActions {
+        @Test
+        @DisplayName("clickNode finds and clicks node in first window")
+        fun clickNodeFindsNodeInFirstWindow() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockRootNode1 = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode1.childCount } returns 0
+                every { mockRootNode1.isClickable } returns true
+                every { mockRootNode1.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+
+                val mockWindowInfo1 = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo1.id } returns 10
+                every { mockWindowInfo1.root } returns mockRootNode1
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo1)
+
+                val tree1 =
+                    AccessibilityNodeData(
+                        id = "node_target",
+                        className = "android.widget.Button",
+                        bounds = BoundsData(0, 0, 100, 50),
+                        clickable = true,
+                    )
+
+                val windows =
+                    listOf(
+                        WindowData(
+                            windowId = 10,
+                            windowType = "APPLICATION",
+                            tree = tree1,
+                            focused = true,
+                        ),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_target", windows)
+
+                // Assert
+                assertTrue(result.isSuccess)
+            }
+
+        @Test
+        @DisplayName("clickNode finds node in second window when not in first")
+        fun clickNodeFindsNodeInSecondWindow() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+
+                val mockRootNode1 = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode1.childCount } returns 0
+                val mockWindowInfo1 = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo1.id } returns 10
+                every { mockWindowInfo1.root } returns mockRootNode1
+
+                val mockRootNode2 = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode2.childCount } returns 0
+                every { mockRootNode2.isClickable } returns true
+                every { mockRootNode2.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+                val mockWindowInfo2 = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo2.id } returns 20
+                every { mockWindowInfo2.root } returns mockRootNode2
+
+                every { mockService.getAccessibilityWindows() } returns
+                    listOf(mockWindowInfo1, mockWindowInfo2)
+
+                val tree1 =
+                    AccessibilityNodeData(
+                        id = "node_other",
+                        bounds = BoundsData(0, 0, 100, 50),
+                    )
+                val tree2 =
+                    AccessibilityNodeData(
+                        id = "node_target",
+                        className = "android.widget.Button",
+                        bounds = BoundsData(0, 0, 200, 100),
+                        clickable = true,
+                    )
+
+                val windows =
+                    listOf(
+                        WindowData(
+                            windowId = 10,
+                            windowType = "APPLICATION",
+                            tree = tree1,
+                            focused = true,
+                        ),
+                        WindowData(windowId = 20, windowType = "SYSTEM", tree = tree2),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_target", windows)
+
+                // Assert
+                assertTrue(result.isSuccess)
+            }
+
+        @Test
+        @DisplayName("clickNode returns failure when node not found in any window")
+        fun clickNodeReturnsFailureWhenNotFoundInAnyWindow() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+
+                val mockRootNode1 = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode1.childCount } returns 0
+                val mockWindowInfo1 = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo1.id } returns 10
+                every { mockWindowInfo1.root } returns mockRootNode1
+
+                val mockRootNode2 = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode2.childCount } returns 0
+                val mockWindowInfo2 = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo2.id } returns 20
+                every { mockWindowInfo2.root } returns mockRootNode2
+
+                every { mockService.getAccessibilityWindows() } returns
+                    listOf(mockWindowInfo1, mockWindowInfo2)
+
+                val tree1 = AccessibilityNodeData(id = "node_a", bounds = BoundsData(0, 0, 100, 50))
+                val tree2 = AccessibilityNodeData(id = "node_b", bounds = BoundsData(0, 0, 200, 100))
+
+                val windows =
+                    listOf(
+                        WindowData(
+                            windowId = 10,
+                            windowType = "APPLICATION",
+                            tree = tree1,
+                            focused = true,
+                        ),
+                        WindowData(windowId = 20, windowType = "SYSTEM", tree = tree2),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_nonexistent", windows)
+
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is NoSuchElementException)
+            }
+    }
+
+    @Nested
+    @DisplayName("Degraded-mode fallback")
+    inner class DegradedModeFallback {
+        @Test
+        @DisplayName("clickNode succeeds in degraded mode when getAccessibilityWindows returns empty")
+        fun clickNodeSucceedsInDegradedMode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+
+                every { mockService.getAccessibilityWindows() } returns emptyList()
+
+                val mockFallbackRoot = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockFallbackRoot.childCount } returns 0
+                every { mockFallbackRoot.isClickable } returns true
+                every { mockFallbackRoot.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+                every { mockService.getRootNode() } returns mockFallbackRoot
+
+                val tree =
+                    AccessibilityNodeData(
+                        id = "node_target",
+                        className = "android.widget.Button",
+                        bounds = BoundsData(0, 0, 100, 50),
+                        clickable = true,
+                    )
+
+                // Act
+                val result = executor.clickNode("node_target", wrapInWindows(tree))
+
+                // Assert
+                assertTrue(result.isSuccess)
+            }
+    }
+
+    @Nested
+    @DisplayName("Scroll with getScreenInfo")
+    inner class ScrollWithScreenInfo {
+        @Test
+        @DisplayName("scroll calls getScreenInfo to obtain screen dimensions")
+        fun scrollCallsGetScreenInfo() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val screenInfo =
+                    ScreenInfo(
+                        width = 1080,
+                        height = 2400,
+                        densityDpi = 420,
+                        orientation = "portrait",
+                    )
+                every { mockService.getScreenInfo() } returns screenInfo
+
+                // Act & Assert: scroll() must call getScreenInfo().
+                // The gesture dispatch will fail in JVM tests (Android framework stubs
+                // return null for GestureDescription.Builder), so we just verify getScreenInfo
+                // was called before the gesture attempt.
+                @Suppress("SwallowedException")
+                try {
+                    executor.scroll(ScrollDirection.UP)
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    // Expected — Android gesture APIs are stubbed in JVM tests
+                }
+
+                verify { mockService.getScreenInfo() }
             }
     }
 

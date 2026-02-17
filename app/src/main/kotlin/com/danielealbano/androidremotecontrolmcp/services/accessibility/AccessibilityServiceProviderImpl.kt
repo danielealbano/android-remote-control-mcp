@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import javax.inject.Inject
 
@@ -15,6 +16,9 @@ class AccessibilityServiceProviderImpl
     @Inject
     constructor() : AccessibilityServiceProvider {
         override fun getRootNode(): AccessibilityNodeInfo? = McpAccessibilityService.instance?.getRootNode()
+
+        override fun getAccessibilityWindows(): List<AccessibilityWindowInfo> =
+            McpAccessibilityService.instance?.getAccessibilityWindows() ?: emptyList()
 
         override fun getCurrentPackageName(): String? = McpAccessibilityService.instance?.getCurrentPackageName()
 

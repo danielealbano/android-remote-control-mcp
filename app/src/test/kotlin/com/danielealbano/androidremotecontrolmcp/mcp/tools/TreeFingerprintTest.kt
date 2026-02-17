@@ -2,8 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -242,6 +244,84 @@ class TreeFingerprintTest {
 
             // Assert
             assertEquals(sim1, sim2)
+        }
+    }
+
+    @Nested
+    @DisplayName("generate(windows)")
+    inner class GenerateWindowsTests {
+        private fun windowData(
+            windowId: Int = 0,
+            tree: AccessibilityNodeData,
+        ): WindowData =
+            WindowData(
+                windowId = windowId,
+                windowType = "APPLICATION",
+                tree = tree,
+                focused = windowId == 0,
+            )
+
+        @Test
+        fun `returns array of size FINGERPRINT_SIZE`() {
+            val windows = listOf(windowData(tree = node()))
+            val result = fingerprint.generate(windows)
+            assertEquals(TreeFingerprint.FINGERPRINT_SIZE, result.size)
+        }
+
+        @Test
+        fun `same windows produce identical fingerprint`() {
+            val tree = node(text = "Hello", children = listOf(node(text = "Child")))
+            val windows = listOf(windowData(tree = tree))
+            val first = fingerprint.generate(windows)
+            val second = fingerprint.generate(windows)
+            assertArrayEquals(first, second)
+        }
+
+        @Test
+        fun `different windows produce different fingerprints`() {
+            val windows1 = listOf(windowData(tree = node(text = "Hello")))
+            val windows2 = listOf(windowData(tree = node(text = "World")))
+            val fp1 = fingerprint.generate(windows1)
+            val fp2 = fingerprint.generate(windows2)
+            assertFalse(fp1.contentEquals(fp2))
+        }
+
+        @Test
+        fun `single window matches single tree fingerprint`() {
+            val tree = node(text = "Hello", children = listOf(node(text = "Child")))
+            val singleTreeFp = fingerprint.generate(tree)
+            val windowsFp = fingerprint.generate(listOf(windowData(tree = tree)))
+            assertArrayEquals(singleTreeFp, windowsFp)
+        }
+
+        @Test
+        fun `two windows combine fingerprints from both trees`() {
+            val tree1 = node(text = "A")
+            val tree2 = node(text = "B")
+            val singleFp1 = fingerprint.generate(tree1)
+            val singleFp2 = fingerprint.generate(tree2)
+
+            val combinedFp =
+                fingerprint.generate(
+                    listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
+                )
+
+            // Combined should have sum == sum(fp1) + sum(fp2)
+            assertEquals(singleFp1.sum() + singleFp2.sum(), combinedFp.sum())
+        }
+
+        @Test
+        fun `window appearing changes fingerprint`() {
+            val tree1 = node(text = "App", children = listOf(node(text = "Content")))
+            val tree2 = node(text = "Dialog")
+
+            val fpBefore = fingerprint.generate(listOf(windowData(windowId = 0, tree = tree1)))
+            val fpAfter =
+                fingerprint.generate(
+                    listOf(windowData(windowId = 0, tree = tree1), windowData(windowId = 1, tree = tree2)),
+                )
+
+            assertFalse(fpBefore.contentEquals(fpAfter))
         }
     }
 }

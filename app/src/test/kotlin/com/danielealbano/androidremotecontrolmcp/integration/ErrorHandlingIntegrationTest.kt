@@ -3,10 +3,12 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
 import android.os.SystemClock
-import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -33,6 +35,14 @@ class ErrorHandlingIntegrationTest {
             className = "android.widget.FrameLayout",
             bounds = BoundsData(0, 0, 1080, 2400),
             visible = true,
+        )
+
+    private val sampleScreenInfo =
+        ScreenInfo(
+            width = 1080,
+            height = 2400,
+            densityDpi = 420,
+            orientation = "portrait",
         )
 
     @BeforeEach
@@ -67,12 +77,9 @@ class ErrorHandlingIntegrationTest {
     fun `element not found returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("nonexistent", sampleTree)
+                deps.actionExecutor.clickNode("nonexistent", any<List<WindowData>>())
             } returns
                 Result.failure(
                     NoSuchElementException("Node 'nonexistent' not found"),
@@ -94,12 +101,9 @@ class ErrorHandlingIntegrationTest {
     fun `action failed returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            val mockRootNode = mockk<AccessibilityNodeInfo>()
-            every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-            every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-            every { mockRootNode.recycle() } returns Unit
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_root", sampleTree)
+                deps.actionExecutor.clickNode("node_root", any<List<WindowData>>())
             } returns
                 Result.failure(
                     IllegalStateException("Node 'node_root' is not clickable"),
@@ -162,13 +166,14 @@ class ErrorHandlingIntegrationTest {
                 every { SystemClock.elapsedRealtime() } answers { clockMs }
 
                 val deps = McpIntegrationTestHelper.createMockDependencies()
-                val mockRootNode = mockk<AccessibilityNodeInfo>()
-                every { deps.accessibilityServiceProvider.isReady() } returns true
-                every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
-                every { deps.treeParser.parseTree(mockRootNode) } returns sampleTree
-                every { mockRootNode.recycle() } returns Unit
+                McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
                 every {
-                    deps.elementFinder.findElements(sampleTree, FindBy.TEXT, "nonexistent_element_xyz", false)
+                    deps.elementFinder.findElements(
+                        any<List<WindowData>>(),
+                        FindBy.TEXT,
+                        "nonexistent_element_xyz",
+                        false,
+                    )
                 } answers {
                     clockMs += 600L
                     emptyList()
@@ -203,13 +208,27 @@ class ErrorHandlingIntegrationTest {
                 every { SystemClock.elapsedRealtime() } answers { clockMs }
 
                 val deps = McpIntegrationTestHelper.createMockDependencies()
-                val mockRootNode = mockk<AccessibilityNodeInfo>()
                 every { deps.accessibilityServiceProvider.isReady() } returns true
-                every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
+                val mockRootNode = mockk<android.view.accessibility.AccessibilityNodeInfo>()
+                val mockWin = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWin.id } returns 0
+                every { mockWin.root } returns mockRootNode
+                every { mockWin.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+                every { mockWin.title } returns "Test"
+                every { mockWin.layer } returns 0
+                every { mockWin.isFocused } returns true
+                every { mockRootNode.packageName } returns "com.example"
+                every {
+                    deps.accessibilityServiceProvider.getAccessibilityWindows()
+                } returns listOf(mockWin)
+                every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
+                every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
+                every { deps.accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
+                @Suppress("DEPRECATION")
                 every { mockRootNode.recycle() } returns Unit
 
                 var callCount = 0
-                every { deps.treeParser.parseTree(mockRootNode) } answers {
+                every { deps.treeParser.parseTree(any(), any()) } answers {
                     callCount++
                     clockMs += 600L
                     AccessibilityNodeData(

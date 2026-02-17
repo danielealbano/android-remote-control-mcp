@@ -153,7 +153,9 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ### `android_get_screen_state`
 
-Returns the consolidated current screen state: app metadata, screen dimensions, and a compact filtered flat TSV list of UI elements. Optionally includes an annotated low-resolution screenshot with bounding boxes and element ID labels.
+Returns the consolidated current screen state: screen dimensions and a compact filtered flat TSV list of UI elements from **all on-screen windows** (including system dialogs, permission popups, and IME keyboards). Optionally includes an annotated low-resolution screenshot with bounding boxes and element ID labels.
+
+Uses Android's multi-window accessibility API (`getWindows()`) to enumerate all interactive windows. Falls back to single-window mode via `rootInActiveWindow` when the multi-window API is unavailable (degraded mode).
 
 Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_current_app`, and `get_screen_info` tools.
 
@@ -209,7 +211,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
       }
     ]
   }
@@ -225,7 +227,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+        "text": "note:structural-only nodes are omitted from the tree\n...\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
       },
       {
         "type": "image",
@@ -239,16 +241,23 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
 
 #### Output Format
 
-The text output is a compact flat TSV (tab-separated values) format designed for token-efficient LLM consumption:
+The text output is a multi-window compact flat TSV (tab-separated values) format designed for token-efficient LLM consumption. Each on-screen window gets its own section:
 
-1. **Note line**: `note:structural-only nodes are omitted from the tree`
-2. **Note line**: `note:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account`
-3. **Note line**: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
-4. **Note line**: `note:offscreen items require scroll_to_element before interaction`
-5. **App line**: `app:<package> activity:<activity>`
-6. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
-7. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
-8. **Data rows**: One row per filtered node with tab-separated values
+1. **Degradation note** (only in fallback mode, appears first): `note:DEGRADED — multi-window unavailable, only active window reported`
+2. **Note lines** (global):
+   - `note:structural-only nodes are omitted from the tree`
+   - `note:certain elements are custom and will not be properly reported...`
+   - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+   - `note:offscreen items require scroll_to_element before interaction`
+3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
+4. **Per-window sections** (repeated for each window):
+   - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
+   - **TSV header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+   - **Data rows**: One row per filtered node with tab-separated values
+
+The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
+
+Element IDs are deterministic hashes that incorporate the window ID internally (e.g., `node_a1b2`). The window ID influences the hash via the `rootParentId` parameter passed to `parseTree()`, ensuring identical nodes in different windows produce different IDs.
 
 #### Flags Reference
 
@@ -297,8 +306,9 @@ Off-screen elements (marked with `off` flag in the TSV) do not have bounding box
 Only request the screenshot when the element list alone is not sufficient to understand the screen layout.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Permission denied**: Accessibility service not enabled
-- **Action failed**: Failed to obtain root accessibility node
+- **Permission denied**: Accessibility service not enabled or not ready
+- **Action failed**: All windows returned null root nodes
+- **Action failed**: No windows available and no active window root node
 - **Permission denied**: Screen capture not available (when `include_screenshot` is true)
 - **Action failed**: Screenshot capture failed
 

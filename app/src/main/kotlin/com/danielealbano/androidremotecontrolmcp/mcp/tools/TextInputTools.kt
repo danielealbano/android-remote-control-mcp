@@ -247,8 +247,8 @@ class TypeAppendTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness (max 500ms, 50ms interval)
@@ -381,8 +381,8 @@ class TypeInsertTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
@@ -555,8 +555,8 @@ class TypeReplaceTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
@@ -730,8 +730,8 @@ class TypeClearTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
@@ -1022,24 +1022,73 @@ fun registerTextInputTools(
  * @return The focused [AccessibilityNodeInfo], or null if no editable node is focused.
  *         The caller is responsible for recycling the returned node.
  */
-@Suppress("ReturnCount", "MaxLineLength")
+@Suppress(
+    "ReturnCount",
+    "NestedBlockDepth",
+    "CyclomaticComplexMethod",
+    "LoopWithTooManyJumpStatements",
+    "MaxLineLength",
+)
 internal fun findFocusedEditableNode(accessibilityServiceProvider: AccessibilityServiceProvider): AccessibilityNodeInfo? {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service is not enabled",
         )
     }
-    val rootNode = accessibilityServiceProvider.getRootNode() ?: return null
-    val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-    @Suppress("DEPRECATION")
-    rootNode.recycle()
+    // Search across all windows for the focused editable node.
+    // Uses a found-node variable to avoid returning from inside the try/finally block,
+    // ensuring all AccessibilityWindowInfo objects are properly recycled before the
+    // caller receives the result.
+    val windows = accessibilityServiceProvider.getAccessibilityWindows()
+    var foundNode: AccessibilityNodeInfo? = null
+    try {
+        for (window in windows) {
+            val rootNode = window.root ?: continue
+            val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-    if (focusedNode != null && !focusedNode.isEditable) {
-        @Suppress("DEPRECATION")
-        focusedNode.recycle()
-        return null
+            if (focusedNode != null && focusedNode.isEditable) {
+                // Recycle root AFTER confirming focusedNode is valid and editable.
+                // On API 34+ recycle() is a no-op, but ordering is correct for safety.
+                @Suppress("DEPRECATION")
+                rootNode.recycle()
+                foundNode = focusedNode
+                break
+            }
+
+            // Not the node we want — recycle both
+            @Suppress("DEPRECATION")
+            rootNode.recycle()
+            if (focusedNode != null) {
+                @Suppress("DEPRECATION")
+                focusedNode.recycle()
+            }
+        }
+    } finally {
+        // Recycle all AccessibilityWindowInfo objects for consistency
+        // (no-op on API 34+, but follows the codebase's recycling convention)
+        for (w in windows) {
+            @Suppress("DEPRECATION")
+            w.recycle()
+        }
     }
 
-    return focusedNode
+    if (foundNode != null) return foundNode
+
+    // Fallback: try rootInActiveWindow if getWindows() returned empty
+    if (windows.isEmpty()) {
+        val rootNode = accessibilityServiceProvider.getRootNode() ?: return null
+        val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        @Suppress("DEPRECATION")
+        rootNode.recycle()
+
+        if (focusedNode != null && !focusedNode.isEditable) {
+            @Suppress("DEPRECATION")
+            focusedNode.recycle()
+            return null
+        }
+        return focusedNode
+    }
+
+    return null
 }

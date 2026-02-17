@@ -3,6 +3,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -12,6 +13,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -41,6 +44,7 @@ class ElementActionToolsTest {
     private val mockActionExecutor = mockk<ActionExecutor>()
     private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
+    private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
 
     private val sampleTree =
         AccessibilityNodeData(
@@ -60,6 +64,20 @@ class ElementActionToolsTest {
                         visible = true,
                     ),
                 ),
+        )
+
+    private val sampleWindows =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                activityName = ".Main",
+                layer = 0,
+                focused = true,
+                tree = sampleTree,
+            ),
         )
 
     private val sampleBounds = BoundsData(50, 800, 250, 1000)
@@ -82,9 +100,29 @@ class ElementActionToolsTest {
 
     @BeforeEach
     fun setUp() {
-        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
-        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockAccessibilityServiceProvider.isReady() } returns true
+        every { mockWindowInfo.id } returns 0
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockWindowInfo.recycle() } returns Unit
+        every { mockRootNode.packageName } returns "com.example"
+        every {
+            mockAccessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
+        every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
+        every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
+        every { mockAccessibilityServiceProvider.getScreenInfo() } returns
+            ScreenInfo(
+                width = 1080,
+                height = 2400,
+                densityDpi = 420,
+                orientation = "portrait",
+            )
     }
 
     @AfterEach
@@ -102,7 +140,7 @@ class ElementActionToolsTest {
             runTest {
                 // Arrange
                 every {
-                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "7", false)
+                    mockElementFinder.findElements(sampleWindows, FindBy.TEXT, "7", false)
                 } returns listOf(sampleElementInfo)
                 val params =
                     buildJsonObject {
@@ -126,7 +164,7 @@ class ElementActionToolsTest {
             runTest {
                 // Arrange
                 every {
-                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "99", false)
+                    mockElementFinder.findElements(sampleWindows, FindBy.TEXT, "99", false)
                 } returns emptyList()
                 val params =
                     buildJsonObject {
@@ -187,7 +225,7 @@ class ElementActionToolsTest {
         @Test
         fun `clicks element successfully`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_abc", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns Result.success(Unit)
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
                 val result = tool.execute(params)
@@ -198,7 +236,7 @@ class ElementActionToolsTest {
         @Test
         fun `throws error when element not found`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_xyz", sampleTree) } returns
+                coEvery { mockActionExecutor.clickNode("node_xyz", sampleWindows) } returns
                     Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
@@ -208,7 +246,7 @@ class ElementActionToolsTest {
         @Test
         fun `throws error when element not clickable`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_abc", sampleTree) } returns
+                coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns
                     Result.failure(IllegalStateException("Node 'node_abc' is not clickable"))
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
@@ -232,7 +270,7 @@ class ElementActionToolsTest {
         @Test
         fun `long-clicks element successfully`() =
             runTest {
-                coEvery { mockActionExecutor.longClickNode("node_abc", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.longClickNode("node_abc", sampleWindows) } returns Result.success(Unit)
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
                 val result = tool.execute(params)
@@ -251,7 +289,7 @@ class ElementActionToolsTest {
         fun `returns immediately when element already visible`() =
             runTest {
                 val visibleNode = sampleTree.children[0] // visible = true
-                every { mockElementFinder.findNodeById(sampleTree, "node_abc") } returns visibleNode
+                every { mockElementFinder.findNodeById(sampleWindows, "node_abc") } returns visibleNode
                 val params = buildJsonObject { put("element_id", "node_abc") }
 
                 val result = tool.execute(params)
@@ -262,10 +300,88 @@ class ElementActionToolsTest {
         @Test
         fun `throws error when element not found`() =
             runTest {
-                every { mockElementFinder.findNodeById(sampleTree, "node_xyz") } returns null
+                every { mockElementFinder.findNodeById(sampleWindows, "node_xyz") } returns null
                 val params = buildJsonObject { put("element_id", "node_xyz") }
 
                 assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
+            }
+
+        @Suppress("LongMethod")
+        @Test
+        fun `scrolls to element in non-primary window`() =
+            runTest {
+                val invisibleNode =
+                    AccessibilityNodeData(
+                        id = "node_dialog_btn",
+                        className = "android.widget.Button",
+                        text = "Allow",
+                        bounds = BoundsData(100, 3000, 300, 3060),
+                        clickable = true,
+                        visible = false,
+                    )
+                val visibleNode = invisibleNode.copy(visible = true)
+
+                val secondWindowTreeBefore =
+                    AccessibilityNodeData(
+                        id = "node_dialog_root",
+                        className = "android.widget.FrameLayout",
+                        bounds = BoundsData(0, 0, 1080, 2400),
+                        scrollable = true,
+                        visible = true,
+                        children = listOf(invisibleNode),
+                    )
+                val secondWindowTreeAfter =
+                    secondWindowTreeBefore.copy(children = listOf(visibleNode))
+
+                val secondMockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val secondMockWindow = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { secondMockWindow.id } returns 5
+                every { secondMockWindow.root } returns secondMockRootNode
+                every { secondMockWindow.type } returns AccessibilityWindowInfo.TYPE_SYSTEM
+                every { secondMockWindow.title } returns "Dialog"
+                every { secondMockWindow.layer } returns 1
+                every { secondMockWindow.isFocused } returns false
+                every { secondMockRootNode.packageName } returns "android"
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns listOf(mockWindowInfo, secondMockWindow)
+
+                // First call returns invisible node, after scroll returns visible
+                var callCount = 0
+                every { mockTreeParser.parseTree(secondMockRootNode, "root_w5") } answers {
+                    callCount++
+                    if (callCount <= 1) secondWindowTreeBefore else secondWindowTreeAfter
+                }
+
+                // Multi-window findNodeById: first call invisible, after scroll visible
+                var findCount = 0
+                every {
+                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_dialog_btn"))
+                } answers {
+                    findCount++
+                    if (findCount <= 1) invisibleNode else visibleNode
+                }
+                // findContainingTree calls single-tree overload per window
+                every {
+                    mockElementFinder.findNodeById(sampleTree, "node_dialog_btn")
+                } returns null
+                every {
+                    mockElementFinder.findNodeById(secondWindowTreeBefore, "node_dialog_btn")
+                } returns invisibleNode
+                every {
+                    mockElementFinder.findNodeById(secondWindowTreeAfter, "node_dialog_btn")
+                } returns visibleNode
+                coEvery {
+                    mockActionExecutor.scrollNode(any(), any(), any())
+                } returns Result.success(Unit)
+
+                val params = buildJsonObject { put("element_id", "node_dialog_btn") }
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                assertTrue(
+                    text.contains("Scrolled") || text.contains("scroll"),
+                    "Expected scroll result but got: $text",
+                )
             }
     }
 }

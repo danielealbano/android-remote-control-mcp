@@ -226,8 +226,8 @@ class WaitForElementTool
                 attemptCount++
 
                 try {
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val elements = elementFinder.findElements(tree, findBy, value, false)
+                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val elements = elementFinder.findElements(multiWindowResult.windows, findBy, value, false)
 
                     if (elements.isNotEmpty()) {
                         val element = elements.first()
@@ -373,8 +373,8 @@ class WaitForIdleTool
 
             while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val currentFingerprint = treeFingerprint.generate(tree)
+                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val currentFingerprint = treeFingerprint.generate(multiWindowResult.windows)
 
                     if (previousFingerprint != null) {
                         val similarity = treeFingerprint.compare(previousFingerprint, currentFingerprint)
@@ -501,15 +501,15 @@ class GetElementDetailsTool
                     primitive.content
                 }
 
-            // 2. Get fresh tree
-            val tree = getFreshTree(treeParser, accessibilityServiceProvider)
+            // 2. Get fresh multi-window snapshot
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
 
             // 3. Build TSV output
             val sb = StringBuilder()
             sb.append("id\ttext\tdesc\n")
 
             for (id in ids) {
-                val node = elementFinder.findNodeById(tree, id)
+                val node = elementFinder.findNodeById(multiWindowResult.windows, id)
                 if (node != null) {
                     val text = sanitizeForTsv(node.text)
                     val desc = sanitizeForTsv(node.contentDescription)

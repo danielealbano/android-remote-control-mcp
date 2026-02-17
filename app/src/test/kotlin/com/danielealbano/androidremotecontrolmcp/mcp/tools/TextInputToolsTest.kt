@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -12,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -42,6 +44,7 @@ class TextInputToolsTest {
     private val mockTypeInputController = mockk<TypeInputController>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockFocusedNode = mockk<AccessibilityNodeInfo>()
+    private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
 
     private val sampleTree =
         AccessibilityNodeData(
@@ -49,6 +52,20 @@ class TextInputToolsTest {
             className = "android.widget.FrameLayout",
             bounds = BoundsData(0, 0, 1080, 2400),
             visible = true,
+        )
+
+    private val sampleWindows =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                activityName = ".Main",
+                layer = 0,
+                focused = true,
+                tree = sampleTree,
+            ),
         )
 
     private fun extractTextContent(result: CallToolResult): String {
@@ -69,11 +86,24 @@ class TextInputToolsTest {
         return mock
     }
 
+    @Suppress("LongMethod")
     @BeforeEach
     fun setUp() {
         every { mockAccessibilityServiceProvider.isReady() } returns true
-        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
-        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockWindowInfo.id } returns 0
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockWindowInfo.recycle() } returns Unit
+        every { mockRootNode.packageName } returns "com.example"
+        every {
+            mockAccessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
+        every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
+        every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
     }
 
@@ -309,7 +339,7 @@ class TextInputToolsTest {
             )
 
         private fun setupDefaultMocks(existingText: String = "existing") {
-            coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+            coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
             every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -425,7 +455,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when input connection not ready after poll timeout`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns false
 
                 val params =
@@ -441,7 +471,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when setSelection fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("existing")
                 every {
@@ -476,7 +506,7 @@ class TextInputToolsTest {
         @Test
         fun `handles emoji text correctly`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -516,7 +546,7 @@ class TextInputToolsTest {
         @Test
         fun `defaults textLength to 0 when getSurroundingText returns null`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -550,7 +580,7 @@ class TextInputToolsTest {
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello") {
-            coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+            coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
             every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -610,7 +640,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when offset exceeds text length`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hi")
                 every {
@@ -673,7 +703,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when setSelection fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hello")
                 every {
@@ -695,7 +725,7 @@ class TextInputToolsTest {
         @Test
         fun `defaults textLength to 0 when getSurroundingText returns null`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -760,7 +790,7 @@ class TextInputToolsTest {
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello World") {
-            coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+            coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
             every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -797,7 +827,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when search text not found`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hello World")
                 every {
@@ -845,7 +875,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when getSurroundingText returns null`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
@@ -879,7 +909,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when setSelection fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hello World")
                 every {
@@ -901,7 +931,7 @@ class TextInputToolsTest {
         @Test
         fun `handles empty new_text (delete only)`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
@@ -930,7 +960,7 @@ class TextInputToolsTest {
         @Test
         fun `replaces only first occurrence when multiple exist`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -957,7 +987,7 @@ class TextInputToolsTest {
         @Test
         fun `replaces search text at position 0 (start of field)`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -983,7 +1013,7 @@ class TextInputToolsTest {
         @Test
         fun `replaces search text at end of field`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
@@ -1057,7 +1087,7 @@ class TextInputToolsTest {
         @Test
         fun `clears text from element`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.performContextMenuAction(any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
@@ -1082,7 +1112,7 @@ class TextInputToolsTest {
         @Test
         fun `returns success for already empty field without sending keys`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val emptyText = createMockSurroundingText("")
                 every {
@@ -1103,7 +1133,7 @@ class TextInputToolsTest {
         @Test
         fun `Mutex released after early return for empty field`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val emptyText = createMockSurroundingText("")
                 every {
@@ -1139,7 +1169,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when input connection not ready after poll timeout`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns false
 
                 val params = buildJsonObject { put("element_id", "node_edit") }
@@ -1151,7 +1181,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when performContextMenuAction fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hello")
                 every {
@@ -1168,7 +1198,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when sendKeyEvent fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleTree) } returns Result.success(Unit)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 val beforeText = createMockSurroundingText("Hello")
                 every {

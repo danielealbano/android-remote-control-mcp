@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.graphics.Bitmap
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -42,6 +43,7 @@ class ScreenIntrospectionToolsTest {
     private lateinit var mockScreenshotAnnotator: ScreenshotAnnotator
     private lateinit var mockScreenshotEncoder: ScreenshotEncoder
     private lateinit var mockRootNode: AccessibilityNodeInfo
+    private lateinit var mockWindowInfo: AccessibilityWindowInfo
 
     @BeforeEach
     fun setUp() {
@@ -52,6 +54,7 @@ class ScreenIntrospectionToolsTest {
         mockScreenshotAnnotator = mockk(relaxed = true)
         mockScreenshotEncoder = mockk(relaxed = true)
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
     }
 
     @AfterEach
@@ -96,20 +99,31 @@ class ScreenIntrospectionToolsTest {
             "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
             "foc=focusable scr=scrollable edt=editable ena=enabled\n" +
             "note:offscreen items require scroll_to_element before interaction\n" +
-            "app:com.example activity:.Main\n" +
             "screen:1080x2400 density:420 orientation:portrait\n" +
+            "--- window:0 type:APPLICATION pkg:com.example title:Test activity:.Main " +
+            "layer:0 focused:true ---\n" +
             "id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
             "node_btn\tButton\tOK\t-\t-\t100,200,300,260\ton,clk,ena"
 
+    @Suppress("LongMethod")
     private fun setupReadyService() {
         every { mockAccessibilityServiceProvider.isReady() } returns true
-        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
-        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockWindowInfo.id } returns 0
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockRootNode.packageName } returns "com.example"
+        every {
+            mockAccessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockAccessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
         every {
-            mockCompactTreeFormatter.format(sampleTree, "com.example", ".Main", sampleScreenInfo)
+            mockCompactTreeFormatter.formatMultiWindow(any(), eq(sampleScreenInfo))
         } returns sampleCompactOutput
         every { mockCompactTreeFormatter.shouldKeepNode(any()) } returns true
     }
@@ -255,10 +269,13 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
-        @DisplayName("throws ActionFailed when root node is null")
-        fun throwsActionFailedWhenRootNodeIsNull() =
+        @DisplayName("throws ActionFailed when no windows and no root node available")
+        fun throwsActionFailedWhenNoWindowsAndNoRootNode() =
             runTest {
                 every { mockAccessibilityServiceProvider.isReady() } returns true
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns emptyList()
                 every { mockAccessibilityServiceProvider.getRootNode() } returns null
 
                 assertThrows<McpToolException.ActionFailed> {
@@ -300,8 +317,8 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
-        @DisplayName("recycles root node after parsing")
-        fun recyclesRootNodeAfterParsing() =
+        @DisplayName("recycles root node and window info after parsing")
+        fun recyclesRootNodeAndWindowInfoAfterParsing() =
             runTest {
                 setupReadyService()
 
@@ -309,6 +326,78 @@ class ScreenIntrospectionToolsTest {
 
                 @Suppress("DEPRECATION")
                 verify(exactly = 1) { mockRootNode.recycle() }
+                @Suppress("DEPRECATION")
+                verify(exactly = 1) { mockWindowInfo.recycle() }
+            }
+
+        @Test
+        @DisplayName("getFreshWindows fallback path returns degraded output")
+        fun getFreshWindowsFallbackPathReturnsDegradedOutput() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns emptyList()
+                val fallbackRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockAccessibilityServiceProvider.getRootNode() } returns fallbackRootNode
+                every { fallbackRootNode.windowId } returns 42
+                every { fallbackRootNode.packageName } returns "com.fallback"
+                every { mockTreeParser.parseTree(fallbackRootNode, "root_w42") } returns sampleTree
+                every { mockAccessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
+                val degradedOutput = "degraded output"
+                every {
+                    mockCompactTreeFormatter.formatMultiWindow(
+                        match { it.degraded },
+                        eq(sampleScreenInfo),
+                    )
+                } returns degradedOutput
+
+                val result = handler.execute(null)
+
+                assertEquals(1, result.content.size)
+                val textContent = result.content[0] as TextContent
+                assertEquals(degradedOutput, textContent.text)
+
+                @Suppress("DEPRECATION")
+                verify(exactly = 1) { fallbackRootNode.recycle() }
+            }
+
+        @Test
+        @DisplayName("getFreshWindows throws ActionFailed when all windows have null roots")
+        fun throwsActionFailedWhenAllWindowsHaveNullRoots() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                val mockNullRootWindow = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockNullRootWindow.root } returns null
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns listOf(mockNullRootWindow)
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        handler.execute(null)
+                    }
+                assertTrue(exception.message!!.contains("All windows returned null root nodes"))
+
+                @Suppress("DEPRECATION")
+                verify(exactly = 1) { mockNullRootWindow.recycle() }
+            }
+
+        @Test
+        @DisplayName("getFreshWindows throws ActionFailed when no windows and no root node")
+        fun throwsActionFailedWhenNoWindowsAndNoRoot() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns true
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns emptyList()
+                every { mockAccessibilityServiceProvider.getRootNode() } returns null
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        handler.execute(null)
+                    }
+                assertTrue(exception.message!!.contains("No windows available"))
             }
     }
 }

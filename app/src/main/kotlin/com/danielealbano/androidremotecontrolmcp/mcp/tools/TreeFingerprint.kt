@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import kotlin.math.abs
 
 /**
@@ -29,6 +30,21 @@ class TreeFingerprint {
     fun generate(root: AccessibilityNodeData): IntArray {
         val fingerprint = IntArray(FINGERPRINT_SIZE)
         populateFingerprint(root, fingerprint)
+        return fingerprint
+    }
+
+    /**
+     * Generates a combined [FINGERPRINT_SIZE]-slot histogram fingerprint from all
+     * windows' accessibility trees.
+     *
+     * @param windows the list of [WindowData] whose trees to fingerprint
+     * @return an [IntArray] of size [FINGERPRINT_SIZE] representing the combined fingerprint
+     */
+    fun generate(windows: List<WindowData>): IntArray {
+        val fingerprint = IntArray(FINGERPRINT_SIZE)
+        for (windowData in windows) {
+            populateFingerprint(windowData.tree, fingerprint)
+        }
         return fingerprint
     }
 

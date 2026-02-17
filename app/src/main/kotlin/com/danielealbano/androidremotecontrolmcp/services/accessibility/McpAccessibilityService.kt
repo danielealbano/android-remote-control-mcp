@@ -12,6 +12,7 @@ import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -110,6 +111,22 @@ class McpAccessibilityService : AccessibilityService() {
     fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow
 
     /**
+     * Returns all on-screen windows via [AccessibilityService.getWindows].
+     * Requires [AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS].
+     *
+     * @return List of [AccessibilityWindowInfo], or empty list if unavailable.
+     */
+    fun getAccessibilityWindows(): List<AccessibilityWindowInfo> =
+        try {
+            windows ?: emptyList()
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            Log.w(TAG, "getWindows() failed: ${e.message}")
+            emptyList()
+        }
+
+    /**
      * Returns the package name of the currently focused application,
      * or null if unknown.
      */
@@ -122,9 +139,11 @@ class McpAccessibilityService : AccessibilityService() {
     fun getCurrentActivityName(): String? = currentActivityName
 
     /**
-     * Returns true if the service is connected and has an active root node available.
+     * Returns true if the service is connected and ready to process requests.
+     * Does NOT check for an active window — multi-window support handles
+     * window availability at tree-parsing time.
      */
-    fun isReady(): Boolean = instance != null && rootInActiveWindow != null
+    fun isReady(): Boolean = instance != null
 
     /**
      * Returns the [CoroutineScope] for this service, or null if not connected.

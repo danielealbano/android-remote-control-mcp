@@ -377,4 +377,61 @@ class ElementFinderTest {
             assertEquals(true, finder.matchesValue("Hello World", "hello", exactMatch = false))
         }
     }
+
+    @Nested
+    @DisplayName("Multi-window search")
+    inner class MultiWindowSearch {
+        private fun makeWindowData(
+            windowId: Int,
+            tree: AccessibilityNodeData,
+        ): WindowData =
+            WindowData(
+                windowId = windowId,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                layer = windowId,
+                focused = windowId == 0,
+                tree = tree,
+            )
+
+        @Test
+        @DisplayName("findElements across two windows finds elements from both")
+        fun findElementsAcrossTwoWindows() {
+            val tree1 = createNode(id = "node_a", text = "Hello")
+            val tree2 = createNode(id = "node_b", text = "Hello World")
+            val windows = listOf(makeWindowData(0, tree1), makeWindowData(1, tree2))
+            val results = finder.findElements(windows, FindBy.TEXT, "Hello", false)
+            assertEquals(2, results.size)
+        }
+
+        @Test
+        @DisplayName("findElements with no matches returns empty")
+        fun findElementsNoMatches() {
+            val tree1 = createNode(id = "node_a", text = "Foo")
+            val windows = listOf(makeWindowData(0, tree1))
+            val results = finder.findElements(windows, FindBy.TEXT, "Bar", false)
+            assertTrue(results.isEmpty())
+        }
+
+        @Test
+        @DisplayName("findNodeById finds node in second window")
+        fun findNodeByIdInSecondWindow() {
+            val tree1 = createNode(id = "node_a", text = "First")
+            val tree2 = createNode(id = "node_b", text = "Second")
+            val windows = listOf(makeWindowData(0, tree1), makeWindowData(1, tree2))
+            val result = finder.findNodeById(windows, "node_b")
+            assertNotNull(result)
+            assertEquals("node_b", result!!.id)
+        }
+
+        @Test
+        @DisplayName("findNodeById returns null when not found")
+        fun findNodeByIdNotFound() {
+            val tree1 = createNode(id = "node_a", text = "First")
+            val windows = listOf(makeWindowData(0, tree1))
+            val result = finder.findNodeById(windows, "node_nonexistent")
+            assertNull(result)
+        }
+    }
 }

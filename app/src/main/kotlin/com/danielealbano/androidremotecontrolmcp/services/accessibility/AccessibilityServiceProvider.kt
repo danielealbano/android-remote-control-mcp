@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 
 /**
  * Abstracts access to the Android accessibility service singleton.
@@ -11,6 +12,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  */
 interface AccessibilityServiceProvider {
     fun getRootNode(): AccessibilityNodeInfo?
+
+    fun getAccessibilityWindows(): List<AccessibilityWindowInfo>
 
     fun getCurrentPackageName(): String?
 

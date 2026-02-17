@@ -99,6 +99,67 @@ class CompactTreeFormatter
         }
 
         /**
+         * Formats multi-window screen state as a compact string.
+         *
+         * Each window gets its own section with a header line containing window metadata,
+         * followed by a TSV column header and element rows.
+         */
+        fun formatMultiWindow(
+            result: MultiWindowResult,
+            screenInfo: ScreenInfo,
+        ): String {
+            val sb = StringBuilder()
+
+            // Degradation note (if applicable)
+            if (result.degraded) {
+                sb.appendLine(DEGRADATION_NOTE)
+            }
+
+            // Note lines
+            sb.appendLine(NOTE_LINE)
+            sb.appendLine(NOTE_LINE_CUSTOM_ELEMENTS)
+            sb.appendLine(NOTE_LINE_FLAGS_LEGEND)
+            sb.appendLine(NOTE_LINE_OFFSCREEN_HINT)
+
+            // Screen info (global)
+            sb.appendLine(
+                "screen:${screenInfo.width}x${screenInfo.height} " +
+                    "density:${screenInfo.densityDpi} orientation:${screenInfo.orientation}",
+            )
+
+            // Per-window sections
+            for (windowData in result.windows) {
+                sb.appendLine(buildWindowHeader(windowData))
+                sb.appendLine(HEADER)
+                walkNode(sb, windowData.tree)
+            }
+
+            return sb.toString().trimEnd('\n')
+        }
+
+        /**
+         * Builds the window header line for a single window.
+         *
+         * Format: `--- window:N type:TYPE pkg:PKG title:TITLE [activity:ACT] layer:N focused:BOOL ---`
+         *
+         * The `activity:` field is omitted when [WindowData.activityName] is null.
+         */
+        internal fun buildWindowHeader(windowData: WindowData): String =
+            buildString {
+                append("--- ")
+                append("window:${windowData.windowId} ")
+                append("type:${windowData.windowType} ")
+                append("pkg:${windowData.packageName ?: "unknown"} ")
+                append("title:${windowData.title ?: "unknown"} ")
+                if (windowData.activityName != null) {
+                    append("activity:${windowData.activityName} ")
+                }
+                append("layer:${windowData.layer} ")
+                append("focused:${windowData.focused}")
+                append(" ---")
+            }
+
+        /**
          * Determines whether a node should be included in the compact output.
          */
         internal fun shouldKeepNode(node: AccessibilityNodeData): Boolean =
@@ -198,6 +259,8 @@ class CompactTreeFormatter
         companion object {
             private const val SEP = "\t"
             const val COLUMN_SEPARATOR = "\t"
+            const val DEGRADATION_NOTE =
+                "note:DEGRADED — multi-window unavailable, only active window reported"
             const val NULL_VALUE = "-"
             const val MAX_TEXT_LENGTH = 100
             const val TRUNCATION_SUFFIX = "...truncated"

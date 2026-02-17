@@ -2,7 +2,6 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
-import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
@@ -41,9 +40,9 @@ class ActionExecutorImpl
          */
         override suspend fun clickNode(
             nodeId: String,
-            tree: AccessibilityNodeData,
+            windows: List<WindowData>,
         ): Result<Unit> {
-            return performNodeAction(nodeId, tree, "click") { realNode ->
+            return performNodeAction(nodeId, windows, "click") { realNode ->
                 if (!realNode.isClickable) {
                     return@performNodeAction Result.failure(
                         IllegalStateException("Node '$nodeId' is not clickable"),
@@ -65,9 +64,9 @@ class ActionExecutorImpl
          */
         override suspend fun longClickNode(
             nodeId: String,
-            tree: AccessibilityNodeData,
+            windows: List<WindowData>,
         ): Result<Unit> {
-            return performNodeAction(nodeId, tree, "long click") { realNode ->
+            return performNodeAction(nodeId, windows, "long click") { realNode ->
                 if (!realNode.isLongClickable) {
                     return@performNodeAction Result.failure(
                         IllegalStateException("Node '$nodeId' is not long-clickable"),
@@ -90,9 +89,9 @@ class ActionExecutorImpl
         override suspend fun setTextOnNode(
             nodeId: String,
             text: String,
-            tree: AccessibilityNodeData,
+            windows: List<WindowData>,
         ): Result<Unit> {
-            return performNodeAction(nodeId, tree, "set text") { realNode ->
+            return performNodeAction(nodeId, windows, "set text") { realNode ->
                 if (!realNode.isEditable) {
                     return@performNodeAction Result.failure(
                         IllegalStateException("Node '$nodeId' is not editable"),
@@ -126,9 +125,9 @@ class ActionExecutorImpl
         override suspend fun scrollNode(
             nodeId: String,
             direction: ScrollDirection,
-            tree: AccessibilityNodeData,
+            windows: List<WindowData>,
         ): Result<Unit> {
-            return performNodeAction(nodeId, tree, "scroll") { realNode ->
+            return performNodeAction(nodeId, windows, "scroll") { realNode ->
                 if (!realNode.isScrollable) {
                     return@performNodeAction Result.failure(
                         IllegalStateException("Node '$nodeId' is not scrollable"),
@@ -294,19 +293,9 @@ class ActionExecutorImpl
                         IllegalStateException("Accessibility service is not available"),
                     )
 
-            val rootNode =
-                service.getRootNode()
-                    ?: return Result.failure(
-                        IllegalStateException("No root node available for screen dimensions"),
-                    )
-
-            val rect = Rect()
-            rootNode.getBoundsInScreen(rect)
-            @Suppress("DEPRECATION")
-            rootNode.recycle()
-
-            val screenWidth = rect.right.toFloat()
-            val screenHeight = rect.bottom.toFloat()
+            val screenInfo = service.getScreenInfo()
+            val screenWidth = screenInfo.width.toFloat()
+            val screenHeight = screenInfo.height.toFloat()
             val centerX = screenWidth / 2f
             val centerY = screenHeight / 2f
             val scrollDistance =
@@ -538,10 +527,23 @@ class ActionExecutorImpl
         // Internal Helpers
         // ─────────────────────────────────────────────────────────────────────────
 
-        @Suppress("ReturnCount")
+        // DESIGN NOTE — Timing gap between parse and act:
+        // The caller parsed window trees at time T1 via getFreshWindows() and passes them here
+        // as `windows`. This method re-queries live windows at time T2 via getAccessibilityWindows().
+        // Between T1 and T2, windows can appear, disappear, or reorder. The parallel tree walk
+        // (findAccessibilityNodeByNodeId) mitigates this: it matches parsed tree structure against
+        // the live tree, so even if a window ID were reused by a different window, the tree
+        // structure mismatch would cause "not found" rather than acting on the wrong node.
+        @Suppress(
+            "ReturnCount",
+            "LongMethod",
+            "CyclomaticComplexMethod",
+            "NestedBlockDepth",
+            "LoopWithTooManyJumpStatements",
+        )
         private suspend fun performNodeAction(
             nodeId: String,
-            tree: AccessibilityNodeData,
+            windows: List<WindowData>,
             actionName: String,
             action: (AccessibilityNodeInfo) -> Result<Unit>,
         ): Result<Unit> {
@@ -551,39 +553,111 @@ class ActionExecutorImpl
                         IllegalStateException("Accessibility service is not available"),
                     )
 
+            val realWindows = service.getAccessibilityWindows()
+
+            // Multi-window path: match by AccessibilityWindowInfo.getId()
+            if (realWindows.isNotEmpty()) {
+                // Build a lookup map for O(1) window matching instead of O(n²) scanning
+                val realWindowById = realWindows.associateBy { it.id }
+                try {
+                    for (windowData in windows) {
+                        val realWindow = realWindowById[windowData.windowId] ?: continue
+                        val realRootNode = realWindow.root ?: continue
+
+                        val realNode =
+                            findAccessibilityNodeByNodeId(realRootNode, nodeId, windowData.tree)
+                        if (realNode != null) {
+                            return try {
+                                val result = action(realNode)
+                                if (result.isSuccess) {
+                                    Log.d(
+                                        TAG,
+                                        "Node action '$actionName' succeeded on node '$nodeId' " +
+                                            "in window ${windowData.windowId}",
+                                    )
+                                } else {
+                                    Log.w(
+                                        TAG,
+                                        "Node action '$actionName' failed on node '$nodeId': " +
+                                            "${result.exceptionOrNull()?.message}",
+                                    )
+                                }
+                                result
+                            } finally {
+                                // Guard against double-recycle: findAccessibilityNodeByNodeId
+                                // can return the root node itself if the target is the root
+                                if (realNode !== realRootNode) {
+                                    @Suppress("DEPRECATION")
+                                    realNode.recycle()
+                                }
+                                @Suppress("DEPRECATION")
+                                realRootNode.recycle()
+                            }
+                        }
+
+                        @Suppress("DEPRECATION")
+                        realRootNode.recycle()
+                    }
+                } finally {
+                    // Recycle all AccessibilityWindowInfo objects for consistency
+                    for (w in realWindows) {
+                        @Suppress("DEPRECATION")
+                        w.recycle()
+                    }
+                }
+
+                return Result.failure(
+                    NoSuchElementException(
+                        "Node '$nodeId' not found in any window's accessibility tree",
+                    ),
+                )
+            }
+
+            // Degraded-mode fallback: getAccessibilityWindows() returned empty,
+            // fall back to getRootNode() (same fallback as getFreshWindows()).
+            Log.w(TAG, "getAccessibilityWindows() returned empty, falling back to getRootNode()")
             val rootNode =
                 service.getRootNode()
                     ?: return Result.failure(
                         IllegalStateException("No root node available"),
                     )
 
-            val realNode = findAccessibilityNodeByNodeId(rootNode, nodeId, tree)
-            if (realNode == null) {
-                @Suppress("DEPRECATION")
-                rootNode.recycle()
-                return Result.failure(
-                    NoSuchElementException("Node '$nodeId' not found in accessibility tree"),
-                )
+            for (windowData in windows) {
+                val realNode = findAccessibilityNodeByNodeId(rootNode, nodeId, windowData.tree)
+                if (realNode != null) {
+                    return try {
+                        val result = action(realNode)
+                        if (result.isSuccess) {
+                            Log.d(
+                                TAG,
+                                "Node action '$actionName' succeeded (degraded) on node '$nodeId'",
+                            )
+                        } else {
+                            Log.w(
+                                TAG,
+                                "Node action '$actionName' failed (degraded) on node '$nodeId': " +
+                                    "${result.exceptionOrNull()?.message}",
+                            )
+                        }
+                        result
+                    } finally {
+                        // Guard against double-recycle: the matched node can be the root itself
+                        if (realNode !== rootNode) {
+                            @Suppress("DEPRECATION")
+                            realNode.recycle()
+                        }
+                        @Suppress("DEPRECATION")
+                        rootNode.recycle()
+                    }
+                }
             }
 
-            return try {
-                val result = action(realNode)
-                if (result.isSuccess) {
-                    Log.d(TAG, "Node action '$actionName' succeeded on node '$nodeId'")
-                } else {
-                    Log.w(
-                        TAG,
-                        "Node action '$actionName' failed on node '$nodeId': " +
-                            "${result.exceptionOrNull()?.message}",
-                    )
-                }
-                result
-            } finally {
-                @Suppress("DEPRECATION")
-                realNode.recycle()
-                @Suppress("DEPRECATION")
-                rootNode.recycle()
-            }
+            @Suppress("DEPRECATION")
+            rootNode.recycle()
+
+            return Result.failure(
+                NoSuchElementException("Node '$nodeId' not found in any window's accessibility tree"),
+            )
         }
 
         private suspend fun performGlobalAction(
