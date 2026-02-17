@@ -2068,21 +2068,21 @@ All must pass with zero errors.
 **As a developer**, I need the MCP tools documentation and project documentation updated to reflect the new tools, removed tools, and minSdk change.
 
 ### Acceptance Criteria
-- [ ] `docs/MCP_TOOLS.md` — Text Input Tools section updated: old tools removed, new tools documented with parameters, flows, and examples
-- [ ] `docs/MCP_TOOLS.md` — Overview table updated (tool counts, tool names)
-- [ ] `docs/MCP_TOOLS.md` — Element Action Tools section updated: `android_set_text` removed
-- [ ] `docs/MCP_TOOLS.md` — `android_press_key` Key Behavior section updated: remove "fallback to newline append" reference
-- [ ] `docs/PROJECT.md` — minSdk updated from 26 to 33
-- [ ] `docs/PROJECT.md` — Total tool count updated from 38 to 39
-- [ ] `docs/PROJECT.md` — Section header tool counts updated: Element Action Tools `(5 tools)` → `(4 tools)`, Text Input Tools `(3 tools)` → `(5 tools)`
-- [ ] `docs/PROJECT.md` — Accessibility Defaults Flags updated to include `FLAG_INPUT_METHOD_EDITOR`
-- [ ] `docs/PROJECT.md` — Folder structure listing updated to include `TypeInputController.kt` and `TypeInputControllerImpl.kt`
-- [ ] `docs/PROJECT.md` — Integration test mocking list updated to include `TypeInputController`
-- [ ] `docs/PROJECT.md` — Text tools section updated
-- [ ] `docs/ARCHITECTURE.md` — Component diagram updated to include `TypeInputController` under `AccSvc`
-- [ ] `README.md` — Tool count updated (38→39), category table updated (Element Actions 5→4, Text Input 3→5 with new tool names), minSdk updated (Android 8.0+→Android 13+), Mermaid diagram tool count updated
-- [ ] Documentation is accurate and consistent with implementation
-- [ ] Linting passes (no code changes in this story, but verify)
+- [x] `docs/MCP_TOOLS.md` — Text Input Tools section updated: old tools removed, new tools documented with parameters, flows, and examples
+- [x] `docs/MCP_TOOLS.md` — Overview table updated (tool counts, tool names)
+- [x] `docs/MCP_TOOLS.md` — Element Action Tools section updated: `android_set_text` removed
+- [x] `docs/MCP_TOOLS.md` — `android_press_key` Key Behavior section updated: remove "fallback to newline append" reference
+- [x] `docs/PROJECT.md` — minSdk updated from 26 to 33
+- [x] `docs/PROJECT.md` — Total tool count updated from 38 to 39
+- [x] `docs/PROJECT.md` — Section header tool counts updated: Element Action Tools `(5 tools)` → `(4 tools)`, Text Input Tools `(3 tools)` → `(5 tools)`
+- [x] `docs/PROJECT.md` — Accessibility Defaults Flags updated to include `FLAG_INPUT_METHOD_EDITOR`
+- [x] `docs/PROJECT.md` — Folder structure listing updated to include `TypeInputController.kt` and `TypeInputControllerImpl.kt`
+- [x] `docs/PROJECT.md` — Integration test mocking list updated to include `TypeInputController`
+- [x] `docs/PROJECT.md` — Text tools section updated
+- [x] `docs/ARCHITECTURE.md` — Component diagram updated to include `TypeInputController` under `AccSvc`
+- [x] `README.md` — Tool count updated (38→39), category table updated (Element Actions 5→4, Text Input 3→5 with new tool names), minSdk updated (Android 8.0+→Android 13+), Mermaid diagram tool count updated
+- [x] Documentation is accurate and consistent with implementation
+- [x] Linting passes (no code changes in this story, but verify)
 
 ---
 
@@ -2090,7 +2090,7 @@ All must pass with zero errors.
 
 **Definition of Done**: Overview table reflects new tool set.
 
-- [ ] **Action 4.1.1**: Update overview table
+- [x] **Action 4.1.1**: Update overview table
 
 **File**: `docs/MCP_TOOLS.md`
 
@@ -2105,7 +2105,7 @@ All must pass with zero errors.
 
 **Definition of Done**: `android_set_text` removed from Element Action Tools section.
 
-- [ ] **Action 4.2.1**: Remove `android_set_text` documentation
+- [x] **Action 4.2.1**: Remove `android_set_text` documentation
 
 **File**: `docs/MCP_TOOLS.md`
 
@@ -2117,7 +2117,7 @@ All must pass with zero errors.
 
 **Definition of Done**: Four new tools documented, `android_press_key` Key Behavior updated, two old tools (`android_input_text`, `android_clear_text`) removed from section.
 
-- [ ] **Action 4.3.1**: Rewrite the Text Input Tools section
+- [x] **Action 4.3.1**: Rewrite the Text Input Tools section
 
 **File**: `docs/MCP_TOOLS.md`
 
@@ -2146,13 +2146,13 @@ Also update `android_press_key` Key Behavior section: change `"Uses ACTION_IME_E
 
 **Definition of Done**: minSdk and text tools references updated.
 
-- [ ] **Action 4.4.1**: Update minSdk references
+- [x] **Action 4.4.1**: Update minSdk references
 
 **File**: `docs/PROJECT.md`
 
 **What changes**: Search for `minSdk`, `API 26`, `Android 8`, or similar references and update to `minSdk 33` / `Android 13 (Tiramisu)`.
 
-- [ ] **Action 4.4.2**: Update text tools references and tool counts
+- [x] **Action 4.4.2**: Update text tools references and tool counts
 
 **File**: `docs/PROJECT.md`
 
@@ -2171,7 +2171,7 @@ Also update `android_press_key` Key Behavior section: change `"Uses ACTION_IME_E
 
 **Definition of Done**: `ARCHITECTURE.md` component diagram includes `TypeInputController` under the `AccSvc` subgraph.
 
-- [ ] **Action 4.5.1**: Add `TypeInputController` to the Mermaid component diagram
+- [x] **Action 4.5.1**: Add `TypeInputController` to the Mermaid component diagram
 
 **File**: `docs/ARCHITECTURE.md`
 
@@ -2183,7 +2183,7 @@ Also update `android_press_key` Key Behavior section: change `"Uses ACTION_IME_E
 
 **Definition of Done**: `README.md` tool counts, tool names, minSdk, and Mermaid diagram are updated.
 
-- [ ] **Action 4.6.1**: Update all stale references in `README.md`
+- [x] **Action 4.6.1**: Update all stale references in `README.md`
 
 **File**: `README.md` (repo root)
 
@@ -2227,7 +2227,7 @@ Also update `android_press_key` Key Behavior section: change `"Uses ACTION_IME_E
 
 **Definition of Done**: No stale references to removed tools in any documentation.
 
-- [ ] **Action 4.7.1**: Search for stale references
+- [x] **Action 4.7.1**: Search for stale references
 
 Search the entire repository — including `docs/` directory (`ARCHITECTURE.md`, `MCP_TOOLS.md`, `PROJECT.md`, and any other docs) AND repo root files (`README.md`, `CLAUDE.md`) — for:
 - `input_text` (should only appear in commit history context, not as a current tool)

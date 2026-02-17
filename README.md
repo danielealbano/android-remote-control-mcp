@@ -20,7 +20,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-start on boot
 - Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 38 MCP Tools across 9 Categories
+### 39 MCP Tools across 9 Categories
 
 All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full naming convention.
 
@@ -30,8 +30,8 @@ All tool names use the `android_` prefix by default (e.g., `android_tap`). When 
 | **System Actions** (6) | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | Global device actions and log retrieval |
 | **Touch Actions** (5) | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | Coordinate-based touch interactions |
 | **Gestures** (2) | `android_pinch`, `android_custom_gesture` | Multi-touch and complex gestures |
-| **Element Actions** (5) | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_set_text`, `android_scroll_to_element` | Accessibility node-based interactions |
-| **Text Input** (3) | `android_input_text`, `android_clear_text`, `android_press_key` | Keyboard input and text manipulation |
+| **Element Actions** (4) | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_scroll_to_element` | Accessibility node-based interactions |
+| **Text Input** (5) | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | Natural text input via InputConnection and key events |
 | **Utilities** (5) | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | Helper tools for automation and element inspection |
 | **File Operations** (8) | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | File system access via Storage Access Framework (SAF) |
 | **App Management** (3) | `android_open_app`, `android_list_apps`, `android_close_app` | Launch, list, and close applications |
@@ -57,7 +57,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - **Gradle** 8.x (wrapper included, no global install needed)
 
 ### For Running
-- Android device or emulator running **Android 8.0+** (API 26+), targeting **Android 14** (API 34)
+- Android device or emulator running **Android 13+** (API 33+), targeting **Android 14** (API 34)
 - **adb** (Android Debug Bridge) for device/emulator management
 
 ### For E2E Tests
@@ -182,7 +182,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 38 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 39 MCP tool handlers.
 
 ### Integration Tests
 
@@ -238,7 +238,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"38 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"39 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end
