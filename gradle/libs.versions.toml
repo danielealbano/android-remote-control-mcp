@@ -13,6 +13,7 @@ core-ktx = "1.17.0"
 lifecycle = "2.10.0"
 datastore = "1.2.0"
 documentfile = "1.1.0"
+camerax = "1.5.2"
 
 # Networking
 ktor = "3.4.0"
@@ -83,6 +84,12 @@ datastore-preferences = { group = "androidx.datastore", name = "datastore-prefer
 
 # DocumentFile (SAF)
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
+
+# CameraX
+camerax-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+camerax-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+camerax-video = { group = "androidx.camera", name = "camera-video", version.ref = "camerax" }
 
 # Ktor Server
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
