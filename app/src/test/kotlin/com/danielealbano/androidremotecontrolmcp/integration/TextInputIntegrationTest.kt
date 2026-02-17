@@ -161,6 +161,9 @@ class TextInputIntegrationTest {
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Field content:"))
             }
+
+            // Verify mock interaction: cursor positioned at specified offset
+            verify { deps.typeInputController.setSelection(3, 3) }
         }
 
     @Test
@@ -203,6 +206,9 @@ class TextInputIntegrationTest {
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Field content:"))
             }
+
+            // Verify mock interaction: search text "Hello" selected (indices 0..5)
+            verify { deps.typeInputController.setSelection(0, 5) }
         }
 
     @Test
