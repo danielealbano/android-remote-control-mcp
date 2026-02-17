@@ -243,5 +243,41 @@ class ScreenshotAnnotatorTest {
                 }
             assertTrue(exception.message!!.contains("Failed to create mutable bitmap copy"))
         }
+
+        @Test
+        fun `throws IllegalArgumentException when screenWidth is zero`() {
+            val exception =
+                org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                    annotator.annotate(mockBitmap, emptyList(), 0, 2400)
+                }
+            assertTrue(exception.message!!.contains("screenWidth must be positive"))
+        }
+
+        @Test
+        fun `throws IllegalArgumentException when screenHeight is zero`() {
+            val exception =
+                org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                    annotator.annotate(mockBitmap, emptyList(), 1080, 0)
+                }
+            assertTrue(exception.message!!.contains("screenHeight must be positive"))
+        }
+
+        @Test
+        fun `throws IllegalArgumentException when screenWidth is negative`() {
+            val exception =
+                org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                    annotator.annotate(mockBitmap, emptyList(), -1, 2400)
+                }
+            assertTrue(exception.message!!.contains("screenWidth must be positive"))
+        }
+
+        @Test
+        fun `throws IllegalArgumentException when screenHeight is negative`() {
+            val exception =
+                org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                    annotator.annotate(mockBitmap, emptyList(), 1080, -1)
+                }
+            assertTrue(exception.message!!.contains("screenHeight must be positive"))
+        }
     }
 }
