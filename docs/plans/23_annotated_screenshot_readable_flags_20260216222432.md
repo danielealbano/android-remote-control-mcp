@@ -596,9 +596,9 @@ Key changes:
 
 **Acceptance Criteria**:
 - [x] `sampleCompactOutput` fixture updated to use new flag format and note lines
-- [ ] Screenshot tests updated to mock `captureScreenshotBitmap` instead of `captureScreenshot`
-- [ ] `GetScreenStateHandler` constructor call updated with new dependencies (mocked)
-- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.mcp.tools.ScreenIntrospectionToolsTest"`
+- [x] Screenshot tests updated to mock `captureScreenshotBitmap` instead of `captureScreenshot`
+- [x] `GetScreenStateHandler` constructor call updated with new dependencies (mocked)
+- [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.mcp.tools.ScreenIntrospectionToolsTest"`
 
 **Note**: This task technically depends on US2 changes (new constructor parameters for `GetScreenStateHandler`). During implementation, the constructor update and mock additions in this task should be applied AFTER Task 2.3 (Action 2.3.1). However, the fixture data update (`sampleCompactOutput`) can be done as part of US1. The implementor should either: (a) update the fixture now and defer the constructor changes to US2, or (b) do the full update together with Task 2.3.
 
@@ -706,37 +706,37 @@ Key changes:
 **Goal**: When `include_screenshot=true`, overlay red dashed bounding boxes with element ID hash labels on the screenshot for all on-screen elements that appear in the TSV.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] Screenshot returned by `get_screen_state` has red dashed bounding boxes drawn on on-screen TSV elements
-- [ ] Each bounding box has a semi-transparent red pill label with white bold text showing the element ID hash (without `node_` prefix)
-- [ ] Element bounds from screen coordinates are correctly mapped to the scaled screenshot coordinates
-- [ ] Off-screen elements have no bounding boxes
-- [ ] Elements not in the TSV (filtered out by `shouldKeepNode`) have no bounding boxes
-- [ ] Password/sensitive fields ARE annotated (intentional — Android masks display text)
-- [ ] `ScreenCaptureProvider` interface exposes a method to get the raw resized `Bitmap`
-- [ ] `ApiLevelProvider` interface extracted for testable SDK version checks (avoids JDK 17 reflection issues with `Build.VERSION.SDK_INT`)
-- [ ] `ScreenCaptureProviderImpl` injects `ApiLevelProvider` instead of reading `Build.VERSION.SDK_INT` directly
-- [ ] `ScreenCaptureProviderImpl.captureScreenshotBitmap` is unit tested (success, failure, bitmap recycling)
-- [ ] `ScreenshotAnnotator` is a new injectable class under `services/screencapture/` with testable helper methods
-- [ ] `ScreenshotAnnotator` creates Paint objects ONCE before the element loop
-- [ ] `collectOnScreenElements` uses accumulator pattern (no intermediate list allocations)
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
-- [ ] All integration tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
-- [ ] Integration test for annotation failure / bitmap cleanup passes
-- [ ] Lint passes on changed files
+- [x] Screenshot returned by `get_screen_state` has red dashed bounding boxes drawn on on-screen TSV elements
+- [x] Each bounding box has a semi-transparent red pill label with white bold text showing the element ID hash (without `node_` prefix)
+- [x] Element bounds from screen coordinates are correctly mapped to the scaled screenshot coordinates
+- [x] Off-screen elements have no bounding boxes
+- [x] Elements not in the TSV (filtered out by `shouldKeepNode`) have no bounding boxes
+- [x] Password/sensitive fields ARE annotated (intentional — Android masks display text)
+- [x] `ScreenCaptureProvider` interface exposes a method to get the raw resized `Bitmap`
+- [x] `ApiLevelProvider` interface extracted for testable SDK version checks (avoids JDK 17 reflection issues with `Build.VERSION.SDK_INT`)
+- [x] `ScreenCaptureProviderImpl` injects `ApiLevelProvider` instead of reading `Build.VERSION.SDK_INT` directly
+- [x] `ScreenCaptureProviderImpl.captureScreenshotBitmap` is unit tested (success, failure, bitmap recycling)
+- [x] `ScreenshotAnnotator` is a new injectable class under `services/screencapture/` with testable helper methods
+- [x] `ScreenshotAnnotator` creates Paint objects ONCE before the element loop
+- [x] `collectOnScreenElements` uses accumulator pattern (no intermediate list allocations)
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
+- [x] All integration tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
+- [x] Integration test for annotation failure / bitmap cleanup passes
+- [x] Lint passes on changed files
 
 ---
 
 ### Task 2.0: Extract `ApiLevelProvider` for testable SDK version checks
 
 **Acceptance Criteria**:
-- [ ] New `ApiLevelProvider` interface in `services/screencapture/`
-- [ ] New `DefaultApiLevelProvider` implementation using `Build.VERSION.SDK_INT`
-- [ ] `ScreenCaptureProviderImpl` constructor updated to inject `ApiLevelProvider`
-- [ ] `validateService()` uses `apiLevelProvider.getSdkInt()` instead of `Build.VERSION.SDK_INT` directly
-- [ ] `isScreenCaptureAvailable()` uses `apiLevelProvider.getSdkInt()` instead of `Build.VERSION.SDK_INT` directly
-- [ ] Hilt `@Binds` added in `ServiceModule`
-- [ ] Lint passes on changed files
+- [x] New `ApiLevelProvider` interface in `services/screencapture/`
+- [x] New `DefaultApiLevelProvider` implementation using `Build.VERSION.SDK_INT`
+- [x] `ScreenCaptureProviderImpl` constructor updated to inject `ApiLevelProvider`
+- [x] `validateService()` uses `apiLevelProvider.getSdkInt()` instead of `Build.VERSION.SDK_INT` directly
+- [x] `isScreenCaptureAvailable()` uses `apiLevelProvider.getSdkInt()` instead of `Build.VERSION.SDK_INT` directly
+- [x] Hilt `@Binds` added in `ServiceModule`
+- [x] Lint passes on changed files
 
 **Why**: `Build.VERSION.SDK_INT` is a `static final int` field. On JDK 17+, the `Field.modifiers` reflection trick for mocking it is broken (`NoSuchFieldException`), and MockK's `mockkStatic` only intercepts methods, not fields. Extracting an injectable interface enables clean mocking in unit tests without JDK-version-dependent reflection hacks.
 
@@ -835,10 +835,10 @@ class DefaultApiLevelProvider
 ### Task 2.1: Add `captureScreenshotBitmap` to `ScreenCaptureProvider`
 
 **Acceptance Criteria**:
-- [ ] `ScreenCaptureProvider` interface has a new `captureScreenshotBitmap(maxWidth, maxHeight)` method returning `Result<Bitmap>`
-- [ ] `ScreenCaptureProviderImpl` implements it (capture + resize, no JPEG encoding)
-- [ ] Bitmap lifecycle is documented (caller must recycle)
-- [ ] Lint passes on changed files
+- [x] `ScreenCaptureProvider` interface has a new `captureScreenshotBitmap(maxWidth, maxHeight)` method returning `Result<Bitmap>`
+- [x] `ScreenCaptureProviderImpl` implements it (capture + resize, no JPEG encoding)
+- [x] Bitmap lifecycle is documented (caller must recycle)
+- [x] Lint passes on changed files
 
 #### Action 2.1.1: Add method to `ScreenCaptureProvider` interface
 
@@ -935,14 +935,14 @@ class DefaultApiLevelProvider
 ### Task 2.2: Create `ScreenshotAnnotator`
 
 **Acceptance Criteria**:
-- [ ] New file `ScreenshotAnnotator.kt` in `services/screencapture/`
-- [ ] Draws red dashed 2px bounding boxes on on-screen elements
-- [ ] Draws semi-transparent red pill label with white bold text (element ID hash) at top-left of each box
-- [ ] Correctly maps element bounds from screen coordinates to scaled bitmap coordinates
-- [ ] Only annotates elements that pass `shouldKeepNode` AND are visible (on-screen)
-- [ ] Returns a new annotated `Bitmap` (does not mutate the input)
-- [ ] Hilt-injectable via `@Inject constructor()`
-- [ ] Lint passes
+- [x] New file `ScreenshotAnnotator.kt` in `services/screencapture/`
+- [x] Draws red dashed 2px bounding boxes on on-screen elements
+- [x] Draws semi-transparent red pill label with white bold text (element ID hash) at top-left of each box
+- [x] Correctly maps element bounds from screen coordinates to scaled bitmap coordinates
+- [x] Only annotates elements that pass `shouldKeepNode` AND are visible (on-screen)
+- [x] Returns a new annotated `Bitmap` (does not mutate the input)
+- [x] Hilt-injectable via `@Inject constructor()`
+- [x] Lint passes
 
 #### Action 2.2.1: Create `ScreenshotAnnotator.kt`
 
@@ -1194,11 +1194,11 @@ class ScreenshotAnnotator
 ### Task 2.3: Inject `ScreenshotAnnotator` and `ScreenshotEncoder` into screen introspection
 
 **Acceptance Criteria**:
-- [ ] `GetScreenStateHandler` accepts `ScreenshotAnnotator` and `ScreenshotEncoder` as constructor dependencies
-- [ ] `registerScreenIntrospectionTools` function signature updated to accept the new dependencies
-- [ ] `McpServerService.registerAllTools` passes the new dependencies
-- [ ] `McpIntegrationTestHelper.registerAllTools` passes the new dependencies (mocked or real)
-- [ ] Lint passes on changed files
+- [x] `GetScreenStateHandler` accepts `ScreenshotAnnotator` and `ScreenshotEncoder` as constructor dependencies
+- [x] `registerScreenIntrospectionTools` function signature updated to accept the new dependencies
+- [x] `McpServerService.registerAllTools` passes the new dependencies
+- [x] `McpIntegrationTestHelper.registerAllTools` passes the new dependencies (mocked or real)
+- [x] Lint passes on changed files
 
 #### Action 2.3.1: Update `GetScreenStateHandler` constructor
 
@@ -1339,11 +1339,11 @@ class ScreenshotAnnotator
 ### Task 2.4: Update `GetScreenStateHandler.execute` to use annotated screenshot
 
 **Acceptance Criteria**:
-- [ ] When `include_screenshot=true`, captures bitmap, collects on-screen filtered elements, annotates, encodes, returns
-- [ ] Uses `captureScreenshotBitmap` instead of `captureScreenshot`
-- [ ] Properly recycles all bitmaps (resized, annotated)
-- [ ] Element collection reuses `CompactTreeFormatter.shouldKeepNode` logic
-- [ ] Lint passes
+- [x] When `include_screenshot=true`, captures bitmap, collects on-screen filtered elements, annotates, encodes, returns
+- [x] Uses `captureScreenshotBitmap` instead of `captureScreenshot`
+- [x] Properly recycles all bitmaps (resized, annotated)
+- [x] Element collection reuses `CompactTreeFormatter.shouldKeepNode` logic
+- [x] Lint passes
 
 #### Action 2.4.1: Add helper to collect annotatable elements
 
@@ -1458,9 +1458,9 @@ Add the necessary imports at the top of the file:
 ### Task 2.5: Create `ScreenshotAnnotatorTest` unit tests
 
 **Acceptance Criteria**:
-- [ ] New test file `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotAnnotatorTest.kt`
-- [ ] Tests cover: empty elements list, single element, multiple elements, coordinate mapping, bounds clamping, element outside bitmap, ID hash extraction
-- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
+- [x] New test file `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenshotAnnotatorTest.kt`
+- [x] Tests cover: empty elements list, single element, multiple elements, coordinate mapping, bounds clamping, element outside bitmap, ID hash extraction
+- [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotatorTest"`
 
 **Note on testability**: The `computeScaledBounds` and `extractLabel` methods were already defined as `internal` in Action 2.2.1 (`ScreenshotAnnotator.kt`). No additional code changes are needed — this task only creates the tests.
 
@@ -1725,9 +1725,9 @@ inner class AnnotateTests {
 ### Task 2.6: Add unit tests for `ScreenCaptureProviderImpl.captureScreenshotBitmap`
 
 **Acceptance Criteria**:
-- [ ] New test class/inner class covering `captureScreenshotBitmap` in the existing `ScreenCaptureProviderImplTest.kt` (or a new file if it doesn't exist)
-- [ ] Tests cover: success path, failure path (null bitmap), bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same bitmap
-- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
+- [x] New test class/inner class covering `captureScreenshotBitmap` in the existing `ScreenCaptureProviderImplTest.kt` (or a new file if it doesn't exist)
+- [x] Tests cover: success path, failure path (null bitmap), bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same bitmap
+- [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImplTest"`
 
 #### Action 2.6.1: Add `captureScreenshotBitmap` tests
 
@@ -1897,9 +1897,9 @@ class ScreenCaptureProviderImplTest {
 ### Task 2.7: Update `ScreenIntrospectionIntegrationTest` for annotated screenshot
 
 **Acceptance Criteria**:
-- [ ] Integration test for screenshot now mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` instead of `captureScreenshot`
-- [ ] No Android framework mocking needed (no `mockkStatic(Bitmap::class)`)
-- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
+- [x] Integration test for screenshot now mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` instead of `captureScreenshot`
+- [x] No Android framework mocking needed (no `mockkStatic(Bitmap::class)`)
+- [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
 
 #### Action 2.7.1: Update `get_screen_state with include_screenshot returns text and image`
 
@@ -2015,8 +2015,8 @@ This is clean, avoids all Android framework mocking, and isolates each component
 ### Task 2.8: Add integration test for exception propagation and bitmap cleanup
 
 **Acceptance Criteria**:
-- [ ] New test verifies that when `screenshotAnnotator.annotate()` throws an exception, the tool returns an error and both bitmaps are still recycled
-- [ ] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
+- [x] New test verifies that when `screenshotAnnotator.annotate()` throws an exception, the tool returns an error and both bitmaps are still recycled
+- [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.ScreenIntrospectionIntegrationTest"`
 
 #### Action 2.8.1: Add `get_screen_state with screenshot annotation failure returns error`
 

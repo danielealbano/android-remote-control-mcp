@@ -20,6 +20,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import io.ktor.serialization.kotlinx.json.json
@@ -64,6 +66,8 @@ object McpIntegrationTestHelper {
             fileOperationProvider = mockk(relaxed = true),
             appManager = mockk(relaxed = true),
             typeInputController = mockk(relaxed = true),
+            screenshotAnnotator = mockk(relaxed = true),
+            screenshotEncoder = mockk(relaxed = true),
         )
 
     /**
@@ -81,6 +85,8 @@ object McpIntegrationTestHelper {
             deps.accessibilityServiceProvider,
             deps.screenCaptureProvider,
             CompactTreeFormatter(),
+            deps.screenshotAnnotator,
+            deps.screenshotEncoder,
             toolNamePrefix,
         )
         registerSystemActionTools(
@@ -262,4 +268,6 @@ data class MockDependencies(
     val fileOperationProvider: FileOperationProvider,
     val appManager: AppManager,
     val typeInputController: TypeInputController,
+    val screenshotAnnotator: ScreenshotAnnotator,
+    val screenshotEncoder: ScreenshotEncoder,
 )

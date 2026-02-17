@@ -2,12 +2,16 @@
 
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.graphics.Bitmap
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
@@ -38,6 +42,8 @@ class GetScreenStateHandler
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val screenCaptureProvider: ScreenCaptureProvider,
         private val compactTreeFormatter: CompactTreeFormatter,
+        private val screenshotAnnotator: ScreenshotAnnotator,
+        private val screenshotEncoder: ScreenshotEncoder,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -89,24 +95,76 @@ class GetScreenStateHandler
                     )
                 }
 
-                val result =
-                    screenCaptureProvider.captureScreenshot(
-                        quality = ScreenCaptureProvider.DEFAULT_QUALITY,
+                val bitmapResult =
+                    screenCaptureProvider.captureScreenshotBitmap(
                         maxWidth = SCREENSHOT_MAX_SIZE,
                         maxHeight = SCREENSHOT_MAX_SIZE,
                     )
-                val screenshotData =
-                    result.getOrElse { exception ->
+                val resizedBitmap =
+                    bitmapResult.getOrElse { exception ->
+                        Log.e(TAG, "Screenshot capture failed", exception)
                         throw McpToolException.ActionFailed(
-                            "Screenshot capture failed: ${exception.message ?: "Unknown error"}",
+                            "Screenshot capture failed",
                         )
                     }
 
-                return McpToolUtils.textAndImageResult(compactOutput, screenshotData.data, "image/jpeg")
+                var annotatedBitmap: Bitmap? = null
+                try {
+                    // Collect on-screen elements that appear in the TSV
+                    val onScreenElements = collectOnScreenElements(tree)
+
+                    // Annotate the screenshot with bounding boxes
+                    annotatedBitmap =
+                        screenshotAnnotator.annotate(
+                            resizedBitmap,
+                            onScreenElements,
+                            screenInfo.width,
+                            screenInfo.height,
+                        )
+
+                    // Encode annotated bitmap to base64 JPEG
+                    val screenshotData =
+                        screenshotEncoder.bitmapToScreenshotData(
+                            annotatedBitmap,
+                            ScreenCaptureProvider.DEFAULT_QUALITY,
+                        )
+
+                    return McpToolUtils.textAndImageResult(compactOutput, screenshotData.data, "image/jpeg")
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Screenshot annotation failed", e)
+                    throw McpToolException.ActionFailed(
+                        "Screenshot annotation failed",
+                    )
+                } finally {
+                    annotatedBitmap?.recycle()
+                    resizedBitmap.recycle()
+                }
             }
 
             // 9. Return text-only result
             return McpToolUtils.textResult(compactOutput)
+        }
+
+        /**
+         * Collects elements that should be annotated on the screenshot:
+         * nodes that pass the formatter's keep filter AND are visible (on-screen).
+         *
+         * Uses an accumulator parameter to avoid O(N) intermediate list allocations
+         * and O(N^2) element copies from recursive addAll calls.
+         */
+        private fun collectOnScreenElements(
+            node: AccessibilityNodeData,
+            result: MutableList<AccessibilityNodeData> = mutableListOf(),
+        ): List<AccessibilityNodeData> {
+            if (compactTreeFormatter.shouldKeepNode(node) && node.visible) {
+                result.add(node)
+            }
+            for (child in node.children) {
+                collectOnScreenElements(child, result)
+            }
+            return result
         }
 
         fun register(
@@ -142,8 +200,8 @@ class GetScreenStateHandler
 
         companion object {
             const val TOOL_NAME = "get_screen_state"
-            const val SCREENSHOT_MAX_SIZE = 700
-            private const val TAG = "MCP:GetScreenStateTool"
+            internal const val SCREENSHOT_MAX_SIZE = 700
+            private const val TAG = "MCP:ScreenIntrospection"
         }
     }
 
@@ -163,8 +221,16 @@ fun registerScreenIntrospectionTools(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     screenCaptureProvider: ScreenCaptureProvider,
     compactTreeFormatter: CompactTreeFormatter,
+    screenshotAnnotator: ScreenshotAnnotator,
+    screenshotEncoder: ScreenshotEncoder,
     toolNamePrefix: String,
 ) {
-    GetScreenStateHandler(treeParser, accessibilityServiceProvider, screenCaptureProvider, compactTreeFormatter)
-        .register(server, toolNamePrefix)
+    GetScreenStateHandler(
+        treeParser,
+        accessibilityServiceProvider,
+        screenCaptureProvider,
+        compactTreeFormatter,
+        screenshotAnnotator,
+        screenshotEncoder,
+    ).register(server, toolNamePrefix)
 }

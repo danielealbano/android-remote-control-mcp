@@ -2,15 +2,18 @@
 
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import android.graphics.Bitmap
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
@@ -112,16 +115,23 @@ class ScreenIntrospectionIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             deps.setupReadyService()
             every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            // Mock captureScreenshotBitmap to return a relaxed mock Bitmap
+            val mockBitmap = mockk<Bitmap>(relaxed = true)
             coEvery {
-                deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
-            } returns
-                Result.success(
-                    ScreenshotData(
-                        data = "dGVzdA==",
-                        width = 700,
-                        height = 500,
-                    ),
-                )
+                deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+            } returns Result.success(mockBitmap)
+
+            // Mock annotator to return the same mock bitmap (no Android Canvas needed)
+            val annotatedMockBitmap = mockk<Bitmap>(relaxed = true)
+            every {
+                deps.screenshotAnnotator.annotate(any(), any(), any(), any())
+            } returns annotatedMockBitmap
+
+            // Mock encoder to return known ScreenshotData
+            every {
+                deps.screenshotEncoder.bitmapToScreenshotData(any(), any())
+            } returns ScreenshotData(data = "dGVzdA==", width = 700, height = 500)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -134,11 +144,30 @@ class ScreenIntrospectionIntegrationTest {
 
                 val textContent = (result.content[0] as TextContent).text
                 assertTrue(textContent.contains("note:"))
+                assertTrue(textContent.contains("note:flags:"))
+                assertTrue(textContent.contains("note:offscreen items"))
                 assertTrue(textContent.contains("app:"))
 
                 val imageContent = result.content[1] as ImageContent
                 assertEquals("image/jpeg", imageContent.mimeType)
                 assertEquals("dGVzdA==", imageContent.data)
+            }
+
+            // Verify the annotated bitmap (not the resized bitmap) is encoded with the correct quality
+            verify {
+                deps.screenshotEncoder.bitmapToScreenshotData(
+                    annotatedMockBitmap,
+                    ScreenCaptureProvider.DEFAULT_QUALITY,
+                )
+            }
+            // Verify annotate received the resized bitmap (not some other bitmap)
+            verify {
+                deps.screenshotAnnotator.annotate(
+                    mockBitmap,
+                    any(),
+                    1080,
+                    2400,
+                )
             }
         }
 
@@ -159,7 +188,7 @@ class ScreenIntrospectionIntegrationTest {
                 assertTrue(result.content[0] is TextContent)
 
                 coVerify(exactly = 0) {
-                    deps.screenCaptureProvider.captureScreenshot(any(), any(), any())
+                    deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
                 }
             }
         }
@@ -180,5 +209,41 @@ class ScreenIntrospectionIntegrationTest {
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Accessibility service not enabled"))
             }
+        }
+
+    @Test
+    fun `get_screen_state with screenshot annotation failure returns error`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            val mockBitmap = mockk<Bitmap>(relaxed = true)
+            coEvery {
+                deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+            } returns Result.success(mockBitmap)
+
+            // Simulate annotation failure
+            every {
+                deps.screenshotAnnotator.annotate(any(), any(), any(), any())
+            } throws RuntimeException("Canvas error")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_screen_state",
+                        arguments = mapOf("include_screenshot" to true),
+                    )
+                // The tool should return an error
+                assertEquals(true, result.isError)
+                // Verify the error message is generic (does not leak internal "Canvas error" details)
+                val errorText = (result.content[0] as TextContent).text
+                assertTrue(errorText.contains("Screenshot annotation failed"))
+                assertFalse(errorText.contains("Canvas error"))
+            }
+
+            // Verify the resized bitmap was still recycled via the finally block
+            // (annotatedBitmap is null because annotate() threw before assignment)
+            verify { mockBitmap.recycle() }
         }
 }
