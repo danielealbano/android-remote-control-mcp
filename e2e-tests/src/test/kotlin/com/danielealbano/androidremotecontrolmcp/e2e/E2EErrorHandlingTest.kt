@@ -75,7 +75,7 @@ class E2EErrorHandlingTest {
 
     @Test
     fun `correct bearer token returns successful response`() = runBlocking {
-        val result = mcpClient.callTool("press_home")
+        val result = mcpClient.callTool("android_press_home")
         assertNotEquals(true, result.isError)
     }
 
@@ -90,14 +90,14 @@ class E2EErrorHandlingTest {
     @Test
     fun `invalid params returns error result`() = runBlocking {
         // Call tap without required x,y coordinates
-        val result = mcpClient.callTool("tap", emptyMap())
+        val result = mcpClient.callTool("android_tap", emptyMap())
         assertEquals(true, result.isError)
     }
 
     @Test
     fun `click on non-existent element returns error result`() = runBlocking {
         val result = mcpClient.callTool(
-            "click_element",
+            "android_click_element",
             mapOf("element_id" to "nonexistent_element_id_12345"),
         )
         assertEquals(true, result.isError)

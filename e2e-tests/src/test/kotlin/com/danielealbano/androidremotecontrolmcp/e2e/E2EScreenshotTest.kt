@@ -31,11 +31,11 @@ class E2EScreenshotTest {
     @Order(1)
     fun `get_screen_state with screenshot returns valid JPEG data`() = runBlocking {
         // Navigate to home screen first
-        mcpClient.callTool("press_home")
+        mcpClient.callTool("android_press_home")
         Thread.sleep(1_000)
 
         val result = mcpClient.callTool(
-            "get_screen_state",
+            "android_get_screen_state",
             mapOf("include_screenshot" to true),
         )
 

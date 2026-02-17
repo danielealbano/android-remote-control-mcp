@@ -64,7 +64,7 @@ class E2ECalculatorTest {
     @Order(2)
     fun `calculate 7 plus 3 equals 10`() = runBlocking {
         // Step 1: Press home to ensure clean state
-        mcpClient.callTool("press_home")
+        mcpClient.callTool("android_press_home")
         Thread.sleep(1_000)
 
         // Step 2: Launch Simple Calculator app via monkey command
@@ -72,7 +72,7 @@ class E2ECalculatorTest {
         Thread.sleep(2_000)
 
         // Step 3: Verify Calculator is visible in screen state
-        val tree = mcpClient.callTool("get_screen_state")
+        val tree = mcpClient.callTool("android_get_screen_state")
         val treeStr = (tree.content[0] as TextContent).text
         println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
         assertTrue(
@@ -103,32 +103,32 @@ class E2ECalculatorTest {
         // Step 4: Find and click "7" button
         val button7 = findElementWithRetry("text", "7")
         assertNotNull(button7, "Could not find '7' button in Calculator")
-        mcpClient.callTool("click_element", mapOf("element_id" to button7!!))
+        mcpClient.callTool("android_click_element", mapOf("element_id" to button7!!))
         Thread.sleep(500)
 
         // Step 5: Find and click "+" button
         val buttonPlus = findElementWithRetry("text", "+")
         assertNotNull(buttonPlus, "Could not find '+' button in Calculator")
-        mcpClient.callTool("click_element", mapOf("element_id" to buttonPlus!!))
+        mcpClient.callTool("android_click_element", mapOf("element_id" to buttonPlus!!))
         Thread.sleep(500)
 
         // Step 6: Find and click "3" button
         val button3 = findElementWithRetry("text", "3")
         assertNotNull(button3, "Could not find '3' button in Calculator")
-        mcpClient.callTool("click_element", mapOf("element_id" to button3!!))
+        mcpClient.callTool("android_click_element", mapOf("element_id" to button3!!))
         Thread.sleep(500)
 
         // Step 7: Find and click "=" button
         val buttonEquals = findElementWithRetry("text", "=")
         assertNotNull(buttonEquals, "Could not find '=' button in Calculator")
-        mcpClient.callTool("click_element", mapOf("element_id" to buttonEquals!!))
+        mcpClient.callTool("android_click_element", mapOf("element_id" to buttonEquals!!))
         Thread.sleep(1_000)
 
         // Step 8: Wait for UI to settle
-        mcpClient.callTool("wait_for_idle", mapOf("timeout" to 3000))
+        mcpClient.callTool("android_wait_for_idle", mapOf("timeout" to 3000))
 
         // Step 9: Verify result "10" in screen state
-        val resultTree = mcpClient.callTool("get_screen_state")
+        val resultTree = mcpClient.callTool("android_get_screen_state")
         val resultTreeStr = (resultTree.content[0] as TextContent).text
         assertTrue(
             resultTreeStr.contains("10"),
@@ -140,7 +140,7 @@ class E2ECalculatorTest {
     @Order(3)
     fun `get_screen_state with screenshot returns valid image data`() = runBlocking {
         val result = mcpClient.callTool(
-            "get_screen_state",
+            "android_get_screen_state",
             mapOf("include_screenshot" to true),
         )
 
@@ -182,7 +182,7 @@ class E2ECalculatorTest {
         while (System.currentTimeMillis() - startTime < ELEMENT_WAIT_TIMEOUT_MS) {
             try {
                 val result = mcpClient.callTool(
-                    "find_elements",
+                    "android_find_elements",
                     mapOf("by" to by, "value" to value, "exact_match" to true),
                 )
 
