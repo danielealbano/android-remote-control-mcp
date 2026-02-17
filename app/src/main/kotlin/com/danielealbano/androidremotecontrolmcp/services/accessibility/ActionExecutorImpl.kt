@@ -557,10 +557,11 @@ class ActionExecutorImpl
 
             // Multi-window path: match by AccessibilityWindowInfo.getId()
             if (realWindows.isNotEmpty()) {
+                // Build a lookup map for O(1) window matching instead of O(n²) scanning
+                val realWindowById = realWindows.associateBy { it.id }
                 try {
                     for (windowData in windows) {
-                        val realWindow =
-                            realWindows.firstOrNull { it.id == windowData.windowId } ?: continue
+                        val realWindow = realWindowById[windowData.windowId] ?: continue
                         val realRootNode = realWindow.root ?: continue
 
                         val realNode =
@@ -583,8 +584,12 @@ class ActionExecutorImpl
                                 }
                                 result
                             } finally {
-                                @Suppress("DEPRECATION")
-                                realNode.recycle()
+                                // Guard against double-recycle: findAccessibilityNodeByNodeId
+                                // can return the root node itself if the target is the root
+                                if (realNode !== realRootNode) {
+                                    @Suppress("DEPRECATION")
+                                    realNode.recycle()
+                                }
                                 @Suppress("DEPRECATION")
                                 realRootNode.recycle()
                             }
@@ -636,8 +641,11 @@ class ActionExecutorImpl
                         }
                         result
                     } finally {
-                        @Suppress("DEPRECATION")
-                        realNode.recycle()
+                        // Guard against double-recycle: the matched node can be the root itself
+                        if (realNode !== rootNode) {
+                            @Suppress("DEPRECATION")
+                            realNode.recycle()
+                        }
                         @Suppress("DEPRECATION")
                         rootNode.recycle()
                     }

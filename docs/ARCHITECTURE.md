@@ -237,8 +237,8 @@ flowchart TB
     WD --> Result["MultiWindowResult(windows, degraded=false)"]
 
     Service -->|"getWindows() fails/empty"| Fallback["rootInActiveWindow"]
-    Fallback -->|"parseTree(root, 'root_w0')"| FallbackTree["AccessibilityNodeData tree"]
-    FallbackTree --> FallbackWD["WindowData(windowId=0, ...)"]
+    Fallback -->|"parseTree(root, 'root_w{rootNode.windowId}')"| FallbackTree["AccessibilityNodeData tree"]
+    FallbackTree --> FallbackWD["WindowData(windowId=rootNode.windowId, ...)"]
     FallbackWD --> DegradedResult["MultiWindowResult(windows, degraded=true)"]
 ```
 
@@ -251,12 +251,13 @@ flowchart TB
 
 ### Node ID Uniqueness
 
-Element IDs include the window ID as a suffix (e.g., `node_abc_w42`) to guarantee uniqueness across windows. The `root_w{windowId}` prefix is passed to `parseTree()` so all nodes in a window's tree incorporate the window ID.
+Node IDs are deterministic hashes generated from the node's properties and parent chain. The `rootParentId` passed to `parseTree()` (e.g., `"root_w42"`) is the root of the hash chain, so identical nodes in different windows produce different IDs. The window ID is not appended as a visible suffix — it influences the hash internally. Example: `node_a1b2` (not `node_a1b2_w42`).
 
 ### Degraded Mode
 
 When `getWindows()` returns empty or fails, the system falls back to `rootInActiveWindow` (single-window mode). In this mode:
-- A single `WindowData` is created with `windowId=0`
+- A single `WindowData` is created with `windowId` set to `rootNode.windowId` (the system-assigned window ID of the active window)
+- The window type is detected via `rootNode.window?.type` when available, defaulting to `APPLICATION` otherwise
 - The `MultiWindowResult.degraded` flag is set to `true`
 - The TSV output includes a `note:DEGRADED` line to inform the MCP client
 - Action execution falls back to `getRootNode()` for node resolution
@@ -264,11 +265,11 @@ When `getWindows()` returns empty or fails, the system falls back to `rootInActi
 ### Cross-Window Action Execution
 
 When executing a node-based action (click, long-click, scroll-to-element):
-1. Extract the window ID from the node's parsed ID suffix (`_w{id}`)
-2. Call `getAccessibilityWindows()` to get live window list
-3. Find the matching `AccessibilityWindowInfo` by `getId()`
+1. The caller provides the `List<WindowData>` from the multi-window snapshot, each containing a `windowId` (from `AccessibilityWindowInfo.getId()`)
+2. `performNodeAction()` calls `getAccessibilityWindows()` to get the live window list
+3. For each `WindowData`, find the matching live `AccessibilityWindowInfo` by `getId()`
 4. Get the window's root `AccessibilityNodeInfo`
-5. Walk the live tree to find the target node by matching the deterministic node ID
+5. Walk the live tree in parallel with the parsed tree to find the target node by matching the deterministic node ID
 6. Perform the accessibility action on the live node
 
 ### Required Configuration
