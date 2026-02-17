@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -15,6 +16,9 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import io.mockk.any
+import io.mockk.eq
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -45,6 +49,7 @@ class UtilityToolsTest {
     private val mockElementFinder = mockk<ElementFinder>()
     private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
+    private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
     private val mockClipboardManager = mockk<ClipboardManager>()
     private val mockContext = mockk<Context>()
 
@@ -54,6 +59,20 @@ class UtilityToolsTest {
             className = "android.widget.FrameLayout",
             bounds = BoundsData(0, 0, 1080, 2400),
             visible = true,
+        )
+
+    private val sampleWindows =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                activityName = ".Main",
+                layer = 0,
+                focused = true,
+                tree = sampleTree,
+            ),
         )
 
     private val sampleBounds = BoundsData(50, 800, 250, 1000)
@@ -74,12 +93,26 @@ class UtilityToolsTest {
         return textContent.text
     }
 
+    @Suppress("LongMethod")
     @BeforeEach
     fun setUp() {
-        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
+        every { mockAccessibilityServiceProvider.isReady() } returns true
+        every { mockWindowInfo.id } returns 0
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockWindowInfo.recycle() } returns Unit
+        every { mockRootNode.packageName } returns "com.example"
+        every {
+            mockAccessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
+        every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
+        every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockAccessibilityServiceProvider.getContext() } returns mockContext
         every { mockContext.getSystemService(ClipboardManager::class.java) } returns mockClipboardManager
-        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
     }
 
@@ -159,7 +192,7 @@ class UtilityToolsTest {
         fun `finds element on first attempt`() =
             runTest {
                 every {
-                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Result", false)
+                    mockElementFinder.findElements(sampleWindows, FindBy.TEXT, "Result", false)
                 } returns listOf(sampleElementInfo)
                 val params =
                     buildJsonObject {
@@ -230,7 +263,7 @@ class UtilityToolsTest {
             runTest {
                 var callCount = 0
                 every {
-                    mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Delayed", false)
+                    mockElementFinder.findElements(any<List<WindowData>>(), eq(FindBy.TEXT), eq("Delayed"), eq(false))
                 } answers {
                     callCount++
                     if (callCount >= 3) listOf(sampleElementInfo) else emptyList()
@@ -257,7 +290,7 @@ class UtilityToolsTest {
                     var clockMs = 0L
                     every { SystemClock.elapsedRealtime() } answers { clockMs }
                     every {
-                        mockElementFinder.findElements(sampleTree, FindBy.TEXT, "Missing", false)
+                        mockElementFinder.findElements(any<List<WindowData>>(), eq(FindBy.TEXT), eq("Missing"), eq(false))
                     } answers {
                         clockMs += 600L
                         emptyList()
@@ -318,11 +351,7 @@ class UtilityToolsTest {
 
                     // Return trees that differ slightly each time (1 node text changes out of 11 total)
                     var callCount = 0
-                    every { mockAccessibilityServiceProvider.getRootNode() } returns
-                        mockk {
-                            every { recycle() } returns Unit
-                        }
-                    every { mockTreeParser.parseTree(any()) } answers {
+                    every { mockTreeParser.parseTree(any(), any()) } answers {
                         callCount++
                         clockMs += 600L
                         AccessibilityNodeData(
@@ -394,11 +423,7 @@ class UtilityToolsTest {
 
                     // Return different trees each time to force timeout
                     var callCount = 0
-                    every { mockAccessibilityServiceProvider.getRootNode() } returns
-                        mockk {
-                            every { recycle() } returns Unit
-                        }
-                    every { mockTreeParser.parseTree(any()) } answers {
+                    every { mockTreeParser.parseTree(any(), any()) } answers {
                         callCount++
                         clockMs += 600L
                         AccessibilityNodeData(

@@ -1,12 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -30,6 +32,7 @@ class GetElementDetailsToolTest {
     private lateinit var mockTreeParser: AccessibilityTreeParser
     private lateinit var mockElementFinder: ElementFinder
     private lateinit var mockRootNode: AccessibilityNodeInfo
+    private lateinit var mockWindowInfo: AccessibilityWindowInfo
     private lateinit var tool: GetElementDetailsTool
 
     private val sampleTree =
@@ -56,15 +59,43 @@ class GetElementDetailsToolTest {
                 ),
         )
 
+    private val sampleWindows =
+        listOf(
+            WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Test",
+                activityName = ".Main",
+                layer = 0,
+                focused = true,
+                tree = sampleTree,
+            ),
+        )
+
+    @Suppress("LongMethod")
     @BeforeEach
     fun setUp() {
         mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>(relaxed = true)
         mockTreeParser = mockk<AccessibilityTreeParser>()
         mockElementFinder = mockk<ElementFinder>()
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
 
-        every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
-        every { mockTreeParser.parseTree(mockRootNode) } returns sampleTree
+        every { mockAccessibilityServiceProvider.isReady() } returns true
+        every { mockWindowInfo.id } returns 0
+        every { mockWindowInfo.root } returns mockRootNode
+        every { mockWindowInfo.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { mockWindowInfo.title } returns "Test"
+        every { mockWindowInfo.layer } returns 0
+        every { mockWindowInfo.isFocused } returns true
+        every { mockRootNode.packageName } returns "com.example"
+        every {
+            mockAccessibilityServiceProvider.getAccessibilityWindows()
+        } returns listOf(mockWindowInfo)
+        every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
+        every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
 
         tool = GetElementDetailsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
     }
@@ -78,8 +109,8 @@ class GetElementDetailsToolTest {
     @DisplayName("returns text and desc for found elements")
     fun returnsTextAndDescForFoundElements() =
         runTest {
-            every { mockElementFinder.findNodeById(sampleTree, "node_a") } returns sampleTree.children[0]
-            every { mockElementFinder.findNodeById(sampleTree, "node_b") } returns sampleTree.children[1]
+            every { mockElementFinder.findNodeById(sampleWindows, "node_a") } returns sampleTree.children[0]
+            every { mockElementFinder.findNodeById(sampleWindows, "node_b") } returns sampleTree.children[1]
 
             val params =
                 buildJsonObject {
@@ -104,8 +135,8 @@ class GetElementDetailsToolTest {
     @DisplayName("returns not_found for missing element IDs")
     fun returnsNotFoundForMissingElementIds() =
         runTest {
-            every { mockElementFinder.findNodeById(sampleTree, "node_a") } returns sampleTree.children[0]
-            every { mockElementFinder.findNodeById(sampleTree, "node_missing") } returns null
+            every { mockElementFinder.findNodeById(sampleWindows, "node_a") } returns sampleTree.children[0]
+            every { mockElementFinder.findNodeById(sampleWindows, "node_missing") } returns null
 
             val params =
                 buildJsonObject {
@@ -129,7 +160,7 @@ class GetElementDetailsToolTest {
     @DisplayName("returns dash for null text and desc")
     fun returnsDashForNullTextAndDesc() =
         runTest {
-            every { mockElementFinder.findNodeById(sampleTree, "node_b") } returns sampleTree.children[1]
+            every { mockElementFinder.findNodeById(sampleWindows, "node_b") } returns sampleTree.children[1]
 
             val params =
                 buildJsonObject {
@@ -154,7 +185,7 @@ class GetElementDetailsToolTest {
                     contentDescription = "desc\rwith\ttabs",
                     bounds = BoundsData(0, 0, 100, 100),
                 )
-            every { mockElementFinder.findNodeById(sampleTree, "node_special") } returns nodeWithSpecialChars
+            every { mockElementFinder.findNodeById(sampleWindows, "node_special") } returns nodeWithSpecialChars
 
             val params =
                 buildJsonObject {
@@ -179,7 +210,7 @@ class GetElementDetailsToolTest {
                     text = longText,
                     bounds = BoundsData(0, 0, 100, 100),
                 )
-            every { mockElementFinder.findNodeById(sampleTree, "node_long") } returns nodeWithLongText
+            every { mockElementFinder.findNodeById(sampleWindows, "node_long") } returns nodeWithLongText
 
             val params =
                 buildJsonObject {
@@ -238,7 +269,7 @@ class GetElementDetailsToolTest {
     @DisplayName("throws PermissionDenied when accessibility not available")
     fun throwsPermissionDeniedWhenAccessibilityNotAvailable() =
         runTest {
-            every { mockAccessibilityServiceProvider.getRootNode() } returns null
+            every { mockAccessibilityServiceProvider.isReady() } returns false
 
             val params =
                 buildJsonObject {

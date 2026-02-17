@@ -899,7 +899,7 @@ on nodes across multiple windows.
 - [x] `ActionExecutorImpl.scroll()` uses `getScreenInfo()` instead of `getRootNode()` for screen dimensions
 - [x] `findFocusedEditableNode()` searches across all window roots
 - [x] Lint passes
-- [ ] Unit tests pass
+- [x] Unit tests pass
 
 ### Task 5.1: Update `ActionExecutor` interface
 
@@ -1314,13 +1314,13 @@ internal fun findFocusedEditableNode(
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ActionExecutorImplTest.kt`
 
 **Definition of Done**:
-- [ ] Existing tests updated to pass `List<WindowData>` instead of single `AccessibilityNodeData`
-- [ ] Test: `clickNode` finds and clicks node in first window
-- [ ] Test: `clickNode` finds and clicks node in second window when not in first
-- [ ] Test: `clickNode` returns failure when node not found in any window
-- [ ] Test: `clickNode` succeeds in degraded mode (empty `getAccessibilityWindows()`, falls back to `getRootNode()`)
-- [ ] Test: `scroll()` works without `rootInActiveWindow` (uses `getScreenInfo()`)
-- [ ] All existing tests adapted and passing
+- [x] Existing tests updated to pass `List<WindowData>` instead of single `AccessibilityNodeData`
+- [x] Test: `clickNode` finds and clicks node in first window
+- [x] Test: `clickNode` finds and clicks node in second window when not in first
+- [x] Test: `clickNode` returns failure when node not found in any window
+- [x] Test: `clickNode` succeeds in degraded mode (empty `getAccessibilityWindows()`, falls back to `getRootNode()`)
+- [x] Test: `scroll()` works without `rootInActiveWindow` (uses `getScreenInfo()`)
+- [x] All existing tests adapted and passing
 
 **Action 5.5.1**: Update all existing tests that call node-action methods
 
@@ -1363,15 +1363,15 @@ This ensures backward compatibility: node-based actions continue to work when th
 multi-window data.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `getFreshTree()` replaced/supplemented by `getFreshWindows()` that returns `MultiWindowResult`
-- [ ] `GetScreenStateHandler` uses `formatMultiWindow()` and passes `MultiWindowResult`
-- [ ] All element action tools use `getFreshWindows()` and pass `List<WindowData>` to action executor
-- [ ] All text input tools use `getFreshWindows()` for tree access
-- [ ] Utility tools (`GetElementDetailsTool`, `WaitForElementTool`, `WaitForIdleTool`) updated
-- [ ] System action tools' `isReady()` checks work with new semantics
-- [ ] Screenshot annotation collects elements from all windows
-- [ ] `getFreshTree()` removed after all tools are migrated (no remaining callers)
-- [ ] Lint passes
+- [x] `getFreshTree()` replaced/supplemented by `getFreshWindows()` that returns `MultiWindowResult`
+- [x] `GetScreenStateHandler` uses `formatMultiWindow()` and passes `MultiWindowResult`
+- [x] All element action tools use `getFreshWindows()` and pass `List<WindowData>` to action executor
+- [x] All text input tools use `getFreshWindows()` for tree access
+- [x] Utility tools (`GetElementDetailsTool`, `WaitForElementTool`, `WaitForIdleTool`) updated
+- [x] System action tools' `isReady()` checks work with new semantics
+- [x] Screenshot annotation collects elements from all windows
+- [x] `getFreshTree()` removed after all tools are migrated (no remaining callers)
+- [x] Lint passes
 - [ ] Unit tests pass
 
 ### Task 6.1: Create `getFreshWindows()` shared utility
@@ -1379,15 +1379,15 @@ multi-window data.
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ElementActionTools.kt`
 
 **Definition of Done**:
-- [ ] `getFreshWindows()` function added
-- [ ] Uses `getAccessibilityWindows()` to get all windows
-- [ ] Parses each window's root node with `treeParser.parseTree(rootNode, "root_w${window.id}")`
-- [ ] Extracts window metadata: type, title, package, layer, focused
-- [ ] Includes activity name for focused APPLICATION window when package matches tracked package
-- [ ] Falls back to `getRootNode()` if `getAccessibilityWindows()` returns empty
-- [ ] Returns `MultiWindowResult` with `degraded` flag
-- [ ] Throws `McpToolException.PermissionDenied` if service not ready
-- [ ] Throws `McpToolException.ActionFailed` if no windows AND no root node available
+- [x] `getFreshWindows()` function added
+- [x] Uses `getAccessibilityWindows()` to get all windows
+- [x] Parses each window's root node with `treeParser.parseTree(rootNode, "root_w${window.id}")`
+- [x] Extracts window metadata: type, title, package, layer, focused
+- [x] Includes activity name for focused APPLICATION window when package matches tracked package
+- [x] Falls back to `getRootNode()` if `getAccessibilityWindows()` returns empty
+- [x] Returns `MultiWindowResult` with `degraded` flag
+- [x] Throws `McpToolException.PermissionDenied` if service not ready
+- [x] Throws `McpToolException.ActionFailed` if no windows AND no root node available
 
 **Action 6.1.1**: Add `getFreshWindows()` function
 
@@ -1541,13 +1541,13 @@ internal fun getFreshWindows(
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ScreenIntrospectionTools.kt`
 
 **Definition of Done**:
-- [ ] Uses `getFreshWindows()` instead of manual `isReady()` + `getRootNode()` + `parseTree()`
-- [ ] Passes `MultiWindowResult` to `compactTreeFormatter.formatMultiWindow()`
-- [ ] Removes manual `isReady()` check (handled by `getFreshWindows()`)
-- [ ] Removes separate `getRootNode()` + `parseTree()` calls
-- [ ] Removes separate `getCurrentPackageName()` / `getCurrentActivityName()` calls
-- [ ] Screenshot annotation collects elements from ALL windows' trees
-- [ ] `collectOnScreenElements()` updated to work with `List<WindowData>`
+- [x] Uses `getFreshWindows()` instead of manual `isReady()` + `getRootNode()` + `parseTree()`
+- [x] Passes `MultiWindowResult` to `compactTreeFormatter.formatMultiWindow()`
+- [x] Removes manual `isReady()` check (handled by `getFreshWindows()`)
+- [x] Removes separate `getRootNode()` + `parseTree()` calls
+- [x] Removes separate `getCurrentPackageName()` / `getCurrentActivityName()` calls
+- [x] Screenshot annotation collects elements from ALL windows' trees
+- [x] `collectOnScreenElements()` updated to work with `List<WindowData>`
 
 **Action 6.2.1**: Rewrite `execute()` method
 
@@ -1694,11 +1694,11 @@ private fun collectOnScreenElementsFromTree(
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/ElementActionTools.kt`
 
 **Definition of Done**:
-- [ ] `FindElementsTool.execute()` uses `getFreshWindows()` and multi-window `elementFinder.findElements(windows, ...)`
-- [ ] `ClickElementTool.execute()` uses `getFreshWindows()` and passes `windows` to `actionExecutor.clickNode()`
-- [ ] `LongClickElementTool.execute()` uses `getFreshWindows()` and passes `windows` to `actionExecutor.longClickNode()`
-- [ ] `ScrollToElementTool.execute()` uses `getFreshWindows()` and multi-window finder + executor
-- [ ] `ScrollToElementTool` has `findContainingTree()` helper to locate the window tree containing a node
+- [x] `FindElementsTool.execute()` uses `getFreshWindows()` and multi-window `elementFinder.findElements(windows, ...)`
+- [x] `ClickElementTool.execute()` uses `getFreshWindows()` and passes `windows` to `actionExecutor.clickNode()`
+- [x] `LongClickElementTool.execute()` uses `getFreshWindows()` and passes `windows` to `actionExecutor.longClickNode()`
+- [x] `ScrollToElementTool.execute()` uses `getFreshWindows()` and multi-window finder + executor
+- [x] `ScrollToElementTool` has `findContainingTree()` helper to locate the window tree containing a node
 
 **Action 6.3.1**: Update `FindElementsTool.execute()`
 
@@ -1820,8 +1820,8 @@ The existing `findScrollableAncestor()` and `findPathToNode()` remain unchanged 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/TextInputTools.kt`
 
 **Definition of Done**:
-- [ ] `TypeAppendTextTool`, `TypeInsertTextTool`, `TypeReplaceTextTool`, `TypeClearTextTool` use `getFreshWindows()` and pass `windows` to `actionExecutor.clickNode()`
-- [ ] `PressKeyTool` unchanged (uses `findFocusedEditableNode()` which was updated in Task 5.4, and global actions which don't need trees)
+- [x] `TypeAppendTextTool`, `TypeInsertTextTool`, `TypeReplaceTextTool`, `TypeClearTextTool` use `getFreshWindows()` and pass `windows` to `actionExecutor.clickNode()`
+- [x] `PressKeyTool` unchanged (uses `findFocusedEditableNode()` which was updated in Task 5.4, and global actions which don't need trees)
 
 **Action 6.4.1**: Update `TypeAppendTextTool.execute()`
 
@@ -1854,10 +1854,10 @@ Same pattern.
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/UtilityTools.kt`
 
 **Definition of Done**:
-- [ ] `GetElementDetailsTool` uses `getFreshWindows()` and `elementFinder.findNodeById(windows, id)`
-- [ ] `WaitForElementTool` uses `getFreshWindows()` and `elementFinder.findElements(windows, ...)`
-- [ ] `WaitForIdleTool` uses `getFreshWindows()` and generates fingerprints from all windows
-- [ ] Window appearing/disappearing between polls is correctly detected as "UI not idle" (fingerprint changes because the set of walked trees changes)
+- [x] `GetElementDetailsTool` uses `getFreshWindows()` and `elementFinder.findNodeById(windows, id)`
+- [x] `WaitForElementTool` uses `getFreshWindows()` and `elementFinder.findElements(windows, ...)`
+- [x] `WaitForIdleTool` uses `getFreshWindows()` and generates fingerprints from all windows
+- [x] Window appearing/disappearing between polls is correctly detected as "UI not idle" (fingerprint changes because the set of walked trees changes)
 
 **Imports to add** (if not already present — once per file, applies to all tools in this file):
 ```kotlin
@@ -1904,8 +1904,8 @@ fun generate(windows: List<WindowData>): IntArray {
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/SystemActionTools.kt`
 
 **Definition of Done**:
-- [ ] `executeSystemAction()` still checks `isReady()` — but now `isReady()` only checks service connected, so this works correctly during permission dialogs
-- [ ] No code changes needed if `isReady()` semantics are already updated in US1
+- [x] `executeSystemAction()` still checks `isReady()` — but now `isReady()` only checks service connected, so this works correctly during permission dialogs
+- [x] No code changes needed if `isReady()` semantics are already updated in US1
 
 **Action 6.6.1**: Verify — no code change needed
 
@@ -1916,18 +1916,18 @@ The `executeSystemAction()` helper in `SystemActionTools.kt` calls `accessibilit
 ### Task 6.7: Unit tests for tool updates
 
 **Definition of Done**:
-- [ ] `ScreenIntrospectionToolsTest` updated: mock returns for `getAccessibilityWindows()` and multi-window flow
-- [ ] `ElementActionToolsTest` updated: `getFreshWindows()` mocking, `List<WindowData>` passing
-- [ ] `TextInputToolsTest` updated: same pattern
-- [ ] `UtilityToolsTest` updated: same pattern
-- [ ] `GetElementDetailsToolTest` updated: same pattern
-- [ ] `SystemActionToolsTest`: verify no changes needed (isReady semantics cover it)
-- [ ] Test: `getFreshWindows()` fallback path returns `degraded=true` with `DEGRADATION_NOTE` in output
-- [ ] Test: `getFreshWindows()` throws `ActionFailed` when all windows have null roots
-- [ ] Test: `getFreshWindows()` throws `ActionFailed` when no windows AND no root node
-- [ ] Test: `ScrollToElementTool` scrolls to element in non-primary window
-- [ ] Test: `TreeFingerprint.generate(windows)` produces correct deterministic histogram
-- [ ] Test: `WaitForIdleTool` detects window appearing/disappearing as "UI not idle"
+- [x] `ScreenIntrospectionToolsTest` updated: mock returns for `getAccessibilityWindows()` and multi-window flow
+- [x] `ElementActionToolsTest` updated: `getFreshWindows()` mocking, `List<WindowData>` passing
+- [x] `TextInputToolsTest` updated: same pattern
+- [x] `UtilityToolsTest` updated: same pattern
+- [x] `GetElementDetailsToolTest` updated: same pattern
+- [x] `SystemActionToolsTest`: verify no changes needed (isReady semantics cover it)
+- [x] Test: `getFreshWindows()` fallback path returns `degraded=true` with `DEGRADATION_NOTE` in output
+- [x] Test: `getFreshWindows()` throws `ActionFailed` when all windows have null roots
+- [x] Test: `getFreshWindows()` throws `ActionFailed` when no windows AND no root node
+- [x] Test: `ScrollToElementTool` scrolls to element in non-primary window
+- [x] Test: `TreeFingerprint.generate(windows)` produces correct deterministic histogram
+- [x] Test: `WaitForIdleTool` detects window appearing/disappearing as "UI not idle"
 - [ ] All tests pass
 
 **Action 6.7.1**: Update test helpers and mocking
