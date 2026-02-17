@@ -2304,10 +2304,10 @@ Update the note below the table:
 ### Task 4.1: Update E2E tests for new TSV format and annotated screenshot
 
 **Acceptance Criteria**:
-- [ ] `E2ECalculatorTest.kt` updated to add assertions for new note lines and flag format
-- [ ] `E2EScreenshotTest.kt` updated to add assertions for new note lines
-- [ ] Both files add negative assertions for old single-char flag format
-- [ ] Lint passes on changed E2E files
+- [x] `E2ECalculatorTest.kt` updated to add assertions for new note lines and flag format
+- [x] `E2EScreenshotTest.kt` updated to add assertions for new note lines
+- [x] Both files add negative assertions for old single-char flag format
+- [x] Lint passes on changed E2E files
 
 #### Action 4.1.1: Update `E2ECalculatorTest.kt` assertions
 

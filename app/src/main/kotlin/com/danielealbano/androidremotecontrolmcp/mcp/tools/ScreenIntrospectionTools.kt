@@ -45,7 +45,7 @@ class GetScreenStateHandler
         private val screenshotAnnotator: ScreenshotAnnotator,
         private val screenshotEncoder: ScreenshotEncoder,
     ) {
-        @Suppress("ThrowsCount")
+        @Suppress("ThrowsCount", "LongMethod", "TooGenericExceptionCaught")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // 1. Parse include_screenshot param FIRST (before expensive operations)
             val includeScreenshot =

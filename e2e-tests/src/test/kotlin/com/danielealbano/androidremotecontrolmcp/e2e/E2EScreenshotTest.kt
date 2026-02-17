@@ -51,6 +51,19 @@ class E2EScreenshotTest {
         val text = (textContent as TextContent).text
         assertTrue(text.contains("note:"), "Text should contain note line")
         assertTrue(text.contains("app:"), "Text should contain app line")
+        assertTrue(
+            text.contains("note:flags: on=onscreen off=offscreen"),
+            "Text should contain flags legend note line",
+        )
+        assertTrue(
+            text.contains("note:offscreen items require scroll_to_element before interaction"),
+            "Text should contain offscreen hint note line",
+        )
+        // Negative assertions: old single-char flags must not appear
+        assertFalse(
+            text.contains("\tvcn") || text.contains("\tvn"),
+            "Text should NOT contain old single-char flag format",
+        )
 
         // Verify second content item is ImageContent with JPEG data
         val imageContent = result.content[1]

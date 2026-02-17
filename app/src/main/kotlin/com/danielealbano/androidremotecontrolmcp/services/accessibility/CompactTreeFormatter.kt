@@ -9,7 +9,8 @@ import javax.inject.Inject
  * Output format:
  * - Line 1: `note:structural-only nodes are omitted from the tree`
  * - Line 2: `note:certain elements are custom and will not be properly reported, ...`
- * - Line 3: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+ * - Line 3: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable
+ *   foc=focusable scr=scrollable edt=editable ena=enabled`
  * - Line 4: `note:offscreen items require scroll_to_element before interaction`
  * - Line 5: `app:<package> activity:<activity>`
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
