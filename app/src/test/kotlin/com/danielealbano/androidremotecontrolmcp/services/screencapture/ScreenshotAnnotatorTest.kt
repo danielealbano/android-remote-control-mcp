@@ -180,6 +180,22 @@ class ScreenshotAnnotatorTest {
         }
 
         @Test
+        fun `multiple elements draws box and label for each`() {
+            val element1 = makeNode(id = "node_a3f2", bounds = BoundsData(100, 200, 300, 400), visible = true)
+            val element2 = makeNode(id = "node_b4c5", bounds = BoundsData(500, 600, 700, 800), visible = true)
+            annotator.annotate(mockBitmap, listOf(element1, element2), 1080, 2400)
+            // Verify drawRect called at least twice (one box per element)
+            verify(atLeast = 2) { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) }
+            // Verify both labels drawn
+            verify(atLeast = 1) {
+                anyConstructed<Canvas>().drawText(match { it.contains("a3f2") }, any(), any(), any())
+            }
+            verify(atLeast = 1) {
+                anyConstructed<Canvas>().drawText(match { it.contains("b4c5") }, any(), any(), any())
+            }
+        }
+
+        @Test
         fun `does not mutate input bitmap`() {
             val element = makeNode(id = "node_x1y2", bounds = BoundsData(100, 200, 300, 400), visible = true)
             val result = annotator.annotate(mockBitmap, listOf(element), 1080, 2400)
