@@ -462,29 +462,29 @@ inner class MapWindowType {
 per-window headers and optional degradation note.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] New `formatMultiWindow()` method produces the agreed TSV format
-- [ ] Per-window header line: `--- window:N type:TYPE pkg:PKG title:TITLE activity:ACT layer:N focused:BOOL ---`
-- [ ] `activity:` field omitted from header when null
-- [ ] Degradation note added when `MultiWindowResult.degraded` is true
-- [ ] Global `app:`/`activity:` line removed from multi-window output
-- [ ] Global `screen:` line preserved
-- [ ] TSV header repeated per window section
-- [ ] Existing `format()` method unchanged (backward compat for tests)
-- [ ] Lint passes
-- [ ] Unit tests pass
+- [x] New `formatMultiWindow()` method produces the agreed TSV format
+- [x] Per-window header line: `--- window:N type:TYPE pkg:PKG title:TITLE activity:ACT layer:N focused:BOOL ---`
+- [x] `activity:` field omitted from header when null
+- [x] Degradation note added when `MultiWindowResult.degraded` is true
+- [x] Global `app:`/`activity:` line removed from multi-window output
+- [x] Global `screen:` line preserved
+- [x] TSV header repeated per window section
+- [x] Existing `format()` method unchanged (backward compat for tests)
+- [x] Lint passes
+- [x] Unit tests pass
 
 ### Task 3.1: Add `formatMultiWindow()` method
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/CompactTreeFormatter.kt`
 
 **Definition of Done**:
-- [ ] Method signature: `fun formatMultiWindow(result: MultiWindowResult, screenInfo: ScreenInfo): String`
-- [ ] Outputs note lines, degradation note (if applicable), screen info line, then per-window sections
-- [ ] Each window section has: window header line, TSV column header, element rows
-- [ ] Window header fields: `window:N type:TYPE pkg:PKG title:TITLE [activity:ACT] layer:N focused:BOOL`
-- [ ] Null `packageName` rendered as `unknown`
-- [ ] Null `title` rendered as `unknown`
-- [ ] Null `activityName` causes `activity:` to be omitted entirely from the header
+- [x] Method signature: `fun formatMultiWindow(result: MultiWindowResult, screenInfo: ScreenInfo): String`
+- [x] Outputs note lines, degradation note (if applicable), screen info line, then per-window sections
+- [x] Each window section has: window header line, TSV column header, element rows
+- [x] Window header fields: `window:N type:TYPE pkg:PKG title:TITLE [activity:ACT] layer:N focused:BOOL`
+- [x] Null `packageName` rendered as `unknown`
+- [x] Null `title` rendered as `unknown`
+- [x] Null `activityName` causes `activity:` to be omitted entirely from the header
 
 **Action 3.1.1**: Add `DEGRADATION_NOTE` constant to companion object
 
@@ -569,15 +569,15 @@ internal fun buildWindowHeader(windowData: WindowData): String =
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/CompactTreeFormatterTest.kt`
 
 **Definition of Done**:
-- [ ] Test: `formatMultiWindow` with single APPLICATION window produces correct output
-- [ ] Test: `formatMultiWindow` with two windows (APPLICATION + SYSTEM) produces both sections
-- [ ] Test: window header includes `activity:` when present, omits when null
-- [ ] Test: `degraded=true` adds DEGRADATION_NOTE line at the top
-- [ ] Test: `degraded=false` does NOT add DEGRADATION_NOTE
-- [ ] Test: null `packageName` renders as `unknown`
-- [ ] Test: null `title` renders as `unknown`
-- [ ] Test: `buildWindowHeader()` produces correct format
-- [ ] Test: existing `format()` tests still pass unchanged
+- [x] Test: `formatMultiWindow` with single APPLICATION window produces correct output
+- [x] Test: `formatMultiWindow` with two windows (APPLICATION + SYSTEM) produces both sections
+- [x] Test: window header includes `activity:` when present, omits when null
+- [x] Test: `degraded=true` adds DEGRADATION_NOTE line at the top
+- [x] Test: `degraded=false` does NOT add DEGRADATION_NOTE
+- [x] Test: null `packageName` renders as `unknown`
+- [x] Test: null `title` renders as `unknown`
+- [x] Test: `buildWindowHeader()` produces correct format
+- [x] Test: existing `format()` tests still pass unchanged
 
 **Action 3.2.1**: Add test class for `formatMultiWindow`
 

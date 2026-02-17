@@ -501,4 +501,198 @@ class CompactTreeFormatterTest {
             assertEquals("off,clk,lclk,foc,scr,edt,ena", formatter.buildFlags(node))
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // formatMultiWindow
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("formatMultiWindow")
+    inner class FormatMultiWindow {
+        @Test
+        @DisplayName("single window produces correct output")
+        fun singleWindowProducesCorrectOutput() {
+            val tree = makeNode(
+                id = "node_btn",
+                className = "android.widget.Button",
+                text = "OK",
+                bounds = BoundsData(0, 0, 100, 48),
+                clickable = true,
+                visible = true,
+                enabled = true,
+            )
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(
+                        windowId = 0,
+                        windowType = "APPLICATION",
+                        packageName = "com.example.app",
+                        title = "MainActivity",
+                        activityName = "com.example.app.MainActivity",
+                        layer = 0,
+                        focused = true,
+                        tree = tree,
+                    ),
+                ),
+                degraded = false,
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.contains("screen:1080x2400"))
+            assertTrue(
+                output.contains(
+                    "--- window:0 type:APPLICATION pkg:com.example.app title:MainActivity " +
+                        "activity:com.example.app.MainActivity layer:0 focused:true ---",
+                ),
+            )
+            assertTrue(output.contains("node_btn"))
+            assertFalse(output.contains(CompactTreeFormatter.DEGRADATION_NOTE))
+        }
+
+        @Test
+        @DisplayName("two windows produce both sections")
+        fun twoWindowsProduceBothSections() {
+            val appTree = makeNode(id = "node_app", text = "App", clickable = true, visible = true)
+            val dialogTree = makeNode(id = "node_allow", text = "Allow", clickable = true, visible = true)
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(
+                        windowId = 0,
+                        windowType = "APPLICATION",
+                        packageName = "com.example",
+                        title = "Main",
+                        layer = 0,
+                        focused = false,
+                        tree = appTree,
+                    ),
+                    WindowData(
+                        windowId = 1,
+                        windowType = "SYSTEM",
+                        packageName = "com.android.permissioncontroller",
+                        title = "Permission",
+                        layer = 1,
+                        focused = true,
+                        tree = dialogTree,
+                    ),
+                ),
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.contains("--- window:0 type:APPLICATION"))
+            assertTrue(output.contains("--- window:1 type:SYSTEM"))
+            assertTrue(output.contains("node_app"))
+            assertTrue(output.contains("node_allow"))
+        }
+
+        @Test
+        @DisplayName("activity omitted when null")
+        fun activityOmittedWhenNull() {
+            val tree = makeNode(id = "node_x", text = "X", clickable = true, visible = true)
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(
+                        windowId = 0,
+                        windowType = "SYSTEM",
+                        packageName = "com.android.systemui",
+                        title = "StatusBar",
+                        activityName = null,
+                        layer = 0,
+                        focused = false,
+                        tree = tree,
+                    ),
+                ),
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.contains("--- window:0 type:SYSTEM"))
+            assertFalse(output.contains("activity:"))
+        }
+
+        @Test
+        @DisplayName("degraded mode adds note")
+        fun degradedModeAddsNote() {
+            val tree = makeNode(id = "node_x", text = "X", clickable = true, visible = true)
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(windowId = 0, windowType = "APPLICATION", tree = tree, focused = true),
+                ),
+                degraded = true,
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.startsWith(CompactTreeFormatter.DEGRADATION_NOTE))
+        }
+
+        @Test
+        @DisplayName("null packageName rendered as unknown")
+        fun nullPackageNameRenderedAsUnknown() {
+            val tree = makeNode(id = "node_x", text = "X", clickable = true, visible = true)
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(
+                        windowId = 0,
+                        windowType = "APPLICATION",
+                        packageName = null,
+                        tree = tree,
+                        focused = true,
+                    ),
+                ),
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.contains("pkg:unknown"))
+        }
+
+        @Test
+        @DisplayName("null title rendered as unknown")
+        fun nullTitleRenderedAsUnknown() {
+            val tree = makeNode(id = "node_x", text = "X", clickable = true, visible = true)
+            val result = MultiWindowResult(
+                windows = listOf(
+                    WindowData(
+                        windowId = 0,
+                        windowType = "APPLICATION",
+                        title = null,
+                        tree = tree,
+                        focused = true,
+                    ),
+                ),
+            )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            assertTrue(output.contains("title:unknown"))
+        }
+
+        @Test
+        @DisplayName("buildWindowHeader produces correct format with all fields")
+        fun buildWindowHeaderAllFields() {
+            val wd = WindowData(
+                windowId = 2,
+                windowType = "INPUT_METHOD",
+                packageName = "com.google.android.inputmethod.latin",
+                title = "Gboard",
+                activityName = null,
+                layer = 5,
+                focused = false,
+                tree = makeNode(id = "node_x"),
+            )
+            val header = formatter.buildWindowHeader(wd)
+            assertEquals(
+                "--- window:2 type:INPUT_METHOD pkg:com.google.android.inputmethod.latin " +
+                    "title:Gboard layer:5 focused:false ---",
+                header,
+            )
+        }
+
+        @Test
+        @DisplayName("buildWindowHeader includes activity when present")
+        fun buildWindowHeaderWithActivity() {
+            val wd = WindowData(
+                windowId = 0,
+                windowType = "APPLICATION",
+                packageName = "com.example",
+                title = "Main",
+                activityName = "com.example.MainActivity",
+                layer = 0,
+                focused = true,
+                tree = makeNode(id = "node_x"),
+            )
+            val header = formatter.buildWindowHeader(wd)
+            assertTrue(header.contains("activity:com.example.MainActivity"))
+        }
+    }
 }
