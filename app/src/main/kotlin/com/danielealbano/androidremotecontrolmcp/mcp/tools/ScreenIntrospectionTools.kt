@@ -87,7 +87,11 @@ class GetScreenStateHandler
 
             Log.d(TAG, "get_screen_state: includeScreenshot=$includeScreenshot")
 
-            // 8. Optionally include screenshot
+            // 8. Optionally include annotated screenshot.
+            // NOTE: There is an inherent timing gap between tree parsing (step 4) and
+            // screenshot capture below. If the UI changes in between, bounding boxes may
+            // reference stale element positions. Atomic capture is not possible with the
+            // current Android accessibility APIs.
             if (includeScreenshot) {
                 if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                     throw McpToolException.PermissionDenied(

@@ -19,6 +19,12 @@ Enhance the `get_screen_state` tool with two improvements:
 - No interleaved `TextContent` captions.
 - **All elements are annotated, including password/sensitive fields.** This is intentional — the MCP server must allow models to identify and interact with password fields. Android already masks password text with dots/asterisks at the display level, so the screenshot does not expose actual password content.
 
+### Known Limitations
+
+1. **Timing gap between tree parse and screenshot capture**: The accessibility tree is parsed (step 4 in `execute()`) before the screenshot is captured (step 8). If the UI changes between these two steps, the bounding boxes drawn on the screenshot may reference stale element positions. Atomic capture of both tree and screenshot is not possible with current Android accessibility APIs. The time gap is typically milliseconds, making this acceptable in practice.
+
+2. **Label overlap on dense UIs**: For screens with many tightly-packed elements, bounding box labels can overlap each other or adjacent bounding boxes, reducing readability. No label collision detection or position adjustment is implemented. This is a known visual limitation — the TSV data remains accurate regardless of label overlap. Future improvement could add label de-conflicting logic.
+
 ### Flag Abbreviation Map
 
 | Abbreviation | Meaning        |
@@ -600,7 +606,7 @@ Key changes:
 - [x] `GetScreenStateHandler` constructor call updated with new dependencies (mocked)
 - [x] Tests pass: `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.mcp.tools.ScreenIntrospectionToolsTest"`
 
-**Note**: This task technically depends on US2 changes (new constructor parameters for `GetScreenStateHandler`). During implementation, the constructor update and mock additions in this task should be applied AFTER Task 2.3 (Action 2.3.1). However, the fixture data update (`sampleCompactOutput`) can be done as part of US1. The implementor should either: (a) update the fixture now and defer the constructor changes to US2, or (b) do the full update together with Task 2.3.
+**Note**: This task has a cross-story dependency on US2 (new constructor parameters for `GetScreenStateHandler`, added in Task 2.3). The fixture data update (`sampleCompactOutput`) belongs to US1, but the constructor and mock changes depend on US2. During implementation, the constructor update and mock additions MUST be applied AFTER Task 2.3 (Action 2.3.1) is complete. The recommended approach is to update the fixture now as part of US1, then apply the constructor/mock changes together with Task 2.3.
 
 #### Action 1.4.1: Update `sampleCompactOutput` and test mocks
 
@@ -1056,8 +1062,9 @@ class ScreenshotAnnotator
         screenHeight: Int,
     ): Bitmap {
         // Always use ARGB_8888 for the mutable copy — HARDWARE bitmaps cannot be mutable
-        val copy = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-            ?: throw IllegalStateException("Failed to create mutable bitmap copy for annotation")
+        val copy = checkNotNull(bitmap.copy(Bitmap.Config.ARGB_8888, true)) {
+            "Failed to create mutable bitmap copy for annotation"
+        }
         if (elements.isEmpty()) return copy
 
         try {
@@ -1077,7 +1084,7 @@ class ScreenshotAnnotator
                 )
             }
             val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(LABEL_BG_ALPHA, 255, 0, 0)
+                color = Color.argb(LABEL_BG_ALPHA, COLOR_CHANNEL_MAX, 0, 0)
                 style = Paint.Style.FILL
             }
             val labelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1173,6 +1180,7 @@ class ScreenshotAnnotator
         private const val LABEL_TEXT_SIZE_DP = 10f
         private const val LABEL_PADDING_DP = 2f
         private const val LABEL_BG_ALPHA = 180
+        private const val COLOR_CHANNEL_MAX = 255
         private const val REFERENCE_WIDTH_DP = 360f
     }
 }
@@ -1480,9 +1488,7 @@ import android.graphics.Canvas
 import android.graphics.RectF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
-import io.mockk.OfTypeMatcher
 import io.mockk.Runs
-import io.mockk.constructedWith
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -1640,9 +1646,9 @@ inner class AnnotateTests {
         every { mockCopy.width } returns 540
         every { mockCopy.height } returns 1200
         mockkConstructor(Canvas::class)
-        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRoundRect(any(), any(), any(), any()) } just Runs
-        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRect(any<RectF>(), any()) } just Runs
-        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawText(any(), any(), any(), any()) } just Runs
+        every { anyConstructed<Canvas>().drawRoundRect(any(), any(), any(), any()) } just Runs
+        every { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) } just Runs
+        every { anyConstructed<Canvas>().drawText(any(), any(), any(), any()) } just Runs
     }
 
     @AfterEach
@@ -1662,8 +1668,10 @@ inner class AnnotateTests {
         val element = makeNode(id = "node_a3f2", bounds = BoundsData(100, 200, 300, 400), visible = true)
         annotator.annotate(mockBitmap, listOf(element), 1080, 2400)
         // Verify at least one drawRect and one drawText were called
-        verify(atLeast = 1) { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRect(any<RectF>(), any()) }
-        verify(atLeast = 1) { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawText(match { it.contains("a3f2") }, any(), any(), any()) }
+        verify(atLeast = 1) { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) }
+        verify(atLeast = 1) {
+            anyConstructed<Canvas>().drawText(match { it.contains("a3f2") }, any(), any(), any())
+        }
     }
 
     @Test
@@ -1677,7 +1685,7 @@ inner class AnnotateTests {
     @Test
     fun `recycles copy bitmap when drawing fails`() {
         // Simulate Canvas drawing throwing
-        every { constructedWith<Canvas>(OfTypeMatcher<Bitmap>(Bitmap::class)).drawRect(any<RectF>(), any()) } throws RuntimeException("Draw failed")
+        every { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) } throws RuntimeException("Draw failed")
         val element = makeNode(id = "node_fail", bounds = BoundsData(100, 200, 300, 400), visible = true)
 
         var thrown = false
@@ -1715,10 +1723,10 @@ inner class AnnotateTests {
 ```
 
 **Notes**:
-- The `mockCanvas` field was removed — it was declared but never used. The tests use `mockkConstructor(Canvas::class)` with `constructedWith<Canvas>(...)` to intercept Canvas methods instead.
+- The `mockCanvas` field was removed — it was declared but never used. The tests use `mockkConstructor(Canvas::class)` with `anyConstructed<Canvas>()` to intercept Canvas methods instead.
 - `@AfterEach` ensures `unmockkConstructor` is always called to prevent test pollution.
 - Two tests for `bitmap.copy()` returning null are included (with elements and with empty elements) to verify the `IllegalStateException` is thrown correctly in both paths.
-- `OfTypeMatcher` is from MockK's `io.mockk` package and is the standard way to match constructor arguments by type when using `constructedWith`. While it's a less common MockK API, it's stable and documented for constructor mocking use cases. The exact verify patterns may need adjustment during implementation based on the final drawing code.
+- Four tests for `screenWidth`/`screenHeight` validation are included (zero and negative values for each) to verify the `IllegalArgumentException` is thrown by the `require` guards.
 
 ---
 
@@ -1731,13 +1739,11 @@ inner class AnnotateTests {
 
 #### Action 2.6.1: Add `captureScreenshotBitmap` tests
 
-**File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureProviderImplTest.kt` (existing or new)
+**File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureProviderImplTest.kt` (NEW)
 
 **What**: Add unit tests for the new method. The test approach:
 - Mock `McpAccessibilityService.takeScreenshotBitmap()` and `ScreenshotEncoder.resizeBitmapProportional()`
 - Verify bitmap recycling behavior
-
-**Full file**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/screencapture/ScreenCaptureProviderImplTest.kt` (NEW)
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
@@ -2072,7 +2078,7 @@ fun `get_screen_state with screenshot annotation failure returns error`() =
 - [x] `docs/MCP_TOOLS.md` updated with new TSV format, flag abbreviations, note lines, annotated screenshot description, and tool intro
 - [x] `docs/PROJECT.md` updated with new flag format, screenshot annotation mention, and `ScreenshotAnnotator.kt` in folder structure
 - [x] `README.md` tool table updated to mention annotated screenshot
-- [ ] Lint passes (no code changes, documentation only)
+- [x] Lint passes (no code changes in this user story, documentation only — N/A)
 
 ---
 
@@ -2427,137 +2433,140 @@ make test-e2e
 **What**: Systematically go through each file changed during implementation and verify:
 
 1. **`CompactTreeFormatter.kt`**:
-   - [ ] Class-level KDoc updated with new line numbers (4 note lines, data rows at 8+)
-   - [ ] `buildFlags` KDoc updated: says `on/off, clk, lclk, foc, scr, edt, ena`
-   - [ ] `buildFlags` uses comma-separated abbreviated words via `buildString`
-   - [ ] `on`/`off` is always the first flag
-   - [ ] New note line constants exist: `NOTE_LINE_FLAGS_LEGEND`, `NOTE_LINE_OFFSCREEN_HINT`
-   - [ ] Flag abbreviation constants exist: `FLAG_ONSCREEN`, `FLAG_OFFSCREEN`, `FLAG_CLICKABLE`, `FLAG_LONG_CLICKABLE`, `FLAG_FOCUSABLE`, `FLAG_SCROLLABLE`, `FLAG_EDITABLE`, `FLAG_ENABLED`, `FLAG_SEPARATOR`
-   - [ ] `format()` outputs 4 note lines (structural, custom elements, flags legend, offscreen hint)
-   - [ ] `format()` comments updated with correct line numbers
-   - [ ] Old `FLAG_COUNT` constant removed
+   - [x] Class-level KDoc updated with new line numbers (4 note lines, data rows at 8+)
+   - [x] `buildFlags` KDoc updated: says `on/off, clk, lclk, foc, scr, edt, ena`
+   - [x] `buildFlags` uses comma-separated abbreviated words via `buildString`
+   - [x] `on`/`off` is always the first flag
+   - [x] New note line constants exist: `NOTE_LINE_FLAGS_LEGEND`, `NOTE_LINE_OFFSCREEN_HINT`
+   - [x] Flag abbreviation constants exist: `FLAG_ONSCREEN`, `FLAG_OFFSCREEN`, `FLAG_CLICKABLE`, `FLAG_LONG_CLICKABLE`, `FLAG_FOCUSABLE`, `FLAG_SCROLLABLE`, `FLAG_EDITABLE`, `FLAG_ENABLED`, `FLAG_SEPARATOR`
+   - [x] `format()` outputs 4 note lines (structural, custom elements, flags legend, offscreen hint)
+   - [x] `format()` comments updated with correct line numbers
+   - [x] Old `FLAG_COUNT` constant removed
 
 2. **`CompactTreeFormatterTest.kt`**:
-   - [ ] All `buildFlags` tests use new expected values
-   - [ ] All `format` tests use updated line indices (data rows at line 7+)
-   - [ ] New tests for flags legend note line and offscreen hint note line
-   - [ ] New test for `off` flag on non-visible nodes
-   - [ ] New test verifying `on` is always first flag
-   - [ ] New test for `off` with ALL other flags set (`off,clk,lclk,foc,scr,edt,ena`)
-   - [ ] `includesNonVisibleNodesThatPassFilter` uses flags-column-specific assertion (split on tab, check last field)
+   - [x] All `buildFlags` tests use new expected values
+   - [x] All `format` tests use updated line indices (data rows at line 7+)
+   - [x] New tests for flags legend note line and offscreen hint note line
+   - [x] New test for `off` flag on non-visible nodes
+   - [x] New test verifying `on` is always first flag
+   - [x] New test for `off` with ALL other flags set (`off,clk,lclk,foc,scr,edt,ena`)
+   - [x] `includesNonVisibleNodesThatPassFilter` uses flags-column-specific assertion (split on tab, check last field)
 
 3. **`ScreenCaptureProvider.kt`**:
-   - [ ] New `captureScreenshotBitmap(maxWidth, maxHeight)` method in interface
-   - [ ] Returns `Result<Bitmap>`
-   - [ ] KDoc documents caller must recycle
+   - [x] New `captureScreenshotBitmap(maxWidth, maxHeight)` method in interface
+   - [x] Returns `Result<Bitmap>`
+   - [x] KDoc documents caller must recycle
 
 4. **`ScreenCaptureProviderImpl.kt`**:
-   - [ ] Injects `ApiLevelProvider` instead of reading `Build.VERSION.SDK_INT` directly
-   - [ ] Uses `apiLevelProvider.getSdkInt()` in `validateService()` and `isScreenCaptureAvailable()`
-   - [ ] `import android.os.Build` removed (uses `API_LEVEL_R` constant instead)
-   - [ ] Implements `captureScreenshotBitmap`
-   - [ ] Captures bitmap, resizes, returns without encoding
-   - [ ] Recycles original bitmap if resize produced a new one
-   - [ ] try/catch ensures original bitmap is recycled if `resizeBitmapProportional` throws
-   - [ ] Error messages are generic (no `exception.message` leaked to client), full exception logged server-side
+   - [x] Injects `ApiLevelProvider` instead of reading `Build.VERSION.SDK_INT` directly
+   - [x] Uses `apiLevelProvider.getSdkInt()` in `validateService()` and `isScreenCaptureAvailable()`
+   - [x] `import android.os.Build` removed (uses `API_LEVEL_R` constant instead)
+   - [x] Implements `captureScreenshotBitmap`
+   - [x] Captures bitmap, resizes, returns without encoding
+   - [x] Recycles original bitmap if resize produced a new one
+   - [x] try/catch ensures original bitmap is recycled if `resizeBitmapProportional` throws
+   - [x] Error messages are generic (no `exception.message` leaked to client), full exception logged server-side
 
 4a. **`ApiLevelProvider.kt`** (NEW):
-   - [ ] `ApiLevelProvider` interface with `getSdkInt(): Int`
-   - [ ] `DefaultApiLevelProvider` implementation reading `Build.VERSION.SDK_INT`
-   - [ ] Both Hilt-injectable (`@Inject constructor()`)
+   - [x] `ApiLevelProvider` interface with `getSdkInt(): Int`
+   - [x] `DefaultApiLevelProvider` implementation reading `Build.VERSION.SDK_INT`
+   - [x] Both Hilt-injectable (`@Inject constructor()`)
 
 4b. **`AppModule.kt` / `ServiceModule`**:
-   - [ ] `@Binds @Singleton` for `ApiLevelProvider` → `DefaultApiLevelProvider`
+   - [x] `@Binds @Singleton` for `ApiLevelProvider` → `DefaultApiLevelProvider`
 
 5. **`ScreenshotAnnotator.kt`** (NEW):
-   - [ ] `@Inject constructor()`
-   - [ ] `ScaledBounds` inner data class (pure Kotlin, NOT `RectF`) for `computeScaledBounds` return type
-   - [ ] `annotate(bitmap, elements, screenWidth, screenHeight)` method
-   - [ ] Uses `Bitmap.Config.ARGB_8888` unconditionally (not `bitmap.config`)
-   - [ ] Null check on `bitmap.copy()` result — throws `IllegalStateException` on null
-   - [ ] try/catch inside `annotate()` — recycles copy bitmap on failure before re-throwing
-   - [ ] Red dashed 2px bounding boxes
-   - [ ] Semi-transparent red pill labels with white bold text
-   - [ ] Element ID hash (without `node_` prefix)
-   - [ ] Coordinate mapping from screen to bitmap space, `ScaledBounds` converted to `RectF` only for Canvas drawing
-   - [ ] Handles empty list, out-of-bounds elements, partial clipping
-   - [ ] Returns new bitmap (does not mutate input)
-   - [ ] Paint objects created ONCE before the element loop (not per-element)
-   - [ ] Testable helper methods extracted: `computeScaledBounds` (returns `ScaledBounds`), `extractLabel`
-   - [ ] `element.bounds` accessed directly (non-nullable `BoundsData`), no `?:` operator
-   - [ ] Password/sensitive fields ARE annotated (intentional; Android already masks display text)
+   - [x] `@Inject constructor()`
+   - [x] `ScaledBounds` inner data class (pure Kotlin, NOT `RectF`) for `computeScaledBounds` return type
+   - [x] `annotate(bitmap, elements, screenWidth, screenHeight)` method
+   - [x] Uses `Bitmap.Config.ARGB_8888` unconditionally (not `bitmap.config`)
+   - [x] Null check on `bitmap.copy()` result — throws `IllegalStateException` on null (via `checkNotNull`)
+   - [x] `require` guards for `screenWidth > 0` and `screenHeight > 0` to prevent division by zero
+   - [x] try/catch inside `annotate()` — recycles copy bitmap on failure before re-throwing
+   - [x] Red dashed 2px bounding boxes
+   - [x] Semi-transparent red pill labels with white bold text
+   - [x] Element ID hash (without `node_` prefix)
+   - [x] Coordinate mapping from screen to bitmap space, `ScaledBounds` converted to `RectF` only for Canvas drawing
+   - [x] Handles empty list, out-of-bounds elements, partial clipping
+   - [x] Returns new bitmap (does not mutate input)
+   - [x] Paint objects created ONCE before the element loop (not per-element)
+   - [x] Testable helper methods extracted: `computeScaledBounds` (returns `ScaledBounds`), `extractLabel`
+   - [x] `element.bounds` accessed directly (non-nullable `BoundsData`), no `?:` operator
+   - [x] Password/sensitive fields ARE annotated (intentional; Android already masks display text)
 
 6. **`ScreenshotAnnotatorTest.kt`** (NEW):
-   - [ ] Local `makeNode` helper defined in the outer test class
-   - [ ] Tests for empty list, single element, multiple elements (AnnotateTests inner class)
-   - [ ] Test for copy bitmap recycling when drawing fails (AnnotateTests inner class)
-   - [ ] Tests for `bitmap.copy()` returning null — `IllegalStateException` thrown (with elements AND with empty elements)
-   - [ ] Tests for coordinate mapping using `ScaledBounds` (ComputeScaledBoundsTests inner class) — no `RectF` assertions
-   - [ ] Tests for ID hash extraction (ExtractLabelTests inner class), including `node_` edge case (empty hash)
-   - [ ] Tests for out-of-bounds elements (fully outside → null, partially outside → clamped, zero-width → null, clamping-caused collapse → null)
-   - [ ] `unmockkConstructor(Canvas::class)` in `@AfterEach` to prevent test pollution
-   - [ ] `bitmap.copy` mock uses `ARGB_8888` (not `bitmap.config`)
-   - [ ] No dead `mockCanvas` field — uses `mockkConstructor(Canvas::class)` with `constructedWith` instead
+   - [x] Local `makeNode` helper defined in the outer test class
+   - [x] Tests for empty list, single element, multiple elements (AnnotateTests inner class)
+   - [x] Test for copy bitmap recycling when drawing fails (AnnotateTests inner class)
+   - [x] Tests for `bitmap.copy()` returning null — `IllegalStateException` thrown (with elements AND with empty elements)
+   - [x] Tests for `screenWidth`/`screenHeight` validation — `IllegalArgumentException` thrown for zero/negative values
+   - [x] Tests for coordinate mapping using `ScaledBounds` (ComputeScaledBoundsTests inner class) — no `RectF` assertions
+   - [x] Tests for ID hash extraction (ExtractLabelTests inner class), including `node_` edge case (empty hash)
+   - [x] Tests for out-of-bounds elements (fully outside → null, partially outside → clamped, zero-width → null, clamping-caused collapse → null)
+   - [x] `unmockkConstructor(Canvas::class)` in `@AfterEach` to prevent test pollution
+   - [x] `bitmap.copy` mock uses `ARGB_8888` (not `bitmap.config`)
+   - [x] No dead `mockCanvas` field — uses `mockkConstructor(Canvas::class)` with `anyConstructed` instead
 
 7. **`ScreenIntrospectionTools.kt`**:
-   - [ ] `GetScreenStateHandler` constructor takes `ScreenshotAnnotator` and `ScreenshotEncoder`
-   - [ ] `collectOnScreenElements` helper method uses accumulator pattern (single `MutableList` parameter, no `addAll`)
-   - [ ] Screenshot path: `captureScreenshotBitmap` → annotate → encode → return
-   - [ ] Proper bitmap recycling (resized + annotated in finally block)
-   - [ ] Generic exceptions wrapped in `McpToolException.ActionFailed` with generic message (no `exception.message` leaked)
-   - [ ] Full exception logged server-side via `Log.e(TAG, ...)`
-   - [ ] `McpToolException` re-thrown as-is (not double-wrapped)
+   - [x] `GetScreenStateHandler` constructor takes `ScreenshotAnnotator` and `ScreenshotEncoder`
+   - [x] `collectOnScreenElements` helper method uses accumulator pattern (single `MutableList` parameter, no `addAll`)
+   - [x] Screenshot path: `captureScreenshotBitmap` → annotate → encode → return
+   - [x] Proper bitmap recycling (resized + annotated in finally block)
+   - [x] Generic exceptions wrapped in `McpToolException.ActionFailed` with generic message (no `exception.message` leaked)
+   - [x] Full exception logged server-side via `Log.e(TAG, ...)`
+   - [x] `McpToolException` re-thrown as-is (not double-wrapped)
+   - [x] Timing limitation documented in comment (tree parse vs screenshot capture gap)
 
 8. **`McpServerService.kt`**:
-   - [ ] `@Inject lateinit var screenshotAnnotator: ScreenshotAnnotator`
-   - [ ] `@Inject lateinit var screenshotEncoder: ScreenshotEncoder`
-   - [ ] Both passed to `registerScreenIntrospectionTools`
+   - [x] `@Inject lateinit var screenshotAnnotator: ScreenshotAnnotator`
+   - [x] `@Inject lateinit var screenshotEncoder: ScreenshotEncoder`
+   - [x] Both passed to `registerScreenIntrospectionTools`
 
 9. **`McpIntegrationTestHelper.kt`**:
-   - [ ] `MockDependencies` has `screenshotAnnotator` and `screenshotEncoder` fields (mocked, NOT real instances)
-   - [ ] `createMockDependencies()` creates both as `mockk(relaxed = true)`
-   - [ ] `registerAllTools` passes `deps.screenshotAnnotator` and `deps.screenshotEncoder` to `registerScreenIntrospectionTools`
+   - [x] `MockDependencies` has `screenshotAnnotator` and `screenshotEncoder` fields (mocked, NOT real instances)
+   - [x] `createMockDependencies()` creates both as `mockk(relaxed = true)`
+   - [x] `registerAllTools` passes `deps.screenshotAnnotator` and `deps.screenshotEncoder` to `registerScreenIntrospectionTools`
 
 10. **`ScreenIntrospectionIntegrationTest.kt`**:
-    - [ ] Added imports: `android.graphics.Bitmap`, `org.junit.jupiter.api.Assertions.assertFalse`
-    - [ ] Assertions for new note lines (`note:flags:`, `note:offscreen items`)
-    - [ ] Assertions for new flag format (`on,clk,ena`)
-    - [ ] Negative assertions for old flag format (no `vcn`, no `vclfsen`)
-    - [ ] Screenshot test mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` — NO `mockkStatic(Bitmap::class)` needed
-    - [ ] Screenshot test verifies correct bitmap and quality passed to encoder (`annotatedMockBitmap`, `DEFAULT_QUALITY`)
-    - [ ] Screenshot test verifies correct bitmap and screen dimensions passed to annotator (`mockBitmap`, `1080`, `2400`)
-    - [ ] No-screenshot test verifies `captureScreenshotBitmap` not called
-    - [ ] New test for annotation failure: verifies error returned, generic error message (no internal details leaked), bitmap recycled
+    - [x] Added imports: `android.graphics.Bitmap`, `org.junit.jupiter.api.Assertions.assertFalse`
+    - [x] Assertions for new note lines (`note:flags:`, `note:offscreen items`)
+    - [x] Assertions for new flag format (`on,clk,ena`)
+    - [x] Negative assertions for old flag format (no `vcn`, no `vclfsen`)
+    - [x] Screenshot test mocks `captureScreenshotBitmap`, `screenshotAnnotator.annotate()`, and `screenshotEncoder.bitmapToScreenshotData()` — NO `mockkStatic(Bitmap::class)` needed
+    - [x] Screenshot test verifies correct bitmap and quality passed to encoder (`annotatedMockBitmap`, `DEFAULT_QUALITY`)
+    - [x] Screenshot test verifies correct bitmap and screen dimensions passed to annotator (`mockBitmap`, `1080`, `2400`)
+    - [x] No-screenshot test verifies `captureScreenshotBitmap` not called
+    - [x] New test for annotation failure: verifies error returned, generic error message (no internal details leaked), bitmap recycled
 
 11. **`ScreenCaptureProviderImplTest.kt`** (NEW):
-    - [ ] Uses mock `ApiLevelProvider` (no `mockkStatic(Build.VERSION::class)`, no `setStaticField` reflection — JDK 17 compatible)
-    - [ ] `@BeforeEach`/`@AfterEach` with `mockkObject(McpAccessibilityService)`/`unmockkObject`
-    - [ ] Tests for `captureScreenshotBitmap`: success, failure (null bitmap), service not available, bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same instance
-    - [ ] Test for bitmap recycling when resize throws (generic error message verified)
-    - [ ] Test for API level below 30 (returns failure)
-    - [ ] Test for null maxWidth/maxHeight pass-through
+    - [x] Uses mock `ApiLevelProvider` (no `mockkStatic(Build.VERSION::class)`, no `setStaticField` reflection — JDK 17 compatible)
+    - [x] `@BeforeEach`/`@AfterEach` with `mockkObject(McpAccessibilityService)`/`unmockkObject`
+    - [x] Tests for `captureScreenshotBitmap`: success, failure (null bitmap), service not available, bitmap recycling when resize produces new bitmap, bitmap NOT recycled when resize returns same instance
+    - [x] Test for bitmap recycling when resize throws (generic error message verified)
+    - [x] Test for API level below 30 (returns failure)
+    - [x] Test for null maxWidth/maxHeight pass-through
 
 11a. **`ScreenIntrospectionToolsTest.kt`** (UPDATED):
-    - [ ] `sampleCompactOutput` updated with new note lines and flag format (`on,clk,ena`)
-    - [ ] Handler construction updated with `screenshotAnnotator` and `screenshotEncoder` mock dependencies
-    - [ ] Screenshot test mocks updated from `captureScreenshot` to `captureScreenshotBitmap` + `annotate` + `bitmapToScreenshotData`
-    - [ ] No-screenshot verify updated from `captureScreenshot` to `captureScreenshotBitmap`
+    - [x] `sampleCompactOutput` updated with new note lines and flag format (`on,clk,ena`)
+    - [x] Handler construction updated with `screenshotAnnotator` and `screenshotEncoder` mock dependencies
+    - [x] Screenshot test mocks updated from `captureScreenshot` to `captureScreenshotBitmap` + `annotate` + `bitmapToScreenshotData`
+    - [x] No-screenshot verify updated from `captureScreenshot` to `captureScreenshotBitmap`
 
 12. **`docs/MCP_TOOLS.md`**:
-    - [ ] Tool intro description mentions "annotated" screenshot
-    - [ ] Response examples use new flag format and include new note lines
-    - [ ] Output Format lists 8 numbered items (4 note lines, app, screen, header, data rows)
-    - [ ] Flags Reference table uses abbreviations (old single-char table removed)
-    - [ ] Screenshot section describes bounding box annotations
+    - [x] Tool intro description mentions "annotated" screenshot
+    - [x] Response examples use new flag format and include new note lines
+    - [x] Output Format lists 8 numbered items (4 note lines, app, screen, header, data rows)
+    - [x] Flags Reference table uses abbreviations (old single-char table removed)
+    - [x] Screenshot section describes bounding box annotations
 
 13. **`docs/PROJECT.md`**:
-    - [ ] Screen Introspection Tools table updated
-    - [ ] Note updated with flag format and annotation info
-    - [ ] Folder structure lists `ScreenshotAnnotator.kt` and `ApiLevelProvider.kt` in `services/screencapture/`
+    - [x] Screen Introspection Tools table updated
+    - [x] Note updated with flag format and annotation info
+    - [x] Folder structure lists `ScreenshotAnnotator.kt` and `ApiLevelProvider.kt` in `services/screencapture/`
 
 14. **`README.md`**:
-    - [ ] Screen Introspection tool table row updated to mention annotated screenshot
+    - [x] Screen Introspection tool table row updated to mention annotated screenshot
 
 15. **E2E tests**:
-    - [ ] `E2ECalculatorTest.kt`: assertions for new note lines, flag format, negative assertions for old format
-    - [ ] `E2EScreenshotTest.kt`: assertions for new note lines, negative assertions for old format
+    - [x] `E2ECalculatorTest.kt`: assertions for new note lines, flag format, negative assertions for old format
+    - [x] `E2EScreenshotTest.kt`: assertions for new note lines, negative assertions for old format
