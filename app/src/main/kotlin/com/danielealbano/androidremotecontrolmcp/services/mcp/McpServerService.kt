@@ -33,6 +33,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
@@ -88,6 +90,10 @@ class McpServerService : Service() {
     @Inject lateinit var elementFinder: ElementFinder
 
     @Inject lateinit var compactTreeFormatter: CompactTreeFormatter
+
+    @Inject lateinit var screenshotAnnotator: ScreenshotAnnotator
+
+    @Inject lateinit var screenshotEncoder: ScreenshotEncoder
 
     @Inject lateinit var tunnelManager: TunnelManager
 
@@ -259,6 +265,8 @@ class McpServerService : Service() {
             accessibilityServiceProvider,
             screenCaptureProvider,
             compactTreeFormatter,
+            screenshotAnnotator,
+            screenshotEncoder,
             toolNamePrefix,
         )
         registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
