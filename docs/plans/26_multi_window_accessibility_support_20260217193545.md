@@ -1,7 +1,7 @@
 # Plan 26: Multi-Window Accessibility Support
 
 **Created**: 2026-02-17 19:35:45
-**Status**: Draft
+**Status**: Implemented
 **Branch**: `feat/multi-window-accessibility`
 
 ## Problem Statement
@@ -1372,7 +1372,7 @@ multi-window data.
 - [x] Screenshot annotation collects elements from all windows
 - [x] `getFreshTree()` removed after all tools are migrated (no remaining callers)
 - [x] Lint passes
-- [ ] Unit tests pass
+- [x] Unit tests pass
 
 ### Task 6.1: Create `getFreshWindows()` shared utility
 
@@ -1928,7 +1928,7 @@ The `executeSystemAction()` helper in `SystemActionTools.kt` calls `accessibilit
 - [x] Test: `ScrollToElementTool` scrolls to element in non-primary window
 - [x] Test: `TreeFingerprint.generate(windows)` produces correct deterministic histogram
 - [x] Test: `WaitForIdleTool` detects window appearing/disappearing as "UI not idle"
-- [ ] All tests pass
+- [x] All tests pass
 
 **Action 6.7.1**: Update test helpers and mocking
 

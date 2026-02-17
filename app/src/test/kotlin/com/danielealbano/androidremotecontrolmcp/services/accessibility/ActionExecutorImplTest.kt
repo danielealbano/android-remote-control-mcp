@@ -466,9 +466,12 @@ class ActionExecutorImplTest {
                 // The gesture dispatch will fail in JVM tests (Android framework stubs
                 // return null for GestureDescription.Builder), so we just verify getScreenInfo
                 // was called before the gesture attempt.
+                @Suppress("SwallowedException")
                 try {
                     executor.scroll(ScrollDirection.UP)
-                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
                     // Expected — Android gesture APIs are stubbed in JVM tests
                 }
 

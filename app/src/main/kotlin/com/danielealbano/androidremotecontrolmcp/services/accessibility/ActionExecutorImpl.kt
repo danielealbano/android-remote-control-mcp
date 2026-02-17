@@ -527,6 +527,13 @@ class ActionExecutorImpl
         // Internal Helpers
         // ─────────────────────────────────────────────────────────────────────────
 
+        // DESIGN NOTE — Timing gap between parse and act:
+        // The caller parsed window trees at time T1 via getFreshWindows() and passes them here
+        // as `windows`. This method re-queries live windows at time T2 via getAccessibilityWindows().
+        // Between T1 and T2, windows can appear, disappear, or reorder. The parallel tree walk
+        // (findAccessibilityNodeByNodeId) mitigates this: it matches parsed tree structure against
+        // the live tree, so even if a window ID were reused by a different window, the tree
+        // structure mismatch would cause "not found" rather than acting on the wrong node.
         @Suppress(
             "ReturnCount",
             "LongMethod",

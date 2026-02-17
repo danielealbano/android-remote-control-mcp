@@ -12,6 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -285,7 +286,7 @@ class ScrollToElementTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) {
-        @Suppress("ThrowsCount")
+        @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
                 arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
@@ -321,33 +322,45 @@ class ScrollToElementTool
                         "No scrollable container found for element '$elementId'",
                     )
 
-            // Attempt to scroll into view
-            for (attempt in 1..MAX_SCROLL_ATTEMPTS) {
-                val scrollResult =
-                    actionExecutor.scrollNode(scrollableAncestorId, ScrollDirection.DOWN, result.windows)
-                if (scrollResult.isFailure) {
-                    throw McpToolException.ActionFailed(
-                        "Scroll failed on ancestor '$scrollableAncestorId': " +
-                            "${scrollResult.exceptionOrNull()?.message}",
-                    )
-                }
+            // Determine initial scroll direction from the element's position relative to
+            // the screen. Elements above the viewport (bounds.bottom <= 0) need UP scrolling;
+            // elements below or at unknown positions default to DOWN.
+            val screenInfo = accessibilityServiceProvider.getScreenInfo()
+            val primaryDirection = determineScrollDirection(node, screenInfo)
+            val oppositeDirection =
+                if (primaryDirection == ScrollDirection.DOWN) ScrollDirection.UP else ScrollDirection.DOWN
 
-                // Small delay to let UI settle after scroll
-                kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
+            // Try primary direction first, then opposite if element not found
+            var totalAttempts = 0
+            for (direction in listOf(primaryDirection, oppositeDirection)) {
+                while (totalAttempts < MAX_SCROLL_ATTEMPTS) {
+                    totalAttempts++
+                    val scrollResult =
+                        actionExecutor.scrollNode(scrollableAncestorId, direction, result.windows)
+                    if (scrollResult.isFailure) {
+                        throw McpToolException.ActionFailed(
+                            "Scroll failed on ancestor '$scrollableAncestorId': " +
+                                "${scrollResult.exceptionOrNull()?.message}",
+                        )
+                    }
 
-                // Re-parse and check visibility
-                result = getFreshWindows(treeParser, accessibilityServiceProvider)
-                node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+                    // Small delay to let UI settle after scroll
+                    kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
 
-                if (node.visible) {
-                    Log.d(
-                        TAG,
-                        "scroll_to_element: element '$elementId' became visible " +
-                            "after $attempt scroll(s)",
-                    )
-                    return McpToolUtils.textResult(
-                        "Scrolled to element '$elementId' ($attempt scroll(s))",
-                    )
+                    // Re-parse and check visibility
+                    result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+
+                    if (node.visible) {
+                        Log.d(
+                            TAG,
+                            "scroll_to_element: element '$elementId' became visible " +
+                                "after $totalAttempts scroll(s) (direction=$direction)",
+                        )
+                        return McpToolUtils.textResult(
+                            "Scrolled to element '$elementId' ($totalAttempts scroll(s))",
+                        )
+                    }
                 }
             }
 
@@ -355,6 +368,23 @@ class ScrollToElementTool
                 "Element '$elementId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
             )
         }
+
+        /**
+         * Determines the best initial scroll direction based on the element's position
+         * relative to the screen viewport.
+         *
+         * - If the element's bottom edge is at or above the top of the screen → UP
+         * - Otherwise (below viewport or unknown) → DOWN (most common case)
+         */
+        internal fun determineScrollDirection(
+            node: AccessibilityNodeData,
+            screenInfo: ScreenInfo,
+        ): ScrollDirection =
+            when {
+                node.bounds.bottom <= 0 -> ScrollDirection.UP
+                node.bounds.top >= screenInfo.height -> ScrollDirection.DOWN
+                else -> ScrollDirection.DOWN
+            }
 
         /**
          * Walks up the tree from [targetNodeId] to find the nearest scrollable ancestor.
@@ -465,6 +495,13 @@ internal fun mapFindBy(by: String): FindBy? =
  * Falls back to single-window mode via [AccessibilityServiceProvider.getRootNode] if
  * [AccessibilityServiceProvider.getAccessibilityWindows] returns an empty list.
  *
+ * **Performance note**: This function re-parses ALL window trees on every invocation.
+ * No caching is used because the accessibility tree can change between calls (UI updates,
+ * window transitions, user interactions). Callers that invoke this in a loop (e.g.,
+ * [ScrollToElementTool] with up to [ScrollToElementTool.MAX_SCROLL_ATTEMPTS] iterations)
+ * accept this cost to ensure correctness — stale tree data would cause actions to target
+ * the wrong nodes or miss UI changes.
+ *
  * @throws McpToolException.PermissionDenied if accessibility service is not connected.
  * @throws McpToolException.ActionFailed if no windows and no root node are available.
  */
@@ -557,8 +594,20 @@ internal fun getFreshWindows(
                     "The screen may be transitioning.",
             )
 
-    // Extract windowId from the root node before recycling
+    // Extract metadata from the root node before recycling.
+    // Use rootNode.window (available API 21+) to detect the actual window type
+    // instead of hardcoding APPLICATION — the active window could be SYSTEM, INPUT_METHOD, etc.
     val fallbackWindowId = rootNode.windowId
+    val windowInfo = rootNode.window
+    val fallbackWindowType =
+        if (windowInfo != null) {
+            val type = AccessibilityTreeParser.mapWindowType(windowInfo.type)
+            @Suppress("DEPRECATION")
+            windowInfo.recycle()
+            type
+        } else {
+            "APPLICATION"
+        }
 
     val tree =
         try {
@@ -576,7 +625,7 @@ internal fun getFreshWindows(
             listOf(
                 WindowData(
                     windowId = fallbackWindowId,
-                    windowType = "APPLICATION",
+                    windowType = fallbackWindowType,
                     packageName = currentPackageName,
                     title = "unknown",
                     activityName = currentActivityName,

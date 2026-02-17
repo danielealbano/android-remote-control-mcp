@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
 import io.mockk.every
@@ -115,6 +116,13 @@ class ElementActionToolsTest {
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
         every { mockRootNode.recycle() } returns Unit
+        every { mockAccessibilityServiceProvider.getScreenInfo() } returns
+            ScreenInfo(
+                width = 1080,
+                height = 2400,
+                densityDpi = 420,
+                orientation = "portrait",
+            )
     }
 
     @AfterEach
@@ -298,6 +306,7 @@ class ElementActionToolsTest {
                 assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
             }
 
+        @Suppress("LongMethod")
         @Test
         fun `scrolls to element in non-primary window`() =
             runTest {

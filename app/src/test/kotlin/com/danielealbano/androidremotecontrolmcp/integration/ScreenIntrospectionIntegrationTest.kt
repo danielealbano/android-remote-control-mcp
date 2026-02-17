@@ -378,6 +378,7 @@ class ScreenIntrospectionIntegrationTest {
                 every { deps.accessibilityServiceProvider.getRootNode() } returns mockRootNode
                 every { mockRootNode.packageName } returns "com.example.app"
                 every { mockRootNode.windowId } returns 0
+                every { mockRootNode.window } returns null
                 every { deps.treeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
                 every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns "com.example.app"
                 every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
