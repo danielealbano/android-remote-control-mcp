@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 
@@ -57,21 +56,14 @@ object PermissionUtils {
     }
 
     /**
-     * Checks whether the `POST_NOTIFICATIONS` permission is granted.
-     *
-     * On Android 12 (API 32) and below, notification permission is always
-     * granted. On Android 13 (API 33) and above, runtime permission is required.
+     * Checks whether the `POST_NOTIFICATIONS` runtime permission is granted.
      *
      * @param context Application context.
      * @return `true` if notification permission is granted, `false` otherwise.
      */
     fun isNotificationPermissionGranted(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
 }

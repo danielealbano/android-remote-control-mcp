@@ -1,8 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.utils
 
+import android.Manifest
 import android.content.ContentResolver
 import android.content.Context
+import android.content.pm.PackageManager
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -92,11 +95,32 @@ class PermissionUtilsTest {
     @Nested
     @DisplayName("isNotificationPermissionGranted")
     inner class IsNotificationPermissionGranted {
+        @BeforeEach
+        fun setUpPermission() {
+            mockkStatic(ContextCompat::class)
+        }
+
+        @AfterEach
+        fun tearDownPermission() {
+            unmockkStatic(ContextCompat::class)
+        }
+
         @Test
-        fun `returns true on API below 33`() {
-            // On API < 33, notification permission is always granted.
-            // In unit test environment, Build.VERSION.SDK_INT is 0, which is < 33.
+        fun `returns true when permission is granted`() {
+            every {
+                ContextCompat.checkSelfPermission(mockContext, Manifest.permission.POST_NOTIFICATIONS)
+            } returns PackageManager.PERMISSION_GRANTED
+
             assertTrue(PermissionUtils.isNotificationPermissionGranted(mockContext))
+        }
+
+        @Test
+        fun `returns false when permission is denied`() {
+            every {
+                ContextCompat.checkSelfPermission(mockContext, Manifest.permission.POST_NOTIFICATIONS)
+            } returns PackageManager.PERMISSION_DENIED
+
+            assertFalse(PermissionUtils.isNotificationPermissionGranted(mockContext))
         }
     }
 }

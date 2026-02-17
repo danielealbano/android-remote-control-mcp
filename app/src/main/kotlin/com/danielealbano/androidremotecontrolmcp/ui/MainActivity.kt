@@ -1,7 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui
 
 import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,14 +46,9 @@ class MainActivity : ComponentActivity() {
     // for server status, which is collected in MainViewModel via viewModelScope.
 
     /**
-     * Requests the POST_NOTIFICATIONS runtime permission (Android 13+).
-     *
-     * On Android 12 and below, notification permission is always granted so
-     * this is a no-op — the UI will already show the permission as granted.
+     * Requests the POST_NOTIFICATIONS runtime permission.
      */
     private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
