@@ -438,6 +438,21 @@ class FileOperationProviderImpl
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        // createFileUri
+        // ─────────────────────────────────────────────────────────────────────
+
+        override suspend fun createFileUri(
+            locationId: String,
+            path: String,
+            mimeType: String,
+        ): Uri {
+            checkAuthorization(locationId)
+            checkWritePermission(locationId)
+            val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
+            return documentFile.uri
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // Private helpers
         // ─────────────────────────────────────────────────────────────────────
 

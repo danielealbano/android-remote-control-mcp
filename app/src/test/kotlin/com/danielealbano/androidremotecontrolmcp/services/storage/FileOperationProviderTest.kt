@@ -1170,6 +1170,90 @@ class FileOperationProviderTest {
             }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // createFileUri
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("createFileUri")
+    inner class CreateFileUri {
+        @Test
+        fun `createFileUri returns valid URI for authorized location with write permission`() =
+            runTest {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+                val mockRootDoc = mockk<DocumentFile>()
+                setupRootDocument(mockRootDoc)
+
+                val mockCreatedFile = mockk<DocumentFile>()
+                val mockFileUri = mockk<Uri>()
+                every { mockRootDoc.findFile("photo.jpg") } returns null
+                every { mockRootDoc.createFile("image/jpeg", "photo.jpg") } returns mockCreatedFile
+                every { mockCreatedFile.uri } returns mockFileUri
+
+                // Act
+                val result = provider.createFileUri("loc1", "photo.jpg", "image/jpeg")
+
+                // Assert
+                assertEquals(mockFileUri, result)
+            }
+
+        @Test
+        fun `createFileUri throws PermissionDenied for unauthorized location`() =
+            runTest {
+                // Arrange
+                setupUnauthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.createFileUri("loc1", "photo.jpg", "image/jpeg")
+                    }
+                assertTrue(exception.message!!.contains("not found"))
+            }
+
+        @Test
+        fun `createFileUri throws PermissionDenied for read-only location`() =
+            runTest {
+                // Arrange
+                coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } returns true
+                coEvery { mockStorageLocationProvider.getTreeUriForLocation("loc1") } returns mockTreeUri
+                coEvery { mockStorageLocationProvider.isWriteAllowed("loc1") } returns false
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.PermissionDenied> {
+                        provider.createFileUri("loc1", "photo.jpg", "image/jpeg")
+                    }
+                assertEquals("Write not allowed", exception.message)
+            }
+
+        @Test
+        fun `createFileUri creates parent directories when they don't exist`() =
+            runTest {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+                val rootDoc = mockk<DocumentFile>()
+                setupRootDocument(rootDoc)
+
+                val subDirDoc = mockk<DocumentFile>()
+                every { rootDoc.findFile("photos") } returns null
+                every { rootDoc.createDirectory("photos") } returns subDirDoc
+
+                val mockCreatedFile = mockk<DocumentFile>()
+                val mockFileUri = mockk<Uri>()
+                every { subDirDoc.findFile("photo.jpg") } returns null
+                every { subDirDoc.createFile("image/jpeg", "photo.jpg") } returns mockCreatedFile
+                every { mockCreatedFile.uri } returns mockFileUri
+
+                // Act
+                val result = provider.createFileUri("loc1", "photos/photo.jpg", "image/jpeg")
+
+                // Assert
+                assertEquals(mockFileUri, result)
+            }
+    }
+
     companion object {
         private const val BYTES_PER_MB = 1024 * 1024
         private const val DEFAULT_FILE_SIZE_LIMIT_MB = 50

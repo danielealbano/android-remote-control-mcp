@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.storage
 
+import android.net.Uri
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
 
 /**
@@ -163,6 +164,28 @@ interface FileOperationProvider {
         locationId: String,
         path: String,
     )
+
+    /**
+     * Creates a new file in the specified storage location and returns its URI.
+     * Creates parent directories if they don't exist. If a file at the given
+     * path already exists, it is returned as-is (no overwrite of content).
+     *
+     * This is intended for use cases where an external component (e.g., CameraX)
+     * needs a URI to write to directly, rather than writing content through
+     * this provider.
+     *
+     * @param locationId The authorized storage location identifier.
+     * @param path Relative path to the file.
+     * @param mimeType The MIME type for the new file (e.g., "image/jpeg", "video/mp4").
+     *        Note: the actual MIME type used for document creation is inferred from the
+     *        file extension in [path] via the internal `guessMimeType` method.
+     * @return The [Uri] for the created file.
+     */
+    suspend fun createFileUri(
+        locationId: String,
+        path: String,
+        mimeType: String,
+    ): Uri
 
     companion object {
         /** Maximum entries returned by list_files. */
