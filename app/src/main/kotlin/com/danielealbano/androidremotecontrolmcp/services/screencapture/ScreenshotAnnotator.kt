@@ -51,6 +51,7 @@ class ScreenshotAnnotator
          * @param screenHeight Original screen height in pixels (for coordinate mapping).
          * @return A new annotated [Bitmap]. Caller must recycle when done.
          * @throws IllegalStateException if the bitmap cannot be copied.
+         * @throws IllegalArgumentException if [screenWidth] or [screenHeight] is not positive.
          */
         @Suppress("LongMethod", "TooGenericExceptionCaught")
         fun annotate(
@@ -59,6 +60,9 @@ class ScreenshotAnnotator
             screenWidth: Int,
             screenHeight: Int,
         ): Bitmap {
+            require(screenWidth > 0) { "screenWidth must be positive, was $screenWidth" }
+            require(screenHeight > 0) { "screenHeight must be positive, was $screenHeight" }
+
             // Always use ARGB_8888 for the mutable copy -- HARDWARE bitmaps cannot be mutable
             val copy =
                 checkNotNull(bitmap.copy(Bitmap.Config.ARGB_8888, true)) {
