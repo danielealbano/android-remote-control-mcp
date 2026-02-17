@@ -42,9 +42,10 @@ The E2E tests use `McpClient.callTool(name)` which passes the tool name as-is to
 
 | File | Action |
 |------|--------|
-| `e2e-tests/src/test/kotlin/.../E2ECalculatorTest.kt` | Modify: add `android_` prefix to all tool calls |
-| `e2e-tests/src/test/kotlin/.../E2EErrorHandlingTest.kt` | Modify: add `android_` prefix to all real tool calls |
-| `e2e-tests/src/test/kotlin/.../E2EScreenshotTest.kt` | Modify: add `android_` prefix to all tool calls |
+| `e2e-tests/src/test/kotlin/.../AndroidContainerSetup.kt` | Modify: add `TOOL_NAME_PREFIX` constant documenting empty device_slug assumption |
+| `e2e-tests/src/test/kotlin/.../E2ECalculatorTest.kt` | Modify: add `android_` prefix to all tool calls, centralize via `TOOL_PREFIX` constant, add prefix validation to `listTools()` |
+| `e2e-tests/src/test/kotlin/.../E2EErrorHandlingTest.kt` | Modify: add `android_` prefix to all real tool calls, centralize via `TOOL_PREFIX` constant, strengthen `invalid params` assertion |
+| `e2e-tests/src/test/kotlin/.../E2EScreenshotTest.kt` | Modify: add `android_` prefix to all tool calls, centralize via `TOOL_PREFIX` constant |
 
 ---
 
@@ -288,3 +289,36 @@ Every tool name string should either:
 All must pass with zero errors.
 
 Note: E2E tests (`./gradlew :e2e-tests:test`) require Docker with the Android emulator image and cannot be run locally in this verification step unless Docker is available. The CI pipeline will validate E2E tests on push.
+
+---
+
+## Post-Review Fixes
+
+After the initial implementation, the plan was reviewed by `plan-user-story-reviewer`, `plan-qa-reviewer`, `plan-performance-reviewer`, and `plan-security-reviewer` subagents. The following findings were identified and addressed:
+
+### Finding 1 (MAJOR): E2E test files not compiled during verification
+
+**Issue**: `./gradlew assembleDebug` and `:app:testDebugUnitTest` only build/test the `app` module, not the `e2e-tests` module. The 3 modified E2E test files were never compiled during verification.
+
+**Fix**: Added `./gradlew :e2e-tests:compileTestKotlin` to the verification pipeline. This compiles the E2E test files without requiring Docker.
+
+### Finding 2 (HIGH): Undocumented coupling to empty device_slug
+
+**Issue**: All 15 E2E tool calls used hardcoded `"android_"` prefix strings. The prefix depends on the `device_slug` being empty (default). If the default slug changes or E2E setup starts configuring one, all tests silently break with "Tool not found" — the exact same bug this plan fixes.
+
+**Fix**:
+- Added `AndroidContainerSetup.TOOL_NAME_PREFIX = "android_"` constant with documentation explaining the empty device_slug assumption and maintenance requirements.
+- Added `TOOL_PREFIX` companion constants in all 3 test classes referencing `AndroidContainerSetup.TOOL_NAME_PREFIX`.
+- Replaced all 15 hardcoded `"android_X"` strings with `"${TOOL_PREFIX}X"` template expressions.
+
+### Finding 3 (MEDIUM): Weak assertion in `invalid params returns error result`
+
+**Issue**: The test only checked `isError == true` but didn't verify the error message relates to parameter validation. It could silently pass if `android_tap` failed for any other reason.
+
+**Fix**: Added assertion verifying error text contains `"Missing required parameter"` or the parameter name `'x'`.
+
+### Finding 4 (LOW): `listTools()` test didn't validate tool name prefixes
+
+**Issue**: The test only checked tool count (`>= 27`) but didn't verify tool names start with the expected prefix. This would serve as an early canary for prefix misconfiguration.
+
+**Fix**: Added `assertTrue(result.tools.all { it.name.startsWith(TOOL_PREFIX) })` assertion to the `MCP server lists all available tools` test.
