@@ -52,6 +52,7 @@ class ScreenshotAnnotator
          * @return A new annotated [Bitmap]. Caller must recycle when done.
          * @throws IllegalStateException if the bitmap cannot be copied.
          */
+        @Suppress("LongMethod", "TooGenericExceptionCaught")
         fun annotate(
             bitmap: Bitmap,
             elements: List<AccessibilityNodeData>,
@@ -60,8 +61,9 @@ class ScreenshotAnnotator
         ): Bitmap {
             // Always use ARGB_8888 for the mutable copy -- HARDWARE bitmaps cannot be mutable
             val copy =
-                bitmap.copy(Bitmap.Config.ARGB_8888, true)
-                    ?: throw IllegalStateException("Failed to create mutable bitmap copy for annotation")
+                checkNotNull(bitmap.copy(Bitmap.Config.ARGB_8888, true)) {
+                    "Failed to create mutable bitmap copy for annotation"
+                }
             if (elements.isEmpty()) return copy
 
             try {
@@ -84,7 +86,7 @@ class ScreenshotAnnotator
                     }
                 val labelBgPaint =
                     Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.argb(LABEL_BG_ALPHA, 255, 0, 0)
+                        color = Color.argb(LABEL_BG_ALPHA, COLOR_CHANNEL_MAX, 0, 0)
                         style = Paint.Style.FILL
                     }
                 val labelTextPaint =
@@ -187,6 +189,7 @@ class ScreenshotAnnotator
             private const val LABEL_TEXT_SIZE_DP = 10f
             private const val LABEL_PADDING_DP = 2f
             private const val LABEL_BG_ALPHA = 180
+            private const val COLOR_CHANNEL_MAX = 255
             private const val REFERENCE_WIDTH_DP = 360f
         }
     }

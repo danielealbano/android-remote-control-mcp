@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test
 class ScreenshotAnnotatorTest {
     private val annotator = ScreenshotAnnotator()
 
+    @Suppress("LongParameterList")
     private fun makeNode(
         id: String = "node_test",
         className: String = "android.widget.Button",

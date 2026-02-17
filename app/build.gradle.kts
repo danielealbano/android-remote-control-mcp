@@ -185,6 +185,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    maxHeapSize = "4g"
     // MockK uses byte-buddy/reflection internally; JDK 17 strong encapsulation
     // blocks access to these packages from unnamed modules, causing test failures.
     jvmArgs(
