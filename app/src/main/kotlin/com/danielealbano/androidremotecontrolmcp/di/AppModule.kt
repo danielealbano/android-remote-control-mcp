@@ -10,6 +10,8 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutorImpl
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputControllerImpl
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManagerImpl
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
@@ -75,6 +77,10 @@ abstract class RepositoryModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ServiceModule {
+    @Binds
+    @Singleton
+    abstract fun bindTypeInputController(impl: TypeInputControllerImpl): TypeInputController
+
     @Binds
     @Singleton
     abstract fun bindActionExecutor(impl: ActionExecutorImpl): ActionExecutor
