@@ -25,17 +25,25 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EScreenshotTest {
 
+    companion object {
+        /**
+         * Tool name prefix for E2E tests. Centralized from [AndroidContainerSetup.TOOL_NAME_PREFIX]
+         * to document the empty device_slug assumption.
+         */
+        private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+    }
+
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     @Test
     @Order(1)
     fun `get_screen_state with screenshot returns valid JPEG data`() = runBlocking {
         // Navigate to home screen first
-        mcpClient.callTool("android_press_home")
+        mcpClient.callTool("${TOOL_PREFIX}press_home")
         Thread.sleep(1_000)
 
         val result = mcpClient.callTool(
-            "android_get_screen_state",
+            "${TOOL_PREFIX}get_screen_state",
             mapOf("include_screenshot" to true),
         )
 
