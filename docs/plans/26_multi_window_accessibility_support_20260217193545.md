@@ -893,12 +893,12 @@ inner class MultiWindowSearch {
 on nodes across multiple windows.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `ActionExecutor` interface node-action methods accept `List<WindowData>` instead of single `AccessibilityNodeData`
-- [ ] `ActionExecutorImpl.performNodeAction()` iterates all windows to find the target node
-- [ ] `ActionExecutorImpl.performNodeAction()` has degraded-mode fallback via `getRootNode()` when `getAccessibilityWindows()` is empty
-- [ ] `ActionExecutorImpl.scroll()` uses `getScreenInfo()` instead of `getRootNode()` for screen dimensions
-- [ ] `findFocusedEditableNode()` searches across all window roots
-- [ ] Lint passes
+- [x] `ActionExecutor` interface node-action methods accept `List<WindowData>` instead of single `AccessibilityNodeData`
+- [x] `ActionExecutorImpl.performNodeAction()` iterates all windows to find the target node
+- [x] `ActionExecutorImpl.performNodeAction()` has degraded-mode fallback via `getRootNode()` when `getAccessibilityWindows()` is empty
+- [x] `ActionExecutorImpl.scroll()` uses `getScreenInfo()` instead of `getRootNode()` for screen dimensions
+- [x] `findFocusedEditableNode()` searches across all window roots
+- [x] Lint passes
 - [ ] Unit tests pass
 
 ### Task 5.1: Update `ActionExecutor` interface
@@ -906,10 +906,10 @@ on nodes across multiple windows.
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ActionExecutor.kt`
 
 **Definition of Done**:
-- [ ] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` accept `windows: List<WindowData>`
-- [ ] `findAccessibilityNodeByNodeId` signature unchanged (operates on single tree)
-- [ ] Coordinate-based and global actions unchanged
-- [ ] Import for `WindowData` not needed (same package)
+- [x] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` accept `windows: List<WindowData>`
+- [x] `findAccessibilityNodeByNodeId` signature unchanged (operates on single tree)
+- [x] Coordinate-based and global actions unchanged
+- [x] Import for `WindowData` not needed (same package)
 
 **Action 5.1.1**: Update node-action method signatures
 
@@ -972,13 +972,13 @@ suspend fun scrollNode(
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ActionExecutorImpl.kt`
 
 **Definition of Done**:
-- [ ] `performNodeAction()` accepts `List<WindowData>`, iterates all windows
-- [ ] For each window, gets real root node from service's `getAccessibilityWindows()` by matching `AccessibilityWindowInfo.getId()` to `windowData.windowId`
-- [ ] Walks real and parsed trees in parallel per window (existing `walkAndMatch` logic)
-- [ ] Returns first successful match; returns failure if not found in any window
-- [ ] **Degraded-mode fallback**: when `getAccessibilityWindows()` returns empty, falls back to `service.getRootNode()` and walks the parsed trees against it
-- [ ] All real root nodes and `AccessibilityWindowInfo` objects properly recycled
-- [ ] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` pass `windows` to `performNodeAction`
+- [x] `performNodeAction()` accepts `List<WindowData>`, iterates all windows
+- [x] For each window, gets real root node from service's `getAccessibilityWindows()` by matching `AccessibilityWindowInfo.getId()` to `windowData.windowId`
+- [x] Walks real and parsed trees in parallel per window (existing `walkAndMatch` logic)
+- [x] Returns first successful match; returns failure if not found in any window
+- [x] **Degraded-mode fallback**: when `getAccessibilityWindows()` returns empty, falls back to `service.getRootNode()` and walks the parsed trees against it
+- [x] All real root nodes and `AccessibilityWindowInfo` objects properly recycled
+- [x] `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` pass `windows` to `performNodeAction`
 
 **Action 5.2.1**: Update `clickNode`, `longClickNode`, `setTextOnNode`, `scrollNode` signatures
 
@@ -1149,8 +1149,8 @@ private suspend fun performNodeAction(
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/ActionExecutorImpl.kt`
 
 **Definition of Done**:
-- [ ] `scroll()` uses `service.getScreenInfo()` for screen dimensions instead of `service.getRootNode()`
-- [ ] No dependency on `rootInActiveWindow` for screen dimensions
+- [x] `scroll()` uses `service.getScreenInfo()` for screen dimensions instead of `service.getRootNode()`
+- [x] No dependency on `rootInActiveWindow` for screen dimensions
 
 **Action 5.3.1**: Replace `getRootNode()` with `getScreenInfo()` in `scroll()`
 
@@ -1211,10 +1211,10 @@ Also remove the now-unused `import android.graphics.Rect` if it is only used by 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/mcp/tools/TextInputTools.kt`
 
 **Definition of Done**:
-- [ ] `findFocusedEditableNode()` iterates all window roots from `getAccessibilityWindows()`
-- [ ] Calls `findFocus(FOCUS_INPUT)` on each window's root node
-- [ ] Returns first editable focused node found across all windows
-- [ ] All root nodes properly recycled
+- [x] `findFocusedEditableNode()` iterates all window roots from `getAccessibilityWindows()`
+- [x] Calls `findFocus(FOCUS_INPUT)` on each window's root node
+- [x] Returns first editable focused node found across all windows
+- [x] All root nodes properly recycled
 
 **Action 5.4.1**: Rewrite `findFocusedEditableNode()`
 

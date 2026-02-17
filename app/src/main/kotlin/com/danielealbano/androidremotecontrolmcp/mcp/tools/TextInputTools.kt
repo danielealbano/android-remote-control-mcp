@@ -1022,24 +1022,56 @@ fun registerTextInputTools(
  * @return The focused [AccessibilityNodeInfo], or null if no editable node is focused.
  *         The caller is responsible for recycling the returned node.
  */
-@Suppress("ReturnCount", "MaxLineLength")
-internal fun findFocusedEditableNode(accessibilityServiceProvider: AccessibilityServiceProvider): AccessibilityNodeInfo? {
+@Suppress("ReturnCount")
+internal fun findFocusedEditableNode(
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+): AccessibilityNodeInfo? {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service is not enabled",
         )
     }
-    val rootNode = accessibilityServiceProvider.getRootNode() ?: return null
-    val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-    @Suppress("DEPRECATION")
-    rootNode.recycle()
+    // Search across all windows for the focused editable node
+    val windows = accessibilityServiceProvider.getAccessibilityWindows()
+    try {
+        for (window in windows) {
+            val rootNode = window.root ?: continue
+            val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            @Suppress("DEPRECATION")
+            rootNode.recycle()
 
-    if (focusedNode != null && !focusedNode.isEditable) {
-        @Suppress("DEPRECATION")
-        focusedNode.recycle()
-        return null
+            if (focusedNode != null) {
+                if (focusedNode.isEditable) {
+                    return focusedNode
+                }
+                @Suppress("DEPRECATION")
+                focusedNode.recycle()
+            }
+        }
+    } finally {
+        // Recycle all AccessibilityWindowInfo objects for consistency
+        // (no-op on API 34+, but follows the codebase's recycling convention)
+        for (w in windows) {
+            @Suppress("DEPRECATION")
+            w.recycle()
+        }
     }
 
-    return focusedNode
+    // Fallback: try rootInActiveWindow if getWindows() returned empty
+    if (windows.isEmpty()) {
+        val rootNode = accessibilityServiceProvider.getRootNode() ?: return null
+        val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        @Suppress("DEPRECATION")
+        rootNode.recycle()
+
+        if (focusedNode != null && !focusedNode.isEditable) {
+            @Suppress("DEPRECATION")
+            focusedNode.recycle()
+            return null
+        }
+        return focusedNode
+    }
+
+    return null
 }

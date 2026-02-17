@@ -58,24 +58,24 @@ enum class ScrollAmount(
 interface ActionExecutor {
     suspend fun clickNode(
         nodeId: String,
-        tree: AccessibilityNodeData,
+        windows: List<WindowData>,
     ): Result<Unit>
 
     suspend fun longClickNode(
         nodeId: String,
-        tree: AccessibilityNodeData,
+        windows: List<WindowData>,
     ): Result<Unit>
 
     suspend fun setTextOnNode(
         nodeId: String,
         text: String,
-        tree: AccessibilityNodeData,
+        windows: List<WindowData>,
     ): Result<Unit>
 
     suspend fun scrollNode(
         nodeId: String,
         direction: ScrollDirection,
-        tree: AccessibilityNodeData,
+        windows: List<WindowData>,
     ): Result<Unit>
 
     suspend fun tap(
