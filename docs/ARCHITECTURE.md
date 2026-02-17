@@ -220,4 +220,61 @@ running requires a restart (UI disables config editing when server is running).
 
 ---
 
+## Multi-Window Accessibility Architecture
+
+The application uses Android's multi-window accessibility API (`AccessibilityService.getWindows()`) to enumerate and introspect **all** interactive windows on screen, not just the foreground app. This enables the MCP client to see and interact with system dialogs, permission popups, IME keyboards, and accessibility overlays.
+
+### Window Discovery Flow
+
+```mermaid
+flowchart TB
+    Service["McpAccessibilityService"]
+    Service -->|"getWindows()"| Windows["List<AccessibilityWindowInfo>"]
+    Windows --> ForEach["For each window"]
+    ForEach -->|"window.root"| Root["AccessibilityNodeInfo (root)"]
+    Root -->|"parseTree(root, 'root_w{windowId}')"| Tree["AccessibilityNodeData tree"]
+    Tree --> WD["WindowData(windowId, type, pkg, title, activity, layer, focused, tree)"]
+    WD --> Result["MultiWindowResult(windows, degraded=false)"]
+
+    Service -->|"getWindows() fails/empty"| Fallback["rootInActiveWindow"]
+    Fallback -->|"parseTree(root, 'root_w0')"| FallbackTree["AccessibilityNodeData tree"]
+    FallbackTree --> FallbackWD["WindowData(windowId=0, ...)"]
+    FallbackWD --> DegradedResult["MultiWindowResult(windows, degraded=true)"]
+```
+
+### Key Data Types
+
+| Type | Description |
+|------|-------------|
+| `WindowData` | Window metadata (ID from `AccessibilityWindowInfo.getId()`, type, package, title, activity, layer, focused) plus the parsed `AccessibilityNodeData` tree |
+| `MultiWindowResult` | List of `WindowData` plus a `degraded` flag indicating fallback to single-window mode |
+
+### Node ID Uniqueness
+
+Element IDs include the window ID as a suffix (e.g., `node_abc_w42`) to guarantee uniqueness across windows. The `root_w{windowId}` prefix is passed to `parseTree()` so all nodes in a window's tree incorporate the window ID.
+
+### Degraded Mode
+
+When `getWindows()` returns empty or fails, the system falls back to `rootInActiveWindow` (single-window mode). In this mode:
+- A single `WindowData` is created with `windowId=0`
+- The `MultiWindowResult.degraded` flag is set to `true`
+- The TSV output includes a `note:DEGRADED` line to inform the MCP client
+- Action execution falls back to `getRootNode()` for node resolution
+
+### Cross-Window Action Execution
+
+When executing a node-based action (click, long-click, scroll-to-element):
+1. Extract the window ID from the node's parsed ID suffix (`_w{id}`)
+2. Call `getAccessibilityWindows()` to get live window list
+3. Find the matching `AccessibilityWindowInfo` by `getId()`
+4. Get the window's root `AccessibilityNodeInfo`
+5. Walk the live tree to find the target node by matching the deterministic node ID
+6. Perform the accessibility action on the live node
+
+### Required Configuration
+
+The accessibility service XML config (`accessibility_service_config.xml`) must include `FLAG_RETRIEVE_INTERACTIVE_WINDOWS` in the `accessibilityFlags` attribute for `getWindows()` to return results.
+
+---
+
 **End of ARCHITECTURE.md**
