@@ -242,62 +242,6 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("SetTextTool")
-    inner class SetTextToolTests {
-        private val tool = SetTextTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
-
-        @Test
-        fun `sets text on element`() =
-            runTest {
-                coEvery {
-                    mockActionExecutor.setTextOnNode("node_abc", "Hello", sampleTree)
-                } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("element_id", "node_abc")
-                        put("text", "Hello")
-                    }
-
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
-                assertTrue(text.contains("Text set"))
-            }
-
-        @Test
-        fun `allows empty text to clear field`() =
-            runTest {
-                coEvery {
-                    mockActionExecutor.setTextOnNode("node_abc", "", sampleTree)
-                } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("element_id", "node_abc")
-                        put("text", "")
-                    }
-
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
-                assertTrue(text.contains("Text set"))
-            }
-
-        @Test
-        fun `throws error for non-editable element`() =
-            runTest {
-                coEvery {
-                    mockActionExecutor.setTextOnNode("node_abc", "Hi", sampleTree)
-                } returns
-                    Result.failure(IllegalStateException("Node 'node_abc' is not editable"))
-                val params =
-                    buildJsonObject {
-                        put("element_id", "node_abc")
-                        put("text", "Hi")
-                    }
-
-                assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
-            }
-    }
-
-    @Nested
     @DisplayName("ScrollToElementTool")
     inner class ScrollToElementToolTests {
         private val tool =

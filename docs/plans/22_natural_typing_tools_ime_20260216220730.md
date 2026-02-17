@@ -823,40 +823,40 @@ The key validation here is that the new infrastructure code (`TypeInputControlle
 **As a developer**, I need the four new natural typing tools implemented and the three old programmatic tools removed, so that all text input goes through the `InputConnection` pipeline.
 
 ### Acceptance Criteria
-- [ ] `android_type_append_text` tool is registered and functional
-- [ ] `android_type_insert_text` tool is registered and functional
-- [ ] `android_type_replace_text` tool is registered and functional
-- [ ] `android_type_clear_text` tool is registered and functional
-- [ ] `android_input_text` tool is removed (no longer registered)
-- [ ] `android_clear_text` tool is removed (no longer registered)
-- [ ] `android_set_text` tool is removed (no longer registered)
-- [ ] `android_press_key` tool is preserved and functional
-- [ ] All four tools use `element_id` (mandatory), click to focus, `setSelection()` for cursor positioning
-- [ ] `type_append_text` and `type_insert_text` type code point by code point with configurable speed/variance
-- [ ] `type_replace_text` finds first occurrence, selects it, sends DELETE, types replacement
-- [ ] `type_clear_text` performs select all + DELETE
-- [ ] Max text length enforced at 2000 characters
-- [ ] Typing speed minimum enforced at 10ms
-- [ ] Variance clamped to `[0, typing_speed]`
-- [ ] Cancellation supported via structured concurrency (coroutine cancellation stops typing loop)
-- [ ] Mid-typing failure stops immediately and returns error
-- [ ] All four tools return field content in the response (via `readFieldContent()` after operation)
-- [ ] Field content read-back is best-effort — failure to read does not fail the tool
-- [ ] `McpServerService` injects `TypeInputController` and passes it to `registerTextInputTools`
-- [ ] `MockDependencies` in `McpIntegrationTestHelper` includes `TypeInputController`
-- [ ] `registerTextInputTools()` has `@Suppress("LongParameterList")` (6 params)
-- [ ] `McpProtocolIntegrationTest.kt` `EXPECTED_TOOL_NAMES` updated (3 old removed, 4 new added)
-- [ ] `typeCharByChar` skips delay after last character
-- [ ] `typeCharByChar("")` is a no-op (no commitText calls)
-- [ ] Unit tests for all four tools pass
-- [ ] Integration tests for all four tools pass
-- [ ] Integration tests explicitly configure `TypeInputController` mock returns (not relying on `relaxed = true` defaults)
-- [ ] At least one integration test per tool verifies a critical mock interaction
-- [ ] PressKeyTool unit tests still pass
-- [ ] Boundary tests exist for `extractTypingParams` at exactly 10ms and 5000ms
-- [ ] Tests exist for `getSurroundingText()` returning null in append/insert/replace tools
-- [ ] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
-- [ ] All tests pass: `./gradlew :app:testDebugUnitTest`
+- [x] `android_type_append_text` tool is registered and functional
+- [x] `android_type_insert_text` tool is registered and functional
+- [x] `android_type_replace_text` tool is registered and functional
+- [x] `android_type_clear_text` tool is registered and functional
+- [x] `android_input_text` tool is removed (no longer registered)
+- [x] `android_clear_text` tool is removed (no longer registered)
+- [x] `android_set_text` tool is removed (no longer registered)
+- [x] `android_press_key` tool is preserved and functional
+- [x] All four tools use `element_id` (mandatory), click to focus, `setSelection()` for cursor positioning
+- [x] `type_append_text` and `type_insert_text` type code point by code point with configurable speed/variance
+- [x] `type_replace_text` finds first occurrence, selects it, sends DELETE, types replacement
+- [x] `type_clear_text` performs select all + DELETE
+- [x] Max text length enforced at 2000 characters
+- [x] Typing speed minimum enforced at 10ms
+- [x] Variance clamped to `[0, typing_speed]`
+- [x] Cancellation supported via structured concurrency (coroutine cancellation stops typing loop)
+- [x] Mid-typing failure stops immediately and returns error
+- [x] All four tools return field content in the response (via `readFieldContent()` after operation)
+- [x] Field content read-back is best-effort — failure to read does not fail the tool
+- [x] `McpServerService` injects `TypeInputController` and passes it to `registerTextInputTools`
+- [x] `MockDependencies` in `McpIntegrationTestHelper` includes `TypeInputController`
+- [x] `registerTextInputTools()` has `@Suppress("LongParameterList")` (6 params)
+- [x] `McpProtocolIntegrationTest.kt` `EXPECTED_TOOL_NAMES` updated (3 old removed, 4 new added)
+- [x] `typeCharByChar` skips delay after last character
+- [x] `typeCharByChar("")` is a no-op (no commitText calls)
+- [x] Unit tests for all four tools pass
+- [x] Integration tests for all four tools pass
+- [x] Integration tests explicitly configure `TypeInputController` mock returns (not relying on `relaxed = true` defaults)
+- [x] At least one integration test per tool verifies a critical mock interaction
+- [x] PressKeyTool unit tests still pass
+- [x] Boundary tests exist for `extractTypingParams` at exactly 10ms and 5000ms
+- [x] Tests exist for `getSurroundingText()` returning null in append/insert/replace tools
+- [x] Linting passes: `./gradlew ktlintCheck && ./gradlew detekt`
+- [x] All tests pass: `./gradlew :app:testDebugUnitTest`
 
 ---
 
@@ -864,7 +864,7 @@ The key validation here is that the new infrastructure code (`TypeInputControlle
 
 **Definition of Done**: Old `InputTextTool` and `ClearTextTool` classes removed. Shared typing utilities added. `PressKeyTool` preserved. `McpServerService` and `McpIntegrationTestHelper` updated with `TypeInputController` wiring. Note: `TextInputTools.kt` will NOT compile until Tasks 3.2–3.5 add the tool classes referenced in `registerTextInputTools()` — the "File compiles" check applies after Task 3.5 is complete.
 
-- [ ] **Action 3.1.0**: Add `McpToolUtils.requireInt()` helper method
+- [x] **Action 3.1.0**: Add `McpToolUtils.requireInt()` helper method
 
 **File**: `app/src/main/kotlin/.../mcp/tools/McpToolUtils.kt`
 
@@ -918,7 +918,7 @@ Also add unit tests for `requireInt()` in `McpToolUtilsTest.kt`, following the s
 - `requireInt throws for float value`
 - `requireInt accepts integer-equivalent float` (e.g., `5.0` → `5`)
 
-- [ ] **Action 3.1.1**: Remove `InputTextTool` class and `ClearTextTool` class
+- [x] **Action 3.1.1**: Remove `InputTextTool` class and `ClearTextTool` class
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -926,7 +926,7 @@ Also add unit tests for `requireInt()` in `McpToolUtilsTest.kt`, following the s
 
 Note: The existing `@file:Suppress("TooManyFunctions")` annotation at the top of the file should be kept — after removing 2 classes and adding 4 new classes + 4 utility functions, it is still needed (even more so).
 
-- [ ] **Action 3.1.2**: Add shared typing constants, Mutex, and utility functions
+- [x] **Action 3.1.2**: Add shared typing constants, Mutex, and utility functions
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1145,7 +1145,7 @@ clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 awaitInputConnectionReady(typeInputController, elementId)
 ```
 
-- [ ] **Action 3.1.3**: Update `registerTextInputTools()` function signature and body — add `typeInputController` param, remove old tool registrations, add new ones
+- [x] **Action 3.1.3**: Update `registerTextInputTools()` function signature and body — add `typeInputController` param, remove old tool registrations, add new ones
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1175,7 +1175,7 @@ awaitInputConnectionReady(typeInputController, elementId)
  }
 ```
 
-- [ ] **Action 3.1.4**: Inject `TypeInputController` in `McpServerService` and update call site
+- [x] **Action 3.1.4**: Inject `TypeInputController` in `McpServerService` and update call site
 
 **File**: `app/src/main/kotlin/.../services/mcp/McpServerService.kt`
 
@@ -1194,7 +1194,7 @@ awaitInputConnectionReady(typeInputController, elementId)
 
 Note: `treeParser` is still needed by the new type tools for `getFreshTree()`. `actionExecutor` is still needed by `PressKeyTool` and the new type tools for `clickNode`. `accessibilityServiceProvider` is still needed by `PressKeyTool` and the new type tools.
 
-- [ ] **Action 3.1.5**: Update `McpIntegrationTestHelper` — add `TypeInputController` to `MockDependencies` and update registration
+- [x] **Action 3.1.5**: Update `McpIntegrationTestHelper` — add `TypeInputController` to `MockDependencies` and update registration
 
 **File**: `app/src/test/kotlin/.../integration/McpIntegrationTestHelper.kt`
 
@@ -1247,7 +1247,7 @@ Add import for `TypeInputController`.
 
 **Definition of Done**: Tool registered, functional, handles all parameters and edge cases.
 
-- [ ] **Action 3.2.1**: Add `TypeAppendTextTool` class
+- [x] **Action 3.2.1**: Add `TypeAppendTextTool` class
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1367,7 +1367,7 @@ class TypeAppendTextTool
 
 **Definition of Done**: Tool registered, functional, validates offset range.
 
-- [ ] **Action 3.3.1**: Add `TypeInsertTextTool` class
+- [x] **Action 3.3.1**: Add `TypeInsertTextTool` class
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1495,7 +1495,7 @@ class TypeInsertTextTool
 
 **Definition of Done**: Tool registered, functional, finds first occurrence, deletes and types replacement.
 
-- [ ] **Action 3.4.1**: Add `TypeReplaceTextTool` class
+- [x] **Action 3.4.1**: Add `TypeReplaceTextTool` class
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1679,7 +1679,7 @@ class TypeReplaceTextTool
 
 **Definition of Done**: Tool registered, functional, performs select all + DELETE.
 
-- [ ] **Action 3.5.1**: Add `TypeClearTextTool` class
+- [x] **Action 3.5.1**: Add `TypeClearTextTool` class
 
 **File**: `app/src/main/kotlin/.../mcp/tools/TextInputTools.kt`
 
@@ -1799,7 +1799,7 @@ class TypeClearTextTool
 
 **Definition of Done**: `SetTextTool` class removed, no longer registered. Other element action tools unaffected.
 
-- [ ] **Action 3.6.1**: Remove `SetTextTool` class from `ElementActionTools.kt`
+- [x] **Action 3.6.1**: Remove `SetTextTool` class from `ElementActionTools.kt`
 
 **File**: `app/src/main/kotlin/.../mcp/tools/ElementActionTools.kt`
 
@@ -1816,7 +1816,7 @@ class TypeClearTextTool
  }
 ```
 
-- [ ] **Action 3.6.2**: Remove `SetTextToolTests` from `ElementActionToolsTest.kt`
+- [x] **Action 3.6.2**: Remove `SetTextToolTests` from `ElementActionToolsTest.kt`
 
 **File**: `app/src/test/kotlin/.../mcp/tools/ElementActionToolsTest.kt`
 
@@ -1828,7 +1828,7 @@ class TypeClearTextTool
 
 **Definition of Done**: All old tool tests removed. New tests for all four type tools. PressKeyTool tests preserved.
 
-- [ ] **Action 3.7.1**: Rewrite `TextInputToolsTest.kt`
+- [x] **Action 3.7.1**: Rewrite `TextInputToolsTest.kt`
 
 **File**: `app/src/test/kotlin/.../mcp/tools/TextInputToolsTest.kt`
 
@@ -1936,7 +1936,7 @@ This works because the project has `unitTests.isReturnDefaultValues = true` in `
 
 **Definition of Done**: Old integration tests removed. New integration tests for all four type tools via MCP protocol.
 
-- [ ] **Action 3.8.1**: Rewrite `TextInputIntegrationTest.kt`
+- [x] **Action 3.8.1**: Rewrite `TextInputIntegrationTest.kt`
 
 **File**: `app/src/test/kotlin/.../integration/TextInputIntegrationTest.kt`
 
@@ -2005,7 +2005,7 @@ Tests:
 
 **Definition of Done**: `McpProtocolIntegrationTest.kt` and `AuthIntegrationTest.kt` tool name/count expectations are updated.
 
-- [ ] **Action 3.9.1**: Update `McpProtocolIntegrationTest.kt`
+- [x] **Action 3.9.1**: Update `McpProtocolIntegrationTest.kt`
 
 **File**: `app/src/test/kotlin/.../integration/McpProtocolIntegrationTest.kt`
 
@@ -2034,7 +2034,7 @@ Tests:
 +fun `listTools returns all 39 registered tools`() =
 ```
 
-- [ ] **Action 3.9.2**: Update `AuthIntegrationTest.kt`
+- [x] **Action 3.9.2**: Update `AuthIntegrationTest.kt`
 
 **File**: `app/src/test/kotlin/.../integration/AuthIntegrationTest.kt`
 
@@ -2050,7 +2050,7 @@ Tests:
 
 **Definition of Done**: Project compiles. All unit and integration tests pass. Lint clean.
 
-- [ ] **Action 3.10.1**: Run full build, tests, and linting
+- [x] **Action 3.10.1**: Run full build, tests, and linting
 
 ```bash
 ./gradlew assembleDebug

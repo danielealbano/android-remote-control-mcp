@@ -17,6 +17,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
@@ -62,6 +63,7 @@ object McpIntegrationTestHelper {
             storageLocationProvider = mockk(relaxed = true),
             fileOperationProvider = mockk(relaxed = true),
             appManager = mockk(relaxed = true),
+            typeInputController = mockk(relaxed = true),
         )
 
     /**
@@ -102,6 +104,7 @@ object McpIntegrationTestHelper {
             deps.treeParser,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
+            deps.typeInputController,
             toolNamePrefix,
         )
         registerUtilityTools(
@@ -258,4 +261,5 @@ data class MockDependencies(
     val storageLocationProvider: StorageLocationProvider,
     val fileOperationProvider: FileOperationProvider,
     val appManager: AppManager,
+    val typeInputController: TypeInputController,
 )

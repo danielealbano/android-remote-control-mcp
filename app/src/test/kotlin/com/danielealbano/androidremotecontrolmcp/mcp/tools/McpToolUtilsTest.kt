@@ -67,6 +67,70 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // requireInt
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("requireInt")
+    inner class RequireIntTests {
+        @Test
+        @DisplayName("returns integer value")
+        fun returnsIntegerValue() {
+            val params = buildJsonObject { put("x", 42) }
+            assertEquals(42, McpToolUtils.requireInt(params, "x"))
+        }
+
+        @Test
+        @DisplayName("throws for missing param")
+        fun throwsForMissingParam() {
+            val params = buildJsonObject { put("y", 100) }
+
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireInt(params, "x")
+            }
+        }
+
+        @Test
+        @DisplayName("throws for null param")
+        fun throwsForNullParam() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireInt(null, "x")
+            }
+        }
+
+        @Test
+        @DisplayName("throws for string-encoded number")
+        fun throwsForStringEncodedNumber() {
+            val params = buildJsonObject { put("x", "42") }
+
+            val exception =
+                assertThrows<McpToolException.InvalidParams> {
+                    McpToolUtils.requireInt(params, "x")
+                }
+            assertTrue(exception.message!!.contains("got string"))
+        }
+
+        @Test
+        @DisplayName("throws for float value")
+        fun throwsForFloatValue() {
+            val params = buildJsonObject { put("x", 3.5) }
+
+            val exception =
+                assertThrows<McpToolException.InvalidParams> {
+                    McpToolUtils.requireInt(params, "x")
+                }
+            assertTrue(exception.message!!.contains("integer"))
+        }
+
+        @Test
+        @DisplayName("accepts integer-equivalent float")
+        fun acceptsIntegerEquivalentFloat() {
+            val params = buildJsonObject { put("x", 5.0) }
+            assertEquals(5, McpToolUtils.requireInt(params, "x"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // optionalFloat
     // ─────────────────────────────────────────────────────────────────────
 
