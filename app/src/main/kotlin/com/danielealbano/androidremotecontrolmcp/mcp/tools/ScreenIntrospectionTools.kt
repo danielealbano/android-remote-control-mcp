@@ -7,6 +7,7 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
@@ -51,51 +52,28 @@ class GetScreenStateHandler
             val includeScreenshot =
                 arguments?.get("include_screenshot")?.jsonPrimitive?.booleanOrNull ?: false
 
-            // 2. Check accessibility service
-            if (!accessibilityServiceProvider.isReady()) {
-                throw McpToolException.PermissionDenied(
-                    "Accessibility service not enabled or not ready. " +
-                        "Please enable it in Android Settings > Accessibility.",
-                )
-            }
+            // 2. Get multi-window accessibility snapshot
+            //    (getFreshWindows handles isReady check and fallback to single-window)
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider)
 
-            // 3. Get root node
-            val rootNode =
-                accessibilityServiceProvider.getRootNode()
-                    ?: throw McpToolException.ActionFailed(
-                        "Failed to obtain root accessibility node.",
-                    )
-
-            // 4. Parse tree (recycle root node in finally)
-            val tree =
-                try {
-                    treeParser.parseTree(rootNode)
-                } finally {
-                    @Suppress("DEPRECATION")
-                    rootNode.recycle()
-                }
-
-            // 5. Get app info
-            val packageName = accessibilityServiceProvider.getCurrentPackageName() ?: "unknown"
-            val activityName = accessibilityServiceProvider.getCurrentActivityName() ?: "unknown"
-
-            // 6. Get screen info
+            // 3. Get screen info
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
 
-            // 7. Format compact output
-            val compactOutput = compactTreeFormatter.format(tree, packageName, activityName, screenInfo)
+            // 4. Format compact multi-window output
+            val compactOutput = compactTreeFormatter.formatMultiWindow(result, screenInfo)
 
             Log.d(TAG, "get_screen_state: includeScreenshot=$includeScreenshot")
 
-            // 8. Optionally include annotated screenshot.
-            // NOTE: There is an inherent timing gap between tree parsing (step 4) and
+            // 5. Optionally include annotated screenshot.
+            // NOTE: There is an inherent timing gap between tree parsing and
             // screenshot capture below. If the UI changes in between, bounding boxes may
             // reference stale element positions. Atomic capture is not possible with the
             // current Android accessibility APIs.
             if (includeScreenshot) {
                 if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                     throw McpToolException.PermissionDenied(
-                        "Screen capture not available. Please enable the accessibility service in Android Settings.",
+                        "Screen capture not available. Please enable the accessibility " +
+                            "service in Android Settings.",
                     )
                 }
 
@@ -114,8 +92,8 @@ class GetScreenStateHandler
 
                 var annotatedBitmap: Bitmap? = null
                 try {
-                    // Collect on-screen elements that appear in the TSV
-                    val onScreenElements = collectOnScreenElements(tree)
+                    // Collect on-screen elements from ALL windows' trees
+                    val onScreenElements = collectOnScreenElements(result.windows)
 
                     // Annotate the screenshot with bounding boxes
                     annotatedBitmap =
@@ -133,7 +111,11 @@ class GetScreenStateHandler
                             ScreenCaptureProvider.DEFAULT_QUALITY,
                         )
 
-                    return McpToolUtils.textAndImageResult(compactOutput, screenshotData.data, "image/jpeg")
+                    return McpToolUtils.textAndImageResult(
+                        compactOutput,
+                        screenshotData.data,
+                        "image/jpeg",
+                    )
                 } catch (e: McpToolException) {
                     throw e
                 } catch (e: Exception) {
@@ -147,28 +129,34 @@ class GetScreenStateHandler
                 }
             }
 
-            // 9. Return text-only result
+            // 6. Return text-only result
             return McpToolUtils.textResult(compactOutput)
         }
 
         /**
-         * Collects elements that should be annotated on the screenshot:
+         * Collects elements from all windows that should be annotated on the screenshot:
          * nodes that pass the formatter's keep filter AND are visible (on-screen).
-         *
-         * Uses an accumulator parameter to avoid O(N) intermediate list allocations
-         * and O(N^2) element copies from recursive addAll calls.
          */
         private fun collectOnScreenElements(
-            node: AccessibilityNodeData,
-            result: MutableList<AccessibilityNodeData> = mutableListOf(),
+            windows: List<WindowData>,
         ): List<AccessibilityNodeData> {
+            val result = mutableListOf<AccessibilityNodeData>()
+            for (windowData in windows) {
+                collectOnScreenElementsFromTree(windowData.tree, result)
+            }
+            return result
+        }
+
+        private fun collectOnScreenElementsFromTree(
+            node: AccessibilityNodeData,
+            result: MutableList<AccessibilityNodeData>,
+        ) {
             if (compactTreeFormatter.shouldKeepNode(node) && node.visible) {
                 result.add(node)
             }
             for (child in node.children) {
-                collectOnScreenElements(child, result)
+                collectOnScreenElementsFromTree(child, result)
             }
-            return result
         }
 
         fun register(

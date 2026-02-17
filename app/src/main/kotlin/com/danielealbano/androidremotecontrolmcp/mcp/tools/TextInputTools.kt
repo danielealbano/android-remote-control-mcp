@@ -247,8 +247,8 @@ class TypeAppendTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness (max 500ms, 50ms interval)
@@ -381,8 +381,8 @@ class TypeInsertTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
@@ -555,8 +555,8 @@ class TypeReplaceTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
@@ -730,8 +730,8 @@ class TypeClearTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val tree = getFreshTree(treeParser, accessibilityServiceProvider)
-                    val clickResult = actionExecutor.clickNode(elementId, tree)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
                     // Poll-retry for InputConnection readiness
