@@ -153,7 +153,7 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ### `android_get_screen_state`
 
-Returns the consolidated current screen state: app metadata, screen dimensions, and a compact filtered flat TSV list of UI elements. Optionally includes a low-resolution screenshot.
+Returns the consolidated current screen state: app metadata, screen dimensions, and a compact filtered flat TSV list of UI elements. Optionally includes an annotated low-resolution screenshot with bounding boxes and element ID labels.
 
 Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_current_app`, and `get_screen_info` tools.
 
@@ -209,7 +209,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\tvn\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\tvcn"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_1\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_2\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
       }
     ]
   }
@@ -225,11 +225,11 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\napp:com.android.calculator2 activity:.Calculator\nscreen:1080x2400 density:420 orientation:portrait\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
       },
       {
         "type": "image",
-        "data": "/9j/4AAQSkZJRgABAQ...<base64 JPEG data>",
+        "data": "/9j/4AAQSkZJRgABAQ...<base64 annotated JPEG data>",
         "mimeType": "image/jpeg"
       }
     ]
@@ -243,26 +243,30 @@ The text output is a compact flat TSV (tab-separated values) format designed for
 
 1. **Note line**: `note:structural-only nodes are omitted from the tree`
 2. **Note line**: `note:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account`
-3. **App line**: `app:<package> activity:<activity>`
-4. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
-5. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
-6. **Data rows**: One row per filtered node with tab-separated values
+3. **Note line**: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+4. **Note line**: `note:offscreen items require scroll_to_element before interaction`
+5. **App line**: `app:<package> activity:<activity>`
+6. **Screen line**: `screen:<width>x<height> density:<dpi> orientation:<orientation>`
+7. **Header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+8. **Data rows**: One row per filtered node with tab-separated values
 
 #### Flags Reference
 
-The `flags` column uses single-character codes for node properties:
+The `flags` column uses comma-separated abbreviated codes. A legend is included in the TSV notes.
+Only flags that are `true` are included. The `on`/`off` flag is always first.
 
-| Flag | Meaning |
-|------|---------|
-| `v` | visible |
-| `c` | clickable |
-| `l` | longClickable |
-| `f` | focusable |
-| `s` | scrollable |
-| `e` | editable |
-| `n` | enabled |
+| Flag   | Meaning       |
+|--------|---------------|
+| `on`   | onscreen      |
+| `off`  | offscreen     |
+| `clk`  | clickable     |
+| `lclk` | longClickable |
+| `foc`  | focusable     |
+| `scr`  | scrollable    |
+| `edt`  | editable      |
+| `ena`  | enabled       |
 
-Only flags that are `true` are included. Example: `vcn` means visible + clickable + enabled.
+Example: `on,clk,ena` means onscreen + clickable + enabled.
 
 #### Class Name Simplification
 
@@ -284,7 +288,13 @@ Both `text` and `desc` columns are truncated to **100 characters**. If truncated
 
 #### Screenshot
 
-When `include_screenshot` is `true`, a low-resolution JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). Only request the screenshot when the element list alone is not sufficient to understand the screen layout.
+When `include_screenshot` is `true`, a low-resolution annotated JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). The screenshot is annotated with:
+- **Red dashed bounding boxes** (2px) around each on-screen element that appears in the TSV
+- **Semi-transparent red pill labels** with white bold text showing the element ID hash (e.g., `a3f2` for `node_a3f2`) at the top-left of each bounding box
+
+Off-screen elements (marked with `off` flag in the TSV) do not have bounding boxes on the screenshot. Use the `scroll_to_element` tool to bring them into view first.
+
+Only request the screenshot when the element list alone is not sufficient to understand the screen layout.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Permission denied**: Accessibility service not enabled

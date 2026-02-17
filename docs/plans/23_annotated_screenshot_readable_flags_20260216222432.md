@@ -2069,9 +2069,9 @@ fun `get_screen_state with screenshot annotation failure returns error`() =
 **Goal**: Update all documentation to reflect the new TSV format and annotated screenshot behavior.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `docs/MCP_TOOLS.md` updated with new TSV format, flag abbreviations, note lines, annotated screenshot description, and tool intro
-- [ ] `docs/PROJECT.md` updated with new flag format, screenshot annotation mention, and `ScreenshotAnnotator.kt` in folder structure
-- [ ] `README.md` tool table updated to mention annotated screenshot
+- [x] `docs/MCP_TOOLS.md` updated with new TSV format, flag abbreviations, note lines, annotated screenshot description, and tool intro
+- [x] `docs/PROJECT.md` updated with new flag format, screenshot annotation mention, and `ScreenshotAnnotator.kt` in folder structure
+- [x] `README.md` tool table updated to mention annotated screenshot
 - [ ] Lint passes (no code changes, documentation only)
 
 ---
@@ -2079,11 +2079,11 @@ fun `get_screen_state with screenshot annotation failure returns error`() =
 ### Task 3.1: Update `docs/MCP_TOOLS.md`
 
 **Acceptance Criteria**:
-- [ ] Tool intro description mentions annotated screenshot
-- [ ] Response examples show new flag format
-- [ ] Flags Reference table updated with abbreviations
-- [ ] Output Format section updated with new note lines
-- [ ] Screenshot section describes bounding box annotations
+- [x] Tool intro description mentions annotated screenshot
+- [x] Response examples show new flag format
+- [x] Flags Reference table updated with abbreviations
+- [x] Output Format section updated with new note lines
+- [x] Screenshot section describes bounding box annotations
 
 #### Action 3.1.0: Update tool intro description
 
@@ -2231,9 +2231,9 @@ fun `get_screen_state with screenshot annotation failure returns error`() =
 ### Task 3.2: Update `docs/PROJECT.md`
 
 **Acceptance Criteria**:
-- [ ] Screen Introspection Tools table updated to mention annotated screenshot
-- [ ] Note about flag format updated
-- [ ] Folder structure updated with `ScreenshotAnnotator.kt`
+- [x] Screen Introspection Tools table updated to mention annotated screenshot
+- [x] Note about flag format updated
+- [x] Folder structure updated with `ScreenshotAnnotator.kt`
 
 #### Action 3.2.1: Update Screen Introspection Tools table
 
@@ -2271,7 +2271,7 @@ Update the note below the table:
 ### Task 3.3: Update `README.md` tool table
 
 **Acceptance Criteria**:
-- [ ] Screen Introspection description mentions annotated screenshot
+- [x] Screen Introspection description mentions annotated screenshot
 
 #### Action 3.3.1: Update tool table row
 
