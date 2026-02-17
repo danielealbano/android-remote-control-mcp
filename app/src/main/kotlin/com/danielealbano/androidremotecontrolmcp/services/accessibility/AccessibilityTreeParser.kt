@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 
@@ -114,12 +115,15 @@ class AccessibilityTreeParser
          * @param rootNode The root [AccessibilityNodeInfo] to parse.
          * @return The parsed tree as [AccessibilityNodeData].
          */
-        fun parseTree(rootNode: AccessibilityNodeInfo): AccessibilityNodeData =
+        fun parseTree(
+            rootNode: AccessibilityNodeInfo,
+            rootParentId: String = ROOT_PARENT_ID,
+        ): AccessibilityNodeData =
             parseNode(
                 node = rootNode,
                 depth = 0,
                 index = 0,
-                parentId = ROOT_PARENT_ID,
+                parentId = rootParentId,
                 recycleNode = false,
             )
 
@@ -234,5 +238,20 @@ class AccessibilityTreeParser
         companion object {
             private const val ROOT_PARENT_ID = "root"
             private const val HASH_RADIX = 16
+
+            /** Maps [AccessibilityWindowInfo] type constants to human-readable labels. */
+            fun mapWindowType(type: Int): String =
+                when (type) {
+                    AccessibilityWindowInfo.TYPE_APPLICATION -> "APPLICATION"
+                    AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "INPUT_METHOD"
+                    AccessibilityWindowInfo.TYPE_SYSTEM -> "SYSTEM"
+                    AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY ->
+                        "ACCESSIBILITY_OVERLAY"
+                    AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER ->
+                        "SPLIT_SCREEN_DIVIDER"
+                    AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY ->
+                        "MAGNIFICATION_OVERLAY"
+                    else -> "UNKNOWN($type)"
+                }
         }
     }

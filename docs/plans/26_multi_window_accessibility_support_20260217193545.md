@@ -289,20 +289,20 @@ If no test file exists for `AccessibilityServiceProviderImpl`, these tests will 
 `AccessibilityWindowInfo.getId()`) for globally unique node IDs across windows.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `parseTree()` accepts optional `rootParentId` parameter (default `"root"` for backward compat)
-- [ ] When called with `"root_w0"`, `"root_w1"`, etc., all generated node IDs differ from the default
-- [ ] Existing tests still pass (default behavior unchanged)
-- [ ] New tests verify window-specific ID uniqueness
-- [ ] Lint passes
+- [x] `parseTree()` accepts optional `rootParentId` parameter (default `"root"` for backward compat)
+- [x] When called with `"root_w0"`, `"root_w1"`, etc., all generated node IDs differ from the default
+- [x] Existing tests still pass (default behavior unchanged)
+- [x] New tests verify window-specific ID uniqueness
+- [x] Lint passes
 
 ### Task 2.1: Add `rootParentId` parameter to `parseTree()`
 
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/AccessibilityTreeParser.kt`
 
 **Definition of Done**:
-- [ ] `parseTree()` accepts `rootParentId: String = ROOT_PARENT_ID` parameter
-- [ ] Passed through to `parseNode()` as `parentId`
-- [ ] Default value preserves existing behavior
+- [x] `parseTree()` accepts `rootParentId: String = ROOT_PARENT_ID` parameter
+- [x] Passed through to `parseNode()` as `parentId`
+- [x] Default value preserves existing behavior
 
 **Action 2.1.1**: Update `parseTree()` signature and body
 
@@ -342,9 +342,9 @@ fun parseTree(
 **File**: `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/AccessibilityTreeParser.kt`
 
 **Definition of Done**:
-- [ ] `mapWindowType()` companion function maps Android `AccessibilityWindowInfo.TYPE_*` constants to string labels
-- [ ] All 6 types mapped: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY
-- [ ] Unknown types return `"UNKNOWN(N)"`
+- [x] `mapWindowType()` companion function maps Android `AccessibilityWindowInfo.TYPE_*` constants to string labels
+- [x] All 6 types mapped: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY
+- [x] Unknown types return `"UNKNOWN(N)"`
 
 **Action 2.2.1**: Add `mapWindowType()` to companion object
 
@@ -379,11 +379,11 @@ fun mapWindowType(type: Int): String =
 **File**: `app/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/services/accessibility/AccessibilityTreeParserTest.kt`
 
 **Definition of Done**:
-- [ ] Test verifies `parseTree()` with default `rootParentId` produces same IDs as before
-- [ ] Test verifies `parseTree()` with `"root_w0"` produces different IDs from default
-- [ ] Test verifies `parseTree()` with `"root_w0"` vs `"root_w1"` produces different IDs for identical node structures
-- [ ] Test verifies `mapWindowType()` returns correct labels for all 6 types + unknown
-- [ ] All existing tests still pass
+- [x] Test verifies `parseTree()` with default `rootParentId` produces same IDs as before
+- [x] Test verifies `parseTree()` with `"root_w0"` produces different IDs from default
+- [x] Test verifies `parseTree()` with `"root_w0"` vs `"root_w1"` produces different IDs for identical node structures
+- [x] Test verifies `mapWindowType()` returns correct labels for all 6 types + unknown
+- [x] All existing tests still pass
 
 **Action 2.3.1**: Add test for `rootParentId` parameter
 

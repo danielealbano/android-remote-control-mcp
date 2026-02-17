@@ -10,6 +10,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -335,6 +336,63 @@ class AccessibilityTreeParserTest {
 
             // Assert
             assertTrue(id.startsWith("node_"))
+        }
+    }
+
+    @Nested
+    @DisplayName("parseTree with rootParentId")
+    inner class ParseTreeWithRootParentId {
+        @Test
+        @DisplayName("default rootParentId preserves existing behavior")
+        fun defaultRootParentIdPreservesExistingBehavior() {
+            val node = createMockNode(text = "Hello")
+            val resultDefault = parser.parseTree(node)
+            val resultExplicit = parser.parseTree(createMockNode(text = "Hello"), "root")
+            assertEquals(resultDefault.id, resultExplicit.id)
+        }
+
+        @Test
+        @DisplayName("window-specific rootParentId produces different IDs")
+        fun windowSpecificRootParentIdProducesDifferentIds() {
+            val node1 = createMockNode(text = "Hello")
+            val node2 = createMockNode(text = "Hello")
+            val resultW0 = parser.parseTree(node1, "root_w0")
+            val resultW1 = parser.parseTree(node2, "root_w1")
+            assertNotEquals(resultW0.id, resultW1.id)
+        }
+
+        @Test
+        @DisplayName("window-specific IDs differ from default IDs")
+        fun windowSpecificIdsDifferFromDefault() {
+            val node1 = createMockNode(text = "Hello")
+            val node2 = createMockNode(text = "Hello")
+            val resultDefault = parser.parseTree(node1)
+            val resultW0 = parser.parseTree(node2, "root_w0")
+            assertNotEquals(resultDefault.id, resultW0.id)
+        }
+    }
+
+    @Nested
+    @DisplayName("mapWindowType")
+    inner class MapWindowType {
+        @Test
+        @DisplayName("maps all known window types")
+        fun mapsAllKnownWindowTypes() {
+            // Android AccessibilityWindowInfo type constants: APPLICATION=1, INPUT_METHOD=2,
+            // SYSTEM=3, ACCESSIBILITY_OVERLAY=4, SPLIT_SCREEN_DIVIDER=5, MAGNIFICATION_OVERLAY=6
+            assertEquals("APPLICATION", AccessibilityTreeParser.mapWindowType(1))
+            assertEquals("INPUT_METHOD", AccessibilityTreeParser.mapWindowType(2))
+            assertEquals("SYSTEM", AccessibilityTreeParser.mapWindowType(3))
+            assertEquals("ACCESSIBILITY_OVERLAY", AccessibilityTreeParser.mapWindowType(4))
+            assertEquals("SPLIT_SCREEN_DIVIDER", AccessibilityTreeParser.mapWindowType(5))
+            assertEquals("MAGNIFICATION_OVERLAY", AccessibilityTreeParser.mapWindowType(6))
+        }
+
+        @Test
+        @DisplayName("maps unknown type to UNKNOWN(N)")
+        fun mapsUnknownType() {
+            assertEquals("UNKNOWN(0)", AccessibilityTreeParser.mapWindowType(0))
+            assertEquals("UNKNOWN(99)", AccessibilityTreeParser.mapWindowType(99))
         }
     }
 }
