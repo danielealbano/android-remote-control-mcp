@@ -4,6 +4,9 @@ import android.util.Log
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
+// NOTE: android.view.accessibility.AccessibilityNodeInfo is NOT explicitly imported because
+// it is accessed only through CachedNode.node (same-package type). KDoc uses backtick notation.
+
 /**
  * Thread-safe implementation of [AccessibilityNodeCache] using [AtomicReference].
  *
@@ -30,6 +33,8 @@ class AccessibilityNodeCacheImpl
             // getFreshWindows). Storing the reference directly would allow the caller to
             // mutate the map after populate(), violating the immutable-snapshot guarantee
             // that concurrent get() callers rely on. toMap() creates a read-only copy.
+            // Performance: O(N) copy for ~500 nodes is negligible. If profiling shows this
+            // as a hotspot, HashMap(entries) could be more efficient due to pre-sizing.
             val snapshot = entries.toMap()
             val old = cache.getAndSet(snapshot)
             Log.d(TAG, "Cache populated with ${snapshot.size} entries (dropped ${old.size} old)")

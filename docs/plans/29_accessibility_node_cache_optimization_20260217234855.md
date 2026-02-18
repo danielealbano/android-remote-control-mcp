@@ -2037,6 +2037,19 @@ creating a new one.
 | I7 | Info | **Interface KDoc imprecise**: Said "populated during parseTree" — technically parseTree fills the nodeMap, the caller populates the cache via `populate()`. | **FIXED**: Updated KDoc in both plan and source to "populated with node references obtained during parseTree (via the caller's accumulation map)". |
 | D1 | Info | **McpAccessibilityService.kt missing NOTE comment**: Plan specified a comment explaining why `AccessibilityNodeCache` is not imported (same package). Implementation omitted it. | **FIXED**: Added comment above `NodeCacheEntryPoint` interface: `// AccessibilityNodeCache is in the same package — no import needed`. Placed at class level (not in imports) to avoid breaking ktlint import ordering. |
 
+### Sixth Plan Review Findings (All Resolved)
+
+> **Numbering**: Findings use DISC-prefix for plan-to-code discrepancies, P-PERF for performance,
+> S-SEC for security, Q-QA for QA.
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| DISC-01 | Minor | **`AccessibilityNodeCacheImpl.populate()` missing P5 performance comment**: Plan's Task 1.2 code block includes the inline comment `// Performance: O(N) copy for ~500 nodes is negligible. If profiling shows this as a hotspot, HashMap(entries) could be more efficient due to pre-sizing.` (added as P5 fix). The actual source file omitted it. | **FIXED**: Added the performance comment to `AccessibilityNodeCacheImpl.kt` `populate()` method, matching the plan exactly. |
+| DISC-02 | Info | **`AccessibilityNodeCacheImpl` missing NOTE about absent `AccessibilityNodeInfo` import**: Plan's Task 1.2 code block includes a `// NOTE: android.view.accessibility.AccessibilityNodeInfo is NOT explicitly imported...` comment. The actual source file omitted it. | **FIXED**: Added the NOTE comment above the class KDoc in `AccessibilityNodeCacheImpl.kt`. |
+| P-PERF-05 | Minor | **`Rect` allocation on every cache-hit identity check**: `performNodeAction` allocates a new `Rect()` on each cache hit for `getBoundsInScreen()`. Trivial cost (object allocation, no IPC) and by design — must read fresh bounds to detect identity changes. | **Acknowledged**: No code change needed. The `Rect` allocation is a few nanoseconds. Caching the `Rect` would not help because fresh bounds are required for identity verification (that's the whole point of the S1 fix). The inline comment at `ActionExecutorImpl.kt` line 574 already documents that `getBoundsInScreen()` is not an additional IPC call. |
+| S-SEC-05 | Minor | **Pre-existing `generateNodeId` hashCode collision risk**: `generateNodeId` uses `String.hashCode()` (32-bit). Theoretical collision between structurally different nodes could cause wrong-node action. Identity check uses the same hash, so a collision would pass verification. | **Acknowledged**: Pre-existing risk in `walkAndMatch` (not introduced by cache). Already documented in P4/P6 review entries. Probability is negligible for real UI trees (~500 nodes). Mitigation: `generateNodeId` inputs include viewIdResourceName, className, bounds, depth, index, parentId — making collisions astronomically unlikely. Future mitigation if needed: use a longer hash (e.g., SHA-256 truncated). |
+| Q-QA-04 | Minor | **No concurrent stress test for `populate()`+`get()`**: Thread safety relies on JDK `AtomicReference` contract rather than an explicit concurrent test. | **Acknowledged**: `AtomicReference` is a well-established JDK primitive with formally verified thread-safety guarantees. A concurrent stress test would test the JDK, not application logic. The unit tests verify populate/get/clear behavior sequentially, which covers the application-level correctness. |
+
 ---
 
 ## User Story 6: Final Verification
@@ -2121,4 +2134,10 @@ consistency, and no regressions.
 - [x] Verify P4 documents `generateNodeId` hashCode collision risk (P6)
 - [x] Verify `AccessibilityNodeCache` interface KDoc uses "via the caller's accumulation map" (I7)
 - [x] Verify `McpAccessibilityService.kt` has same-package import comment (D1)
+- [x] Verify all sixth plan review findings (DISC-01, DISC-02, P-PERF-05, S-SEC-05, Q-QA-04) are addressed
+- [x] Verify `AccessibilityNodeCacheImpl.populate()` has P5 performance comment in source (DISC-01)
+- [x] Verify `AccessibilityNodeCacheImpl` has NOTE about absent `AccessibilityNodeInfo` import in source (DISC-02)
+- [x] Verify `Rect` allocation in cache-hit path is documented as by-design (P-PERF-05)
+- [x] Verify `generateNodeId` hashCode collision risk is documented in P4/P6 (S-SEC-05)
+- [x] Verify thread-safety relies on JDK `AtomicReference` contract, no concurrent stress test needed (Q-QA-04)
 - [x] Review git diff to ensure only intended changes are present
