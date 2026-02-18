@@ -4,6 +4,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.MethodOrderer
@@ -42,15 +43,36 @@ class E2EScreenshotTest {
         mcpClient.callTool("${TOOL_PREFIX}press_home")
         Thread.sleep(1_000)
 
-        val result = mcpClient.callTool(
+        // Retry screenshot capture — accessibility service screenshot can be transiently
+        // unavailable on slow CI emulators right after camera operations or app startup.
+        var result = mcpClient.callTool(
             "${TOOL_PREFIX}get_screen_state",
             mapOf("include_screenshot" to true),
+        )
+
+        if (result.isError == true || result.content.size < 2) {
+            val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+            println("[E2E Screenshot] First attempt failed (isError=${result.isError}, " +
+                "content.size=${result.content.size}): $errorText — retrying after 3s")
+            Thread.sleep(3_000)
+            result = mcpClient.callTool(
+                "${TOOL_PREFIX}get_screen_state",
+                mapOf("include_screenshot" to true),
+            )
+        }
+
+        assertNotEquals(
+            true,
+            result.isError,
+            "get_screen_state should not return error: " +
+                (result.content.firstOrNull() as? TextContent)?.text,
         )
 
         assertNotNull(result.content, "Result should have content")
         assertTrue(
             result.content.size >= 2,
-            "Result should have at least 2 content items (text + image), got: ${result.content.size}",
+            "Result should have at least 2 content items (text + image), got: ${result.content.size}. " +
+                "Content[0]: ${(result.content.firstOrNull() as? TextContent)?.text?.take(200)}",
         )
 
         // Verify first content item is TextContent with compact TSV

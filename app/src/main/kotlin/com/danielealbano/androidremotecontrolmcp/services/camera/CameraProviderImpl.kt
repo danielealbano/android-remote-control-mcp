@@ -34,8 +34,10 @@ import com.danielealbano.androidremotecontrolmcp.data.model.VideoResolution
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -213,6 +215,8 @@ class CameraProviderImpl
                             provider.bindToLifecycle(lifecycleOwner, selector, imageCapture)
                             lifecycleOwner.start()
 
+                            delay(CAMERA_WARMUP_MS)
+
                             val imageProxy = captureImage(imageCapture)
                             try {
                                 val bitmap = imageProxyToBitmap(imageProxy)
@@ -230,6 +234,8 @@ class CameraProviderImpl
                                 imageProxy.close()
                             }
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: McpToolException) {
                         throw e
                     } catch (e: Exception) {
@@ -237,7 +243,7 @@ class CameraProviderImpl
                             "Photo capture failed: ${e.message ?: "Unknown error"}",
                         )
                     } finally {
-                        withContext(Dispatchers.Main) {
+                        withContext(NonCancellable + Dispatchers.Main) {
                             lifecycleOwner.stop()
                         }
                     }
@@ -282,6 +288,8 @@ class CameraProviderImpl
                                 capture
                             }
 
+                        delay(CAMERA_WARMUP_MS)
+
                         withContext(Dispatchers.IO) {
                             var outputStream: java.io.OutputStream? = null
                             try {
@@ -301,6 +309,8 @@ class CameraProviderImpl
                         }
 
                         getFileSize(outputUri)
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: McpToolException) {
                         throw e
                     } catch (e: Exception) {
@@ -308,7 +318,7 @@ class CameraProviderImpl
                             "Photo save failed: ${e.message ?: "Unknown error"}",
                         )
                     } finally {
-                        withContext(Dispatchers.Main) {
+                        withContext(NonCancellable + Dispatchers.Main) {
                             lifecycleOwner.stop()
                         }
                     }
@@ -459,6 +469,8 @@ class CameraProviderImpl
                             thumbnailWidth = thumbnail.width,
                             thumbnailHeight = thumbnail.height,
                         )
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: McpToolException) {
                         throw e
                     } catch (e: Exception) {
@@ -467,7 +479,7 @@ class CameraProviderImpl
                         )
                     } finally {
                         pfd?.close()
-                        withContext(Dispatchers.Main) {
+                        withContext(NonCancellable + Dispatchers.Main) {
                             lifecycleOwner.stop()
                         }
                     }
@@ -750,6 +762,7 @@ class CameraProviderImpl
 
         companion object {
             private const val TAG = "MCP:CameraProvider"
+            private const val CAMERA_WARMUP_MS = 2_000L
             private const val MEGAPIXEL_DIVISOR = 1_000_000.0
             private const val MEGAPIXEL_ROUNDING = 10.0
             private const val MILLIS_PER_SECOND = 1000L

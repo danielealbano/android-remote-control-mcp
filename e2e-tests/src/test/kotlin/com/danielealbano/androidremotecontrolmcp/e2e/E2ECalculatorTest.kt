@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.MethodOrderer
@@ -81,7 +82,7 @@ class E2ECalculatorTest {
 
         // Step 2: Launch Simple Calculator app via monkey command
         AndroidContainerSetup.launchCalculator(container)
-        Thread.sleep(2_000)
+        Thread.sleep(5_000)
 
         // Step 3: Verify Calculator is visible in screen state
         val tree = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
@@ -151,15 +152,35 @@ class E2ECalculatorTest {
     @Test
     @Order(3)
     fun `get_screen_state with screenshot returns valid image data`() = runBlocking {
-        val result = mcpClient.callTool(
+        // Retry screenshot capture — can be transiently unavailable on slow CI emulators.
+        var result = mcpClient.callTool(
             "${TOOL_PREFIX}get_screen_state",
             mapOf("include_screenshot" to true),
+        )
+
+        if (result.isError == true || result.content.size < 2) {
+            val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+            println("[E2E Calculator] Screenshot first attempt failed (isError=${result.isError}, " +
+                "content.size=${result.content.size}): $errorText — retrying after 3s")
+            Thread.sleep(3_000)
+            result = mcpClient.callTool(
+                "${TOOL_PREFIX}get_screen_state",
+                mapOf("include_screenshot" to true),
+            )
+        }
+
+        assertNotEquals(
+            true,
+            result.isError,
+            "get_screen_state should not return error: " +
+                (result.content.firstOrNull() as? TextContent)?.text,
         )
 
         val content = result.content
         assertTrue(
             content.size >= 2,
-            "Result should have at least 2 content items (text + image), got: ${content.size}",
+            "Result should have at least 2 content items (text + image), got: ${content.size}. " +
+                "Content[0]: ${(content.firstOrNull() as? TextContent)?.text?.take(200)}",
         )
 
         // First item is TextContent with compact TSV

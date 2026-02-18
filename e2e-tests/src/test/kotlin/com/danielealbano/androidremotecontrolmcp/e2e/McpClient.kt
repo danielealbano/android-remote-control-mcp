@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.sse.SSE
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
@@ -16,6 +17,10 @@ import javax.net.ssl.X509TrustManager
  *
  * Uses the MCP SDK [Client] with [StreamableHttpClientTransport] over Ktor CIO.
  * Trusts all certificates (self-signed) — this is acceptable ONLY for testing.
+ *
+ * Timeouts are set higher than the server-side operation timeouts (45s for
+ * camera operations) to ensure the server has time to respond with a proper
+ * error before the client disconnects.
  */
 class McpClient(
     private val baseUrl: String,
@@ -23,13 +28,22 @@ class McpClient(
 ) {
     private val httpClient = HttpClient(CIO) {
         install(SSE)
+        install(HttpTimeout) {
+            requestTimeoutMillis = CLIENT_TIMEOUT_MS
+            socketTimeoutMillis = CLIENT_TIMEOUT_MS
+        }
         engine {
             https {
                 trustManager = TrustAllX509TrustManager()
             }
+            requestTimeout = CLIENT_TIMEOUT_MS
         }
     }
     private var client: Client? = null
+
+    companion object {
+        private const val CLIENT_TIMEOUT_MS = 90_000L
+    }
 
     /**
      * Connect to the MCP server and complete the initialize handshake.
