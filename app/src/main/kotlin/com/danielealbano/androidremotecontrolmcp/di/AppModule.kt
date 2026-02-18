@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImpl
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCacheImpl
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
@@ -81,6 +83,10 @@ abstract class RepositoryModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ServiceModule {
+    @Binds
+    @Singleton
+    abstract fun bindAccessibilityNodeCache(impl: AccessibilityNodeCacheImpl): AccessibilityNodeCache
+
     @Binds
     @Singleton
     abstract fun bindApiLevelProvider(impl: DefaultApiLevelProvider): ApiLevelProvider
