@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -46,6 +47,7 @@ class UtilityToolsTest {
     private val mockTreeParser = mockk<AccessibilityTreeParser>()
     private val mockElementFinder = mockk<ElementFinder>()
     private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
+    private val mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
     private val mockClipboardManager = mockk<ClipboardManager>()
@@ -110,8 +112,7 @@ class UtilityToolsTest {
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockAccessibilityServiceProvider.getContext() } returns mockContext
         every { mockContext.getSystemService(ClipboardManager::class.java) } returns mockClipboardManager
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
-        every { mockRootNode.recycle() } returns Unit
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
     }
 
     @AfterEach
@@ -184,7 +185,7 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForElementTool")
     inner class WaitForElementToolTests {
-        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
+        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `finds element on first attempt`() =
@@ -317,7 +318,7 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForIdleTool")
     inner class WaitForIdleToolTests {
-        private val tool = WaitForIdleTool(mockTreeParser, mockAccessibilityServiceProvider)
+        private val tool = WaitForIdleTool(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `detects idle when tree does not change`() =
@@ -354,7 +355,7 @@ class UtilityToolsTest {
 
                     // Return trees that differ slightly each time (1 node text changes out of 11 total)
                     var callCount = 0
-                    every { mockTreeParser.parseTree(any(), any()) } answers {
+                    every { mockTreeParser.parseTree(any(), any(), any()) } answers {
                         callCount++
                         clockMs += 600L
                         AccessibilityNodeData(
@@ -426,7 +427,7 @@ class UtilityToolsTest {
 
                     // Return different trees each time to force timeout
                     var callCount = 0
-                    every { mockTreeParser.parseTree(any(), any()) } answers {
+                    every { mockTreeParser.parseTree(any(), any(), any()) } answers {
                         callCount++
                         clockMs += 600L
                         AccessibilityNodeData(

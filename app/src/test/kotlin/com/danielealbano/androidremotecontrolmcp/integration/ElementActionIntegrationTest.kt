@@ -210,11 +210,8 @@ class ElementActionIntegrationTest {
             every { accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
             every { accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
 
-            every { treeParser.parseTree(mockRootApp, "root_w42") } returns sampleTree
-            every { treeParser.parseTree(mockRootDialog, "root_w99") } returns dialogTree
-
-            every { mockRootApp.recycle() } returns Unit
-            every { mockRootDialog.recycle() } returns Unit
+            every { treeParser.parseTree(mockRootApp, "root_w42", any()) } returns sampleTree
+            every { treeParser.parseTree(mockRootDialog, "root_w99", any()) } returns dialogTree
         }
 
         @Test

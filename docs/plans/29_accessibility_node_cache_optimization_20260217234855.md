@@ -590,19 +590,19 @@ All tool classes that call `getFreshWindows` must pass the `nodeCache` parameter
 through tool constructors → `register*Tools` functions → `McpServerService`.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `getFreshWindows` accepts a `nodeCache: AccessibilityNodeCache` parameter
-- [ ] `getFreshWindows` creates a `MutableMap<String, CachedNode>()` and passes it to each `parseTree` call
-- [ ] `getFreshWindows` calls `nodeCache.populate(accumulatedMap)` ONCE after the window loop
-- [ ] Root nodes are NOT recycled by `getFreshWindows` (they are stored in the cache)
-- [ ] The fallback single-window path also accumulates and populates the cache
-- [ ] All 12 tool classes that call `getFreshWindows` have `nodeCache` in their constructor
-- [ ] All 4 affected `register*Tools` functions accept and pass `nodeCache`
-- [ ] `McpServerService` injects `AccessibilityNodeCache` and passes it to register functions
-- [ ] `McpIntegrationTestHelper` passes a mock `nodeCache` to register functions
-- [ ] All 5 unit test files updated: tool constructors gain `mockNodeCache`, `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
-- [ ] All 3 integration test files updated: local `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
-- [ ] `ScreenIntrospectionToolsTest` test `recyclesRootNodeAndWindowInfoAfterParsing` updated — root nodes no longer recycled, verify `nodeCache.populate()` instead
-- [ ] Linting passes on all changed files
+- [x] `getFreshWindows` accepts a `nodeCache: AccessibilityNodeCache` parameter
+- [x] `getFreshWindows` creates a `MutableMap<String, CachedNode>()` and passes it to each `parseTree` call
+- [x] `getFreshWindows` calls `nodeCache.populate(accumulatedMap)` ONCE after the window loop
+- [x] Root nodes are NOT recycled by `getFreshWindows` (they are stored in the cache)
+- [x] The fallback single-window path also accumulates and populates the cache
+- [x] All 12 tool classes that call `getFreshWindows` have `nodeCache` in their constructor
+- [x] All 4 affected `register*Tools` functions accept and pass `nodeCache`
+- [x] `McpServerService` injects `AccessibilityNodeCache` and passes it to register functions
+- [x] `McpIntegrationTestHelper` passes a mock `nodeCache` to register functions
+- [x] All 5 unit test files updated: tool constructors gain `mockNodeCache`, `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
+- [x] All 3 integration test files updated: local `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
+- [x] `ScreenIntrospectionToolsTest` test `recyclesRootNodeAndWindowInfoAfterParsing` updated — root nodes no longer recycled, verify `nodeCache.populate()` instead
+- [x] Linting passes on all changed files
 
 ### Task 3.1: Add `nodeCache` parameter to `getFreshWindows` and accumulate across windows
 
@@ -741,14 +741,14 @@ Also update the `getFreshWindows` function-level KDoc — the existing "**Perfor
 ```
 
 **Definition of Done**:
-- [ ] `nodeCache` parameter added to `getFreshWindows`
-- [ ] `accumulatedNodeMap` created at the start, passed to every `parseTree` call
-- [ ] `nodeCache.populate(accumulatedNodeMap)` called ONCE after multi-window loop
-- [ ] Root nodes NOT recycled in multi-window path (stored in cache)
-- [ ] Root node NOT recycled in fallback single-window path (stored in cache)
-- [ ] `nodeCache.populate()` also called in fallback path
-- [ ] `getFreshWindows` function-level KDoc updated — "No caching is used" replaced with cache population description
-- [ ] Linting passes
+- [x] `nodeCache` parameter added to `getFreshWindows`
+- [x] `accumulatedNodeMap` created at the start, passed to every `parseTree` call
+- [x] `nodeCache.populate(accumulatedNodeMap)` called ONCE after multi-window loop
+- [x] Root nodes NOT recycled in multi-window path (stored in cache)
+- [x] Root node NOT recycled in fallback single-window path (stored in cache)
+- [x] `nodeCache.populate()` also called in fallback path
+- [x] `getFreshWindows` function-level KDoc updated — "No caching is used" replaced with cache population description
+- [x] Linting passes
 
 ### Task 3.2: Add `nodeCache` to tool classes in `ElementActionTools.kt`
 
@@ -808,10 +808,10 @@ Update `registerElementActionTools` to accept and pass `nodeCache`:
 ```
 
 **Definition of Done**:
-- [ ] All 4 tool classes have `nodeCache` in constructor
-- [ ] All `getFreshWindows` call sites pass `nodeCache`
-- [ ] `registerElementActionTools` accepts and passes `nodeCache`
-- [ ] Linting passes
+- [x] All 4 tool classes have `nodeCache` in constructor
+- [x] All `getFreshWindows` call sites pass `nodeCache`
+- [x] `registerElementActionTools` accepts and passes `nodeCache`
+- [x] Linting passes
 
 ### Task 3.3: Add `nodeCache` to tool classes in `ScreenIntrospectionTools.kt`
 
@@ -868,9 +868,9 @@ Update `registerScreenIntrospectionTools`:
 ```
 
 **Definition of Done**:
-- [ ] `GetScreenStateHandler` has `nodeCache` in constructor, passes to `getFreshWindows`
-- [ ] `registerScreenIntrospectionTools` accepts and passes `nodeCache`
-- [ ] Linting passes
+- [x] `GetScreenStateHandler` has `nodeCache` in constructor, passes to `getFreshWindows`
+- [x] `registerScreenIntrospectionTools` accepts and passes `nodeCache`
+- [x] Linting passes
 
 ### Task 3.4: Add `nodeCache` to tool classes in `TextInputTools.kt`
 
@@ -939,10 +939,10 @@ ktlint to require multi-line wrapping:
 ```
 
 **Definition of Done**:
-- [ ] All 4 Type* tool classes have `nodeCache` in constructor, pass to `getFreshWindows`
-- [ ] `PressKeyTool` is NOT modified (does not call `getFreshWindows`)
-- [ ] `registerTextInputTools` accepts and passes `nodeCache`
-- [ ] Linting passes
+- [x] All 4 Type* tool classes have `nodeCache` in constructor, pass to `getFreshWindows`
+- [x] `PressKeyTool` is NOT modified (does not call `getFreshWindows`)
+- [x] `registerTextInputTools` accepts and passes `nodeCache`
+- [x] Linting passes
 
 ### Task 3.5: Add `nodeCache` to tool classes in `UtilityTools.kt`
 
@@ -1008,11 +1008,11 @@ auto-format output). The function gains a 6th parameter, which exceeds detekt's 
 ```
 
 **Definition of Done**:
-- [ ] All 3 utility tool classes that call `getFreshWindows` have `nodeCache` in constructor
-- [ ] `GetClipboardTool` and `SetClipboardTool` are NOT modified
-- [ ] `registerUtilityTools` accepts and passes `nodeCache`
-- [ ] `registerUtilityTools` has `@Suppress("LongParameterList")` annotation (6 parameters exceeds detekt threshold)
-- [ ] Linting passes
+- [x] All 3 utility tool classes that call `getFreshWindows` have `nodeCache` in constructor
+- [x] `GetClipboardTool` and `SetClipboardTool` are NOT modified
+- [x] `registerUtilityTools` accepts and passes `nodeCache`
+- [x] `registerUtilityTools` has `@Suppress("LongParameterList")` annotation (6 parameters exceeds detekt threshold)
+- [x] Linting passes
 
 ### Task 3.6: Inject `AccessibilityNodeCache` in `McpServerService` and pass to register functions
 
@@ -1067,10 +1067,10 @@ Pass `nodeCache` to all 4 affected register function calls.
 ```
 
 **Definition of Done**:
-- [ ] `AccessibilityNodeCache` injected via `@Inject lateinit var`
-- [ ] Import added
-- [ ] `nodeCache` passed to `registerElementActionTools`, `registerScreenIntrospectionTools`, `registerTextInputTools`, `registerUtilityTools`
-- [ ] Linting passes
+- [x] `AccessibilityNodeCache` injected via `@Inject lateinit var`
+- [x] Import added
+- [x] `nodeCache` passed to `registerElementActionTools`, `registerScreenIntrospectionTools`, `registerTextInputTools`, `registerUtilityTools`
+- [x] Linting passes
 
 ### Task 3.7: Update `McpIntegrationTestHelper` to pass mock `nodeCache`
 
@@ -1183,14 +1183,14 @@ is active.
 ```
 
 **Definition of Done**:
-- [ ] Import added for `AccessibilityNodeCache`
-- [ ] `MockDependencies` data class has `nodeCache: AccessibilityNodeCache` field
-- [ ] `createMockDependencies()` creates `nodeCache` mock
-- [ ] `setupMultiWindowMock` uses 3-arg `parseTree` mock (`any()` for nodeMap)
-- [ ] `setupMultiWindowMock` no longer mocks `rootNode.recycle()` (roots not recycled when caching)
-- [ ] All 4 affected register calls pass `deps.nodeCache`
-- [ ] Integration tests continue to compile and pass
-- [ ] Linting passes
+- [x] Import added for `AccessibilityNodeCache`
+- [x] `MockDependencies` data class has `nodeCache: AccessibilityNodeCache` field
+- [x] `createMockDependencies()` creates `nodeCache` mock
+- [x] `setupMultiWindowMock` uses 3-arg `parseTree` mock (`any()` for nodeMap)
+- [x] `setupMultiWindowMock` no longer mocks `rootNode.recycle()` (roots not recycled when caching)
+- [x] All 4 affected register calls pass `deps.nodeCache`
+- [x] Integration tests continue to compile and pass
+- [x] Linting passes
 
 ### Task 3.8: Update 8 test files for `parseTree` signature change, tool constructor changes, and `rootNode.recycle()` removal
 
@@ -1473,10 +1473,10 @@ In the `wait_for_idle` test:
 ```
 
 **Definition of Done**:
-- [ ] All 5 unit test files: `mockNodeCache` field added, import added, constructors updated, `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
-- [ ] `ScreenIntrospectionToolsTest`: `recyclesRootNodeAndWindowInfoAfterParsing` test updated to verify root node NOT recycled and `nodeCache.populate()` called; fallback test updated similarly
-- [ ] All 3 integration test files: local `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
-- [ ] All tests compile and pass
+- [x] All 5 unit test files: `mockNodeCache` field added, import added, constructors updated, `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
+- [x] `ScreenIntrospectionToolsTest`: `recyclesRootNodeAndWindowInfoAfterParsing` test updated to verify root node NOT recycled and `nodeCache.populate()` called; fallback test updated similarly
+- [x] All 3 integration test files: local `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
+- [x] All tests compile and pass
 - [ ] Linting passes on all changed files
 
 ---
