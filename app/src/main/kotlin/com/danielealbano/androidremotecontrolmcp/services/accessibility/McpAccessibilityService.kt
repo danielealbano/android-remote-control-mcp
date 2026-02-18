@@ -28,6 +28,7 @@ import kotlin.coroutines.resume
 
 @Suppress("TooManyFunctions")
 class McpAccessibilityService : AccessibilityService() {
+    // AccessibilityNodeCache is in the same package — no import needed
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface NodeCacheEntryPoint {

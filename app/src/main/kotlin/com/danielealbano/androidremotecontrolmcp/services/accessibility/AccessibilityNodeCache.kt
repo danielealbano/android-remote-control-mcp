@@ -22,8 +22,8 @@ data class CachedNode(
  * Cache for real [AccessibilityNodeInfo] references obtained during tree parsing.
  *
  * Enables O(1) node resolution by ID instead of O(N) tree walks via Binder IPC.
- * The cache is populated during [AccessibilityTreeParser.parseTree] and consumed
- * by [ActionExecutorImpl.performNodeAction].
+ * The cache is populated with node references obtained during [AccessibilityTreeParser.parseTree]
+ * (via the caller's accumulation map) and consumed by [ActionExecutorImpl.performNodeAction].
  *
  * Thread-safe: all operations are safe to call from any thread.
  */

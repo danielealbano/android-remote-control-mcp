@@ -123,8 +123,8 @@ data class CachedNode(
  * Cache for real [AccessibilityNodeInfo] references obtained during tree parsing.
  *
  * Enables O(1) node resolution by ID instead of O(N) tree walks via Binder IPC.
- * The cache is populated during [AccessibilityTreeParser.parseTree] and consumed
- * by [ActionExecutorImpl.performNodeAction].
+ * The cache is populated with node references obtained during [AccessibilityTreeParser.parseTree]
+ * (via the caller's accumulation map) and consumed by [ActionExecutorImpl.performNodeAction].
  *
  * Thread-safe: all operations are safe to call from any thread.
  */
@@ -215,6 +215,8 @@ class AccessibilityNodeCacheImpl
             // getFreshWindows). Storing the reference directly would allow the caller to
             // mutate the map after populate(), violating the immutable-snapshot guarantee
             // that concurrent get() callers rely on. toMap() creates a read-only copy.
+            // Performance: O(N) copy for ~500 nodes is negligible. If profiling shows this
+            // as a hotspot, HashMap(entries) could be more efficient due to pre-sizing.
             val snapshot = entries.toMap()
             val old = cache.getAndSet(snapshot)
             Log.d(TAG, "Cache populated with ${snapshot.size} entries (dropped ${old.size} old)")
@@ -438,7 +440,7 @@ nodes when caching is active:
 Key points:
 - When `nodeMap` is non-null (caching active), child nodes are NOT recycled — they're stored as `CachedNode`.
 - When `nodeMap` is null (no caching, e.g., direct `parseNode` call in tests), existing recycle behavior is preserved.
-- `recycleNode` parameter for children is `false` when caching is active (`nodeMap == null` is `false`).
+- When caching is active (`nodeMap` is non-null), `recycleNode` for children is set to `false` because the expression `nodeMap == null` evaluates to `false`.
 - The `recycleNode && nodeMap == null` condition is defensively redundant for the normal flow (where `recycleNode` already reflects `nodeMap`'s state). However, it is kept explicitly to guard against direct `parseNode` calls that might set `recycleNode = true` alongside a non-null `nodeMap`. An inline comment in the code explains this intent (Minor Finding 7 clarification).
 - Each `CachedNode` stores `depth`, `index`, and `parentId` so the consumer can re-generate the nodeId after `refresh()` (S1 identity check).
 
@@ -541,7 +543,7 @@ are always recycled" — this is now stale. Replace with conditional description
    - Verify the map contains 3 entries
    - Verify each entry's key matches the expected nodeId
    - Verify each `CachedNode` has correct `node`, `depth`, `index`, and `parentId` metadata:
-     - Root: depth=0, index=0, parentId=ROOT_PARENT_ID
+     - Root: depth=0, index=0, parentId="root" (the default `rootParentId` value)
      - Child 0: depth=1, index=0, parentId=rootNodeId
      - Child 1: depth=1, index=1, parentId=rootNodeId
 
@@ -553,14 +555,14 @@ are always recycled" — this is now stale. Replace with conditional description
    - Parse a single root node (no children) with a nodeMap
    - Verify the map contains exactly 1 entry with the root node's ID as key
    - Verify the `CachedNode.node` is the root `AccessibilityNodeInfo`
-   - Verify `CachedNode.depth == 0`, `CachedNode.index == 0`, `CachedNode.parentId == ROOT_PARENT_ID`
+   - Verify `CachedNode.depth == 0`, `CachedNode.index == 0`, `CachedNode.parentId == "root"` (the default `rootParentId` value)
 
 8. **Add new test `multipleParseTreeCallsAccumulateIntoSameNodeMap`** (from QA finding — verify accumulation):
    - Create a single `MutableMap<String, CachedNode>()`
    - Create two separate root nodes, each with 1 child (simulating 2 windows)
    - Call `parser.parseTree(root1, "root_w0", nodeMap)` then `parser.parseTree(root2, "root_w1", nodeMap)`
    - Verify the map contains **4** entries (2 roots + 2 children from both calls)
-   - Verify entries from both calls coexist in the same map (keys include both "root_w0" and "root_w1" prefixed IDs)
+   - Verify entries from both calls coexist in the same map (entries have distinct nodeId keys, with CachedNode metadata containing `parentId` values rooted in `"root_w0"` and `"root_w1"` respectively)
    - NodeId collisions across windows are impossible because each `parseTree` call receives a
      different `rootParentId` (`"root_w0"` vs `"root_w1"`), and `generateNodeId` incorporates the
      `parentId` chain — so even structurally identical windows produce unique nodeIds.
@@ -1208,7 +1210,17 @@ All 5 unit test files share the same change pattern:
 1. **Add `mockNodeCache` field** — `private val mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)`
 2. **Add import** — `import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache`
 3. **Update `parseTree` mocks** — from 2-arg to 3-arg by adding `any()` for `nodeMap`
-4. **Remove `rootNode.recycle()` mocks** (where they exist) — root nodes are no longer recycled by `getFreshWindows`. Applies to `ElementActionToolsTest`, `TextInputToolsTest`, `UtilityToolsTest`. Does NOT apply to `GetElementDetailsToolTest` or `ScreenIntrospectionToolsTest` (which have no `every { mockRootNode.recycle() }` setup — `ScreenIntrospectionToolsTest` has `verify` calls instead, handled separately below).
+4. **Remove `rootNode.recycle()` mocks from setUp** (where they exist) — root nodes are no longer recycled by `getFreshWindows`. Applies to `ElementActionToolsTest`, `TextInputToolsTest`, `UtilityToolsTest`. Does NOT apply to `GetElementDetailsToolTest` or `ScreenIntrospectionToolsTest` (which have no `every { mockRootNode.recycle() }` setup — `ScreenIntrospectionToolsTest` has `verify` calls instead, handled separately below).
+
+> **IMPORTANT — PressKeyTool exception (TextInputToolsTest only):** `PressKeyTool` does NOT use
+> `getFreshWindows`. It uses `findFocusedEditableNode`, which obtains a root node via
+> `window.root` or `getRootNode()` and recycles it directly. Removing the `rootNode.recycle()`
+> mock from `setUp()` is correct for the Type* tools, but the PressKeyTool tests that exercise
+> `findFocusedEditableNode` paths (`presses DEL key removes last character` and
+> `presses SPACE key appends space`) MUST add local mocks:
+> `every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode` and
+> `@Suppress("DEPRECATION") every { mockRootNode.recycle() } returns Unit`
+> within those specific test methods.
 5. **Update tool constructor calls** — add `mockNodeCache` as the last argument before `)` or `,`
 
 **File 1: `ElementActionToolsTest.kt`**
@@ -1918,7 +1930,7 @@ creating a new one.
 | P1 | Critical | `AtomicReference` pattern is correct for this use case. `getAndSet` is atomic, `get()` returns immutable snapshot, no locking needed. | **Verified**: Pattern confirmed correct. No change needed. |
 | P2 | Critical | Race between `populate` and `get`: a concurrent `get()` may see the old map whose entries get recycled. Since `recycle()` is a no-op on API 33+ (minSdk), this is safe. If minSdk is ever lowered below 33, a lock would be needed. | **FIXED**: Removed `recycle()` from `populate()`. Old entries are simply dropped and GC'd (`recycle()` is no-op on API 33+). Only `clear()` recycles, and it's called exclusively during service shutdown when no concurrent reads are possible. This eliminates the race condition entirely regardless of future minSdk changes. See updated Task 1.2 and Design Decisions table. Test 1.4.1 updated to verify populate does NOT recycle. |
 | P3 | Critical | Memory cost is ~100-250KB for ~500 nodes — acceptable. Cleared on every `getFreshWindows` call (via `populate` atomic swap) and service destroy. | **Verified**: `CachedNode` wrapper adds minimal overhead (~16 bytes per entry for depth/index/parentId ref). Total cost remains acceptable for typical UIs (~500 nodes). Text-heavy UIs (e.g., chat apps with 1000+ nodes and long text content) may exceed 250KB due to `AccessibilityNodeInfo`'s internal text references, but this is still well within Android's per-app memory limits and is transient (replaced on next `getFreshWindows` call). Cleared on every `getFreshWindows` call (via `populate` atomic swap) and during service destroy (via `clear`). |
-| P4 | Critical | Optimization trades O(N) IPC for O(1) on cache hits. Worst case (miss/stale) is identical to current behavior. No regression possible. | **Verified**: No regression path exists. Identity mismatch (S1 fix) adds one more fallback case but still falls through to walkAndMatch. |
+| P4 | Critical | Optimization trades O(N) IPC for O(1) on cache hits. Worst case (miss/stale) is identical to current behavior. No regression possible. | **Verified**: No regression path exists. Identity mismatch (S1 fix) adds one more fallback case but still falls through to walkAndMatch. **Note on `generateNodeId` hashCode**: `generateNodeId` uses `hashCode()` to produce node IDs. Theoretical hash collisions are possible for structurally different nodes but extremely rare in practice. If a collision occurred, the cache would return a different node whose identity re-verification via `generateNodeId()` would produce the same nodeId (since the IDs collided), potentially executing an action on the wrong node. This is a pre-existing risk in `walkAndMatch` (which also uses `generateNodeId`) and is not introduced by caching. Mitigation: the identity check after `refresh()` compares bounds/depth/index/parentId, which provides strong structural validation beyond the hash alone. |
 
 ### Security Review
 
@@ -2009,6 +2021,22 @@ creating a new one.
 | m26 | Minor | **Finding ID collision across review tables**: "m4" appeared in both the Second Review table (m4: "Missing import instructions for 3 tool files") and the Third Review table (m4: "Helper documented for a, d, f, g, h"), causing ambiguity when referencing them. | **FIXED**: Renumbered the Third Review table to use unique IDs — Majors continue at M5-M8, Minors at m14-m23. All US6 checklist cross-references updated to use new IDs. Added a note at the top of the Third Review table explaining the numbering scheme. |
 | i1 | Info | **`generateNodeId` visibility**: `generateNodeId` is `internal` in `AccessibilityTreeParser`. `ActionExecutorImpl` is in the same `app` module, so `internal` is sufficient. No issue, but worth confirming during implementation. | **FIXED**: Added note in Task 4.1 confirming `internal` visibility is sufficient since both classes are in the same Gradle module. |
 
+### Fifth Plan Review Findings (All Resolved)
+
+> **Numbering**: Findings use F-prefix for Medium, M-prefix for Minor (continuing from m26),
+> P-prefix for Performance, I-prefix for Informational, D-prefix for implementation Discrepancies.
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| F1 | Medium | **Task 3.8 TextInputToolsTest PressKeyTool deviation undocumented**: The plan instructs removing `mockRootNode.recycle()` from setUp, which is correct for Type* tools using `getFreshWindows`. However, `PressKeyTool` uses `findFocusedEditableNode` → `getRootNode()` and recycles the root node directly. During implementation, `mockRootNode.recycle()` + `getRootNode()` mocks were added to 2 specific PressKeyTool tests. This deviation was not documented. | **FIXED**: Added a detailed note to Task 3.8 common pattern item 4 explaining the PressKeyTool exception: which tests need local mocks and why. |
+| m27 | Minor | **Task 2.4 test 8 "prefixed IDs" wording**: Said "keys include both 'root_w0' and 'root_w1' prefixed IDs". Node IDs are hashes (`node_<hash>`), not literally prefixed with `root_w0`. The `rootParentId` values flow through CachedNode metadata, but keys are generated hashes. | **FIXED**: Reworded to "entries have distinct nodeId keys, with CachedNode metadata containing parentId values rooted in root_w0 and root_w1 respectively". |
+| m28 | Minor | **Task 2.2 confusing recycleNode phrasing**: "`recycleNode` parameter for children is `false` when caching is active (`nodeMap == null` is `false`)" was hard to parse. | **FIXED**: Reworded to "When caching is active (nodeMap is non-null), recycleNode for children is set to false because the expression nodeMap == null evaluates to false." |
+| m29 | Minor | **Task 2.4 test 5/7 `ROOT_PARENT_ID` reference**: Used `ROOT_PARENT_ID` which is a private constant in AccessibilityTreeParser; tests must use the string `"root"` directly. | **FIXED**: Changed to `parentId="root" (the default rootParentId value)` in both test 5 and test 7. |
+| P5 | Minor | **`entries.toMap()` is O(N) copy**: While acceptable for ~500 nodes, worth documenting that `HashMap(entries)` could be more efficient if profiling shows a hotspot. | **FIXED**: Added inline comment in Task 1.2 populate() noting the O(N) cost and HashMap alternative. |
+| P6 | Minor | **`generateNodeId` hashCode collision risk**: `generateNodeId` uses `hashCode()` — theoretical collision risk for structurally different nodes. Very rare but could target wrong node. | **FIXED**: Added detailed note to P4 performance review entry documenting the risk, noting it is pre-existing in `walkAndMatch`, and explaining that the identity check after `refresh()` provides structural validation beyond the hash. |
+| I7 | Info | **Interface KDoc imprecise**: Said "populated during parseTree" — technically parseTree fills the nodeMap, the caller populates the cache via `populate()`. | **FIXED**: Updated KDoc in both plan and source to "populated with node references obtained during parseTree (via the caller's accumulation map)". |
+| D1 | Info | **McpAccessibilityService.kt missing NOTE comment**: Plan specified a comment explaining why `AccessibilityNodeCache` is not imported (same package). Implementation omitted it. | **FIXED**: Added comment above `NodeCacheEntryPoint` interface: `// AccessibilityNodeCache is in the same package — no import needed`. Placed at class level (not in imports) to avoid breaking ktlint import ordering. |
+
 ---
 
 ## User Story 6: Final Verification
@@ -2084,4 +2112,13 @@ consistency, and no regressions.
 - [x] Verify Task 4.3 has note explaining `windows` parameter for cache-hit tests (m25)
 - [x] Verify Third Review table uses unique IDs (M5-M8, m14-m23) with no collisions with Second Review (m26)
 - [x] Verify Task 4.1 has note confirming `generateNodeId` `internal` visibility is sufficient (i1)
+- [x] Verify all fifth plan review findings (F1, m27-m29, P5-P6, I7, D1) are addressed
+- [x] Verify Task 3.8 documents PressKeyTool exception for TextInputToolsTest (F1)
+- [x] Verify Task 2.4 test 8 uses correct wording for nodeId keys vs parentId metadata (m27)
+- [x] Verify Task 2.2 recycleNode phrasing is clear (m28)
+- [x] Verify Task 2.4 tests 5 and 7 use `"root"` instead of `ROOT_PARENT_ID` (m29)
+- [x] Verify `populate()` has O(N) efficiency note in plan (P5)
+- [x] Verify P4 documents `generateNodeId` hashCode collision risk (P6)
+- [x] Verify `AccessibilityNodeCache` interface KDoc uses "via the caller's accumulation map" (I7)
+- [x] Verify `McpAccessibilityService.kt` has same-package import comment (D1)
 - [x] Review git diff to ensure only intended changes are present
