@@ -340,6 +340,210 @@ class AccessibilityTreeParserTest {
     }
 
     @Nested
+    @DisplayName("parseTree with nodeMap")
+    inner class ParseTreeWithNodeMap {
+        @Test
+        @DisplayName("does not recycle children when nodeMap is provided")
+        fun parseTreeWithNodeMapDoesNotRecycleChildren() {
+            // Arrange
+            val child1 = createMockNode(text = "Child 1")
+            val child2 = createMockNode(text = "Child 2")
+            val root =
+                createMockNode(
+                    className = "android.widget.LinearLayout",
+                    childCount = 2,
+                    children = listOf(child1, child2),
+                )
+            val nodeMap = mutableMapOf<String, CachedNode>()
+
+            // Act
+            parser.parseTree(root, nodeMap = nodeMap)
+
+            // Assert
+            @Suppress("DEPRECATION")
+            verify(exactly = 0) { child1.recycle() }
+            @Suppress("DEPRECATION")
+            verify(exactly = 0) { child2.recycle() }
+            assertEquals(3, nodeMap.size)
+        }
+
+        @Test
+        @DisplayName("populates nodeMap with correct metadata")
+        fun parseTreePopulatesNodeMap() {
+            // Arrange
+            val child1 =
+                createMockNode(
+                    className = "android.widget.Button",
+                    text = "Button 1",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 100,
+                    boundsBottom = 50,
+                )
+            val child2 =
+                createMockNode(
+                    className = "android.widget.Button",
+                    text = "Button 2",
+                    boundsLeft = 100,
+                    boundsTop = 0,
+                    boundsRight = 200,
+                    boundsBottom = 50,
+                )
+            val root =
+                createMockNode(
+                    className = "android.widget.LinearLayout",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 200,
+                    boundsBottom = 50,
+                    childCount = 2,
+                    children = listOf(child1, child2),
+                )
+            val nodeMap = mutableMapOf<String, CachedNode>()
+
+            // Act
+            val result = parser.parseTree(root, nodeMap = nodeMap)
+
+            // Assert
+            assertEquals(3, nodeMap.size)
+
+            val rootNodeId = result.id
+            val child1NodeId = result.children[0].id
+            val child2NodeId = result.children[1].id
+
+            assertTrue(nodeMap.containsKey(rootNodeId))
+            assertTrue(nodeMap.containsKey(child1NodeId))
+            assertTrue(nodeMap.containsKey(child2NodeId))
+
+            val rootCached = nodeMap[rootNodeId]!!
+            assertEquals(root, rootCached.node)
+            assertEquals(0, rootCached.depth)
+            assertEquals(0, rootCached.index)
+            assertEquals("root", rootCached.parentId)
+
+            val child1Cached = nodeMap[child1NodeId]!!
+            assertEquals(child1, child1Cached.node)
+            assertEquals(1, child1Cached.depth)
+            assertEquals(0, child1Cached.index)
+            assertEquals(rootNodeId, child1Cached.parentId)
+
+            val child2Cached = nodeMap[child2NodeId]!!
+            assertEquals(child2, child2Cached.node)
+            assertEquals(1, child2Cached.depth)
+            assertEquals(1, child2Cached.index)
+            assertEquals(rootNodeId, child2Cached.parentId)
+        }
+
+        @Test
+        @DisplayName("populates nodeMap with window-scoped rootParentId")
+        fun parseTreeWithDifferentRootParentIdPopulatesNodeMap() {
+            // Arrange
+            val child = createMockNode(text = "Child")
+            val root =
+                createMockNode(
+                    className = "android.widget.FrameLayout",
+                    childCount = 1,
+                    children = listOf(child),
+                )
+            val nodeMap = mutableMapOf<String, CachedNode>()
+
+            // Act
+            val result = parser.parseTree(root, rootParentId = "root_w42", nodeMap = nodeMap)
+
+            // Assert
+            assertEquals(2, nodeMap.size)
+
+            val rootCached = nodeMap[result.id]!!
+            assertEquals("root_w42", rootCached.parentId)
+
+            val childCached = nodeMap[result.children[0].id]!!
+            assertEquals(result.id, childCached.parentId)
+        }
+
+        @Test
+        @DisplayName("nodeMap includes root node even when no children")
+        fun parseTreeNodeMapIncludesRootNode() {
+            // Arrange
+            val root =
+                createMockNode(
+                    className = "android.widget.TextView",
+                    text = "Alone",
+                )
+            val nodeMap = mutableMapOf<String, CachedNode>()
+
+            // Act
+            val result = parser.parseTree(root, nodeMap = nodeMap)
+
+            // Assert
+            assertEquals(1, nodeMap.size)
+            assertTrue(nodeMap.containsKey(result.id))
+
+            val cached = nodeMap[result.id]!!
+            assertEquals(root, cached.node)
+            assertEquals(0, cached.depth)
+            assertEquals(0, cached.index)
+            assertEquals("root", cached.parentId)
+        }
+
+        @Test
+        @DisplayName("multiple parseTree calls accumulate into same nodeMap")
+        fun multipleParseTreeCallsAccumulateIntoSameNodeMap() {
+            // Arrange
+            val child1 =
+                createMockNode(
+                    text = "Child W0",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 50,
+                    boundsBottom = 50,
+                )
+            val root1 =
+                createMockNode(
+                    className = "android.widget.FrameLayout",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 100,
+                    boundsBottom = 100,
+                    childCount = 1,
+                    children = listOf(child1),
+                )
+            val child2 =
+                createMockNode(
+                    text = "Child W1",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 60,
+                    boundsBottom = 60,
+                )
+            val root2 =
+                createMockNode(
+                    className = "android.widget.FrameLayout",
+                    boundsLeft = 0,
+                    boundsTop = 0,
+                    boundsRight = 100,
+                    boundsBottom = 100,
+                    childCount = 1,
+                    children = listOf(child2),
+                )
+            val nodeMap = mutableMapOf<String, CachedNode>()
+
+            // Act
+            val result1 = parser.parseTree(root1, "root_w0", nodeMap)
+            val result2 = parser.parseTree(root2, "root_w1", nodeMap)
+
+            // Assert
+            assertEquals(4, nodeMap.size)
+            assertTrue(nodeMap.containsKey(result1.id))
+            assertTrue(nodeMap.containsKey(result1.children[0].id))
+            assertTrue(nodeMap.containsKey(result2.id))
+            assertTrue(nodeMap.containsKey(result2.children[0].id))
+
+            assertEquals("root_w0", nodeMap[result1.id]!!.parentId)
+            assertEquals("root_w1", nodeMap[result2.id]!!.parentId)
+        }
+    }
+
+    @Nested
     @DisplayName("parseTree with rootParentId")
     inner class ParseTreeWithRootParentId {
         @Test

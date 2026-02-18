@@ -324,17 +324,17 @@ avoids the multi-window cache overwrite problem (Critical Finding 1).
 > parser instances; this has no impact on correctness (Minor Finding 8).
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `parseTree` accepts optional `nodeMap: MutableMap<String, CachedNode>?` parameter (default `null`)
-- [ ] `parseNode` accepts optional `nodeMap: MutableMap<String, CachedNode>?` parameter (default `null`)
-- [ ] When `nodeMap` is non-null, each parsed node is stored as a `CachedNode` in the map
-- [ ] When `nodeMap` is non-null, child nodes are NOT recycled (stored in map instead)
-- [ ] When `nodeMap` is null, existing recycle behavior is preserved (backward compatible)
-- [ ] `parseTree` does NOT call `cache.populate()` — the caller accumulates and populates
-- [ ] `AccessibilityTreeParser` constructor is UNCHANGED (no cache injection)
-- [ ] Root node is still NOT recycled by `parseTree` (caller retains ownership), but IS stored in nodeMap when provided
-- [ ] Existing unit tests updated to pass `nodeMap` where appropriate
-- [ ] New tests verify nodeMap is populated during parsing
-- [ ] Linting passes on all changed files
+- [x] `parseTree` accepts optional `nodeMap: MutableMap<String, CachedNode>?` parameter (default `null`)
+- [x] `parseNode` accepts optional `nodeMap: MutableMap<String, CachedNode>?` parameter (default `null`)
+- [x] When `nodeMap` is non-null, each parsed node is stored as a `CachedNode` in the map
+- [x] When `nodeMap` is non-null, child nodes are NOT recycled (stored in map instead)
+- [x] When `nodeMap` is null, existing recycle behavior is preserved (backward compatible)
+- [x] `parseTree` does NOT call `cache.populate()` — the caller accumulates and populates
+- [x] `AccessibilityTreeParser` constructor is UNCHANGED (no cache injection)
+- [x] Root node is still NOT recycled by `parseTree` (caller retains ownership), but IS stored in nodeMap when provided
+- [x] Existing unit tests updated to pass `nodeMap` where appropriate
+- [x] New tests verify nodeMap is populated during parsing
+- [x] Linting passes on all changed files
 
 ### Task 2.1: Add `nodeMap` parameter to `parseTree`
 
@@ -363,10 +363,10 @@ does NOT call `cache.populate()` — the caller is responsible for accumulating 
 ```
 
 **Definition of Done**:
-- [ ] `nodeMap` parameter added to `parseTree`
-- [ ] Parameter is passed through to `parseNode`
-- [ ] No `cache.populate()` call — caller is responsible
-- [ ] Linting passes
+- [x] `nodeMap` parameter added to `parseTree`
+- [x] Parameter is passed through to `parseNode`
+- [x] No `cache.populate()` call — caller is responsible
+- [x] Linting passes
 
 ### Task 2.2: Modify `parseNode` to store nodes in map and stop recycling
 
@@ -443,12 +443,12 @@ Key points:
 - Each `CachedNode` stores `depth`, `index`, and `parentId` so the consumer can re-generate the nodeId after `refresh()` (S1 identity check).
 
 **Definition of Done**:
-- [ ] `nodeMap` parameter added to `parseNode`
-- [ ] Nodes stored in map when `nodeMap` is non-null
-- [ ] Child nodes NOT recycled when caching is active
-- [ ] Existing non-cached behavior preserved when `nodeMap` is null
-- [ ] Defensive double condition has inline comment explaining intent (Minor Finding 7)
-- [ ] Linting passes
+- [x] `nodeMap` parameter added to `parseNode`
+- [x] Nodes stored in map when `nodeMap` is non-null
+- [x] Child nodes NOT recycled when caching is active
+- [x] Existing non-cached behavior preserved when `nodeMap` is null
+- [x] Defensive double condition has inline comment explaining intent (Minor Finding 7)
+- [x] Linting passes
 
 ### Task 2.3: Update `AccessibilityTreeParser` KDoc (class-level and function-level)
 
@@ -503,10 +503,10 @@ are always recycled" — this is now stale. Replace with conditional description
 ```
 
 **Definition of Done**:
-- [ ] Class-level KDoc updated
-- [ ] `parseTree` function-level KDoc updated with `@param nodeMap`
-- [ ] `parseNode` function-level KDoc updated with `@param nodeMap`
-- [ ] Linting passes
+- [x] Class-level KDoc updated
+- [x] `parseTree` function-level KDoc updated with `@param nodeMap`
+- [x] `parseNode` function-level KDoc updated with `@param nodeMap`
+- [x] Linting passes
 
 ### Task 2.4: Update `AccessibilityTreeParserTest`
 
@@ -572,9 +572,9 @@ are always recycled" — this is now stale. Replace with conditional description
    No new test needed.
 
 **Definition of Done**:
-- [ ] All existing tests continue to pass (parser constructor unchanged, no mock needed)
-- [ ] New nodeMap-related tests added and passing (including QA finding Q2 and accumulation test)
-- [ ] Linting passes
+- [x] All existing tests continue to pass (parser constructor unchanged, no mock needed)
+- [x] New nodeMap-related tests added and passing (including QA finding Q2 and accumulation test)
+- [x] Linting passes
 
 ---
 
