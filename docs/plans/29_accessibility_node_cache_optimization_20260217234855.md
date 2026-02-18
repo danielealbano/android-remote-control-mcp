@@ -1830,9 +1830,9 @@ recycles nodes (during `clear`).
 `AccessibilityNodeInfo` references become invalid when the service disconnects.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `McpAccessibilityService.onDestroy()` clears the cache
-- [ ] Cache is accessed via Hilt `EntryPoint` (since `McpAccessibilityService` is system-managed, not Hilt-injectable)
-- [ ] Linting passes on all changed files
+- [x] `McpAccessibilityService.onDestroy()` clears the cache
+- [x] Cache is accessed via Hilt `EntryPoint` (since `McpAccessibilityService` is system-managed, not Hilt-injectable)
+- [x] Linting passes on all changed files
 
 > **Note on testing**: `McpAccessibilityService.onDestroy()` uses `EntryPointAccessors.fromApplication()`
 > which requires a real Hilt application context. This cannot be unit tested with MockK alone.
@@ -1902,10 +1902,10 @@ pattern. If an `EntryPoint` already exists in this class, add `nodeCache()` to i
 creating a new one.
 
 **Definition of Done**:
-- [ ] Cache cleared in `onDestroy()` before nulling `instance`
-- [ ] EntryPoint used to access cache singleton (or existing pattern if available)
-- [ ] Defensive try/catch for edge cases
-- [ ] Linting passes
+- [x] Cache cleared in `onDestroy()` before nulling `instance`
+- [x] EntryPoint used to access cache singleton (or existing pattern if available)
+- [x] Defensive try/catch for edge cases
+- [x] Linting passes
 
 ---
 
