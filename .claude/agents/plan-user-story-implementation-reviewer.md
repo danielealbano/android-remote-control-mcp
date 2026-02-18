@@ -53,6 +53,7 @@ For each action in the plan:
 - [ ] No extra code changes were made beyond the plan
 - [ ] All specified files were modified/created
 - [ ] No unplanned files were modified/created
+- [ ] **No files in `docs/plans/` were deleted or removed** (plan files are PERMANENT — this is a CRITICAL violation if found)
 
 ### Code Correctness
 - [ ] Code changes match the plan's diff/patch descriptions
@@ -136,6 +137,9 @@ For each unplanned change:
 - **File**: Path to modified file
 - **Description**: What was changed
 - **Concern**: Whether this is acceptable or problematic
+
+### Plan File Protection Violations
+**CRITICAL**: If ANY file in `docs/plans/` was deleted, removed, or included as a deletion in the git diff, this is a CRITICAL violation that MUST be flagged immediately. Plan documents are PERMANENT project artifacts and MUST NEVER be deleted under any circumstances. If a plan file was accidentally staged, it should have been unstaged — not removed.
 
 ### Quality Gate Violations
 For each violation:

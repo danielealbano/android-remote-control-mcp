@@ -76,6 +76,7 @@ When asked to make a plan:
 - You MUST NEVER digress or improvise when implementing a plan, you MUST follow it to the letter
 
 When implementing a plan (git workflow):
+- **NEVER use `git add -A`, `git add .`, or `git add --all`** — always stage specific files relevant to the task. Using broad `git add` commands risks staging unrelated files (e.g., plan documents from other work) which can lead to accidental deletions or unrelated changes in PRs.
 - You MUST ALWAYS use the `plan-user-story-implementator` subagent to implement a task.
 - If tasks of a user story can be implemented in parallel (no cross files impacted) then you MUST start them in parallel; When you start them in parallel you MUST run the tests ONLY after they finish all, the subagents MUST run the linter on the changed files though.
 - After ALL tasks of a user story are implemented, you MUST spawn the `plan-user-story-implementation-reviewer` subagent to verify the implementation matches the plan.
@@ -174,6 +175,14 @@ These subagents are used during plan execution — implementing tasks and verify
 - NEVER delete code, tests, config, build files, or docker files to "fix" failures.
 - FIX THE ROOT CAUSE instead.
 - ANY removal requires EXPLICIT permission.
+
+### Plan file protection - ABSOLUTE RULES
+- **NEVER delete, remove, or exclude files in `docs/plans/`**. Plan documents are PERMANENT project artifacts.
+- This applies in ALL contexts: commits, PRs, branch operations, cleanup tasks, and ANY other workflow.
+- If a plan file is accidentally staged (e.g., via `git add -A`), you MUST **unstage** it (`git reset HEAD <file>`) — you MUST NEVER create a commit that removes it.
+- If a plan file appears in a PR diff as a deletion or as an unrelated addition, you MUST **unstage** it — NEVER delete it to "clean up" the PR.
+- Plan files MUST NOT be modified during implementation EXCEPT to update checkmarks (`[ ]` → `[x]`) and to add review finding sections as part of the plan review workflow.
+- **There are ZERO exceptions to this rule.** If you believe a plan file should be removed, you MUST ask the user. DO NOT act on your own.
 
 ---
 
