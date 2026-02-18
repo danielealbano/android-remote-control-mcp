@@ -79,6 +79,7 @@ object AndroidContainerSetup {
         val isCI = System.getenv("CI") == "true"
         val emulatorArgs = buildString {
             append("-no-boot-anim -no-audio -no-snapshot")
+            append(" -camera-back emulated -camera-front emulated")
             if (isCI) append(" -no-window")
         }
         val memoryBytes = if (isCI) 5632L * 1024 * 1024 else 6L * 1024 * 1024 * 1024 // 5.5 GB CI, 6 GB local
@@ -250,6 +251,35 @@ object AndroidContainerSetup {
         }
 
         println("[E2E Setup] Calculator APK installed successfully")
+    }
+
+    /**
+     * Grant camera and microphone runtime permissions via adb.
+     *
+     * These permissions are required for the camera MCP tools (take_camera_photo,
+     * save_camera_photo, save_camera_video). Granting via `pm grant` avoids the
+     * need for interactive permission dialogs in E2E tests.
+     *
+     * Must be called after APK installation.
+     *
+     * @param container the running Docker container
+     */
+    fun grantCameraPermissions(container: GenericContainer<*>) {
+        println("[E2E Setup] Granting camera and microphone permissions...")
+
+        execInContainer(
+            container,
+            "adb", "shell", "pm", "grant", APP_PACKAGE,
+            "android.permission.CAMERA"
+        )
+
+        execInContainer(
+            container,
+            "adb", "shell", "pm", "grant", APP_PACKAGE,
+            "android.permission.RECORD_AUDIO"
+        )
+
+        println("[E2E Setup] Camera and microphone permissions granted")
     }
 
     /**

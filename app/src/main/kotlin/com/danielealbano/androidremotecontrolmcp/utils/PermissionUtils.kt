@@ -66,4 +66,28 @@ object PermissionUtils {
             context,
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Checks whether the `CAMERA` runtime permission is granted.
+     *
+     * @param context Application context.
+     * @return `true` if camera permission is granted, `false` otherwise.
+     */
+    fun isCameraPermissionGranted(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Checks whether the `RECORD_AUDIO` runtime permission is granted.
+     *
+     * @param context Application context.
+     * @return `true` if microphone permission is granted, `false` otherwise.
+     */
+    fun isMicrophonePermissionGranted(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
 }

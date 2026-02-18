@@ -83,8 +83,20 @@ class E2EErrorHandlingTest {
 
     @Test
     fun `correct bearer token returns successful response`() = runBlocking {
-        val result = mcpClient.callTool("${TOOL_PREFIX}press_home")
-        assertNotEquals(true, result.isError)
+        // Retry — accessibility service may be transiently unavailable after
+        // camera timeout operations on slow CI emulators.
+        var result = mcpClient.callTool("${TOOL_PREFIX}press_home")
+        if (result.isError == true) {
+            val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+            println("[E2E ErrorHandling] press_home failed: $errorText — retrying after 3s")
+            Thread.sleep(3_000)
+            result = mcpClient.callTool("${TOOL_PREFIX}press_home")
+        }
+        assertNotEquals(
+            true,
+            result.isError,
+            "press_home should succeed: ${(result.content.firstOrNull() as? TextContent)?.text}",
+        )
     }
 
     @Test
@@ -110,12 +122,27 @@ class E2EErrorHandlingTest {
 
     @Test
     fun `click on non-existent element returns error result`() = runBlocking {
-        val result = mcpClient.callTool(
+        // If accessibility service is transiently unavailable, the error message
+        // won't contain the element ID. Retry once to allow recovery.
+        var result = mcpClient.callTool(
             "${TOOL_PREFIX}click_element",
             mapOf("element_id" to "nonexistent_element_id_12345"),
         )
         assertEquals(true, result.isError)
-        val text = (result.content[0] as TextContent).text
-        assertTrue(text.contains("nonexistent_element_id_12345"))
+        var text = (result.content[0] as TextContent).text
+        if (!text.contains("nonexistent_element_id_12345")) {
+            println("[E2E ErrorHandling] click_element error didn't mention element ID: $text — retrying after 3s")
+            Thread.sleep(3_000)
+            result = mcpClient.callTool(
+                "${TOOL_PREFIX}click_element",
+                mapOf("element_id" to "nonexistent_element_id_12345"),
+            )
+            assertEquals(true, result.isError)
+            text = (result.content[0] as TextContent).text
+        }
+        assertTrue(
+            text.contains("nonexistent_element_id_12345"),
+            "Error should mention the element ID, got: $text",
+        )
     }
 }

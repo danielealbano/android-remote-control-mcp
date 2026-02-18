@@ -80,6 +80,9 @@ object SharedAndroidContainer {
                 // Install calculator APK for E2E interaction tests
                 AndroidContainerSetup.installCalculatorApk(c)
 
+                // Grant camera and microphone permissions for camera E2E tests
+                AndroidContainerSetup.grantCameraPermissions(c)
+
                 // Configure server settings (binding 0.0.0.0, known bearer token)
                 // NOTE: This step force-stops the app to flush DataStore, which disconnects
                 // any accessibility service. Therefore, accessibility must be enabled AFTER

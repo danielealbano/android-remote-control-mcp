@@ -17,6 +17,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
@@ -32,6 +33,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactT
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
+import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -104,6 +106,8 @@ class McpServerService : Service() {
     @Inject lateinit var appManager: AppManager
 
     @Inject lateinit var typeInputController: TypeInputController
+
+    @Inject lateinit var cameraProvider: CameraProvider
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverStarting = AtomicBoolean(false)
@@ -291,6 +295,7 @@ class McpServerService : Service() {
         registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, toolNamePrefix)
         registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
         registerAppManagementTools(server, appManager, toolNamePrefix)
+        registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix)
     }
 
     override fun onDestroy() {

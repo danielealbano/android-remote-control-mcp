@@ -131,10 +131,11 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`, `ScreenshotAnnotator.kt`, `ApiLevelProvider.kt`
   - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
+  - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -142,7 +143,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
-  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`
+  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
@@ -188,7 +189,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 39 tools across 9 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 45 tools across 10 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -296,6 +297,19 @@ The MCP server exposes 39 tools across 9 categories. For full JSON-RPC schemas, 
 
 **Errors**: `android_open_app` returns `CallToolResult(isError = true)` if the app is not installed or has no launchable activity. `android_close_app` only affects background processes — for foreground apps, use `android_press_home` first to send the app to the background. `android_list_apps` requires the `QUERY_ALL_PACKAGES` permission. `android_close_app` requires the `KILL_BACKGROUND_PROCESSES` permission.
 
+### 10. Camera Tools (6 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `android_list_cameras` | List all available cameras with capabilities | — | — |
+| `android_list_camera_photo_resolutions` | List supported photo resolutions for a camera | `camera_id` (string) | — |
+| `android_list_camera_video_resolutions` | List supported video resolutions for a camera | `camera_id` (string) | — |
+| `android_take_camera_photo` | Capture a photo and return as base64 JPEG (max 1920x1080) | `camera_id` (string) | `resolution` (string, WIDTHxHEIGHT), `quality` (int, 1-100, default 80), `flash_mode` (string: off/on/auto, default auto) |
+| `android_save_camera_photo` | Capture a photo and save to storage location | `camera_id` (string), `location_id` (string), `path` (string) | `resolution` (string, WIDTHxHEIGHT), `quality` (int, 1-100, default 80), `flash_mode` (string: off/on/auto, default auto) |
+| `android_save_camera_video` | Record video and save to storage (max 30s), returns thumbnail | `camera_id` (string), `location_id` (string), `path` (string), `duration` (int, 1-30) | `resolution` (string, WIDTHxHEIGHT), `audio` (boolean, default true), `flash_mode` (string: off/on/auto, default auto) |
+
+**Errors**: All camera tools return `McpToolException.PermissionDenied` if CAMERA permission is not granted. `android_save_camera_video` also requires RECORD_AUDIO permission when audio is enabled. Save tools delegate write permission checks to `FileOperationProvider.createFileUri()`. Invalid parameters (resolution format, quality range, duration range, flash mode) return `McpToolException.InvalidParams`.
+
 ---
 
 ## Android-Specific Conventions
@@ -321,6 +335,8 @@ The MCP server exposes 39 tools across 9 categories. For full JSON-RPC schemas, 
 - **Internet**: Declared in manifest, granted automatically
 - **QUERY_ALL_PACKAGES**: Required for listing all installed applications via `PackageManager`. Declared in manifest, granted automatically
 - **KILL_BACKGROUND_PROCESSES**: Required for killing background app processes via `ActivityManager.killBackgroundProcesses()`. Declared in manifest, granted automatically
+- **CAMERA**: Runtime permission required for camera photo/video tools. Requested via UI permission launcher
+- **RECORD_AUDIO**: Runtime permission required for video recording with audio. Requested via UI permission launcher
 - Always check permission state before operations; return `CallToolResult(isError = true)` if permission missing
 
 ### Storage Access Framework (SAF) — User-Managed Locations
@@ -611,6 +627,15 @@ Per-location read/write/delete permissions are enforced by `FileOperationProvide
 - **Gesture Duration**: 300ms
 - **Scroll Amount**: "medium" (50% of screen dimension)
 
+### Camera Defaults
+
+- **Default Resolution**: 720p (closest available match)
+- **Default Quality**: 80 (JPEG, 1-100)
+- **Default Flash Mode**: auto (off/on/auto)
+- **Max Video Duration**: 30 seconds
+- **Default Audio**: Enabled (true)
+- **Max Photo Resolution (take_camera_photo)**: 1920x1080 (to prevent excessively large base64 responses)
+
 ### Accessibility Defaults
 
 - **Event Types**: TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOW_CONTENT_CHANGED
@@ -692,7 +717,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 39 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 45 tools
 
 ---
 

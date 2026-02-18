@@ -6,6 +6,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.auth.BearerTokenAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
@@ -23,6 +24,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
+import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -117,6 +119,7 @@ object McpIntegrationTestHelper {
             typeInputController = mockk(relaxed = true),
             screenshotAnnotator = mockk(relaxed = true),
             screenshotEncoder = mockk(relaxed = true),
+            cameraProvider = mockk(relaxed = true),
         )
 
     /**
@@ -171,6 +174,7 @@ object McpIntegrationTestHelper {
         )
         registerFileTools(server, deps.storageLocationProvider, deps.fileOperationProvider, toolNamePrefix)
         registerAppManagementTools(server, deps.appManager, toolNamePrefix)
+        registerCameraTools(server, deps.cameraProvider, deps.fileOperationProvider, toolNamePrefix)
     }
 
     /**
@@ -319,4 +323,5 @@ data class MockDependencies(
     val typeInputController: TypeInputController,
     val screenshotAnnotator: ScreenshotAnnotator,
     val screenshotEncoder: ScreenshotEncoder,
+    val cameraProvider: CameraProvider,
 )
