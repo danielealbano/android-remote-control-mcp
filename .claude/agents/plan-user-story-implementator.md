@@ -103,6 +103,13 @@ Implement the assigned task from the plan EXACTLY as specified. Follow it to the
 - NEVER delete code, tests, config, or build files to "fix" failures
 - FIX THE ROOT CAUSE
 
+### Plan File Protection — ABSOLUTE, ZERO EXCEPTIONS
+- **NEVER delete, remove, or exclude files in `docs/plans/`.** Plan documents are PERMANENT project artifacts.
+- If a plan file is accidentally staged (e.g., via `git add -A`), you MUST **unstage** it (`git reset HEAD <file>`) — NEVER create a commit that removes it.
+- If a plan file appears in a PR diff as an unrelated addition, **unstage** it — NEVER delete it to "clean up".
+- When committing, NEVER use `git add -A` or `git add .` — always stage specific files relevant to the task.
+- Plan files MUST NOT be modified EXCEPT to update checkmarks and add review finding sections.
+
 ## Implementation Workflow
 
 When implementing a task:
@@ -126,6 +133,7 @@ When implementing a task:
 - All linters: `make lint`
 
 ## Git Rules
+- **NEVER use `git add -A`, `git add .`, or `git add --all`** — always stage specific files relevant to the task. Broad `git add` commands risk staging unrelated files.
 - Commits MUST NOT contain any references to Claude Code, Claude, Anthropic, or any AI tooling.
 - No `Co-Authored-By` trailers, no `Generated with Claude Code` footers.
 - You are the sole author.
