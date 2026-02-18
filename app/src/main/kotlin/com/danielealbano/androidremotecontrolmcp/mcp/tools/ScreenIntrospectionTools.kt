@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.graphics.Bitmap
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -37,6 +38,7 @@ import javax.inject.Inject
  * Replaces: get_accessibility_tree, capture_screenshot, get_current_app, get_screen_info.
  */
 class GetScreenStateHandler
+    @Suppress("LongParameterList")
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -45,6 +47,7 @@ class GetScreenStateHandler
         private val compactTreeFormatter: CompactTreeFormatter,
         private val screenshotAnnotator: ScreenshotAnnotator,
         private val screenshotEncoder: ScreenshotEncoder,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount", "LongMethod", "TooGenericExceptionCaught")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -54,7 +57,7 @@ class GetScreenStateHandler
 
             // 2. Get multi-window accessibility snapshot
             //    (getFreshWindows handles isReady check and fallback to single-window)
-            val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             // 3. Get screen info
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
@@ -213,6 +216,7 @@ fun registerScreenIntrospectionTools(
     compactTreeFormatter: CompactTreeFormatter,
     screenshotAnnotator: ScreenshotAnnotator,
     screenshotEncoder: ScreenshotEncoder,
+    nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
 ) {
     GetScreenStateHandler(
@@ -222,5 +226,6 @@ fun registerScreenIntrospectionTools(
         compactTreeFormatter,
         screenshotAnnotator,
         screenshotEncoder,
+        nodeCache,
     ).register(server, toolNamePrefix)
 }

@@ -1,10 +1,12 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -19,10 +21,14 @@ import java.lang.reflect.Field
 class ActionExecutorImplTest {
     private lateinit var executor: ActionExecutorImpl
     private lateinit var mockService: McpAccessibilityService
+    private lateinit var mockCache: AccessibilityNodeCache
+    private lateinit var mockTreeParser: AccessibilityTreeParser
 
     @BeforeEach
     fun setUp() {
-        executor = ActionExecutorImpl()
+        mockCache = mockk<AccessibilityNodeCache>(relaxed = true)
+        mockTreeParser = mockk<AccessibilityTreeParser>(relaxed = true)
+        executor = ActionExecutorImpl(mockCache, mockTreeParser)
         mockService = mockk<McpAccessibilityService>(relaxed = true)
     }
 
@@ -514,6 +520,261 @@ class ActionExecutorImplTest {
                 // Assert
                 assertTrue(result.isFailure)
                 assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+            }
+    }
+
+    private fun mockCacheHitWithIdentity(
+        cachedNode: CachedNode,
+        expectedNodeId: String,
+        refreshResult: Boolean = true,
+    ) {
+        every { mockCache.get(expectedNodeId) } returns cachedNode
+        every { cachedNode.node.refresh() } returns refreshResult
+        if (refreshResult) {
+            val rectSlot = slot<Rect>()
+            every { cachedNode.node.getBoundsInScreen(capture(rectSlot)) } answers {
+                rectSlot.captured.left = 0
+                rectSlot.captured.top = 0
+                rectSlot.captured.right = 100
+                rectSlot.captured.bottom = 100
+            }
+            every {
+                mockTreeParser.generateNodeId(
+                    cachedNode.node,
+                    any(),
+                    cachedNode.depth,
+                    cachedNode.index,
+                    cachedNode.parentId,
+                )
+            } returns expectedNodeId
+        }
+    }
+
+    @Nested
+    @DisplayName("Cache hit")
+    inner class CacheHit {
+        @Test
+        @DisplayName("clickNode uses valid cached node")
+        fun clickNodeUsesValidCachedNode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isClickable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+
+                // Act
+                val result = executor.clickNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify(exactly = 0) { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("clickNode falls back when cache is stale")
+        fun clickNodeFallsBackWhenCacheStale() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                every { mockCache.get("node_target") } returns cachedNode
+                every { cachedNode.node.refresh() } returns false
+
+                val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode.childCount } returns 0
+                every { mockRootNode.isClickable } returns true
+                every { mockRootNode.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 10
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
+
+                val tree =
+                    AccessibilityNodeData(
+                        id = "node_target",
+                        className = "android.widget.Button",
+                        bounds = BoundsData(0, 0, 100, 50),
+                        clickable = true,
+                    )
+                val windows =
+                    listOf(
+                        WindowData(windowId = 10, windowType = "APPLICATION", tree = tree, focused = true),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_target", windows)
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("clickNode falls back when cache miss")
+        fun clickNodeFallsBackWhenCacheMiss() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                every { mockCache.get("node_nonexistent") } returns null
+
+                val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode.childCount } returns 0
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 0
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
+
+                val tree =
+                    AccessibilityNodeData(
+                        id = "node_root",
+                        bounds = BoundsData(0, 0, 1080, 2400),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_nonexistent", wrapInWindows(tree))
+
+                // Assert
+                assertTrue(result.isFailure)
+                verify { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("cached node is not recycled after use")
+        fun cachedNodeNotRecycledAfterUse() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isClickable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+
+                // Act
+                val result = executor.clickNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify(exactly = 0) {
+                    @Suppress("DEPRECATION")
+                    cachedNode.node.recycle()
+                }
+            }
+
+        @Test
+        @DisplayName("clickNode fails when service unavailable even with cache")
+        fun clickNodeFailsWhenServiceUnavailableEvenWithCache() =
+            runTest {
+                // Arrange
+                setServiceInstance(null)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                every { mockCache.get("node_target") } returns cachedNode
+
+                // Act
+                val result = executor.clickNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("not available") == true,
+                )
+                verify(exactly = 0) { mockCache.get(any()) }
+            }
+
+        @Test
+        @DisplayName("scrollNode uses valid cached node")
+        fun scrollNodeUsesValidCachedNode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isScrollable } returns true
+                every {
+                    cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                } returns true
+
+                // Act
+                val result = executor.scrollNode("node_target", ScrollDirection.DOWN, emptyList())
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify(exactly = 0) { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("clickNode action fails via cached node")
+        fun clickNodeActionFailsViaCachedNode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isClickable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns false
+
+                // Act
+                val result = executor.clickNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+                verify(exactly = 0) { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("clickNode falls back when identity mismatch")
+        fun clickNodeFallsBackWhenIdentityMismatch() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                // Override generateNodeId to return a different ID (identity mismatch)
+                every {
+                    mockTreeParser.generateNodeId(
+                        cachedNode.node,
+                        any(),
+                        cachedNode.depth,
+                        cachedNode.index,
+                        cachedNode.parentId,
+                    )
+                } returns "node_DIFFERENT"
+
+                val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode.childCount } returns 0
+                every { mockRootNode.isClickable } returns true
+                every { mockRootNode.performAction(AccessibilityNodeInfo.ACTION_CLICK) } returns true
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 10
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
+
+                val tree =
+                    AccessibilityNodeData(
+                        id = "node_target",
+                        className = "android.widget.Button",
+                        bounds = BoundsData(0, 0, 100, 50),
+                        clickable = true,
+                    )
+                val windows =
+                    listOf(
+                        WindowData(windowId = 10, windowType = "APPLICATION", tree = tree, focused = true),
+                    )
+
+                // Act
+                val result = executor.clickNode("node_target", windows)
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify { mockService.getAccessibilityWindows() }
             }
     }
 }

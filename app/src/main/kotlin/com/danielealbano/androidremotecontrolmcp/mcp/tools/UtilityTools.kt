@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.os.SystemClock
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
@@ -187,6 +188,7 @@ class WaitForElementTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("CyclomaticComplexity", "LongMethod", "ThrowsCount", "InstanceOfCheckForException")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -226,7 +228,7 @@ class WaitForElementTool
                 attemptCount++
 
                 try {
-                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val elements = elementFinder.findElements(multiWindowResult.windows, findBy, value, false)
 
                     if (elements.isNotEmpty()) {
@@ -333,6 +335,7 @@ class WaitForIdleTool
     constructor(
         private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         private val treeFingerprint = TreeFingerprint()
 
@@ -373,7 +376,7 @@ class WaitForIdleTool
 
             while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
-                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val currentFingerprint = treeFingerprint.generate(multiWindowResult.windows)
 
                     if (previousFingerprint != null) {
@@ -477,6 +480,7 @@ class GetElementDetailsTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -502,7 +506,7 @@ class GetElementDetailsTool
                 }
 
             // 2. Get fresh multi-window snapshot
-            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             // 3. Build TSV output
             val sb = StringBuilder()
@@ -575,16 +579,21 @@ class GetElementDetailsTool
 /**
  * Registers all utility tools with the given [Server].
  */
+@Suppress("LongParameterList")
 fun registerUtilityTools(
     server: Server,
     treeParser: AccessibilityTreeParser,
     elementFinder: ElementFinder,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
 ) {
     GetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
     SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
-    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
-    WaitForIdleTool(treeParser, accessibilityServiceProvider).register(server, toolNamePrefix)
-    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
+    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
+    WaitForIdleTool(treeParser, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
+    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
 }

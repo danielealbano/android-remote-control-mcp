@@ -15,6 +15,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -97,10 +98,7 @@ object McpIntegrationTestHelper {
         every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns packageName
         every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns activityName
         every { deps.accessibilityServiceProvider.getScreenInfo() } returns screenInfo
-        @Suppress("DEPRECATION")
-        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId") } returns tree
-        @Suppress("DEPRECATION")
-        every { mockRootNode.recycle() } returns Unit
+        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId", any()) } returns tree
     }
 
     /**
@@ -120,6 +118,7 @@ object McpIntegrationTestHelper {
             screenshotAnnotator = mockk(relaxed = true),
             screenshotEncoder = mockk(relaxed = true),
             cameraProvider = mockk(relaxed = true),
+            nodeCache = mockk(relaxed = true),
         )
 
     /**
@@ -139,6 +138,7 @@ object McpIntegrationTestHelper {
             CompactTreeFormatter(),
             deps.screenshotAnnotator,
             deps.screenshotEncoder,
+            deps.nodeCache,
             toolNamePrefix,
         )
         registerSystemActionTools(
@@ -155,6 +155,7 @@ object McpIntegrationTestHelper {
             deps.elementFinder,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
+            deps.nodeCache,
             toolNamePrefix,
         )
         registerTextInputTools(
@@ -163,6 +164,7 @@ object McpIntegrationTestHelper {
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
             deps.typeInputController,
+            deps.nodeCache,
             toolNamePrefix,
         )
         registerUtilityTools(
@@ -170,6 +172,7 @@ object McpIntegrationTestHelper {
             deps.treeParser,
             deps.elementFinder,
             deps.accessibilityServiceProvider,
+            deps.nodeCache,
             toolNamePrefix,
         )
         registerFileTools(server, deps.storageLocationProvider, deps.fileOperationProvider, toolNamePrefix)
@@ -324,4 +327,5 @@ data class MockDependencies(
     val screenshotAnnotator: ScreenshotAnnotator,
     val screenshotEncoder: ScreenshotEncoder,
     val cameraProvider: CameraProvider,
+    val nodeCache: AccessibilityNodeCache,
 )

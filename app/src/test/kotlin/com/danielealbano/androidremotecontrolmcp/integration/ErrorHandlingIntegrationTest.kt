@@ -224,11 +224,8 @@ class ErrorHandlingIntegrationTest {
                 every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
                 every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
                 every { deps.accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
-                @Suppress("DEPRECATION")
-                every { mockRootNode.recycle() } returns Unit
-
                 var callCount = 0
-                every { deps.treeParser.parseTree(any(), any()) } answers {
+                every { deps.treeParser.parseTree(any(), any(), any()) } answers {
                     callCount++
                     clockMs += 600L
                     AccessibilityNodeData(

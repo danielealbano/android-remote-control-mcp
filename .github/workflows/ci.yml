@@ -174,7 +174,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/docker-android-image.tar.zst
-          key: docker-android-emulator-14-0-v2
+          key: docker-android-emulator-14-0-v3
 
       - name: Load cached Docker Android image
         if: steps.docker-android-cache.outputs.cache-hit == 'true'

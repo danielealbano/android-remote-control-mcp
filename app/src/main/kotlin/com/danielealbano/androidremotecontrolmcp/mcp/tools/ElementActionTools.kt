@@ -5,10 +5,12 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.util.Log
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
@@ -42,6 +44,7 @@ class FindElementsTool
         private val treeParser: AccessibilityTreeParser,
         private val elementFinder: ElementFinder,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -67,7 +70,7 @@ class FindElementsTool
                     )
 
             // Get fresh multi-window accessibility snapshot
-            val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             // Search across all windows
             val elements = elementFinder.findElements(result.windows, findBy, value, exactMatch)
@@ -169,6 +172,7 @@ class ClickElementTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
@@ -179,7 +183,7 @@ class ClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             val result = actionExecutor.clickNode(elementId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
@@ -226,6 +230,7 @@ class LongClickElementTool
         private val treeParser: AccessibilityTreeParser,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val elementId =
@@ -236,7 +241,7 @@ class LongClickElementTool
                 throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
             }
 
-            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider)
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             val result = actionExecutor.longClickNode(elementId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, elementId) }
@@ -285,6 +290,7 @@ class ScrollToElementTool
         private val elementFinder: ElementFinder,
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -297,7 +303,7 @@ class ScrollToElementTool
             }
 
             // Parse multi-window trees and find the element
-            var result = getFreshWindows(treeParser, accessibilityServiceProvider)
+            var result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
             var node =
                 elementFinder.findNodeById(result.windows, elementId)
                     ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
@@ -348,7 +354,7 @@ class ScrollToElementTool
                     kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
 
                     // Re-parse and check visibility
-                    result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     node = elementFinder.findNodeById(result.windows, elementId) ?: continue
 
                     if (node.visible) {
@@ -495,12 +501,11 @@ internal fun mapFindBy(by: String): FindBy? =
  * Falls back to single-window mode via [AccessibilityServiceProvider.getRootNode] if
  * [AccessibilityServiceProvider.getAccessibilityWindows] returns an empty list.
  *
- * **Performance note**: This function re-parses ALL window trees on every invocation.
- * No caching is used because the accessibility tree can change between calls (UI updates,
- * window transitions, user interactions). Callers that invoke this in a loop (e.g.,
- * [ScrollToElementTool] with up to [ScrollToElementTool.MAX_SCROLL_ATTEMPTS] iterations)
- * accept this cost to ensure correctness — stale tree data would cause actions to target
- * the wrong nodes or miss UI changes.
+ * **Performance note**: This function re-parses ALL window trees on every invocation to ensure
+ * correctness — stale tree data would cause actions to target the wrong nodes. During parsing,
+ * real [AccessibilityNodeInfo] references are accumulated in a [MutableMap] and stored in
+ * [nodeCache] via [AccessibilityNodeCache.populate] for O(1) node resolution in
+ * [ActionExecutorImpl.performNodeAction]. The cache is replaced atomically on each call.
  *
  * @throws McpToolException.PermissionDenied if accessibility service is not connected.
  * @throws McpToolException.ActionFailed if no windows and no root node are available.
@@ -509,6 +514,7 @@ internal fun mapFindBy(by: String): FindBy? =
 internal fun getFreshWindows(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
 ): MultiWindowResult {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
@@ -516,6 +522,12 @@ internal fun getFreshWindows(
                 "Please enable it in Android Settings > Accessibility.",
         )
     }
+
+    // Accumulate real AccessibilityNodeInfo references from ALL windows for cache population.
+    // This map is passed to each parseTree call and populated during tree traversal.
+    // We populate the cache ONCE after all windows are parsed to avoid the multi-window
+    // cache overwrite problem (Critical Finding 1).
+    val accumulatedNodeMap = mutableMapOf<String, CachedNode>()
 
     val accessibilityWindows = accessibilityServiceProvider.getAccessibilityWindows()
 
@@ -528,7 +540,7 @@ internal fun getFreshWindows(
             for (window in accessibilityWindows) {
                 val rootNode = window.root ?: continue
 
-                // Extract metadata BEFORE recycling rootNode
+                // Extract metadata BEFORE parsing
                 val wId = window.id
                 val windowPackage = rootNode.packageName?.toString()
                 val windowTitle = window.title?.toString()
@@ -536,13 +548,10 @@ internal fun getFreshWindows(
                 val windowLayer = window.layer
                 val windowFocused = window.isFocused
 
-                val tree =
-                    try {
-                        treeParser.parseTree(rootNode, "root_w$wId")
-                    } finally {
-                        @Suppress("DEPRECATION")
-                        rootNode.recycle()
-                    }
+                // Root nodes are NOT recycled — they are stored in accumulatedNodeMap
+                // and owned by the cache. On API 33+ recycle() is a no-op, but we
+                // avoid calling it on cached nodes for semantic clarity (Critical Finding 2).
+                val tree = treeParser.parseTree(rootNode, "root_w$wId", accumulatedNodeMap)
 
                 // Best-effort activity name: only for focused APPLICATION window matching tracked package
                 val activityName =
@@ -574,6 +583,9 @@ internal fun getFreshWindows(
                     "All windows returned null root nodes.",
                 )
             }
+
+            // Populate cache with ALL windows' nodes in a single atomic swap
+            nodeCache.populate(accumulatedNodeMap)
 
             return MultiWindowResult(windows = windowDataList, degraded = false)
         } finally {
@@ -609,13 +621,11 @@ internal fun getFreshWindows(
             "APPLICATION"
         }
 
-    val tree =
-        try {
-            treeParser.parseTree(rootNode, "root_w$fallbackWindowId")
-        } finally {
-            @Suppress("DEPRECATION")
-            rootNode.recycle()
-        }
+    // Fallback path also accumulates into the same map and does NOT recycle root node
+    val tree = treeParser.parseTree(rootNode, "root_w$fallbackWindowId", accumulatedNodeMap)
+
+    // Populate cache with fallback window's nodes
+    nodeCache.populate(accumulatedNodeMap)
 
     val currentPackageName = accessibilityServiceProvider.getCurrentPackageName()
     val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
@@ -648,12 +658,16 @@ fun registerElementActionTools(
     elementFinder: ElementFinder,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
 ) {
-    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider).register(server, toolNamePrefix)
-    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider)
+    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
+    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
+    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+        .register(server, toolNamePrefix)
+    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
         .register(server, toolNamePrefix)
 }
 

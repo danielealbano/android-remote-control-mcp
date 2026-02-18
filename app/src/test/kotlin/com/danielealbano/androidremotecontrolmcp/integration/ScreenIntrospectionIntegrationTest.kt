@@ -328,11 +328,8 @@ class ScreenIntrospectionIntegrationTest {
             every { accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
             every { accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
 
-            every { treeParser.parseTree(mockRootApp, "root_w42") } returns appTree
-            every { treeParser.parseTree(mockRootDialog, "root_w99") } returns dialogTree
-
-            every { mockRootApp.recycle() } returns Unit
-            every { mockRootDialog.recycle() } returns Unit
+            every { treeParser.parseTree(mockRootApp, "root_w42", any()) } returns appTree
+            every { treeParser.parseTree(mockRootDialog, "root_w99", any()) } returns dialogTree
         }
 
         @Test
@@ -379,11 +376,10 @@ class ScreenIntrospectionIntegrationTest {
                 every { mockRootNode.packageName } returns "com.example.app"
                 every { mockRootNode.windowId } returns 0
                 every { mockRootNode.window } returns null
-                every { deps.treeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
+                every { deps.treeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
                 every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns "com.example.app"
                 every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns ".MainActivity"
                 every { deps.accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
-                every { mockRootNode.recycle() } returns Unit
 
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =

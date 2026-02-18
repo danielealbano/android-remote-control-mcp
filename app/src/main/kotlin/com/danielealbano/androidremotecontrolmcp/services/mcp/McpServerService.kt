@@ -26,6 +26,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
@@ -106,6 +107,8 @@ class McpServerService : Service() {
     @Inject lateinit var appManager: AppManager
 
     @Inject lateinit var typeInputController: TypeInputController
+
+    @Inject lateinit var nodeCache: AccessibilityNodeCache
 
     @Inject lateinit var cameraProvider: CameraProvider
 
@@ -271,6 +274,7 @@ class McpServerService : Service() {
             compactTreeFormatter,
             screenshotAnnotator,
             screenshotEncoder,
+            nodeCache,
             toolNamePrefix,
         )
         registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
@@ -282,6 +286,7 @@ class McpServerService : Service() {
             elementFinder,
             actionExecutor,
             accessibilityServiceProvider,
+            nodeCache,
             toolNamePrefix,
         )
         registerTextInputTools(
@@ -290,9 +295,10 @@ class McpServerService : Service() {
             actionExecutor,
             accessibilityServiceProvider,
             typeInputController,
+            nodeCache,
             toolNamePrefix,
         )
-        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, toolNamePrefix)
+        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, nodeCache, toolNamePrefix)
         registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
         registerAppManagementTools(server, appManager, toolNamePrefix)
         registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix)

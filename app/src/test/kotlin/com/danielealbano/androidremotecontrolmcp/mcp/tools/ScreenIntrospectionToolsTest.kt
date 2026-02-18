@@ -5,6 +5,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -42,6 +43,7 @@ class ScreenIntrospectionToolsTest {
     private lateinit var mockCompactTreeFormatter: CompactTreeFormatter
     private lateinit var mockScreenshotAnnotator: ScreenshotAnnotator
     private lateinit var mockScreenshotEncoder: ScreenshotEncoder
+    private lateinit var mockNodeCache: AccessibilityNodeCache
     private lateinit var mockRootNode: AccessibilityNodeInfo
     private lateinit var mockWindowInfo: AccessibilityWindowInfo
 
@@ -53,6 +55,7 @@ class ScreenIntrospectionToolsTest {
         mockCompactTreeFormatter = mockk<CompactTreeFormatter>()
         mockScreenshotAnnotator = mockk(relaxed = true)
         mockScreenshotEncoder = mockk(relaxed = true)
+        mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
         mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
     }
@@ -121,7 +124,7 @@ class ScreenIntrospectionToolsTest {
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockAccessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
         every {
             mockCompactTreeFormatter.formatMultiWindow(any(), eq(sampleScreenInfo))
         } returns sampleCompactOutput
@@ -147,6 +150,7 @@ class ScreenIntrospectionToolsTest {
                     mockCompactTreeFormatter,
                     mockScreenshotAnnotator,
                     mockScreenshotEncoder,
+                    mockNodeCache,
                 )
         }
 
@@ -317,15 +321,16 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
-        @DisplayName("recycles root node and window info after parsing")
-        fun recyclesRootNodeAndWindowInfoAfterParsing() =
+        @DisplayName("populates cache and recycles window info but not root node after parsing")
+        fun populatesCacheAndRecyclesWindowInfoButNotRootNodeAfterParsing() =
             runTest {
                 setupReadyService()
 
                 handler.execute(null)
 
                 @Suppress("DEPRECATION")
-                verify(exactly = 1) { mockRootNode.recycle() }
+                verify(exactly = 0) { mockRootNode.recycle() }
+                verify(exactly = 1) { mockNodeCache.populate(any()) }
                 @Suppress("DEPRECATION")
                 verify(exactly = 1) { mockWindowInfo.recycle() }
             }
@@ -342,7 +347,7 @@ class ScreenIntrospectionToolsTest {
                 every { mockAccessibilityServiceProvider.getRootNode() } returns fallbackRootNode
                 every { fallbackRootNode.windowId } returns 42
                 every { fallbackRootNode.packageName } returns "com.fallback"
-                every { mockTreeParser.parseTree(fallbackRootNode, "root_w42") } returns sampleTree
+                every { mockTreeParser.parseTree(fallbackRootNode, "root_w42", any()) } returns sampleTree
                 every { mockAccessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
                 val degradedOutput = "degraded output"
                 every {
@@ -359,7 +364,8 @@ class ScreenIntrospectionToolsTest {
                 assertEquals(degradedOutput, textContent.text)
 
                 @Suppress("DEPRECATION")
-                verify(exactly = 1) { fallbackRootNode.recycle() }
+                verify(exactly = 0) { fallbackRootNode.recycle() }
+                verify(exactly = 1) { mockNodeCache.populate(any()) }
             }
 
         @Test

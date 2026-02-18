@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -32,6 +33,7 @@ class GetElementDetailsToolTest {
     private lateinit var mockTreeParser: AccessibilityTreeParser
     private lateinit var mockElementFinder: ElementFinder
     private lateinit var mockRootNode: AccessibilityNodeInfo
+    private lateinit var mockNodeCache: AccessibilityNodeCache
     private lateinit var mockWindowInfo: AccessibilityWindowInfo
     private lateinit var tool: GetElementDetailsTool
 
@@ -80,6 +82,7 @@ class GetElementDetailsToolTest {
         mockTreeParser = mockk<AccessibilityTreeParser>()
         mockElementFinder = mockk<ElementFinder>()
         mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)
         mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
 
         every { mockAccessibilityServiceProvider.isReady() } returns true
@@ -95,9 +98,9 @@ class GetElementDetailsToolTest {
         } returns listOf(mockWindowInfo)
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
 
-        tool = GetElementDetailsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
+        tool = GetElementDetailsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
     }
 
     @AfterEach

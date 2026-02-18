@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
@@ -228,6 +229,7 @@ class TypeAppendTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val typeInputController: TypeInputController,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -247,7 +249,7 @@ class TypeAppendTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -356,6 +358,7 @@ class TypeInsertTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val typeInputController: TypeInputController,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -381,7 +384,7 @@ class TypeInsertTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -526,6 +529,7 @@ class TypeReplaceTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val typeInputController: TypeInputController,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -555,7 +559,7 @@ class TypeReplaceTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -719,6 +723,7 @@ class TypeClearTextTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val typeInputController: TypeInputController,
+        private val nodeCache: AccessibilityNodeCache,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
@@ -730,7 +735,7 @@ class TypeClearTextTool
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider)
+                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
                     val clickResult = actionExecutor.clickNode(elementId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
 
@@ -996,15 +1001,16 @@ fun registerTextInputTools(
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     typeInputController: TypeInputController,
+    nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
 ) {
-    TypeAppendTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController)
+    TypeAppendTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
         .register(server, toolNamePrefix)
-    TypeInsertTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController)
+    TypeInsertTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
         .register(server, toolNamePrefix)
-    TypeReplaceTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController)
+    TypeReplaceTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
         .register(server, toolNamePrefix)
-    TypeClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController)
+    TypeClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
         .register(server, toolNamePrefix)
     PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
 }

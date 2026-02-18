@@ -7,6 +7,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -42,6 +43,7 @@ class TextInputToolsTest {
     private val mockActionExecutor = mockk<ActionExecutor>()
     private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
     private val mockTypeInputController = mockk<TypeInputController>()
+    private val mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockFocusedNode = mockk<AccessibilityNodeInfo>()
     private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
@@ -103,8 +105,7 @@ class TextInputToolsTest {
         } returns listOf(mockWindowInfo)
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
-        every { mockRootNode.recycle() } returns Unit
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
     }
 
     @AfterEach
@@ -336,6 +337,7 @@ class TextInputToolsTest {
                 mockActionExecutor,
                 mockAccessibilityServiceProvider,
                 mockTypeInputController,
+                mockNodeCache,
             )
 
         private fun setupDefaultMocks(existingText: String = "existing") {
@@ -577,6 +579,7 @@ class TextInputToolsTest {
                 mockActionExecutor,
                 mockAccessibilityServiceProvider,
                 mockTypeInputController,
+                mockNodeCache,
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello") {
@@ -787,6 +790,7 @@ class TextInputToolsTest {
                 mockActionExecutor,
                 mockAccessibilityServiceProvider,
                 mockTypeInputController,
+                mockNodeCache,
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello World") {
@@ -1082,6 +1086,7 @@ class TextInputToolsTest {
                 mockActionExecutor,
                 mockAccessibilityServiceProvider,
                 mockTypeInputController,
+                mockNodeCache,
             )
 
         @Test
@@ -1244,6 +1249,9 @@ class TextInputToolsTest {
         @Test
         fun `presses DEL key removes last character`() =
             runTest {
+                every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
+                @Suppress("DEPRECATION")
+                every { mockRootNode.recycle() } returns Unit
                 every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns mockFocusedNode
                 every { mockFocusedNode.isEditable } returns true
                 every { mockFocusedNode.text } returns "Hello"
@@ -1259,6 +1267,9 @@ class TextInputToolsTest {
         @Test
         fun `presses SPACE key appends space`() =
             runTest {
+                every { mockAccessibilityServiceProvider.getRootNode() } returns mockRootNode
+                @Suppress("DEPRECATION")
+                every { mockRootNode.recycle() } returns Unit
                 every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns mockFocusedNode
                 every { mockFocusedNode.isEditable } returns true
                 every { mockFocusedNode.text } returns "Hello"

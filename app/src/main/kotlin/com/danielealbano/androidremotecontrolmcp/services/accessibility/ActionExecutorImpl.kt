@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
@@ -21,12 +22,20 @@ import kotlin.coroutines.resume
  * Accesses [McpAccessibilityService.instance] directly (singleton pattern) because the
  * accessibility service is system-managed and cannot be injected via Hilt.
  *
- * This class is Hilt-injectable and stateless.
+ * Uses [AccessibilityNodeCache] for O(1) node resolution on cache hits (populated during
+ * tree parsing). Falls back to [walkAndMatch] tree traversal on cache miss/stale/identity
+ * mismatch. Uses [AccessibilityTreeParser.generateNodeId] to re-verify node identity after
+ * [AccessibilityNodeInfo.refresh].
+ *
+ * This class is Hilt-injectable.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 class ActionExecutorImpl
     @Inject
-    constructor() : ActionExecutor {
+    constructor(
+        private val nodeCache: AccessibilityNodeCache,
+        private val treeParser: AccessibilityTreeParser,
+    ) : ActionExecutor {
         // ─────────────────────────────────────────────────────────────────────────
         // Node Actions
         // ─────────────────────────────────────────────────────────────────────────
@@ -552,6 +561,56 @@ class ActionExecutorImpl
                     ?: return Result.failure(
                         IllegalStateException("Accessibility service is not available"),
                     )
+
+            // Fast path: check cache for a direct hit
+            val cached = nodeCache.get(nodeId)
+            if (cached != null) {
+                if (cached.node.refresh()) {
+                    // S1 fix: re-verify node identity after refresh.
+                    // refresh() updates the node's properties from the live UI.
+                    // If the View was reused for a different element (e.g., RecyclerView),
+                    // the regenerated nodeId will differ → treat as cache miss.
+                    // NOTE: getBoundsInScreen() reads the locally cached bounds field
+                    // (already updated by refresh()) — this is NOT an additional IPC call.
+                    val rect = Rect()
+                    cached.node.getBoundsInScreen(rect)
+                    val refreshedBounds = BoundsData(rect.left, rect.top, rect.right, rect.bottom)
+                    val refreshedId =
+                        treeParser.generateNodeId(
+                            cached.node,
+                            refreshedBounds,
+                            cached.depth,
+                            cached.index,
+                            cached.parentId,
+                        )
+                    if (refreshedId == nodeId) {
+                        Log.d(TAG, "Cache hit for node '$nodeId', identity verified")
+                        val result = action(cached.node)
+                        if (result.isSuccess) {
+                            Log.d(TAG, "Node action '$actionName' succeeded (cached) on '$nodeId'")
+                        } else {
+                            Log.w(
+                                TAG,
+                                "Node action '$actionName' failed (cached) on '$nodeId': " +
+                                    "${result.exceptionOrNull()?.message}",
+                            )
+                        }
+                        // Do NOT recycle cached nodes — they are owned by the cache.
+                        // No try/finally needed since there is no cleanup to perform.
+                        return result
+                    } else {
+                        Log.d(
+                            TAG,
+                            "Cache identity mismatch for '$nodeId' (refreshed='$refreshedId'), " +
+                                "falling back to tree walk",
+                        )
+                    }
+                } else {
+                    Log.d(TAG, "Cache stale for node '$nodeId', falling back to tree walk")
+                }
+            } else {
+                Log.d(TAG, "Cache miss for node '$nodeId', falling back to tree walk")
+            }
 
             val realWindows = service.getAccessibilityWindows()
 

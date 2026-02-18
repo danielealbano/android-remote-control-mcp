@@ -13,6 +13,10 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +28,13 @@ import kotlin.coroutines.resume
 
 @Suppress("TooManyFunctions")
 class McpAccessibilityService : AccessibilityService() {
+    // AccessibilityNodeCache is in the same package — no import needed
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface NodeCacheEntryPoint {
+        fun nodeCache(): AccessibilityNodeCache
+    }
+
     private var serviceScope: CoroutineScope? = null
     private var currentPackageName: String? = null
     private var currentActivityName: String? = null
@@ -71,6 +82,18 @@ class McpAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         Log.i(TAG, "Accessibility service destroying")
+
+        // Flush the node cache — all AccessibilityNodeInfo references become invalid
+        try {
+            val entryPoint =
+                EntryPointAccessors.fromApplication(
+                    applicationContext,
+                    NodeCacheEntryPoint::class.java,
+                )
+            entryPoint.nodeCache().clear()
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Could not flush node cache during destroy", e)
+        }
 
         serviceScope?.cancel()
         serviceScope = null

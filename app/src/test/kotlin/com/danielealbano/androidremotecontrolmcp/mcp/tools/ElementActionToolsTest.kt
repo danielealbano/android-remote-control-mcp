@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -43,6 +44,7 @@ class ElementActionToolsTest {
     private val mockElementFinder = mockk<ElementFinder>()
     private val mockActionExecutor = mockk<ActionExecutor>()
     private val mockAccessibilityServiceProvider = mockk<AccessibilityServiceProvider>()
+    private val mockNodeCache = mockk<AccessibilityNodeCache>(relaxed = true)
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
 
@@ -114,8 +116,7 @@ class ElementActionToolsTest {
         } returns listOf(mockWindowInfo)
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0") } returns sampleTree
-        every { mockRootNode.recycle() } returns Unit
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
         every { mockAccessibilityServiceProvider.getScreenInfo() } returns
             ScreenInfo(
                 width = 1080,
@@ -133,7 +134,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("FindElementsTool")
     inner class FindElementsToolTests {
-        private val tool = FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider)
+        private val tool =
+            FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `returns matching elements`() =
@@ -220,7 +222,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("ClickElementTool")
     inner class ClickElementToolTests {
-        private val tool = ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
+        private val tool =
+            ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `clicks element successfully`() =
@@ -265,7 +268,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("LongClickElementTool")
     inner class LongClickElementToolTests {
-        private val tool = LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider)
+        private val tool =
+            LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `long-clicks element successfully`() =
@@ -283,7 +287,13 @@ class ElementActionToolsTest {
     @DisplayName("ScrollToElementTool")
     inner class ScrollToElementToolTests {
         private val tool =
-            ScrollToElementTool(mockTreeParser, mockElementFinder, mockActionExecutor, mockAccessibilityServiceProvider)
+            ScrollToElementTool(
+                mockTreeParser,
+                mockElementFinder,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockNodeCache,
+            )
 
         @Test
         fun `returns immediately when element already visible`() =
@@ -348,7 +358,7 @@ class ElementActionToolsTest {
 
                 // First call returns invisible node, after scroll returns visible
                 var callCount = 0
-                every { mockTreeParser.parseTree(secondMockRootNode, "root_w5") } answers {
+                every { mockTreeParser.parseTree(secondMockRootNode, "root_w5", any()) } answers {
                     callCount++
                     if (callCount <= 1) secondWindowTreeBefore else secondWindowTreeAfter
                 }
