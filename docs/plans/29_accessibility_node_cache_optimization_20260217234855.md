@@ -1477,7 +1477,7 @@ In the `wait_for_idle` test:
 - [x] `ScreenIntrospectionToolsTest`: `recyclesRootNodeAndWindowInfoAfterParsing` test updated to verify root node NOT recycled and `nodeCache.populate()` called; fallback test updated similarly
 - [x] All 3 integration test files: local `parseTree` mocks updated to 3-arg, `rootNode.recycle()` mocks removed
 - [x] All tests compile and pass
-- [ ] Linting passes on all changed files
+- [x] Linting passes on all changed files
 
 ---
 
@@ -1488,15 +1488,15 @@ In the `wait_for_idle` test:
 `walkAndMatch` (O(N) IPC, same as current behavior).
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] `ActionExecutorImpl` receives `AccessibilityNodeCache` and `AccessibilityTreeParser` via constructor injection
-- [ ] `performNodeAction` checks cache before walking the tree
-- [ ] Cache hit + `refresh()` returns `true` + identity verified (nodeId re-generated matches) → node used directly (no tree walk)
-- [ ] Cache hit + `refresh()` returns `true` + identity mismatch → fall back to `walkAndMatch` (S1 fix)
-- [ ] Cache miss or `refresh()` returns `false` → fall back to `walkAndMatch` (existing behavior)
-- [ ] Logging added for cache hit, cache miss, cache stale, and identity mismatch (explicit Log.d for each path)
-- [ ] Existing unit tests updated for cache injection
-- [ ] New tests verify cache hit path, fallback path, and identity mismatch path
-- [ ] Linting passes on all changed files
+- [x] `ActionExecutorImpl` receives `AccessibilityNodeCache` and `AccessibilityTreeParser` via constructor injection
+- [x] `performNodeAction` checks cache before walking the tree
+- [x] Cache hit + `refresh()` returns `true` + identity verified (nodeId re-generated matches) → node used directly (no tree walk)
+- [x] Cache hit + `refresh()` returns `true` + identity mismatch → fall back to `walkAndMatch` (S1 fix)
+- [x] Cache miss or `refresh()` returns `false` → fall back to `walkAndMatch` (existing behavior)
+- [x] Logging added for cache hit, cache miss, cache stale, and identity mismatch (explicit Log.d for each path)
+- [x] Existing unit tests updated for cache injection
+- [x] New tests verify cache hit path, fallback path, and identity mismatch path
+- [x] Linting passes on all changed files
 
 ### Task 4.1: Inject `AccessibilityNodeCache` and `AccessibilityTreeParser` into `ActionExecutorImpl`
 
@@ -1542,9 +1542,9 @@ Update class KDoc — replace the last two lines:
 ```
 
 **Definition of Done**:
-- [ ] Constructor parameters added (cache + tree parser)
-- [ ] KDoc updated with concrete replacement text above
-- [ ] Linting passes
+- [x] Constructor parameters added (cache + tree parser)
+- [x] KDoc updated with concrete replacement text above
+- [x] Linting passes
 
 ### Task 4.2: Add cache lookup in `performNodeAction` (multi-window path)
 
@@ -1643,15 +1643,15 @@ Cache lookup diff in `performNodeAction`:
 recycles nodes (during `clear`).
 
 **Definition of Done**:
-- [ ] Cache lookup added at the start of `performNodeAction`
-- [ ] `import android.graphics.Rect` added at top of file (Major Finding 3)
-- [ ] No empty finally block — code uses plain sequential flow (Major Finding 4)
-- [ ] Cache hit + `refresh()` true + identity verified → action executed, node NOT recycled
-- [ ] Cache hit + `refresh()` true + identity mismatch → falls through to walkAndMatch (S1 fix)
-- [ ] Cache stale (`refresh()` false) → falls through to existing walkAndMatch logic
-- [ ] Cache miss (null) → falls through to existing walkAndMatch logic
-- [ ] Logging for cache hit, cache miss, cache stale, and identity mismatch (explicit Log.d for each path)
-- [ ] Linting passes
+- [x] Cache lookup added at the start of `performNodeAction`
+- [x] `import android.graphics.Rect` added at top of file (Major Finding 3)
+- [x] No empty finally block — code uses plain sequential flow (Major Finding 4)
+- [x] Cache hit + `refresh()` true + identity verified → action executed, node NOT recycled
+- [x] Cache hit + `refresh()` true + identity mismatch → falls through to walkAndMatch (S1 fix)
+- [x] Cache stale (`refresh()` false) → falls through to existing walkAndMatch logic
+- [x] Cache miss (null) → falls through to existing walkAndMatch logic
+- [x] Logging for cache hit, cache miss, cache stale, and identity mismatch (explicit Log.d for each path)
+- [x] Linting passes
 
 ### Task 4.3: Update `ActionExecutorImplTest`
 
@@ -1814,13 +1814,13 @@ recycles nodes (during `clear`).
       - Verify `mockService.getAccessibilityWindows()` WAS called (fell back to tree walk)
 
 **Definition of Done**:
-- [ ] All existing tests updated and passing (constructor now takes `mockCache` + `mockTreeParser`)
-- [ ] New cache hit/miss/stale tests added and passing
-- [ ] All cache-hit tests (a, d, f, g, h) mock `getBoundsInScreen` on cached node via slot + field assignment (Minor Finding 6, M4 fix)
-- [ ] Action failure on cached node path test added and passing (test g)
-- [ ] Identity mismatch test added and passing (S1 fix — test h)
-- [ ] Additional tests from QA review findings (Q1, Q4) added and passing
-- [ ] Linting passes
+- [x] All existing tests updated and passing (constructor now takes `mockCache` + `mockTreeParser`)
+- [x] New cache hit/miss/stale tests added and passing
+- [x] All cache-hit tests (a, d, f, g, h) mock `getBoundsInScreen` on cached node via slot + field assignment (Minor Finding 6, M4 fix)
+- [x] Action failure on cached node path test added and passing (test g)
+- [x] Identity mismatch test added and passing (S1 fix — test h)
+- [x] Additional tests from QA review findings (Q1, Q4) added and passing
+- [x] Linting passes
 
 ---
 
