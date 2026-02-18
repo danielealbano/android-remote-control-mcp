@@ -185,7 +185,8 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForElementTool")
     inner class WaitForElementToolTests {
-        private val tool = WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
+        private val tool =
+            WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `finds element on first attempt`() =

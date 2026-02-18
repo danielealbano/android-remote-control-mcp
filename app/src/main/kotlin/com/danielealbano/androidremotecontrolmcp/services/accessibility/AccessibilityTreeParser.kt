@@ -154,6 +154,7 @@ class AccessibilityTreeParser
          *   after data extraction per the original behavior.
          * @return The parsed node as [AccessibilityNodeData].
          */
+        @Suppress("LongParameterList", "LongMethod")
         internal fun parseNode(
             node: AccessibilityNodeInfo,
             depth: Int,

@@ -80,6 +80,7 @@ abstract class RepositoryModule {
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 }
 
+@Suppress("TooManyFunctions")
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ServiceModule {

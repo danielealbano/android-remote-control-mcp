@@ -29,7 +29,7 @@ import kotlin.coroutines.resume
  *
  * This class is Hilt-injectable.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 class ActionExecutorImpl
     @Inject
     constructor(

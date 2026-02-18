@@ -2017,71 +2017,71 @@ creating a new one.
 consistency, and no regressions.
 
 **Acceptance Criteria / Definition of Done**:
-- [ ] Re-read ALL created and modified files end-to-end
-- [ ] Verify `CachedNode` data class has `node`, `depth`, `index`, `parentId` fields
-- [ ] Verify `AccessibilityNodeCache` interface has correct method signatures using `CachedNode`
-- [ ] Verify `AccessibilityNodeCacheImpl` uses `AtomicReference<Map<String, CachedNode>>` correctly
-- [ ] Verify `populate()` does NOT call `recycle()` on old entries (P2 fix)
-- [ ] Verify `clear()` DOES call `recycle()` on old entries (shutdown-only operation)
-- [ ] Verify `AccessibilityTreeParser` has `nodeMap` parameter on `parseTree`/`parseNode` (NOT cache injection)
-- [ ] Verify `AccessibilityTreeParser` does NOT recycle nodes when `nodeMap` is provided
-- [ ] Verify `AccessibilityTreeParser` DOES recycle nodes when `nodeMap` is null (backward compat)
-- [ ] Verify `getFreshWindows` accumulates nodes across ALL windows into a single `nodeMap`
-- [ ] Verify `getFreshWindows` calls `nodeCache.populate()` ONCE after the window loop
-- [ ] Verify `getFreshWindows` does NOT recycle root nodes (they are in the cache)
-- [ ] Verify the fallback single-window path in `getFreshWindows` also populates the cache
-- [ ] Verify all 12 tool classes that call `getFreshWindows` pass `nodeCache`
-- [ ] Verify all 4 `register*Tools` functions accept and pass `nodeCache`
-- [ ] Verify `McpServerService` injects `nodeCache` and passes to register functions
-- [ ] Verify `McpIntegrationTestHelper` passes mock `nodeCache` to register functions
-- [ ] Verify `setupMultiWindowMock` uses 3-arg `parseTree` mock (`any()` for nodeMap) and no longer mocks `rootNode.recycle()`
-- [ ] Verify integration tests still return correct tree content (not empty `AccessibilityNodeData` defaults from relaxed mock)
-- [ ] Verify `ActionExecutorImpl` constructor takes both `AccessibilityNodeCache` and `AccessibilityTreeParser`
-- [ ] Verify `ActionExecutorImpl.performNodeAction` checks cache first, validates with `refresh()`, AND re-verifies identity via `generateNodeId()` (S1 fix)
-- [ ] Verify `import android.graphics.Rect` in `ActionExecutorImpl` (not fully-qualified, Major Finding 3)
-- [ ] Verify no empty finally block in `ActionExecutorImpl` cache path (Major Finding 4)
-- [ ] Verify identity mismatch falls through to walkAndMatch (S1 fix)
-- [ ] Verify cached nodes are NOT recycled by action executor (owned by cache)
-- [ ] Verify `McpAccessibilityService.onDestroy()` clears the cache
-- [ ] Verify Hilt binding exists in `AppModule.kt`
-- [ ] Verify ALL unit tests pass: `./gradlew :app:testDebugUnitTest`
-- [ ] Verify linting passes: `make lint`
-- [ ] Verify build succeeds: `./gradlew assembleDebug`
-- [ ] Verify no TODOs, no dead code, no temporary hacks in changed files
-- [ ] Verify KDoc is accurate and up-to-date on all changed/created classes and methods
-- [ ] Verify thread safety: `AtomicReference` swap in cache, no shared mutable state elsewhere
-- [ ] Verify `populate()` race safety: no recycle on old entries, safe for concurrent `get()` (P2 fix verified)
-- [ ] Verify identity check: `generateNodeId()` re-called after `refresh()`, mismatch → fallback (S1 fix verified)
-- [ ] Verify the fallback path (cache miss/stale/identity mismatch) is identical to previous behavior (no regression)
-- [ ] Verify all review findings (P1-P4, S1-S4, Q1-Q4) are addressed
-- [ ] Verify all plan review findings (Critical 1-2, Major 3-5, Minor 6-9, Info 10) are addressed
-- [ ] Verify all second plan review findings (Major M1-M4, Minor m1-m13, Info i4-i5) are addressed
-- [ ] Verify `populate()` uses `entries.toMap()` defensive copy (m1 fix)
-- [ ] Verify `mockCacheHitWithIdentity` uses slot + field assignment, NOT `Rect.set()` (M4 fix)
-- [ ] Verify `ScrollToElementTool` both `getFreshWindows` call sites pass `nodeCache` (m5 fix)
-- [ ] Verify `onTrimMemory` does NOT clear cache (documented design decision, m13 fix)
-- [ ] Verify `AccessibilityNodeCacheImpl` does NOT import `AccessibilityNodeInfo` (i5 fix)
-- [ ] Verify `McpAccessibilityService` does NOT import same-package `AccessibilityNodeCache` (i4 fix)
-- [ ] Verify all 5 unit test files updated: `mockNodeCache` field, `parseTree` 3-arg mocks, tool constructors with `nodeCache` (C1/Task 3.8)
-- [ ] Verify all 3 integration test files updated: local `parseTree` 3-arg mocks, `rootNode.recycle()` mocks removed (C1/Task 3.8)
-- [ ] Verify `ScreenIntrospectionToolsTest.recyclesRootNodeAndWindowInfoAfterParsing` renamed and updated: root node NOT recycled, `nodeCache.populate()` verified (C1/Task 3.8)
-- [ ] Verify `ScreenIntrospectionToolsTest` fallback test: root node NOT recycled, `nodeCache.populate()` verified (C1/Task 3.8)
-- [ ] Verify `registerUtilityTools` has `@Suppress("LongParameterList")` annotation (M5/Task 3.5)
-- [ ] Verify `ActionExecutorImplTest` does NOT import same-package classes (`AccessibilityNodeCache`, `AccessibilityTreeParser`, `CachedNode`) (M7/Task 4.3)
-- [ ] Verify test h uses `mockCacheHitWithIdentity` helper then overrides `generateNodeId` (M8/Task 4.3)
-- [ ] Verify `parseTree` function-level KDoc has `@param nodeMap` (m14/Task 2.3)
-- [ ] Verify `parseNode` function-level KDoc `@param recycleNode` updated — no longer says "always recycled" (m15/Task 2.3)
-- [ ] Verify `registerTextInputTools` diff matches actual source layout (m16/Task 3.4)
-- [ ] Verify `Hilt ServiceModule` reference says "inside `AppModule.kt`" (m18/US1)
-- [ ] Verify `getBoundsInScreen` after `refresh()` comment explains 0 IPC cost (m19/Task 4.2)
-- [ ] Verify P3 memory estimate notes text-heavy UI caveat (m20)
-- [ ] Verify `getFreshWindows` KDoc updated — "No caching is used" replaced (m21/Task 3.1)
-- [ ] Verify accumulation test notes nodeId collision impossibility due to different `rootParentId` (m22/Task 2.4)
-- [ ] Verify `onTrimMemory` design decision documents failed-`getFreshWindows` edge case (m23)
-- [ ] Verify all third plan review findings (C1, M5-M8, m14-m23) are addressed
-- [ ] Verify all fourth plan review findings (m24-m26, i1) are addressed
-- [ ] Verify Task 3.8 common pattern item 4 specifies which files have recycle mocks to remove (m24)
-- [ ] Verify Task 4.3 has note explaining `windows` parameter for cache-hit tests (m25)
-- [ ] Verify Third Review table uses unique IDs (M5-M8, m14-m23) with no collisions with Second Review (m26)
-- [ ] Verify Task 4.1 has note confirming `generateNodeId` `internal` visibility is sufficient (i1)
-- [ ] Review git diff to ensure only intended changes are present
+- [x] Re-read ALL created and modified files end-to-end
+- [x] Verify `CachedNode` data class has `node`, `depth`, `index`, `parentId` fields
+- [x] Verify `AccessibilityNodeCache` interface has correct method signatures using `CachedNode`
+- [x] Verify `AccessibilityNodeCacheImpl` uses `AtomicReference<Map<String, CachedNode>>` correctly
+- [x] Verify `populate()` does NOT call `recycle()` on old entries (P2 fix)
+- [x] Verify `clear()` DOES call `recycle()` on old entries (shutdown-only operation)
+- [x] Verify `AccessibilityTreeParser` has `nodeMap` parameter on `parseTree`/`parseNode` (NOT cache injection)
+- [x] Verify `AccessibilityTreeParser` does NOT recycle nodes when `nodeMap` is provided
+- [x] Verify `AccessibilityTreeParser` DOES recycle nodes when `nodeMap` is null (backward compat)
+- [x] Verify `getFreshWindows` accumulates nodes across ALL windows into a single `nodeMap`
+- [x] Verify `getFreshWindows` calls `nodeCache.populate()` ONCE after the window loop
+- [x] Verify `getFreshWindows` does NOT recycle root nodes (they are in the cache)
+- [x] Verify the fallback single-window path in `getFreshWindows` also populates the cache
+- [x] Verify all 12 tool classes that call `getFreshWindows` pass `nodeCache`
+- [x] Verify all 4 `register*Tools` functions accept and pass `nodeCache`
+- [x] Verify `McpServerService` injects `nodeCache` and passes to register functions
+- [x] Verify `McpIntegrationTestHelper` passes mock `nodeCache` to register functions
+- [x] Verify `setupMultiWindowMock` uses 3-arg `parseTree` mock (`any()` for nodeMap) and no longer mocks `rootNode.recycle()`
+- [x] Verify integration tests still return correct tree content (not empty `AccessibilityNodeData` defaults from relaxed mock)
+- [x] Verify `ActionExecutorImpl` constructor takes both `AccessibilityNodeCache` and `AccessibilityTreeParser`
+- [x] Verify `ActionExecutorImpl.performNodeAction` checks cache first, validates with `refresh()`, AND re-verifies identity via `generateNodeId()` (S1 fix)
+- [x] Verify `import android.graphics.Rect` in `ActionExecutorImpl` (not fully-qualified, Major Finding 3)
+- [x] Verify no empty finally block in `ActionExecutorImpl` cache path (Major Finding 4)
+- [x] Verify identity mismatch falls through to walkAndMatch (S1 fix)
+- [x] Verify cached nodes are NOT recycled by action executor (owned by cache)
+- [x] Verify `McpAccessibilityService.onDestroy()` clears the cache
+- [x] Verify Hilt binding exists in `AppModule.kt`
+- [x] Verify ALL unit tests pass: `./gradlew :app:testDebugUnitTest`
+- [x] Verify linting passes: `make lint`
+- [x] Verify build succeeds: `./gradlew assembleDebug`
+- [x] Verify no TODOs, no dead code, no temporary hacks in changed files
+- [x] Verify KDoc is accurate and up-to-date on all changed/created classes and methods
+- [x] Verify thread safety: `AtomicReference` swap in cache, no shared mutable state elsewhere
+- [x] Verify `populate()` race safety: no recycle on old entries, safe for concurrent `get()` (P2 fix verified)
+- [x] Verify identity check: `generateNodeId()` re-called after `refresh()`, mismatch → fallback (S1 fix verified)
+- [x] Verify the fallback path (cache miss/stale/identity mismatch) is identical to previous behavior (no regression)
+- [x] Verify all review findings (P1-P4, S1-S4, Q1-Q4) are addressed
+- [x] Verify all plan review findings (Critical 1-2, Major 3-5, Minor 6-9, Info 10) are addressed
+- [x] Verify all second plan review findings (Major M1-M4, Minor m1-m13, Info i4-i5) are addressed
+- [x] Verify `populate()` uses `entries.toMap()` defensive copy (m1 fix)
+- [x] Verify `mockCacheHitWithIdentity` uses slot + field assignment, NOT `Rect.set()` (M4 fix)
+- [x] Verify `ScrollToElementTool` both `getFreshWindows` call sites pass `nodeCache` (m5 fix)
+- [x] Verify `onTrimMemory` does NOT clear cache (documented design decision, m13 fix)
+- [x] Verify `AccessibilityNodeCacheImpl` does NOT import `AccessibilityNodeInfo` (i5 fix)
+- [x] Verify `McpAccessibilityService` does NOT import same-package `AccessibilityNodeCache` (i4 fix)
+- [x] Verify all 5 unit test files updated: `mockNodeCache` field, `parseTree` 3-arg mocks, tool constructors with `nodeCache` (C1/Task 3.8)
+- [x] Verify all 3 integration test files updated: local `parseTree` 3-arg mocks, `rootNode.recycle()` mocks removed (C1/Task 3.8)
+- [x] Verify `ScreenIntrospectionToolsTest.recyclesRootNodeAndWindowInfoAfterParsing` renamed and updated: root node NOT recycled, `nodeCache.populate()` verified (C1/Task 3.8)
+- [x] Verify `ScreenIntrospectionToolsTest` fallback test: root node NOT recycled, `nodeCache.populate()` verified (C1/Task 3.8)
+- [x] Verify `registerUtilityTools` has `@Suppress("LongParameterList")` annotation (M5/Task 3.5)
+- [x] Verify `ActionExecutorImplTest` does NOT import same-package classes (`AccessibilityNodeCache`, `AccessibilityTreeParser`, `CachedNode`) (M7/Task 4.3)
+- [x] Verify test h uses `mockCacheHitWithIdentity` helper then overrides `generateNodeId` (M8/Task 4.3)
+- [x] Verify `parseTree` function-level KDoc has `@param nodeMap` (m14/Task 2.3)
+- [x] Verify `parseNode` function-level KDoc `@param recycleNode` updated — no longer says "always recycled" (m15/Task 2.3)
+- [x] Verify `registerTextInputTools` diff matches actual source layout (m16/Task 3.4)
+- [x] Verify `Hilt ServiceModule` reference says "inside `AppModule.kt`" (m18/US1)
+- [x] Verify `getBoundsInScreen` after `refresh()` comment explains 0 IPC cost (m19/Task 4.2)
+- [x] Verify P3 memory estimate notes text-heavy UI caveat (m20)
+- [x] Verify `getFreshWindows` KDoc updated — "No caching is used" replaced (m21/Task 3.1)
+- [x] Verify accumulation test notes nodeId collision impossibility due to different `rootParentId` (m22/Task 2.4)
+- [x] Verify `onTrimMemory` design decision documents failed-`getFreshWindows` edge case (m23)
+- [x] Verify all third plan review findings (C1, M5-M8, m14-m23) are addressed
+- [x] Verify all fourth plan review findings (m24-m26, i1) are addressed
+- [x] Verify Task 3.8 common pattern item 4 specifies which files have recycle mocks to remove (m24)
+- [x] Verify Task 4.3 has note explaining `windows` parameter for cache-hit tests (m25)
+- [x] Verify Third Review table uses unique IDs (M5-M8, m14-m23) with no collisions with Second Review (m26)
+- [x] Verify Task 4.1 has note confirming `generateNodeId` `internal` visibility is sufficient (i1)
+- [x] Review git diff to ensure only intended changes are present

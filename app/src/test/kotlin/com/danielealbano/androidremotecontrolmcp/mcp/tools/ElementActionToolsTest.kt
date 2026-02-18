@@ -134,7 +134,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("FindElementsTool")
     inner class FindElementsToolTests {
-        private val tool = FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
+        private val tool =
+            FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `returns matching elements`() =
@@ -221,7 +222,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("ClickElementTool")
     inner class ClickElementToolTests {
-        private val tool = ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
+        private val tool =
+            ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `clicks element successfully`() =
@@ -266,7 +268,8 @@ class ElementActionToolsTest {
     @Nested
     @DisplayName("LongClickElementTool")
     inner class LongClickElementToolTests {
-        private val tool = LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
+        private val tool =
+            LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
         fun `long-clicks element successfully`() =
@@ -284,7 +287,13 @@ class ElementActionToolsTest {
     @DisplayName("ScrollToElementTool")
     inner class ScrollToElementToolTests {
         private val tool =
-            ScrollToElementTool(mockTreeParser, mockElementFinder, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
+            ScrollToElementTool(
+                mockTreeParser,
+                mockElementFinder,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockNodeCache,
+            )
 
         @Test
         fun `returns immediately when element already visible`() =
