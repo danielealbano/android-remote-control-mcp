@@ -11,10 +11,12 @@ import androidx.lifecycle.LifecycleRegistry
  * Since [android.app.Service] does not implement [LifecycleOwner],
  * this class provides a manually controlled lifecycle.
  *
- * Usage:
- * 1. Call [start] before binding CameraX use cases
- * 2. Use the camera
- * 3. Call [stop] to unbind and release camera resources
+ * Typical usage:
+ * 1. Create a [ServiceLifecycleOwner] instance and pass it when binding CameraX use cases
+ *    via [androidx.camera.lifecycle.ProcessCameraProvider.bindToLifecycle]
+ * 2. Call [start] to transition the lifecycle to RESUMED, activating bound use cases
+ * 3. Use the camera (capture photo, record video, etc.)
+ * 4. Call [stop] to transition to DESTROYED, releasing camera resources
  */
 class ServiceLifecycleOwner : LifecycleOwner {
     @Suppress("VisibleForTests")

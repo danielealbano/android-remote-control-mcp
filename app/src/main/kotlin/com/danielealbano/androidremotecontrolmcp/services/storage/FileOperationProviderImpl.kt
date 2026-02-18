@@ -448,7 +448,7 @@ class FileOperationProviderImpl
         ): Uri {
             checkAuthorization(locationId)
             checkWritePermission(locationId)
-            val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
+            val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path, mimeType)
             return documentFile.uri
         }
 
@@ -542,6 +542,7 @@ class FileOperationProviderImpl
         private suspend fun ensureParentDirectoriesAndCreateFile(
             locationId: String,
             path: String,
+            explicitMimeType: String? = null,
         ): DocumentFile {
             val treeUri =
                 storageLocationProvider.getTreeUriForLocation(locationId)
@@ -584,9 +585,9 @@ class FileOperationProviderImpl
                 return existingFile
             }
 
-            // Determine MIME type from extension
-            val mimeType = guessMimeType(fileName)
-            return current.createFile(mimeType, fileName)
+            // Use explicit MIME type if provided, otherwise infer from extension
+            val resolvedMimeType = explicitMimeType ?: guessMimeType(fileName)
+            return current.createFile(resolvedMimeType, fileName)
                 ?: throw McpToolException.ActionFailed(
                     "Failed to create file '$fileName' in path '$path'",
                 )

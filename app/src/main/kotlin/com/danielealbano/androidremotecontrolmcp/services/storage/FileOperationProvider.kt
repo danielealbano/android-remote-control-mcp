@@ -177,8 +177,7 @@ interface FileOperationProvider {
      * @param locationId The authorized storage location identifier.
      * @param path Relative path to the file.
      * @param mimeType The MIME type for the new file (e.g., "image/jpeg", "video/mp4").
-     *        Note: the actual MIME type used for document creation is inferred from the
-     *        file extension in [path] via the internal `guessMimeType` method.
+     *        Used directly for document creation via [android.provider.DocumentsContract].
      * @return The [Uri] for the created file.
      */
     suspend fun createFileUri(

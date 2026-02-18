@@ -28,6 +28,40 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 
+/**
+ * Unit tests for [CameraProviderImpl].
+ *
+ * These tests cover permission checks, parameter validation, and early-exit error paths —
+ * logic that executes before any CameraX interaction and can be tested in a pure JVM environment.
+ *
+ * **Camera-operation tests are in E2E (`E2ECameraTest`):**
+ * The following scenarios require a real CameraX camera pipeline (ProcessCameraProvider,
+ * ImageCapture, VideoCapture, Recorder) which cannot be meaningfully mocked in JVM unit
+ * tests — CameraX internally uses Android camera HAL, SurfaceTexture, and lifecycle
+ * observers that are tightly coupled to the Android runtime. These are covered by E2E
+ * tests running against a Docker Android emulator with emulated cameras:
+ *
+ * - `listCameras returns available cameras with correct facing`
+ * - `listCameras returns empty list when no cameras available`
+ * - `listPhotoResolutions returns sorted resolutions for valid camera`
+ * - `listPhotoResolutions throws ActionFailed for invalid camera ID`
+ * - `listVideoResolutions returns sorted resolutions for valid camera`
+ * - `listVideoResolutions throws ActionFailed for invalid camera ID`
+ * - `takePhoto returns base64 JPEG data for valid camera`
+ * - `takePhoto applies flash mode correctly (off, on, auto)`
+ * - `takePhoto caps resolution at 1920x1080 for inline return`
+ * - `takePhoto uses default 720p resolution when none specified`
+ * - `savePhoto writes to output URI`
+ * - `savePhoto does not cap resolution (no 1920x1080 limit)` (needs storage location)
+ * - `saveVideo records for specified duration` (needs storage location)
+ * - `saveVideo returns thumbnail with correct dimensions` (needs storage location)
+ * - `saveVideo records without audio when audio is false` (needs storage location)
+ * - `saveVideo uses torch for flash on and auto modes` (needs storage location)
+ * - `camera operation throws ActionFailed on mutex timeout` (requires timing control)
+ * - `concurrent camera operations are serialized via mutex` (requires concurrency control)
+ *
+ * See: `e2e-tests/.../E2ECameraTest.kt` for camera-operation E2E tests.
+ */
 @ExtendWith(MockKExtension::class)
 @DisplayName("CameraProviderImpl")
 @ExperimentalCamera2Interop

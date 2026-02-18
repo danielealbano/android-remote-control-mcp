@@ -34,6 +34,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.VideoResolution
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -264,36 +265,38 @@ class CameraProviderImpl
                 cameraMutex.withLock {
                     val lifecycleOwner = ServiceLifecycleOwner()
                     try {
-                        withContext(Dispatchers.Main) {
-                            val provider = getCameraProvider()
-                            val selector = buildCameraSelector(provider, cameraId)
-                            val imageCapture = buildImageCapture(width, height, flashMode)
+                        val imageCapture =
+                            withContext(Dispatchers.Main) {
+                                val provider = getCameraProvider()
+                                val selector = buildCameraSelector(provider, cameraId)
+                                val capture =
+                                    buildImageCapture(width, height, flashMode, quality)
 
-                            provider.unbindAll()
-                            provider.bindToLifecycle(lifecycleOwner, selector, imageCapture)
-                            lifecycleOwner.start()
+                                provider.unbindAll()
+                                provider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    selector,
+                                    capture,
+                                )
+                                lifecycleOwner.start()
+                                capture
+                            }
 
-                            val imageProxy = captureImage(imageCapture)
+                        withContext(Dispatchers.IO) {
                             var outputStream: java.io.OutputStream? = null
                             try {
-                                val bitmap = imageProxyToBitmap(imageProxy)
-                                try {
-                                    val jpegBytes =
-                                        withContext(Dispatchers.Default) {
-                                            screenshotEncoder.encodeBitmapToJpeg(bitmap, quality)
-                                        }
-                                    outputStream = context.contentResolver.openOutputStream(
-                                        outputUri,
-                                    ) ?: throw McpToolException.ActionFailed(
-                                        "Failed to open output URI for writing",
-                                    )
-                                    outputStream.write(jpegBytes)
-                                } finally {
-                                    bitmap.recycle()
-                                }
+                                outputStream =
+                                    context.contentResolver.openOutputStream(outputUri)
+                                        ?: throw McpToolException.ActionFailed(
+                                            "Failed to open output URI for writing",
+                                        )
+                                val outputOptions =
+                                    ImageCapture.OutputFileOptions
+                                        .Builder(outputStream)
+                                        .build()
+                                saveImageToStream(imageCapture, outputOptions)
                             } finally {
                                 outputStream?.close()
-                                imageProxy.close()
                             }
                         }
 
@@ -399,11 +402,30 @@ class CameraProviderImpl
                                     }
 
                                 val startTimeMs = System.currentTimeMillis()
+                                val finalizeDeferred = CompletableDeferred<Unit>()
 
                                 val recording =
                                     pendingRecording.start(mainExecutor) { event ->
                                         if (event is VideoRecordEvent.Finalize) {
-                                            Log.d(TAG, "Video recording finalized")
+                                            val error = event.error
+                                            if (error != VideoRecordEvent.Finalize.ERROR_NONE) {
+                                                Log.w(
+                                                    TAG,
+                                                    "Video recording finalized with error: $error",
+                                                )
+                                                finalizeDeferred.completeExceptionally(
+                                                    McpToolException.ActionFailed(
+                                                        "Video recording finalized with error " +
+                                                            "code: $error",
+                                                    ),
+                                                )
+                                            } else {
+                                                Log.d(
+                                                    TAG,
+                                                    "Video recording finalized successfully",
+                                                )
+                                                finalizeDeferred.complete(Unit)
+                                            }
                                         }
                                     }
 
@@ -415,6 +437,11 @@ class CameraProviderImpl
                                 if (flashMode == "on" || flashMode == "auto") {
                                     camera.cameraControl.enableTorch(false)
                                 }
+
+                                // Wait for CameraX to fully finalize the recording
+                                // (flush buffers, write metadata) before accessing the
+                                // file for size and thumbnail extraction.
+                                finalizeDeferred.await()
 
                                 actualDurationMs
                             }
@@ -463,8 +490,17 @@ class CameraProviderImpl
         private suspend fun getCameraProvider(): ProcessCameraProvider =
             suspendCancellableCoroutine { continuation ->
                 val future = ProcessCameraProvider.getInstance(context)
+                continuation.invokeOnCancellation { future.cancel(true) }
                 future.addListener(
-                    { continuation.resume(future.get()) },
+                    {
+                        if (continuation.isActive) {
+                            try {
+                                continuation.resume(future.get())
+                            } catch (e: Exception) {
+                                continuation.resumeWithException(e)
+                            }
+                        }
+                    },
                     mainExecutor,
                 )
             }
@@ -516,6 +552,7 @@ class CameraProviderImpl
             width: Int?,
             height: Int?,
             flashMode: String,
+            jpegQuality: Int? = null,
         ): ImageCapture {
             val targetWidth = width ?: CameraProvider.DEFAULT_RESOLUTION_WIDTH
             val targetHeight = height ?: CameraProvider.DEFAULT_RESOLUTION_HEIGHT
@@ -539,11 +576,15 @@ class CameraProviderImpl
                     else -> ImageCapture.FLASH_MODE_AUTO
                 }
 
-            return ImageCapture
-                .Builder()
-                .setResolutionSelector(resolutionSelector)
-                .setFlashMode(captureFlashMode)
-                .build()
+            val builder =
+                ImageCapture
+                    .Builder()
+                    .setResolutionSelector(resolutionSelector)
+                    .setFlashMode(captureFlashMode)
+            if (jpegQuality != null) {
+                builder.setJpegQuality(jpegQuality)
+            }
+            return builder.build()
         }
 
         @Suppress("UnusedParameter")
@@ -572,19 +613,54 @@ class CameraProviderImpl
                     mainExecutor,
                     object : ImageCapture.OnImageCapturedCallback() {
                         override fun onCaptureSuccess(image: ImageProxy) {
-                            continuation.resume(image)
+                            if (continuation.isActive) {
+                                continuation.resume(image)
+                            } else {
+                                image.close()
+                            }
                         }
 
                         override fun onError(exception: ImageCaptureException) {
-                            continuation.resumeWithException(
-                                McpToolException.ActionFailed(
-                                    "Image capture failed: ${exception.message}",
-                                ),
-                            )
+                            if (continuation.isActive) {
+                                continuation.resumeWithException(
+                                    McpToolException.ActionFailed(
+                                        "Image capture failed: ${exception.message}",
+                                    ),
+                                )
+                            }
                         }
                     },
                 )
             }
+
+        private suspend fun saveImageToStream(
+            imageCapture: ImageCapture,
+            outputOptions: ImageCapture.OutputFileOptions,
+        ) {
+            suspendCancellableCoroutine<Unit> { continuation ->
+                imageCapture.takePicture(
+                    outputOptions,
+                    mainExecutor,
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(results: ImageCapture.OutputFileResults) {
+                            if (continuation.isActive) {
+                                continuation.resume(Unit)
+                            }
+                        }
+
+                        override fun onError(exception: ImageCaptureException) {
+                            if (continuation.isActive) {
+                                continuation.resumeWithException(
+                                    McpToolException.ActionFailed(
+                                        "Image save failed: ${exception.message}",
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }
 
         private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
             val buffer = imageProxy.planes[0].buffer

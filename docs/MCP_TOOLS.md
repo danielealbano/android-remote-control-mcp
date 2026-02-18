@@ -30,7 +30,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes tools via the JSON-RPC 2.0 protocol. Tools are organized into 10 categories:
+The MCP server exposes 45 tools via the JSON-RPC 2.0 protocol, organized into 10 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|

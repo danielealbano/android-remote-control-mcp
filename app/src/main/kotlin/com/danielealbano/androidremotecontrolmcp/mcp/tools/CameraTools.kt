@@ -552,11 +552,15 @@ private fun parseOptionalResolution(
     arguments: JsonObject?,
     paramName: String,
 ): Pair<Int, Int>? {
+    val rawValue = arguments?.get(paramName) ?: return null
     val resolutionStr =
-        (arguments?.get(paramName) as? JsonPrimitive)
+        (rawValue as? JsonPrimitive)
             ?.takeIf { it.isString }
             ?.content
-            ?: return null
+            ?: throw McpToolException.InvalidParams(
+                "Parameter '$paramName' must be a string in 'WIDTHxHEIGHT' format " +
+                    "(e.g., '1280x720')",
+            )
 
     val parts = resolutionStr.split("x")
     if (parts.size != 2) {
