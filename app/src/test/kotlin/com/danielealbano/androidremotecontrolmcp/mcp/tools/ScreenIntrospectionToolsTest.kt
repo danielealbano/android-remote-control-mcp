@@ -105,7 +105,7 @@ class ScreenIntrospectionToolsTest {
             "screen:1080x2400 density:420 orientation:portrait\n" +
             "--- window:0 type:APPLICATION pkg:com.example title:Test activity:.Main " +
             "layer:0 focused:true ---\n" +
-            "id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
+            "element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
             "node_btn\tButton\tOK\t-\t-\t100,200,300,260\ton,clk,ena"
 
     @Suppress("LongMethod")

@@ -85,7 +85,7 @@ class FindElementsTool
                             elements.forEach { element ->
                                 add(
                                     buildJsonObject {
-                                        put("id", element.id)
+                                        put("element_id", element.id)
                                         put("text", element.text)
                                         put("contentDescription", element.contentDescription)
                                         put("resourceId", element.resourceId)

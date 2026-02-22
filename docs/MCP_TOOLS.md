@@ -213,7 +213,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nelement_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
       }
     ]
   }
@@ -229,7 +229,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\n...\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nid\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+        "text": "note:structural-only nodes are omitted from the tree\n...\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nelement_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
       },
       {
         "type": "image",
@@ -254,7 +254,7 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
 3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
 4. **Per-window sections** (repeated for each window):
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
-   - **TSV header**: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+   - **TSV header**: `element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
 
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
@@ -295,7 +295,7 @@ This filters out structural-only container nodes (e.g., bare `FrameLayout`, `Lin
 
 #### Text/Description Truncation
 
-Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `android_get_element_details` tool to retrieve full untruncated values by element ID.
+Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `android_get_element_details` tool to retrieve full untruncated values by element_id.
 
 #### Screenshot
 
@@ -1091,7 +1091,7 @@ Find UI elements matching the specified criteria in the accessibility tree.
 {
   "elements": [
     {
-      "id": "node_abc123",
+      "element_id": "node_abc123",
       "text": "Submit",
       "contentDescription": null,
       "resourceId": "com.example:id/submit_btn",
@@ -1604,7 +1604,7 @@ Wait until an element matching the specified criteria appears in the accessibili
   "elapsedMs": 1200,
   "attempts": 3,
   "element": {
-    "id": "node_abc123",
+    "element_id": "node_abc123",
     "text": "Result",
     "contentDescription": null,
     "resourceId": null,
@@ -1708,20 +1708,20 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_element_details`
 
-Retrieves full untruncated text and contentDescription for one or more elements by their IDs. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more elements by their element_ids. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "ids": {
+    "element_ids": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Array of element IDs to look up (from get_screen_state output)"
+      "description": "Array of element_ids to look up (from get_screen_state output)"
     }
   },
-  "required": ["ids"]
+  "required": ["element_ids"]
 }
 ```
 
@@ -1734,7 +1734,7 @@ Retrieves full untruncated text and contentDescription for one or more elements 
   "params": {
     "name": "android_get_element_details",
     "arguments": {
-      "ids": ["node_1", "node_2"]
+      "element_ids": ["node_1", "node_2"]
     }
   }
 }
@@ -1749,7 +1749,7 @@ Retrieves full untruncated text and contentDescription for one or more elements 
     "content": [
       {
         "type": "text",
-        "text": "id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this element"
+        "text": "element_id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this element"
       }
     ]
   }
@@ -1757,14 +1757,14 @@ Retrieves full untruncated text and contentDescription for one or more elements 
 ```
 
 **Output Format**: TSV with three columns:
-- `id`: The element ID
+- `element_id`: The element ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
 
 If an element ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing `ids` parameter, `ids` is not an array, array is empty, or contains non-string values
+- **Invalid params**: Missing `element_ids` parameter, `element_ids` is not an array, array is empty, or contains non-string values
 - **Permission denied**: Accessibility service not enabled
 
 ---

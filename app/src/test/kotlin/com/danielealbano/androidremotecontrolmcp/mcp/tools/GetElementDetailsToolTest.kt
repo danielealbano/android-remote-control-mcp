@@ -118,7 +118,7 @@ class GetElementDetailsToolTest {
             val params =
                 buildJsonObject {
                     put(
-                        "ids",
+                        "element_ids",
                         buildJsonArray {
                             add(JsonPrimitive("node_a"))
                             add(JsonPrimitive("node_b"))
@@ -129,7 +129,7 @@ class GetElementDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = text.lines()
-            assertEquals("id\ttext\tdesc", lines[0])
+            assertEquals("element_id\ttext\tdesc", lines[0])
             assertEquals("node_a\tHello World\tA button", lines[1])
             assertEquals("node_b\t-\t-", lines[2])
         }
@@ -144,7 +144,7 @@ class GetElementDetailsToolTest {
             val params =
                 buildJsonObject {
                     put(
-                        "ids",
+                        "element_ids",
                         buildJsonArray {
                             add(JsonPrimitive("node_a"))
                             add(JsonPrimitive("node_missing"))
@@ -167,7 +167,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("ids", buildJsonArray { add(JsonPrimitive("node_b")) })
+                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_b")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -192,7 +192,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("ids", buildJsonArray { add(JsonPrimitive("node_special")) })
+                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_special")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -217,7 +217,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("ids", buildJsonArray { add(JsonPrimitive("node_long")) })
+                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_long")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -227,8 +227,8 @@ class GetElementDetailsToolTest {
         }
 
     @Test
-    @DisplayName("throws InvalidParams when ids missing")
-    fun throwsInvalidParamsWhenIdsMissing() =
+    @DisplayName("throws InvalidParams when element_ids missing")
+    fun throwsInvalidParamsWhenElementIdsMissing() =
         runTest {
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(null)
@@ -236,32 +236,32 @@ class GetElementDetailsToolTest {
         }
 
     @Test
-    @DisplayName("throws InvalidParams when ids is not array")
-    fun throwsInvalidParamsWhenIdsIsNotArray() =
+    @DisplayName("throws InvalidParams when element_ids is not array")
+    fun throwsInvalidParamsWhenElementIdsIsNotArray() =
         runTest {
-            val params = buildJsonObject { put("ids", "not_an_array") }
+            val params = buildJsonObject { put("element_ids", "not_an_array") }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
             }
         }
 
     @Test
-    @DisplayName("throws InvalidParams when ids is empty array")
-    fun throwsInvalidParamsWhenIdsIsEmptyArray() =
+    @DisplayName("throws InvalidParams when element_ids is empty array")
+    fun throwsInvalidParamsWhenElementIdsIsEmptyArray() =
         runTest {
-            val params = buildJsonObject { put("ids", buildJsonArray { }) }
+            val params = buildJsonObject { put("element_ids", buildJsonArray { }) }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
             }
         }
 
     @Test
-    @DisplayName("throws InvalidParams when ids contains non-string")
-    fun throwsInvalidParamsWhenIdsContainsNonString() =
+    @DisplayName("throws InvalidParams when element_ids contains non-string")
+    fun throwsInvalidParamsWhenElementIdsContainsNonString() =
         runTest {
             val params =
                 buildJsonObject {
-                    put("ids", buildJsonArray { add(JsonPrimitive(123)) })
+                    put("element_ids", buildJsonArray { add(JsonPrimitive(123)) })
                 }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
@@ -276,7 +276,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("ids", buildJsonArray { add(JsonPrimitive("node_a")) })
+                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_a")) })
                 }
             assertThrows<McpToolException.PermissionDenied> {
                 tool.execute(params)

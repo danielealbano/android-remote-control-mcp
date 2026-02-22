@@ -242,7 +242,7 @@ class WaitForElementTool
                                 put("elapsedMs", elapsed)
                                 put("attempts", attemptCount)
                                 putJsonObject("element") {
-                                    put("id", element.id)
+                                    put("element_id", element.id)
                                     put("text", element.text)
                                     put("contentDescription", element.contentDescription)
                                     put("resourceId", element.resourceId)
@@ -471,7 +471,7 @@ class WaitForIdleTool
 /**
  * MCP tool: get_element_details
  *
- * Retrieves full (untruncated) text and contentDescription for a list of element IDs.
+ * Retrieves full (untruncated) text and contentDescription for a list of element_ids.
  * Use after get_screen_state when text or desc columns were truncated.
  */
 class GetElementDetailsTool
@@ -484,23 +484,23 @@ class GetElementDetailsTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            // 1. Parse "ids" parameter — required, JSON array of strings
+            // 1. Parse "element_ids" parameter — required, JSON array of strings
             val idsElement =
-                arguments?.get("ids")
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'ids'")
+                arguments?.get("element_ids")
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_ids'")
             val idsArray =
                 (idsElement as? JsonArray)
-                    ?: throw McpToolException.InvalidParams("Parameter 'ids' must be an array of strings")
+                    ?: throw McpToolException.InvalidParams("Parameter 'element_ids' must be an array of strings")
             if (idsArray.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'ids' must not be empty")
+                throw McpToolException.InvalidParams("Parameter 'element_ids' must not be empty")
             }
             val ids =
                 idsArray.map { element ->
                     val primitive =
                         (element as? JsonPrimitive)
-                            ?: throw McpToolException.InvalidParams("Each element in 'ids' must be a string")
+                            ?: throw McpToolException.InvalidParams("Each element in 'element_ids' must be a string")
                     if (!primitive.isString) {
-                        throw McpToolException.InvalidParams("Each element in 'ids' must be a string")
+                        throw McpToolException.InvalidParams("Each element in 'element_ids' must be a string")
                     }
                     primitive.content
                 }
@@ -510,7 +510,7 @@ class GetElementDetailsTool
 
             // 3. Build TSV output
             val sb = StringBuilder()
-            sb.append("id\ttext\tdesc\n")
+            sb.append("element_id\ttext\tdesc\n")
 
             for (id in ids) {
                 val node = elementFinder.findNodeById(multiWindowResult.windows, id)
@@ -523,7 +523,7 @@ class GetElementDetailsTool
                 }
             }
 
-            Log.d(TAG, "get_element_details: ids=${ids.size}")
+            Log.d(TAG, "get_element_details: element_ids=${ids.size}")
 
             return McpToolUtils.textResult(sb.toString().trimEnd('\n'))
         }
@@ -551,21 +551,21 @@ class GetElementDetailsTool
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Retrieve full untruncated text and description for elements by ID. " +
+                    "Retrieve full untruncated text and description for elements by element_id. " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("ids") {
+                                putJsonObject("element_ids") {
                                     put("type", "array")
                                     putJsonObject("items") {
                                         put("type", "string")
                                     }
-                                    put("description", "List of element IDs to retrieve details for")
+                                    put("description", "List of element_ids to retrieve details for")
                                 }
                             },
-                        required = listOf("ids"),
+                        required = listOf("element_ids"),
                     ),
             ) { request -> execute(request.arguments) }
         }

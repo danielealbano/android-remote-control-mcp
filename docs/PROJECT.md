@@ -262,7 +262,7 @@ The MCP server exposes 45 tools across 10 categories. For full JSON-RPC schemas,
 | `android_set_clipboard` | Set clipboard content | `text` (string) | — |
 | `android_wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
 | `android_wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
-| `android_get_element_details` | Get full untruncated text/desc by element IDs | `ids` (array of strings) | — |
+| `android_get_element_details` | Get full untruncated text/desc by element_ids | `element_ids` (array of strings) | — |
 
 **Timeout behavior**: Both `android_wait_for_element` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 

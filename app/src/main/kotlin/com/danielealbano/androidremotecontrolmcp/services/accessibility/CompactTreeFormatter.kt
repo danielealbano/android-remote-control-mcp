@@ -14,7 +14,7 @@ import javax.inject.Inject
  * - Line 4: `note:offscreen items require scroll_to_element before interaction`
  * - Line 5: `app:<package> activity:<activity>`
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
- * - Line 7: TSV header: `id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+ * - Line 7: TSV header: `element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
  * - Lines 8+: one TSV row per kept node (flat, no depth)
  *
  * Nodes are filtered: a node is KEPT if ANY of:
@@ -284,7 +284,7 @@ class CompactTreeFormatter
             const val FLAG_ENABLED = "ena"
             private const val FLAG_SEPARATOR = ","
             const val HEADER =
-                "id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
+                "element_id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
                     "desc${COLUMN_SEPARATOR}res_id${COLUMN_SEPARATOR}bounds${COLUMN_SEPARATOR}flags"
         }
     }
