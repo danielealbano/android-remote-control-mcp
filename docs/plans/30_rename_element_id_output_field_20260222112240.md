@@ -344,7 +344,7 @@ The `sampleElementInfo` used by this test has `id = "node_abc"` (line 82), which
 - [x] All unit tests updated to use `"element_id"` for output assertions and `"element_ids"` for input parameters
 - [x] All `@DisplayName` annotations and function names reference `element_ids` instead of `ids`
 - [x] Regression assertion added for `wait_for_element` `"element_id"` output field
-- [ ] All unit tests pass: `./gradlew :app:testDebugUnitTest`
+- [x] All unit tests pass: `./gradlew :app:testDebugUnitTest`
 
 ---
 
