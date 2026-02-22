@@ -225,7 +225,7 @@ class E2ECalculatorTest {
                     val innerJson = Json.parseToJsonElement(textContent).jsonObject
                     val elements = innerJson["elements"]?.jsonArray
                     if (elements != null && elements.isNotEmpty()) {
-                        return elements[0].jsonObject["id"]?.jsonPrimitive?.contentOrNull
+                        return elements[0].jsonObject["element_id"]?.jsonPrimitive?.contentOrNull
                     }
                 }
             } catch (_: Exception) {
