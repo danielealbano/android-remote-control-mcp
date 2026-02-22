@@ -104,7 +104,7 @@ class ScreenIntrospectionIntegrationTest {
                 assertTrue(textContent.contains("--- window:0 type:APPLICATION"))
                 assertTrue(textContent.contains("pkg:com.example.app"))
                 assertTrue(textContent.contains("activity:.MainActivity"))
-                assertTrue(textContent.contains("id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
+                assertTrue(textContent.contains("element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
                 assertTrue(textContent.contains("node_btn"))
                 assertTrue(textContent.contains("on,clk,ena"))
                 // Negative assertions: ensure old single-char flag format is gone

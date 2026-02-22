@@ -102,7 +102,7 @@ class ElementActionIntegrationTest {
                 assertEquals(1, elements.size)
                 assertEquals(
                     "node_btn",
-                    elements[0].jsonObject["id"]?.jsonPrimitive?.content,
+                    elements[0].jsonObject["element_id"]?.jsonPrimitive?.content,
                 )
             }
         }
@@ -246,7 +246,7 @@ class ElementActionIntegrationTest {
                     assertEquals(1, elements.size)
                     assertEquals(
                         "node_allow_w99",
-                        elements[0].jsonObject["id"]?.jsonPrimitive?.content,
+                        elements[0].jsonObject["element_id"]?.jsonPrimitive?.content,
                     )
                 }
             }

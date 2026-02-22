@@ -3,6 +3,10 @@ package com.danielealbano.androidremotecontrolmcp.integration
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.every
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -20,6 +24,42 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("Utility Integration Tests")
 class UtilityIntegrationTest {
+    private val sampleTree =
+        AccessibilityNodeData(
+            id = "node_root",
+            className = "android.widget.FrameLayout",
+            bounds = BoundsData(0, 0, 1080, 2400),
+            visible = true,
+            children =
+                listOf(
+                    AccessibilityNodeData(
+                        id = "node_a",
+                        className = "android.widget.Button",
+                        text = "Hello World",
+                        contentDescription = "A button",
+                        bounds = BoundsData(50, 800, 250, 1000),
+                        clickable = true,
+                        enabled = true,
+                        visible = true,
+                    ),
+                    AccessibilityNodeData(
+                        id = "node_b",
+                        className = "android.widget.TextView",
+                        bounds = BoundsData(50, 1000, 250, 1200),
+                        visible = true,
+                        enabled = true,
+                    ),
+                ),
+        )
+
+    private val sampleScreenInfo =
+        ScreenInfo(
+            width = 1080,
+            height = 2400,
+            densityDpi = 420,
+            orientation = "portrait",
+        )
+
     @BeforeEach
     fun setUp() {
         McpIntegrationTestHelper.mockAndroidLog()
@@ -86,6 +126,54 @@ class UtilityIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
+            }
+        }
+
+    @Test
+    fun `get_element_details returns TSV with element_id header and correct values`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+
+            every {
+                deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_a")
+            } returns
+                AccessibilityNodeData(
+                    id = "node_a",
+                    className = "android.widget.Button",
+                    text = "Hello World",
+                    contentDescription = "A button",
+                    bounds = BoundsData(50, 800, 250, 1000),
+                    clickable = true,
+                    enabled = true,
+                    visible = true,
+                )
+
+            every {
+                deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_b")
+            } returns
+                AccessibilityNodeData(
+                    id = "node_b",
+                    className = "android.widget.TextView",
+                    bounds = BoundsData(50, 1000, 250, 1200),
+                    visible = true,
+                    enabled = true,
+                )
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_element_details",
+                        arguments = mapOf("element_ids" to listOf("node_a", "node_b")),
+                    )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
+
+                val textContent = (result.content[0] as TextContent).text
+                val lines = textContent.split("\n")
+                assertEquals("element_id\ttext\tdesc", lines[0])
+                assertEquals("node_a\tHello World\tA button", lines[1])
+                assertEquals("node_b\t-\t-", lines[2])
             }
         }
 }
