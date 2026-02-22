@@ -3,12 +3,17 @@ package com.danielealbano.androidremotecontrolmcp.integration
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.SystemClock
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -137,28 +142,11 @@ class UtilityIntegrationTest {
 
             every {
                 deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_a")
-            } returns
-                AccessibilityNodeData(
-                    id = "node_a",
-                    className = "android.widget.Button",
-                    text = "Hello World",
-                    contentDescription = "A button",
-                    bounds = BoundsData(50, 800, 250, 1000),
-                    clickable = true,
-                    enabled = true,
-                    visible = true,
-                )
+            } returns sampleTree.children[0]
 
             every {
                 deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_b")
-            } returns
-                AccessibilityNodeData(
-                    id = "node_b",
-                    className = "android.widget.TextView",
-                    bounds = BoundsData(50, 1000, 250, 1200),
-                    visible = true,
-                    enabled = true,
-                )
+            } returns sampleTree.children[1]
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -174,6 +162,70 @@ class UtilityIntegrationTest {
                 assertEquals("element_id\ttext\tdesc", lines[0])
                 assertEquals("node_a\tHello World\tA button", lines[1])
                 assertEquals("node_b\t-\t-", lines[2])
+            }
+        }
+
+    @Test
+    fun `wait_for_element success returns element_id in response`() =
+        runTest {
+            mockkStatic(SystemClock::class)
+            try {
+                every { SystemClock.elapsedRealtime() } returns 0L
+
+                val deps = McpIntegrationTestHelper.createMockDependencies()
+                McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+
+                every {
+                    deps.elementFinder.findElements(
+                        any<List<WindowData>>(),
+                        FindBy.TEXT,
+                        "Hello World",
+                        false,
+                    )
+                } returns
+                    listOf(
+                        ElementInfo(
+                            id = "node_a",
+                            text = "Hello World",
+                            contentDescription = "A button",
+                            className = "android.widget.Button",
+                            bounds = BoundsData(50, 800, 250, 1000),
+                            clickable = true,
+                            enabled = true,
+                        ),
+                    )
+
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "android_wait_for_element",
+                            arguments =
+                                mapOf(
+                                    "by" to "text",
+                                    "value" to "Hello World",
+                                    "timeout" to 5000,
+                                ),
+                        )
+                    assertNotEquals(true, result.isError)
+                    assertTrue(result.content.isNotEmpty())
+
+                    val textContent = (result.content[0] as TextContent).text
+                    val parsed = Json.parseToJsonElement(textContent).jsonObject
+                    assertEquals(
+                        true,
+                        parsed["found"]?.jsonPrimitive?.content?.toBoolean(),
+                    )
+                    assertEquals(
+                        "node_a",
+                        parsed["element"]
+                            ?.jsonObject
+                            ?.get("element_id")
+                            ?.jsonPrimitive
+                            ?.content,
+                    )
+                }
+            } finally {
+                unmockkStatic(SystemClock::class)
             }
         }
 }
