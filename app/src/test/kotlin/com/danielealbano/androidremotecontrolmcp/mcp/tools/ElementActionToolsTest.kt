@@ -158,7 +158,7 @@ class ElementActionToolsTest {
                 // Assert
                 val elements = parsed["elements"]!!.jsonArray
                 assertEquals(1, elements.size)
-                assertEquals("node_abc", elements[0].jsonObject["id"]?.jsonPrimitive?.content)
+                assertEquals("node_abc", elements[0].jsonObject["element_id"]?.jsonPrimitive?.content)
             }
 
         @Test

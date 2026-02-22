@@ -205,6 +205,14 @@ class UtilityToolsTest {
                 val text = extractTextContent(result)
                 val parsed = Json.parseToJsonElement(text).jsonObject
                 assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
+                assertEquals(
+                    "node_abc",
+                    parsed["element"]
+                        ?.jsonObject
+                        ?.get("element_id")
+                        ?.jsonPrimitive
+                        ?.content,
+                )
             }
 
         @Test

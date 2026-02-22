@@ -111,7 +111,7 @@ class CompactTreeFormatterTest {
             val tree = makeNode(text = "hello")
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals("id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[6])
+            assertEquals("element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags", lines[6])
         }
 
         @Test
