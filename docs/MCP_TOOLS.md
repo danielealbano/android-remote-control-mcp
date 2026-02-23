@@ -862,13 +862,14 @@ Performs a swipe gesture from one point to another.
 
 ### `android_scroll`
 
-Scrolls the screen in the specified direction. Calculates scroll distance as a percentage of screen dimension based on the amount parameter.
+Scrolls the screen in the specified direction. Calculates scroll distance as a percentage of screen dimension based on the amount parameter. Applies random variance to scroll distance and center point for more natural-looking gestures.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `direction` | string | Yes | - | Direction: "up", "down", "left", "right" |
 | `amount` | string | No | "medium" | Amount: "small" (25%), "medium" (50%), "large" (75%) |
+| `variance` | number | No | 5 | Random variance percentage (0-20). Applied as ±variance% to scroll distance and center point. |
 
 **Example Request**:
 ```json
@@ -880,7 +881,8 @@ Scrolls the screen in the specified direction. Calculates scroll distance as a p
     "name": "android_scroll",
     "arguments": {
       "direction": "down",
-      "amount": "large"
+      "amount": "large",
+      "variance": 10
     }
   }
 }
@@ -903,7 +905,7 @@ Scrolls the screen in the specified direction. Calculates scroll distance as a p
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Invalid direction (not one of up/down/left/right) or invalid amount (not one of small/medium/large)
+- **Invalid params**: Invalid direction (not one of up/down/left/right), invalid amount (not one of small/medium/large), or invalid variance (negative or exceeding 20)
 - **Permission denied**: Accessibility service not enabled
 - **Action failed**: Scroll gesture execution failed (e.g., no root node available for screen dimensions)
 
