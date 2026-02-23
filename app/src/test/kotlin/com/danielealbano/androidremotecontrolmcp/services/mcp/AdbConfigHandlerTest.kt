@@ -647,13 +647,13 @@ class AdbConfigHandlerTest {
     @DisplayName("ACTION_STOP_SERVER")
     inner class StopServerTests {
         @Test
-        @DisplayName("stop server sends startService intent")
+        @DisplayName("stop server sends startForegroundService intent")
         fun stopServerSendsIntent() =
             runTest {
                 val intent = createIntent(AdbConfigReceiver.ACTION_STOP_SERVER)
                 handler.handle(context, intent)
-                verify(exactly = 1) { context.startService(any()) }
-                verify(exactly = 0) { context.startForegroundService(any()) }
+                verify(exactly = 1) { context.startForegroundService(any()) }
+                verify(exactly = 0) { context.startService(any()) }
             }
     }
 

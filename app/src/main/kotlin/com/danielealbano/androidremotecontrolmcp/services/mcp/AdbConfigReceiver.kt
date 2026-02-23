@@ -3,7 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Binder
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
@@ -19,8 +19,9 @@ import javax.inject.Inject
  *
  * This receiver is available in both debug and release builds, allowing headless
  * configuration of the MCP server settings via ADB. It is `exported=true` so that
- * ADB (running as the shell user) can send broadcasts to it. Only broadcasts from
- * the ADB shell user (UID 2000) are accepted; all other callers are rejected.
+ * ADB (running as the shell user) can send broadcasts to it. On API 34+, only
+ * broadcasts from the ADB shell user (UID 2000) are accepted via [getSentFromUid];
+ * on API 33 the sender UID cannot be reliably determined, so the check is skipped.
  *
  * Only settings that do not require direct user interaction (e.g., SAF document
  * picker for storage locations) are supported. Each extra is optional; omitted
@@ -76,10 +77,12 @@ class AdbConfigReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
-        val callingUid = Binder.getCallingUid()
-        if (callingUid != Process.SHELL_UID) {
-            Log.w(TAG, "Rejecting broadcast from non-shell caller (uid=$callingUid)")
-            return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val senderUid = getSentFromUid()
+            if (senderUid != Process.SHELL_UID) {
+                Log.w(TAG, "Rejecting broadcast from non-shell caller (uid=$senderUid)")
+                return
+            }
         }
 
         Log.i(TAG, "onReceive called with action: ${intent.action}")

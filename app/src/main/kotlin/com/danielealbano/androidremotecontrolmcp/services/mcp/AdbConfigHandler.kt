@@ -249,12 +249,12 @@ class AdbConfigHandler(
             Intent(context, McpServerService::class.java).apply {
                 action = McpServerService.ACTION_STOP
             }
-        context.startService(serviceIntent)
+        context.startForegroundService(serviceIntent)
         Log.i(TAG, "McpServerService stop command sent")
     }
 
     companion object {
-        private const val TAG = "MCP:AdbConfigReceiver"
+        private const val TAG = "MCP:AdbConfigHandler"
 
         internal const val EXTRA_BEARER_TOKEN = "bearer_token"
         internal const val EXTRA_BINDING_ADDRESS = "binding_address"
