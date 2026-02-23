@@ -34,7 +34,7 @@ class AdbConfigHandler(
         }
     }
 
-    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    @Suppress("LongMethod")
     private suspend fun handleConfigure(intent: Intent) {
         Log.i(TAG, "Received ADB configuration broadcast")
 
@@ -71,10 +71,18 @@ class AdbConfigHandler(
     private suspend fun applyBindingAddress(intent: Intent) {
         val value = intent.getStringExtra(EXTRA_BINDING_ADDRESS) ?: return
         val address =
-            if (value == BindingAddress.NETWORK.address) {
-                BindingAddress.NETWORK
-            } else {
-                BindingAddress.LOCALHOST
+            when (value) {
+                BindingAddress.NETWORK.address -> BindingAddress.NETWORK
+                BindingAddress.LOCALHOST.address -> BindingAddress.LOCALHOST
+                else -> {
+                    Log.w(
+                        TAG,
+                        "Ignoring unrecognized binding_address '$value' " +
+                            "(valid: ${BindingAddress.LOCALHOST.address}, " +
+                            "${BindingAddress.NETWORK.address})",
+                    )
+                    return
+                }
             }
         settingsRepository.updateBindingAddress(address)
         Log.i(TAG, "Binding address updated to $address")
@@ -160,6 +168,10 @@ class AdbConfigHandler(
 
     private suspend fun applyNgrokAuthtoken(intent: Intent) {
         val value = intent.getStringExtra(EXTRA_NGROK_AUTHTOKEN) ?: return
+        if (value.isEmpty()) {
+            Log.w(TAG, "Ignoring empty ngrok_authtoken")
+            return
+        }
         settingsRepository.updateNgrokAuthtoken(value)
         Log.i(TAG, "ngrok authtoken updated (length=${value.length})")
     }

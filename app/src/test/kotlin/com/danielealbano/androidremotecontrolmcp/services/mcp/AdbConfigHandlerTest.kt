@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test
  * BroadcastReceiver lifecycle involved).
  */
 @DisplayName("AdbConfigHandler")
-class AdbConfigReceiverTest {
+class AdbConfigHandlerTest {
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var handler: AdbConfigHandler
     private lateinit var context: Context
@@ -539,6 +539,90 @@ class AdbConfigReceiverTest {
                 coVerify(exactly = 0) { settingsRepository.updateDownloadTimeout(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
             }
+
+        @Test
+        @DisplayName("unrecognized binding_address is rejected")
+        fun unrecognizedBindingAddressRejected() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_BINDING_ADDRESS, "192.168.1.100")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateBindingAddress(any()) }
+            }
+
+        @Test
+        @DisplayName("empty ngrok_authtoken is ignored")
+        fun emptyNgrokAuthtokenIgnored() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_NGROK_AUTHTOKEN, "")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateNgrokAuthtoken(any()) }
+            }
+
+        @Test
+        @DisplayName("absent ngrok_domain does not update setting")
+        fun absentNgrokDomain() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_NGROK_AUTHTOKEN, "some-token")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateNgrokDomain(any()) }
+            }
+
+        @Test
+        @DisplayName("https_enabled false is applied")
+        fun httpsEnabledFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_HTTPS_ENABLED, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateHttpsEnabled(false) }
+            }
+
+        @Test
+        @DisplayName("tunnel_enabled false is applied")
+        fun tunnelEnabledFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_TUNNEL_ENABLED, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateTunnelEnabled(false) }
+            }
+
+        @Test
+        @DisplayName("allow_http_downloads false is applied")
+        fun allowHttpDownloadsFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_ALLOW_HTTP_DOWNLOADS, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateAllowHttpDownloads(false) }
+            }
+
+        @Test
+        @DisplayName("allow_unverified_https_certs false is applied")
+        fun allowUnverifiedHttpsCertsFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateAllowUnverifiedHttpsCerts(false) }
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -554,7 +638,8 @@ class AdbConfigReceiverTest {
             runTest {
                 val intent = createIntent(AdbConfigReceiver.ACTION_START_SERVER)
                 handler.handle(context, intent)
-                verify { context.startForegroundService(any()) }
+                verify(exactly = 1) { context.startForegroundService(any()) }
+                verify(exactly = 0) { context.startService(any()) }
             }
     }
 
@@ -562,12 +647,13 @@ class AdbConfigReceiverTest {
     @DisplayName("ACTION_STOP_SERVER")
     inner class StopServerTests {
         @Test
-        @DisplayName("stop server sends startService intent with stop action")
+        @DisplayName("stop server sends startService intent")
         fun stopServerSendsIntent() =
             runTest {
                 val intent = createIntent(AdbConfigReceiver.ACTION_STOP_SERVER)
                 handler.handle(context, intent)
-                verify { context.startService(any()) }
+                verify(exactly = 1) { context.startService(any()) }
+                verify(exactly = 0) { context.startForegroundService(any()) }
             }
     }
 
