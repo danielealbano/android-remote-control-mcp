@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.lang.reflect.Field
 
 @DisplayName("ActionExecutorImpl")
@@ -688,6 +689,27 @@ class ActionExecutorImplTest {
                 assertTrue(
                     result.exceptionOrNull()?.message?.contains("not available") == true,
                 )
+            }
+
+        @Test
+        @DisplayName("scroll with negative variancePercent throws IllegalArgumentException")
+        fun scrollWithNegativeVariancePercentThrows() =
+            runTest {
+                assertThrows<IllegalArgumentException> {
+                    spyExecutor.scroll(ScrollDirection.DOWN, variancePercent = -0.01f)
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with variancePercent exceeding max throws IllegalArgumentException")
+        fun scrollWithVariancePercentExceedingMaxThrows() =
+            runTest {
+                assertThrows<IllegalArgumentException> {
+                    spyExecutor.scroll(
+                        ScrollDirection.DOWN,
+                        variancePercent = ActionExecutor.MAX_SCROLL_VARIANCE_PERCENT + 0.01f,
+                    )
+                }
             }
     }
 

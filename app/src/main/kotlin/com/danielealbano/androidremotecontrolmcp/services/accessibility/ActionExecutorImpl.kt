@@ -353,25 +353,41 @@ class ActionExecutorImpl
                 ScrollDirection.UP -> {
                     val startY = (centerY - halfDistance).coerceIn(0f, screenHeight)
                     val endY = (centerY + halfDistance).coerceIn(0f, screenHeight)
-                    swipe(centerX, startY.coerceAtMost(endY - MIN_SCROLL_DISTANCE), centerX, endY)
+                    val adjustedStartY =
+                        startY
+                            .coerceAtMost(endY - MIN_SCROLL_DISTANCE)
+                            .coerceIn(0f, screenHeight)
+                    swipe(centerX, adjustedStartY, centerX, endY)
                 }
                 // Scroll down (reveal content below): finger swipes upward (y1 > y2)
                 ScrollDirection.DOWN -> {
                     val startY = (centerY + halfDistance).coerceIn(0f, screenHeight)
                     val endY = (centerY - halfDistance).coerceIn(0f, screenHeight)
-                    swipe(centerX, startY.coerceAtLeast(endY + MIN_SCROLL_DISTANCE), centerX, endY)
+                    val adjustedStartY =
+                        startY
+                            .coerceAtLeast(endY + MIN_SCROLL_DISTANCE)
+                            .coerceIn(0f, screenHeight)
+                    swipe(centerX, adjustedStartY, centerX, endY)
                 }
                 // Scroll left (reveal content to the left): finger swipes rightward (x1 < x2)
                 ScrollDirection.LEFT -> {
                     val startX = (centerX - halfDistance).coerceIn(0f, screenWidth)
                     val endX = (centerX + halfDistance).coerceIn(0f, screenWidth)
-                    swipe(startX.coerceAtMost(endX - MIN_SCROLL_DISTANCE), centerY, endX, centerY)
+                    val adjustedStartX =
+                        startX
+                            .coerceAtMost(endX - MIN_SCROLL_DISTANCE)
+                            .coerceIn(0f, screenWidth)
+                    swipe(adjustedStartX, centerY, endX, centerY)
                 }
                 // Scroll right (reveal content to the right): finger swipes leftward (x1 > x2)
                 ScrollDirection.RIGHT -> {
                     val startX = (centerX + halfDistance).coerceIn(0f, screenWidth)
                     val endX = (centerX - halfDistance).coerceIn(0f, screenWidth)
-                    swipe(startX.coerceAtLeast(endX + MIN_SCROLL_DISTANCE), centerY, endX, centerY)
+                    val adjustedStartX =
+                        startX
+                            .coerceAtLeast(endX + MIN_SCROLL_DISTANCE)
+                            .coerceIn(0f, screenWidth)
+                    swipe(adjustedStartX, centerY, endX, centerY)
                 }
             }
         }
