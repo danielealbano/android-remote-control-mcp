@@ -30,7 +30,8 @@ import javax.inject.Inject
  *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver \
  *   --es bearer_token "test-token-uuid" \
  *   --es binding_address "0.0.0.0" \
- *   --ei port 8080
+ *   --ei port 8080 \
+ *   --ez auto_start_on_boot true
  *
  * # Start the MCP server (runs inside app process, avoids exported=false restriction)
  * adb shell am broadcast \
@@ -69,6 +70,8 @@ class E2EConfigReceiver : BroadcastReceiver() {
         val bearerToken = intent.getStringExtra(EXTRA_BEARER_TOKEN)
         val bindingAddress = intent.getStringExtra(EXTRA_BINDING_ADDRESS)
         val port = intent.getIntExtra(EXTRA_PORT, -1)
+        val hasAutoStart = intent.hasExtra(EXTRA_AUTO_START_ON_BOOT)
+        val autoStart = intent.getBooleanExtra(EXTRA_AUTO_START_ON_BOOT, false)
 
         scope.launch {
             if (!bearerToken.isNullOrEmpty()) {
@@ -88,6 +91,10 @@ class E2EConfigReceiver : BroadcastReceiver() {
             if (port in 1..65535) {
                 settingsRepository.updatePort(port)
                 Log.i(TAG, "Port updated to $port")
+            }
+            if (hasAutoStart) {
+                settingsRepository.updateAutoStartOnBoot(autoStart)
+                Log.i(TAG, "Auto-start on boot updated to $autoStart")
             }
             Log.i(TAG, "E2E configuration applied successfully")
         }
@@ -110,5 +117,6 @@ class E2EConfigReceiver : BroadcastReceiver() {
         private const val EXTRA_BEARER_TOKEN = "bearer_token"
         private const val EXTRA_BINDING_ADDRESS = "binding_address"
         private const val EXTRA_PORT = "port"
+        private const val EXTRA_AUTO_START_ON_BOOT = "auto_start_on_boot"
     }
 }
