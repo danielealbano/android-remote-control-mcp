@@ -80,6 +80,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- ADB Configuration Receiver (headless setup via adb shell am broadcast) -->
+        <receiver
+            android:name=".services.mcp.AdbConfigReceiver"
+            android:exported="true">
+        </receiver>
+
     </application>
 
 </manifest>
