@@ -309,9 +309,11 @@ class ScrollTool
     constructor(
         private val actionExecutor: ActionExecutor,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val directionStr = McpToolUtils.requireString(arguments, "direction")
             val amountStr = McpToolUtils.optionalString(arguments, "amount", "medium")
+            val variance = McpToolUtils.optionalFloat(arguments, "variance", DEFAULT_VARIANCE)
 
             val direction =
                 when (directionStr.lowercase()) {
@@ -334,8 +336,17 @@ class ScrollTool
                     )
                 }
 
-            Log.d(TAG, "Executing scroll ${direction.name} with amount ${amount.name}")
-            val result = actionExecutor.scroll(direction, amount)
+            McpToolUtils.validateNonNegative(variance, "variance")
+            if (variance > MAX_VARIANCE) {
+                throw McpToolException.InvalidParams(
+                    "Parameter 'variance' must be between 0 and ${MAX_VARIANCE.toInt()}, got: $variance",
+                )
+            }
+
+            val variancePercent = variance / PERCENT_DIVISOR
+
+            Log.d(TAG, "Executing scroll ${direction.name} with amount ${amount.name}, variance $variance%")
+            val result = actionExecutor.scroll(direction, amount, variancePercent)
             return McpToolUtils.handleActionResult(
                 result,
                 "Scroll ${directionStr.lowercase()} (${amountStr.lowercase()}) executed",
@@ -348,7 +359,9 @@ class ScrollTool
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Scrolls in the specified direction.",
+                description =
+                    "Scrolls in the specified direction. Applies random variance to " +
+                        "scroll distance and center point for more natural-looking gestures.",
                 inputSchema =
                     ToolSchema(
                         properties =
@@ -377,6 +390,17 @@ class ScrollTool
                                     )
                                     put("default", "medium")
                                 }
+                                putJsonObject("variance") {
+                                    put("type", "number")
+                                    put(
+                                        "description",
+                                        "Random variance percentage (0-${MAX_VARIANCE.toInt()}). " +
+                                            "Applied as ±variance% to scroll distance and center point.",
+                                    )
+                                    put("default", DEFAULT_VARIANCE.toInt())
+                                    put("minimum", 0)
+                                    put("maximum", MAX_VARIANCE.toInt())
+                                }
                             },
                         required = listOf("direction"),
                     ),
@@ -386,6 +410,9 @@ class ScrollTool
         companion object {
             const val TOOL_NAME = "scroll"
             private const val TAG = "MCP:ScrollTool"
+            private const val PERCENT_DIVISOR = 100f
+            private val DEFAULT_VARIANCE = ActionExecutor.DEFAULT_SCROLL_VARIANCE_PERCENT * PERCENT_DIVISOR
+            private val MAX_VARIANCE = ActionExecutor.MAX_SCROLL_VARIANCE_PERCENT * PERCENT_DIVISOR
         }
     }
 

@@ -4,9 +4,12 @@ import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.lang.reflect.Field
 
 @DisplayName("ActionExecutorImpl")
@@ -451,37 +455,261 @@ class ActionExecutorImplTest {
     }
 
     @Nested
-    @DisplayName("Scroll with getScreenInfo")
-    inner class ScrollWithScreenInfo {
+    @DisplayName("Scroll coordinate-based gestures")
+    inner class ScrollCoordinateGestures {
+        // Test screen: 1080x2400, center=(540, 1200)
+        private val testScreenInfo =
+            ScreenInfo(
+                width = 1080,
+                height = 2400,
+                densityDpi = 420,
+                orientation = "portrait",
+            )
+
+        private lateinit var spyExecutor: ActionExecutorImpl
+
+        @BeforeEach
+        fun setUpScroll() {
+            setServiceInstance(mockService)
+            every { mockService.getScreenInfo() } returns testScreenInfo
+            spyExecutor = spyk(executor)
+            coEvery { spyExecutor.swipe(any(), any(), any(), any(), any()) } returns
+                Result.success(Unit)
+        }
+
         @Test
         @DisplayName("scroll calls getScreenInfo to obtain screen dimensions")
         fun scrollCallsGetScreenInfo() =
             runTest {
-                // Arrange
-                setServiceInstance(mockService)
-                val screenInfo =
-                    ScreenInfo(
-                        width = 1080,
-                        height = 2400,
-                        densityDpi = 420,
-                        orientation = "portrait",
-                    )
-                every { mockService.getScreenInfo() } returns screenInfo
+                // Act — use variancePercent=0f for deterministic test
+                spyExecutor.scroll(ScrollDirection.UP, variancePercent = 0f)
 
-                // Act & Assert: scroll() must call getScreenInfo().
-                // The gesture dispatch will fail in JVM tests (Android framework stubs
-                // return null for GestureDescription.Builder), so we just verify getScreenInfo
-                // was called before the gesture attempt.
-                @Suppress("SwallowedException")
-                try {
-                    executor.scroll(ScrollDirection.UP)
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") e: Exception,
-                ) {
-                    // Expected — Android gesture APIs are stubbed in JVM tests
-                }
-
+                // Assert
                 verify { mockService.getScreenInfo() }
+            }
+
+        @Test
+        @DisplayName("scroll DOWN dispatches upward swipe (finger moves up to reveal content below)")
+        fun scrollDownDispatchesUpwardSwipe() =
+            runTest {
+                // Act — MEDIUM=50%, scrollDistance=2400*0.5=1200, halfDistance=600
+                val result = spyExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, variancePercent = 0f)
+
+                // Assert: finger starts at bottom (1800) and swipes to top (600)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(540f, 1800f, 540f, 600f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll UP dispatches downward swipe (finger moves down to reveal content above)")
+        fun scrollUpDispatchesDownwardSwipe() =
+            runTest {
+                // Act — MEDIUM=50%, scrollDistance=2400*0.5=1200, halfDistance=600
+                val result = spyExecutor.scroll(ScrollDirection.UP, ScrollAmount.MEDIUM, variancePercent = 0f)
+
+                // Assert: finger starts at top (600) and swipes to bottom (1800)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(540f, 600f, 540f, 1800f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll LEFT dispatches rightward swipe (finger moves right to reveal content to the left)")
+        fun scrollLeftDispatchesRightwardSwipe() =
+            runTest {
+                // Act — MEDIUM=50%, scrollDistance=1080*0.5=540, halfDistance=270
+                val result = spyExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.MEDIUM, variancePercent = 0f)
+
+                // Assert: finger starts at left (270) and swipes to right (810)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(270f, 1200f, 810f, 1200f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll RIGHT dispatches leftward swipe (finger moves left to reveal content to the right)")
+        fun scrollRightDispatchesLeftwardSwipe() =
+            runTest {
+                // Act — MEDIUM=50%, scrollDistance=1080*0.5=540, halfDistance=270
+                val result = spyExecutor.scroll(ScrollDirection.RIGHT, ScrollAmount.MEDIUM, variancePercent = 0f)
+
+                // Assert: finger starts at right (810) and swipes to left (270)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(810f, 1200f, 270f, 1200f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll DOWN with LARGE amount uses 75% of screen height")
+        fun scrollDownWithLargeAmountUsesCorrectDistance() =
+            runTest {
+                // Act — LARGE=75%, scrollDistance=2400*0.75=1800, halfDistance=900
+                val result = spyExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.LARGE, variancePercent = 0f)
+
+                // Assert: finger starts at (540, 2100) swipes to (540, 300)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(540f, 2100f, 540f, 300f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll UP with SMALL amount uses 25% of screen height")
+        fun scrollUpWithSmallAmountUsesCorrectDistance() =
+            runTest {
+                // Act — SMALL=25%, scrollDistance=2400*0.25=600, halfDistance=300
+                val result = spyExecutor.scroll(ScrollDirection.UP, ScrollAmount.SMALL, variancePercent = 0f)
+
+                // Assert: finger starts at (540, 900) swipes to (540, 1500)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(540f, 900f, 540f, 1500f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll LEFT with LARGE amount uses 75% of screen width")
+        fun scrollLeftWithLargeAmountUsesCorrectDistance() =
+            runTest {
+                // Act — LARGE=75%, scrollDistance=1080*0.75=810, halfDistance=405
+                val result = spyExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.LARGE, variancePercent = 0f)
+
+                // Assert: finger starts at (540-405=135) swipes to (540+405=945)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(135f, 1200f, 945f, 1200f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll RIGHT with SMALL amount uses 25% of screen width")
+        fun scrollRightWithSmallAmountUsesCorrectDistance() =
+            runTest {
+                // Act — SMALL=25%, scrollDistance=1080*0.25=270, halfDistance=135
+                val result = spyExecutor.scroll(ScrollDirection.RIGHT, ScrollAmount.SMALL, variancePercent = 0f)
+
+                // Assert: finger starts at (540+135=675) swipes to (540-135=405)
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(675f, 1200f, 405f, 1200f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with variance produces coordinates within expected bounds")
+        fun scrollWithVarianceProducesCoordinatesWithinBounds() =
+            runTest {
+                // Arrange — capture actual swipe coordinates
+                val x1Slot = slot<Float>()
+                val y1Slot = slot<Float>()
+                val x2Slot = slot<Float>()
+                val y2Slot = slot<Float>()
+                coEvery {
+                    spyExecutor.swipe(
+                        capture(x1Slot),
+                        capture(y1Slot),
+                        capture(x2Slot),
+                        capture(y2Slot),
+                        any(),
+                    )
+                } returns Result.success(Unit)
+
+                // Act — 10% variance on 1080x2400 screen
+                val result =
+                    spyExecutor.scroll(
+                        ScrollDirection.DOWN,
+                        ScrollAmount.MEDIUM,
+                        variancePercent = 0.10f,
+                    )
+
+                // Assert — all coordinates must be within screen bounds
+                assertTrue(result.isSuccess)
+                assertTrue(x1Slot.captured in 0f..1080f, "x1=${x1Slot.captured} out of screen bounds")
+                assertTrue(y1Slot.captured in 0f..2400f, "y1=${y1Slot.captured} out of screen bounds")
+                assertTrue(x2Slot.captured in 0f..1080f, "x2=${x2Slot.captured} out of screen bounds")
+                assertTrue(y2Slot.captured in 0f..2400f, "y2=${y2Slot.captured} out of screen bounds")
+            }
+
+        @Test
+        @DisplayName("scroll with zero variance produces exact center coordinates")
+        fun scrollWithZeroVarianceProducesExactCenter() =
+            runTest {
+                // Act — 0% variance = deterministic, same as original behavior
+                val result =
+                    spyExecutor.scroll(
+                        ScrollDirection.DOWN,
+                        ScrollAmount.MEDIUM,
+                        variancePercent = 0f,
+                    )
+
+                // Assert: exact center X for both endpoints
+                assertTrue(result.isSuccess)
+                coVerify {
+                    spyExecutor.swipe(540f, 1800f, 540f, 600f, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll propagates failure when swipe returns failure")
+        fun scrollPropagatesSwipeFailure() =
+            runTest {
+                // Arrange — override the default success stub with a failure
+                coEvery { spyExecutor.swipe(any(), any(), any(), any(), any()) } returns
+                    Result.failure(RuntimeException("Gesture cancelled: swipe"))
+
+                // Act
+                val result = spyExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, variancePercent = 0f)
+
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is RuntimeException)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("Gesture cancelled") == true,
+                )
+            }
+
+        @Test
+        @DisplayName("scroll returns failure when service is not available")
+        fun scrollReturnsFailureWhenServiceNotAvailable() =
+            runTest {
+                // Arrange — override the @BeforeEach service instance with null
+                setServiceInstance(null)
+
+                // Act — use executor directly (not spyExecutor) since service is null
+                val result = executor.scroll(ScrollDirection.DOWN)
+
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalStateException)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("not available") == true,
+                )
+            }
+
+        @Test
+        @DisplayName("scroll with negative variancePercent throws IllegalArgumentException")
+        fun scrollWithNegativeVariancePercentThrows() =
+            runTest {
+                assertThrows<IllegalArgumentException> {
+                    spyExecutor.scroll(ScrollDirection.DOWN, variancePercent = -0.01f)
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with variancePercent exceeding max throws IllegalArgumentException")
+        fun scrollWithVariancePercentExceedingMaxThrows() =
+            runTest {
+                assertThrows<IllegalArgumentException> {
+                    spyExecutor.scroll(
+                        ScrollDirection.DOWN,
+                        variancePercent = ActionExecutor.MAX_SCROLL_VARIANCE_PERCENT + 0.01f,
+                    )
+                }
             }
     }
 

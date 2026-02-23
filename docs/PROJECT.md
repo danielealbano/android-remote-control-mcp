@@ -211,7 +211,7 @@ The MCP server exposes 45 tools across 10 categories. For full JSON-RPC schemas,
 | `android_long_press` | Long press at coordinates | `x` (number), `y` (number) | `duration` (number, ms, default 1000) |
 | `android_double_tap` | Double tap at coordinates | `x` (number), `y` (number) | — |
 | `android_swipe` | Swipe from point A to B | `x1`, `y1`, `x2`, `y2` (all number) | `duration` (number, ms, default 300) |
-| `android_scroll` | Scroll in direction | `direction` (string: up/down/left/right) | `amount` (string: small/medium/large, default medium) |
+| `android_scroll` | Scroll in direction | `direction` (string: up/down/left/right) | `amount` (string: small/medium/large, default medium), `variance` (number: 0-20, default 5) |
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 

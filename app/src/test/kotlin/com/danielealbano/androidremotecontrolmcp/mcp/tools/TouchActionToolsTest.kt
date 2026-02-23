@@ -555,8 +555,9 @@ class TouchActionToolsTest {
         @DisplayName("scroll down with default amount returns success")
         fun scrollDownWithDefaultAmountReturnsSuccess() =
             runTest {
-                coEvery { actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM) } returns
-                    Result.success(Unit)
+                coEvery {
+                    actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, any())
+                } returns Result.success(Unit)
 
                 val params =
                     buildJsonObject {
@@ -566,15 +567,18 @@ class TouchActionToolsTest {
                 val text = extractTextContent(result)
 
                 assertTrue(text.contains("Scroll down"))
-                coVerify(exactly = 1) { actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM) }
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, any())
+                }
             }
 
         @Test
         @DisplayName("scroll up with large amount returns success")
         fun scrollUpWithLargeAmountReturnsSuccess() =
             runTest {
-                coEvery { actionExecutor.scroll(ScrollDirection.UP, ScrollAmount.LARGE) } returns
-                    Result.success(Unit)
+                coEvery {
+                    actionExecutor.scroll(ScrollDirection.UP, ScrollAmount.LARGE, any())
+                } returns Result.success(Unit)
 
                 val params =
                     buildJsonObject {
@@ -586,22 +590,123 @@ class TouchActionToolsTest {
 
                 assertTrue(text.contains("Scroll up"))
                 assertTrue(text.contains("large"))
-                coVerify(exactly = 1) { actionExecutor.scroll(ScrollDirection.UP, ScrollAmount.LARGE) }
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.UP, ScrollAmount.LARGE, any())
+                }
             }
 
         @Test
         @DisplayName("scroll with case-insensitive direction returns success")
         fun scrollWithCaseInsensitiveDirectionReturnsSuccess() =
             runTest {
-                coEvery { actionExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.MEDIUM) } returns
-                    Result.success(Unit)
+                coEvery {
+                    actionExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.MEDIUM, any())
+                } returns Result.success(Unit)
 
                 val params =
                     buildJsonObject {
                         put("direction", "LEFT")
                     }
                 tool.execute(params)
-                coVerify(exactly = 1) { actionExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.MEDIUM) }
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.LEFT, ScrollAmount.MEDIUM, any())
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with custom variance passes correct variancePercent")
+        fun scrollWithCustomVariancePassesCorrectVariancePercent() =
+            runTest {
+                coEvery {
+                    actionExecutor.scroll(any(), any(), any())
+                } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("direction", "down")
+                        put("variance", 10)
+                    }
+                tool.execute(params)
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, 0.10f)
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with zero variance passes 0f variancePercent")
+        fun scrollWithZeroVariancePassesZeroVariancePercent() =
+            runTest {
+                coEvery {
+                    actionExecutor.scroll(any(), any(), any())
+                } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("direction", "down")
+                        put("variance", 0)
+                    }
+                tool.execute(params)
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, 0f)
+                }
+            }
+
+        @Test
+        @DisplayName("scroll with negative variance returns invalid params")
+        fun scrollWithNegativeVarianceReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("direction", "down")
+                        put("variance", -1)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("variance"))
+                assertTrue(exception.message!!.contains(">= 0"))
+            }
+
+        @Test
+        @DisplayName("scroll with variance exceeding max returns invalid params")
+        fun scrollWithVarianceExceedingMaxReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("direction", "down")
+                        put("variance", 21)
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("variance"))
+                assertTrue(exception.message!!.contains("20"))
+            }
+
+        @Test
+        @DisplayName("scroll with variance at exact max (20) is accepted")
+        fun scrollWithVarianceAtExactMaxIsAccepted() =
+            runTest {
+                coEvery {
+                    actionExecutor.scroll(any(), any(), any())
+                } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("direction", "down")
+                        put("variance", 20)
+                    }
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+
+                assertTrue(text.contains("Scroll down"))
+                coVerify(exactly = 1) {
+                    actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, 0.20f)
+                }
             }
 
         @Test
@@ -657,7 +762,7 @@ class TouchActionToolsTest {
         @DisplayName("scroll when service not enabled returns permission denied")
         fun scrollWhenServiceNotEnabledReturnsPermissionDenied() =
             runTest {
-                coEvery { actionExecutor.scroll(any(), any()) } returns
+                coEvery { actionExecutor.scroll(any(), any(), any()) } returns
                     Result.failure(
                         IllegalStateException("Accessibility service is not available"),
                     )
@@ -676,7 +781,7 @@ class TouchActionToolsTest {
         @DisplayName("scroll when action fails returns action failed")
         fun scrollWhenActionFailsReturnsActionFailed() =
             runTest {
-                coEvery { actionExecutor.scroll(any(), any()) } returns
+                coEvery { actionExecutor.scroll(any(), any(), any()) } returns
                     Result.failure(
                         RuntimeException("No root node available for screen dimensions"),
                     )

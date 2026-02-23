@@ -1,5 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollAmount
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import io.mockk.coEvery
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
@@ -79,6 +81,87 @@ class TouchActionIntegrationTest {
                 assertTrue(result.content.isNotEmpty())
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Swipe executed"))
+            }
+        }
+
+    @Test
+    fun `scroll down with default params calls actionExecutor and returns success`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery {
+                deps.actionExecutor.scroll(ScrollDirection.DOWN, ScrollAmount.MEDIUM, any())
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll",
+                        arguments = mapOf("direction" to "down"),
+                    )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Scroll down"))
+            }
+        }
+
+    @Test
+    fun `scroll with custom variance passes correct variancePercent to actionExecutor`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery {
+                deps.actionExecutor.scroll(ScrollDirection.UP, ScrollAmount.SMALL, 0.10f)
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll",
+                        arguments =
+                            mapOf(
+                                "direction" to "up",
+                                "amount" to "small",
+                                "variance" to 10,
+                            ),
+                    )
+                assertNotEquals(true, result.isError)
+                assertTrue(result.content.isNotEmpty())
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Scroll up"))
+            }
+        }
+
+    @Test
+    fun `scroll with variance exceeding max returns error`() =
+        runTest {
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll",
+                        arguments =
+                            mapOf(
+                                "direction" to "down",
+                                "variance" to 21,
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("variance"))
+            }
+        }
+
+    @Test
+    fun `scroll with invalid direction returns error`() =
+        runTest {
+            McpIntegrationTestHelper.withTestApplication { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll",
+                        arguments = mapOf("direction" to "diagonal"),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("direction"))
             }
         }
 }

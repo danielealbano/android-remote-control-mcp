@@ -105,6 +105,7 @@ interface ActionExecutor {
     suspend fun scroll(
         direction: ScrollDirection,
         amount: ScrollAmount = ScrollAmount.MEDIUM,
+        variancePercent: Float = DEFAULT_SCROLL_VARIANCE_PERCENT,
     ): Result<Unit>
 
     suspend fun pressBack(): Result<Unit>
@@ -136,5 +137,7 @@ interface ActionExecutor {
         internal const val DEFAULT_LONG_PRESS_DURATION_MS = 1000L
         internal const val DEFAULT_SWIPE_DURATION_MS = 300L
         internal const val DEFAULT_GESTURE_DURATION_MS = 300L
+        internal const val DEFAULT_SCROLL_VARIANCE_PERCENT = 0.05f
+        internal const val MAX_SCROLL_VARIANCE_PERCENT = 0.20f
     }
 }
