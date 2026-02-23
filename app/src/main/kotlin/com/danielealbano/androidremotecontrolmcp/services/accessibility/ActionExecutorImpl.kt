@@ -289,13 +289,30 @@ class ActionExecutorImpl
          * Scrolls the screen in the given [direction] by the given [amount].
          *
          * Calculates start and end coordinates as percentages of the screen size
-         * and dispatches a swipe gesture.
+         * and dispatches a swipe gesture. The swipe direction is the **opposite**
+         * of the scroll direction because the finger must move against the desired
+         * scroll direction (e.g., to "scroll down" and reveal content below, the
+         * finger swipes upward).
+         *
+         * When [variancePercent] > 0, three independent random offsets are applied:
+         * 1. **Center X**: shifted by ±[variancePercent] of screen width
+         * 2. **Center Y**: shifted by ±[variancePercent] of screen height
+         * 3. **Scroll distance**: adjusted by ±[variancePercent] of the relevant dimension
+         *
+         * All final coordinates are clamped to [0, screenDimension] to prevent
+         * off-screen gestures.
          */
         @Suppress("ReturnCount")
         override suspend fun scroll(
             direction: ScrollDirection,
             amount: ScrollAmount,
+            variancePercent: Float,
         ): Result<Unit> {
+            require(variancePercent in 0f..ActionExecutor.MAX_SCROLL_VARIANCE_PERCENT) {
+                "variancePercent must be between 0 and ${ActionExecutor.MAX_SCROLL_VARIANCE_PERCENT}, " +
+                    "got: $variancePercent"
+            }
+
             val service =
                 McpAccessibilityService.instance
                     ?: return Result.failure(
@@ -305,48 +322,66 @@ class ActionExecutorImpl
             val screenInfo = service.getScreenInfo()
             val screenWidth = screenInfo.width.toFloat()
             val screenHeight = screenInfo.height.toFloat()
-            val centerX = screenWidth / 2f
-            val centerY = screenHeight / 2f
-            val scrollDistance =
+
+            // Apply random variance to the center point
+            val centerX =
+                (
+                    screenWidth / 2f +
+                        screenWidth * variancePercent * randomSignedOffset()
+                ).coerceIn(0f, screenWidth)
+            val centerY =
+                (
+                    screenHeight / 2f +
+                        screenHeight * variancePercent * randomSignedOffset()
+                ).coerceIn(0f, screenHeight)
+
+            // Calculate scroll distance with random variance, ensuring it stays positive
+            val baseDimension =
                 when (direction) {
-                    ScrollDirection.UP, ScrollDirection.DOWN ->
-                        screenHeight * amount.screenPercentage
-                    ScrollDirection.LEFT, ScrollDirection.RIGHT ->
-                        screenWidth * amount.screenPercentage
+                    ScrollDirection.UP, ScrollDirection.DOWN -> screenHeight
+                    ScrollDirection.LEFT, ScrollDirection.RIGHT -> screenWidth
                 }
+            val scrollDistance =
+                (
+                    baseDimension * amount.screenPercentage +
+                        baseDimension * variancePercent * randomSignedOffset()
+                ).coerceAtLeast(MIN_SCROLL_DISTANCE)
             val halfDistance = scrollDistance / 2f
 
             return when (direction) {
-                ScrollDirection.UP ->
-                    swipe(
-                        centerX,
-                        centerY + halfDistance,
-                        centerX,
-                        centerY - halfDistance,
-                    )
-                ScrollDirection.DOWN ->
-                    swipe(
-                        centerX,
-                        centerY - halfDistance,
-                        centerX,
-                        centerY + halfDistance,
-                    )
-                ScrollDirection.LEFT ->
-                    swipe(
-                        centerX + halfDistance,
-                        centerY,
-                        centerX - halfDistance,
-                        centerY,
-                    )
-                ScrollDirection.RIGHT ->
-                    swipe(
-                        centerX - halfDistance,
-                        centerY,
-                        centerX + halfDistance,
-                        centerY,
-                    )
+                // Scroll up (reveal content above): finger swipes downward (y1 < y2)
+                ScrollDirection.UP -> {
+                    val startY = (centerY - halfDistance).coerceIn(0f, screenHeight)
+                    val endY = (centerY + halfDistance).coerceIn(0f, screenHeight)
+                    swipe(centerX, startY.coerceAtMost(endY - MIN_SCROLL_DISTANCE), centerX, endY)
+                }
+                // Scroll down (reveal content below): finger swipes upward (y1 > y2)
+                ScrollDirection.DOWN -> {
+                    val startY = (centerY + halfDistance).coerceIn(0f, screenHeight)
+                    val endY = (centerY - halfDistance).coerceIn(0f, screenHeight)
+                    swipe(centerX, startY.coerceAtLeast(endY + MIN_SCROLL_DISTANCE), centerX, endY)
+                }
+                // Scroll left (reveal content to the left): finger swipes rightward (x1 < x2)
+                ScrollDirection.LEFT -> {
+                    val startX = (centerX - halfDistance).coerceIn(0f, screenWidth)
+                    val endX = (centerX + halfDistance).coerceIn(0f, screenWidth)
+                    swipe(startX.coerceAtMost(endX - MIN_SCROLL_DISTANCE), centerY, endX, centerY)
+                }
+                // Scroll right (reveal content to the right): finger swipes leftward (x1 > x2)
+                ScrollDirection.RIGHT -> {
+                    val startX = (centerX + halfDistance).coerceIn(0f, screenWidth)
+                    val endX = (centerX - halfDistance).coerceIn(0f, screenWidth)
+                    swipe(startX.coerceAtLeast(endX + MIN_SCROLL_DISTANCE), centerY, endX, centerY)
+                }
             }
         }
+
+        /**
+         * Returns a random Float in [-1.0, 1.0) for use as a signed variance offset.
+         */
+        private fun randomSignedOffset(): Float =
+            (kotlin.random.Random.nextFloat() * 2f) -
+                1f
 
         // ─────────────────────────────────────────────────────────────────────────
         // Global Actions
@@ -855,5 +890,6 @@ class ActionExecutorImpl
             private const val TAP_DURATION_MS = 50L
             private const val DOUBLE_TAP_GAP_MS = 100L
             private const val PINCH_BASE_DISTANCE = 100f
+            private const val MIN_SCROLL_DISTANCE = 1f
         }
     }
