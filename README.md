@@ -20,7 +20,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-start on boot
 - Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 39 MCP Tools across 9 Categories
+### 45 MCP Tools across 10 Categories
 
 All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full naming convention.
 
@@ -35,6 +35,7 @@ All tool names use the `android_` prefix by default (e.g., `android_tap`). When 
 | **Utilities** (5) | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | Helper tools for automation and element inspection |
 | **File Operations** (8) | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | File system access via Storage Access Framework (SAF) |
 | **App Management** (3) | `android_open_app`, `android_list_apps`, `android_close_app` | Launch, list, and close applications |
+| **Camera** (6) | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | Camera photo/video capture via CameraX, list capabilities and resolutions |
 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with input/output schemas and examples.
 
@@ -42,10 +43,11 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - Material Design 3 configuration UI with dark mode
 - Server status monitoring (running/stopped)
 - Connection info display (IP, port, token, tunnel URL)
-- Permission management (Accessibility, Notifications)
+- Permission management (Accessibility, Notifications, Camera, Microphone)
 - Remote access tunnel configuration (Cloudflare / ngrok)
 - Storage location management (SAF authorization for file tools)
 - Server log viewer (MCP tool calls, tunnel events)
+- Headless setup via ADB (configure, grant permissions, start/stop server without UI)
 
 ---
 
@@ -94,6 +96,7 @@ make install
 ### 3. Configure Permissions
 
 1. **Enable Accessibility Service**: Open the app, tap "Enable Accessibility Service", and toggle it on in Android Settings. This also enables screenshot capture via the `takeScreenshot()` API (Android 11+).
+2. **Grant Camera & Microphone** (optional, for camera tools): Grant via the app UI or `make grant-permissions`.
 
 ### 4. Start the MCP Server
 
@@ -182,7 +185,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 39 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 45 MCP tool handlers.
 
 ### Integration Tests
 
@@ -190,7 +193,7 @@ Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree p
 make test-integration
 ```
 
-Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 9 tool categories, and error handling.
+Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 10 tool categories, and error handling.
 
 > **Note**: Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables. Copy `.env.example` to `.env` and fill in the required values. The Makefile sources `.env` automatically.
 
@@ -238,7 +241,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"39 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"45 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end
@@ -256,10 +259,15 @@ graph TB
             AppMgr["AppManager"]
         end
 
+        subgraph CameraSvc["Camera Services"]
+            CamProv["CameraProvider\n(CameraX)"]
+        end
+
         MainActivity["MainActivity (Compose UI)"]
 
         Tools --> Accessibility
         Tools --> Storage
+        Tools --> CameraSvc
         MainActivity -->|"StateFlow (status)"| McpServerService
     end
 ```
@@ -429,6 +437,8 @@ Enable the tunnel in the app's "Remote Access" section. The public URL is displa
 
 ### Permissions
 - **Accessibility Service**: Required for UI introspection, actions, and screenshots (user must enable manually)
+- **Camera**: Required for camera photo/video tools (runtime permission, system dialog)
+- **Record Audio**: Required for video recording with audio (runtime permission, system dialog)
 - **Internet**: For running the HTTP/HTTPS server
 - **Foreground Service**: For keeping services alive in background
 - **Receive Boot Completed**: For auto-start on boot

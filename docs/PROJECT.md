@@ -127,15 +127,15 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
-  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`
+  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`, `CompactTreeFormatter.kt`, `AccessibilityNodeCache.kt`, `AccessibilityNodeCacheImpl.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`, `ScreenshotAnnotator.kt`, `ApiLevelProvider.kt`
   - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
   - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
-  - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`
+  - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -476,8 +476,8 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### Integration Tests
 
 - **Framework**: Ktor `testApplication`, JUnit 5, MockK
-- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 9 tool categories, error code propagation
-- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `TypeInputController`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
+- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 10 tool categories, error code propagation
+- **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `TypeInputController`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`, `CameraProvider`) via interfaces; real SDK `Server` with `McpStreamableHttp` routing and `BearerTokenAuth`
 - **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; uses SDK `Client` + `StreamableHttpClientTransport` for type-safe MCP communication
 - **Run**: `make test-integration` or `./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"`
 - **Note**: JVM-based, no emulator or device required. Runs as part of `make test-unit` since both are under `app/src/test/`
@@ -588,7 +588,7 @@ Tunnel architecture:
 
 ### Permission Security
 
-Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
+Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), `CAMERA` (camera tools, runtime), `RECORD_AUDIO` (video recording with audio, runtime), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
 Per-location read/write/delete permissions are enforced by `FileOperationProvider` — see the Storage Location Permissions section above.
 
 ### Code Security
@@ -686,7 +686,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 | `install` | Install debug APK on connected device/emulator |
 | `install-release` | Install release APK |
 | `uninstall` | Uninstall app from device |
-| `grant-permissions` | Display instructions for granting accessibility permissions |
+| `grant-permissions` | Grant permissions via adb (accessibility, notifications, camera, microphone) |
 | `start-server` | Launch MainActivity on device via adb |
 | `forward-port` | Set up adb port forwarding (device 8080 → host 8080) |
 
