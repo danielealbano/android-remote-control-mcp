@@ -1,15 +1,13 @@
 package com.danielealbano.androidremotecontrolmcp.services.screencapture
 
 import android.graphics.Bitmap
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -21,6 +19,7 @@ import org.junit.jupiter.api.Test
 class ScreenCaptureProviderImplTest {
     private lateinit var screenshotEncoder: ScreenshotEncoder
     private lateinit var mockApiLevelProvider: ApiLevelProvider
+    private lateinit var mockAccessibilityServiceProvider: AccessibilityServiceProvider
     private lateinit var provider: ScreenCaptureProviderImpl
     private lateinit var mockService: McpAccessibilityService
 
@@ -28,21 +27,18 @@ class ScreenCaptureProviderImplTest {
     fun setup() {
         screenshotEncoder = mockk(relaxed = true)
         mockApiLevelProvider = mockk()
+        mockAccessibilityServiceProvider = mockk()
         // Return API 30 (Android R) — minimum for screenshot capability
         every { mockApiLevelProvider.getSdkInt() } returns 30
 
-        provider = ScreenCaptureProviderImpl(screenshotEncoder, mockApiLevelProvider)
         mockService = mockk(relaxed = true)
         every { mockService.canTakeScreenshot() } returns true
 
-        // Mock McpAccessibilityService.instance companion
-        mockkObject(McpAccessibilityService)
-        every { McpAccessibilityService.instance } returns mockService
-    }
+        // Configure the AccessibilityServiceProvider to report ready and return the mock service
+        every { mockAccessibilityServiceProvider.isReady() } returns true
+        every { mockAccessibilityServiceProvider.getContext() } returns mockService
 
-    @AfterEach
-    fun teardown() {
-        unmockkObject(McpAccessibilityService)
+        provider = ScreenCaptureProviderImpl(screenshotEncoder, mockApiLevelProvider, mockAccessibilityServiceProvider)
     }
 
     @Nested
@@ -95,7 +91,7 @@ class ScreenCaptureProviderImplTest {
         @Test
         fun `returns failure when service not available`() =
             runTest {
-                every { McpAccessibilityService.instance } returns null
+                every { mockAccessibilityServiceProvider.isReady() } returns false
 
                 val result = provider.captureScreenshotBitmap(maxWidth = 700, maxHeight = 700)
 

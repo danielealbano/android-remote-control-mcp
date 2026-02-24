@@ -125,7 +125,8 @@ fun ConnectionInfoCard(
 
             val connectionString =
                 buildString {
-                    append("URL: $serverUrl\nToken: $bearerToken")
+                    val tokenValue = if (showToken) bearerToken else TOKEN_MASK
+                    append("URL: $serverUrl\nToken: $tokenValue")
                     tunnelUrl?.let { append("\nPublic URL: $it") }
                 }
             Row(

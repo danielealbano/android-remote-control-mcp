@@ -278,6 +278,25 @@ class GestureToolsTest {
                     tool.execute(params)
                 }
             }
+
+        @Test
+        @DisplayName("pinch with scale=1.0 returns success with no-op label")
+        fun pinchWithScaleOneReturnsNoOp() =
+            runTest {
+                coEvery { actionExecutor.pinch(540f, 1200f, 1.0f, 300L) } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("center_x", 540)
+                        put("center_y", 1200)
+                        put("scale", 1.0)
+                    }
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+
+                assertTrue(text.contains("no-op"))
+                coVerify(exactly = 1) { actionExecutor.pinch(540f, 1200f, 1.0f, 300L) }
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -746,6 +765,83 @@ class GestureToolsTest {
                 assertThrows<McpToolException.ActionFailed> {
                     tool.execute(params)
                 }
+            }
+
+        @Test
+        @DisplayName("custom gesture with too many paths returns invalid params")
+        fun customGestureWithTooManyPathsReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put(
+                            "paths",
+                            buildJsonArray {
+                                // Add 11 paths (max is 10)
+                                repeat(11) {
+                                    add(
+                                        buildJsonArray {
+                                            add(
+                                                buildJsonObject {
+                                                    put("x", 100)
+                                                    put("y", 100)
+                                                    put("time", 0)
+                                                },
+                                            )
+                                            add(
+                                                buildJsonObject {
+                                                    put("x", 200)
+                                                    put("y", 200)
+                                                    put("time", 300)
+                                                },
+                                            )
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("Too many paths"))
+                assertTrue(exception.message!!.contains("10"))
+            }
+
+        @Test
+        @DisplayName("custom gesture with too many points per path returns invalid params")
+        fun customGestureWithTooManyPointsPerPathReturnsInvalidParams() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put(
+                            "paths",
+                            buildJsonArray {
+                                add(
+                                    buildJsonArray {
+                                        // Add 101 points (max is 100)
+                                        repeat(101) { i ->
+                                            add(
+                                                buildJsonObject {
+                                                    put("x", 100 + i)
+                                                    put("y", 100 + i)
+                                                    put("time", i.toLong())
+                                                },
+                                            )
+                                        }
+                                    },
+                                )
+                            },
+                        )
+                    }
+
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("too many points"))
+                assertTrue(exception.message!!.contains("100"))
             }
     }
 }

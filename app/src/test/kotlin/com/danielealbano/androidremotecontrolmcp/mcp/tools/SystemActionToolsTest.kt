@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.ByteArrayInputStream
+import java.util.concurrent.TimeUnit
 
 @DisplayName("System Action Tools")
 class SystemActionToolsTest {
@@ -319,7 +320,8 @@ class SystemActionToolsTest {
             every { mockProcess.inputStream } returns
                 ByteArrayInputStream("2024-01-15 10:30:00 D/TestTag: Sample log line\n".toByteArray())
             every { mockProcess.errorStream } returns ByteArrayInputStream(ByteArray(0))
-            every { mockProcess.waitFor() } returns 0
+            every { mockProcess.waitFor(any<Long>(), any<TimeUnit>()) } returns true
+            every { mockProcess.exitValue() } returns 0
         }
 
         @Test
@@ -502,7 +504,8 @@ class SystemActionToolsTest {
                 every { logProcess.inputStream } returns
                     ByteArrayInputStream("01-15 10:00:00.000 D/Tag: App log\n".toByteArray())
                 every { logProcess.errorStream } returns ByteArrayInputStream(ByteArray(0))
-                every { logProcess.waitFor() } returns 0
+                every { logProcess.waitFor(any(), any()) } returns true
+                every { logProcess.exitValue() } returns 0
 
                 // First exec call = pidof, second = logcat
                 every { mockRuntime.exec(any<Array<String>>()) } returnsMany
@@ -544,6 +547,70 @@ class SystemActionToolsTest {
                 assertNotNull(textContent.text)
                 assertTrue(textContent.text.contains("\"truncated\":true"))
                 assertTrue(textContent.text.contains("\"line_count\":1"))
+            }
+
+        @Test
+        @DisplayName("throws InvalidParams for tag with invalid characters")
+        fun throwsErrorForTagWithInvalidCharacters() =
+            runTest {
+                val params = buildJsonObject { put("tag", JsonPrimitive("tag with spaces")) }
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("tag"))
+                assertTrue(exception.message!!.contains("invalid characters"))
+            }
+
+        @Test
+        @DisplayName("accepts valid tag characters")
+        fun acceptsValidTagCharacters() =
+            runTest {
+                val params = buildJsonObject { put("tag", JsonPrimitive("MCP:Server.*")) }
+                val result = handler.execute(params)
+                assertTrue(result.content.isNotEmpty())
+            }
+
+        @Test
+        @DisplayName("throws InvalidParams for package_name with invalid characters")
+        fun throwsErrorForPackageNameWithInvalidCharacters() =
+            runTest {
+                val params = buildJsonObject { put("package_name", JsonPrimitive("123invalid")) }
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("package_name"))
+            }
+
+        @Test
+        @DisplayName("throws InvalidParams for since with invalid timestamp format")
+        fun throwsErrorForInvalidSinceTimestamp() =
+            runTest {
+                val params = buildJsonObject { put("since", JsonPrimitive("not-a-timestamp")) }
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("since"))
+                assertTrue(exception.message!!.contains("ISO 8601"))
+            }
+
+        @Test
+        @DisplayName("throws InvalidParams for until with invalid timestamp format")
+        fun throwsErrorForInvalidUntilTimestamp() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("since", JsonPrimitive("2024-01-15T10:00:00"))
+                        put("until", JsonPrimitive("bad-format"))
+                    }
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(params)
+                    }
+                assertTrue(exception.message!!.contains("until"))
+                assertTrue(exception.message!!.contains("ISO 8601"))
             }
     }
 }

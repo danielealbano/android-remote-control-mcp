@@ -583,9 +583,6 @@ class FileToolsIntegrationTest {
     fun `download_from_url returns error for invalid URL`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            coEvery {
-                deps.fileOperationProvider.downloadFromUrl(any(), any(), any())
-            } throws McpToolException.ActionFailed("Invalid URL")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -600,7 +597,7 @@ class FileToolsIntegrationTest {
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("Invalid URL"))
+                assertTrue(text.contains("URL must use http:// or https:// scheme"))
             }
         }
 

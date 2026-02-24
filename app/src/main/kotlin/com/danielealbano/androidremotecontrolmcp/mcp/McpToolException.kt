@@ -10,28 +10,42 @@ package com.danielealbano.androidremotecontrolmcp.mcp
  */
 sealed class McpToolException(
     message: String,
-) : Exception(message) {
+    cause: Throwable? = null,
+) : Exception(message, cause) {
     class InvalidParams(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 
     class InternalError(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 
     class PermissionDenied(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 
     class ElementNotFound(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 
     class ActionFailed(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 
+    /**
+     * Thrown when a tool operation exceeds its time limit.
+     *
+     * Note: The SDK wraps all tool exceptions as `CallToolResult(isError = true)` with the
+     * message in `TextContent`, so the specific subclass is used for logging granularity
+     * and internal classification, not wire-level error codes.
+     */
     class Timeout(
         message: String,
-    ) : McpToolException(message)
+        cause: Throwable? = null,
+    ) : McpToolException(message, cause)
 }

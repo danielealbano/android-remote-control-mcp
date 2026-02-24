@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
 import android.net.Uri
+import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
@@ -19,6 +20,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +54,14 @@ class MainViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+
         configFlow =
             MutableStateFlow(
                 ServerConfig(
@@ -80,6 +91,7 @@ class MainViewModelTest {
     @AfterEach
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(Log::class)
     }
 
     @Test
@@ -260,11 +272,13 @@ class MainViewModelTest {
         runTest {
             advanceUntilIdle()
 
+            every { settingsRepository.validateCertificateHostname("") } returns
+                Result.failure(IllegalArgumentException("Certificate hostname must not be empty"))
             viewModel.updateCertificateHostname("")
             advanceUntilIdle()
 
             assertEquals("", viewModel.hostnameInput.value)
-            assertEquals("Hostname is required", viewModel.hostnameError.value)
+            assertEquals("Certificate hostname must not be empty", viewModel.hostnameError.value)
             coVerify(exactly = 0) { settingsRepository.updateCertificateHostname("") }
         }
 
@@ -273,11 +287,22 @@ class MainViewModelTest {
         runTest {
             advanceUntilIdle()
 
+            every { settingsRepository.validateCertificateHostname("-invalid") } returns
+                Result.failure(
+                    IllegalArgumentException(
+                        "Certificate hostname contains invalid characters. " +
+                            "Use only letters, digits, hyphens, and dots.",
+                    ),
+                )
             viewModel.updateCertificateHostname("-invalid")
             advanceUntilIdle()
 
             assertEquals("-invalid", viewModel.hostnameInput.value)
-            assertEquals("Invalid hostname format", viewModel.hostnameError.value)
+            assertEquals(
+                "Certificate hostname contains invalid characters. " +
+                    "Use only letters, digits, hyphens, and dots.",
+                viewModel.hostnameError.value,
+            )
             coVerify(exactly = 0) { settingsRepository.updateCertificateHostname("-invalid") }
         }
 
@@ -412,13 +437,13 @@ class MainViewModelTest {
     @Test
     fun `serverConfig collection sets ngrok input fields`() =
         runTest {
-            advanceUntilIdle()
-
+            // Set ngrok fields BEFORE creating ViewModel so initial load picks them up
             configFlow.value =
                 configFlow.value.copy(
                     ngrokAuthtoken = "my-authtoken",
                     ngrokDomain = "my.ngrok.app",
                 )
+            viewModel = MainViewModel(settingsRepository, tunnelManager, storageLocationProvider, testDispatcher)
             advanceUntilIdle()
 
             assertEquals("my-authtoken", viewModel.ngrokAuthtokenInput.value)
@@ -972,7 +997,9 @@ class MainViewModelTest {
     @Test
     fun `initial state loads deviceSlug from repository`() =
         runTest {
+            // Set deviceSlug BEFORE creating ViewModel so initial load picks it up
             configFlow.value = configFlow.value.copy(deviceSlug = "test_device")
+            viewModel = MainViewModel(settingsRepository, tunnelManager, storageLocationProvider, testDispatcher)
             advanceUntilIdle()
 
             assertEquals("test_device", viewModel.deviceSlugInput.value)

@@ -219,7 +219,12 @@ private fun NgrokConfigFields(
                             } else {
                                 Icons.Default.Visibility
                             },
-                        contentDescription = null,
+                        contentDescription =
+                            if (showAuthtoken) {
+                                "Hide authtoken"
+                            } else {
+                                "Show authtoken"
+                            },
                     )
                 }
             },

@@ -57,7 +57,16 @@ class TunnelManager
                         provider.status.collect { _tunnelStatus.value = it }
                     }
 
-                provider.start(localPort, config)
+                try {
+                    provider.start(localPort, config)
+                } catch (
+                    @Suppress("TooGenericExceptionCaught")
+                    e: Exception,
+                ) {
+                    statusRelayJob?.cancel()
+                    statusRelayJob = null
+                    throw e
+                }
                 activeProvider = provider
             }
         }

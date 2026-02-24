@@ -208,6 +208,31 @@ class BearerTokenAuthTest {
             assertEquals("OK", response.bodyAsText())
         }
 
+    @Test
+    fun `plugin skips authentication for excluded paths`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                install(BearerTokenAuthPlugin) {
+                    expectedToken = TEST_TOKEN
+                    excludedPaths = setOf("/health")
+                }
+                routing {
+                    get("/health") { call.respondText("OK") }
+                    get("/protected/resource") { call.respondText("Secret") }
+                }
+            }
+
+            // /health should be accessible without auth
+            val healthResponse = client.get("/health")
+            assertEquals(HttpStatusCode.OK, healthResponse.status)
+            assertEquals("OK", healthResponse.bodyAsText())
+
+            // /protected/resource should still require auth
+            val protectedResponse = client.get("/protected/resource")
+            assertEquals(HttpStatusCode.Unauthorized, protectedResponse.status)
+        }
+
     companion object {
         private const val TEST_TOKEN = "test-secret-token"
     }

@@ -85,6 +85,7 @@ class UtilityToolsTest {
             bounds = sampleBounds,
             clickable = false,
             enabled = true,
+            visible = true,
         )
 
     private fun extractTextContent(result: CallToolResult): String {

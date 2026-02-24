@@ -97,7 +97,7 @@ class GetClipboardTool
 
         companion object {
             private const val TAG = "MCP:GetClipboardTool"
-            private const val TOOL_NAME = "get_clipboard"
+            const val TOOL_NAME = "get_clipboard"
         }
     }
 
@@ -172,7 +172,7 @@ class SetClipboardTool
 
         companion object {
             private const val TAG = "MCP:SetClipboardTool"
-            private const val TOOL_NAME = "set_clipboard"
+            const val TOOL_NAME = "set_clipboard"
         }
     }
 
@@ -241,21 +241,7 @@ class WaitForElementTool
                                 put("found", true)
                                 put("elapsedMs", elapsed)
                                 put("attempts", attemptCount)
-                                putJsonObject("element") {
-                                    put("element_id", element.id)
-                                    put("text", element.text)
-                                    put("contentDescription", element.contentDescription)
-                                    put("resourceId", element.resourceId)
-                                    put("className", element.className)
-                                    putJsonObject("bounds") {
-                                        put("left", element.bounds.left)
-                                        put("top", element.bounds.top)
-                                        put("right", element.bounds.right)
-                                        put("bottom", element.bounds.bottom)
-                                    }
-                                    put("clickable", element.clickable)
-                                    put("enabled", element.enabled)
-                                }
+                                put("element", McpToolUtils.buildElementJson(element))
                             }
                         return McpToolUtils.textResult(Json.encodeToString(resultJson))
                     }
@@ -269,10 +255,18 @@ class WaitForElementTool
                 delay(POLL_INTERVAL_MS)
             }
 
-            return McpToolUtils.textResult(
-                "Operation timed out after ${timeout}ms waiting for element (by=$byStr, value='$value', " +
-                    "attempts=$attemptCount). Retry if the operation is long-running.",
-            )
+            val timeoutJson =
+                buildJsonObject {
+                    put("found", false)
+                    put("elapsedMs", timeout)
+                    put("attempts", attemptCount)
+                    put(
+                        "message",
+                        "Operation timed out after ${timeout}ms waiting for element " +
+                            "(by=$byStr, value='$value'). Retry if the operation is long-running.",
+                    )
+                }
+            return McpToolUtils.textResult(Json.encodeToString(timeoutJson))
         }
 
         fun register(
@@ -315,7 +309,7 @@ class WaitForElementTool
 
         companion object {
             private const val TAG = "MCP:WaitForElementTool"
-            private const val TOOL_NAME = "wait_for_element"
+            const val TOOL_NAME = "wait_for_element"
             private const val POLL_INTERVAL_MS = 500L
             private const val MAX_TIMEOUT_MS = 30000L
         }
@@ -458,7 +452,7 @@ class WaitForIdleTool
 
         companion object {
             private const val TAG = "MCP:WaitForIdleTool"
-            private const val TOOL_NAME = "wait_for_idle"
+            const val TOOL_NAME = "wait_for_idle"
             private const val IDLE_CHECK_INTERVAL_MS = 500L
             private const val MAX_TIMEOUT_MS = 30000L
             private const val DEFAULT_MATCH_PERCENTAGE = 100
@@ -572,7 +566,7 @@ class GetElementDetailsTool
 
         companion object {
             private const val TAG = "MCP:GetElementDetailsTool"
-            private const val TOOL_NAME = "get_element_details"
+            const val TOOL_NAME = "get_element_details"
         }
     }
 

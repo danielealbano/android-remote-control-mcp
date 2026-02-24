@@ -192,6 +192,7 @@ class UtilityIntegrationTest {
                             bounds = BoundsData(50, 800, 250, 1000),
                             clickable = true,
                             enabled = true,
+                            visible = true,
                         ),
                     )
 

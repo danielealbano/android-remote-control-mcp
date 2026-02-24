@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
@@ -91,7 +92,9 @@ class AdbConfigReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                handler.handle(context, intent)
+                withTimeout(HANDLER_TIMEOUT_MS) {
+                    handler.handle(context, intent)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Exception in onReceive", e)
             } finally {
@@ -102,6 +105,7 @@ class AdbConfigReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "MCP:AdbConfigReceiver"
+        private const val HANDLER_TIMEOUT_MS = 10_000L
 
         const val ACTION_CONFIGURE = "com.danielealbano.androidremotecontrolmcp.ADB_CONFIGURE"
         const val ACTION_START_SERVER = "com.danielealbano.androidremotecontrolmcp.ADB_START_SERVER"

@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,7 +43,7 @@ fun ServerStatusCard(
     modifier: Modifier = Modifier,
 ) {
     val statusColor by animateColorAsState(
-        targetValue = statusToColor(status),
+        targetValue = statusToColor(status, isSystemInDarkTheme()),
         animationSpec = tween(durationMillis = ANIMATION_DURATION_MS),
         label = "statusColor",
     )
@@ -118,13 +119,26 @@ private fun statusToText(status: ServerStatus): String =
         is ServerStatus.Error -> stringResource(R.string.server_status_error, status.message)
     }
 
-private fun statusToColor(status: ServerStatus): Color =
-    when (status) {
-        is ServerStatus.Running -> Color(0xFF4CAF50)
-        is ServerStatus.Stopped -> Color(0xFFF44336)
-        is ServerStatus.Starting -> Color(0xFFFFC107)
-        is ServerStatus.Stopping -> Color(0xFFFFC107)
-        is ServerStatus.Error -> Color(0xFFFF9800)
+private fun statusToColor(
+    status: ServerStatus,
+    isDarkTheme: Boolean,
+): Color =
+    if (isDarkTheme) {
+        when (status) {
+            is ServerStatus.Running -> Color(0xFF81C784)
+            is ServerStatus.Stopped -> Color(0xFFEF5350)
+            is ServerStatus.Starting -> Color(0xFFFFD54F)
+            is ServerStatus.Stopping -> Color(0xFFFFD54F)
+            is ServerStatus.Error -> Color(0xFFFFB74D)
+        }
+    } else {
+        when (status) {
+            is ServerStatus.Running -> Color(0xFF4CAF50)
+            is ServerStatus.Stopped -> Color(0xFFF44336)
+            is ServerStatus.Starting -> Color(0xFFFFC107)
+            is ServerStatus.Stopping -> Color(0xFFFFC107)
+            is ServerStatus.Error -> Color(0xFFFF9800)
+        }
     }
 
 @Preview(showBackground = true)

@@ -92,6 +92,7 @@ class ElementActionToolsTest {
             bounds = sampleBounds,
             clickable = true,
             enabled = true,
+            visible = true,
         )
 
     private fun extractTextContent(result: CallToolResult): String {

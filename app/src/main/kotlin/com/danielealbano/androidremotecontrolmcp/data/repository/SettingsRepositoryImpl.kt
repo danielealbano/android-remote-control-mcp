@@ -358,6 +358,9 @@ class SettingsRepositoryImpl
                         val treeUri = obj["treeUri"]?.jsonPrimitive?.content ?: return@mapNotNull null
                         val description = obj["description"]?.jsonPrimitive?.content ?: ""
                         val allowWriteElement = obj["allowWrite"]
+                        // Missing allowWrite in persisted JSON means this is pre-permission-fields
+                        // data; default to true for backwards compatibility (old locations were
+                        // implicitly full-access).
                         val allowWrite =
                             if (allowWriteElement == null || allowWriteElement is JsonNull) {
                                 true
@@ -365,6 +368,9 @@ class SettingsRepositoryImpl
                                 allowWriteElement.jsonPrimitive.booleanOrNull ?: false
                             }
                         val allowDeleteElement = obj["allowDelete"]
+                        // Missing allowDelete in persisted JSON means this is pre-permission-fields
+                        // data; default to true for backwards compatibility (old locations were
+                        // implicitly full-access).
                         val allowDelete =
                             if (allowDeleteElement == null || allowDeleteElement is JsonNull) {
                                 true
@@ -386,7 +392,9 @@ class SettingsRepositoryImpl
                     }
                 }
             } catch (_: Exception) {
-                // Migration: try parsing old format (JSON object: {"locationId": "treeUri"})
+                // Migration: try parsing old format (JSON object: {"locationId": "treeUri"}).
+                // Old-format locations pre-date permission fields and were implicitly
+                // full-access, so allowWrite and allowDelete default to true.
                 try {
                     val jsonObject = Json.parseToJsonElement(json).jsonObject
                     jsonObject.map { (key, value) ->

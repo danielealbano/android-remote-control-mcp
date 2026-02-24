@@ -1,11 +1,15 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Shared utilities for MCP tool parameter extraction and response building.
@@ -83,6 +87,11 @@ internal object McpToolUtils {
                 ?: throw McpToolException.InvalidParams(
                     "Parameter '$name' must be a number, got: '${primitive.content}'",
                 )
+        if (doubleVal < Int.MIN_VALUE.toDouble() || doubleVal > Int.MAX_VALUE.toDouble()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' value exceeds integer range",
+            )
+        }
         val intVal = doubleVal.toInt()
         if (doubleVal != intVal.toDouble()) {
             throw McpToolException.InvalidParams(
@@ -414,5 +423,33 @@ internal object McpToolUtils {
             "android-remote-control-mcp"
         } else {
             "android-remote-control-mcp-$deviceSlug"
+        }
+
+    /**
+     * Builds a JSON object representation of an [ElementInfo] for MCP tool responses.
+     *
+     * Shared by [FindElementsTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.FindElementsTool]
+     * and [WaitForElementTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.WaitForElementTool]
+     * to ensure consistent element serialization across tools.
+     */
+    fun buildElementJson(element: ElementInfo): JsonObject =
+        buildJsonObject {
+            put("element_id", element.id)
+            put("text", element.text)
+            put("contentDescription", element.contentDescription)
+            put("resourceId", element.resourceId)
+            put("className", element.className)
+            putJsonObject("bounds") {
+                put("left", element.bounds.left)
+                put("top", element.bounds.top)
+                put("right", element.bounds.right)
+                put("bottom", element.bounds.bottom)
+            }
+            put("clickable", element.clickable)
+            put("longClickable", element.longClickable)
+            put("scrollable", element.scrollable)
+            put("editable", element.editable)
+            put("enabled", element.enabled)
+            put("visible", element.visible)
         }
 }

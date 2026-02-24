@@ -84,6 +84,7 @@ class ElementActionIntegrationTest {
                         bounds = BoundsData(50, 800, 250, 1000),
                         clickable = true,
                         enabled = true,
+                        visible = true,
                     ),
                 )
 
@@ -230,6 +231,7 @@ class ElementActionIntegrationTest {
                             bounds = BoundsData(200, 1200, 500, 1300),
                             clickable = true,
                             enabled = true,
+                            visible = true,
                         ),
                     )
 

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import javax.inject.Inject
 
@@ -22,6 +23,7 @@ class ScreenCaptureProviderImpl
     constructor(
         private val screenshotEncoder: ScreenshotEncoder,
         private val apiLevelProvider: ApiLevelProvider,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
     ) : ScreenCaptureProvider {
         private sealed class ServiceValidation {
             data class Valid(
@@ -111,8 +113,15 @@ class ScreenCaptureProviderImpl
                     ),
                 )
             }
+            if (!accessibilityServiceProvider.isReady()) {
+                return ServiceValidation.Invalid(
+                    McpToolException.PermissionDenied(
+                        "Accessibility service not enabled. Please enable it in Android Settings.",
+                    ),
+                )
+            }
             val service =
-                McpAccessibilityService.instance
+                accessibilityServiceProvider.getContext() as? McpAccessibilityService
                     ?: return ServiceValidation.Invalid(
                         McpToolException.PermissionDenied(
                             "Accessibility service not enabled. Please enable it in Android Settings.",
@@ -128,8 +137,10 @@ class ScreenCaptureProviderImpl
             return ServiceValidation.Valid(service)
         }
 
+        @Suppress("ReturnCount")
         override fun isScreenCaptureAvailable(): Boolean {
-            val service = McpAccessibilityService.instance ?: return false
+            if (!accessibilityServiceProvider.isReady()) return false
+            val service = accessibilityServiceProvider.getContext() as? McpAccessibilityService ?: return false
             return apiLevelProvider.getSdkInt() >= API_LEVEL_R && service.canTakeScreenshot()
         }
 

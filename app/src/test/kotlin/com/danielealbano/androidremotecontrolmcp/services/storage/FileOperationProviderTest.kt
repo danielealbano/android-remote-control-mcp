@@ -365,6 +365,20 @@ class FileOperationProviderTest {
             }
 
         @Test
+        fun `readFile throws IllegalArgumentException when offset is less than 1`() =
+            runTest {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+
+                // Act & Assert
+                val exception =
+                    assertThrows<IllegalArgumentException> {
+                        provider.readFile("loc1", "file.txt", 0, 100)
+                    }
+                assertTrue(exception.message!!.contains("offset must be >= 1"))
+            }
+
+        @Test
         fun `readFile throws ActionFailed when file exceeds size limit`() =
             runTest {
                 // Arrange

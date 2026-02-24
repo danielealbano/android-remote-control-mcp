@@ -55,6 +55,9 @@ class ListStorageLocationsHandler
                                     } else {
                                         put("available_bytes", JsonNull)
                                     }
+                                    // All storage locations are always readable by design — the StorageLocation
+                                    // model has no allowRead field because read access is granted implicitly
+                                    // when the user adds a location via the SAF picker.
                                     put("allow_read", true)
                                     put("allow_write", location.allowWrite)
                                     put("allow_delete", location.allowDelete)
@@ -580,6 +583,10 @@ class DownloadFromUrlHandler
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
                 val path = McpToolUtils.requireString(arguments, "path")
                 val url = McpToolUtils.requireString(arguments, "url")
+
+                if (!url.lowercase().startsWith("http://") && !url.lowercase().startsWith("https://")) {
+                    throw McpToolException.InvalidParams("URL must use http:// or https:// scheme")
+                }
 
                 val downloadedBytes = fileOperationProvider.downloadFromUrl(locationId, path, url)
 
