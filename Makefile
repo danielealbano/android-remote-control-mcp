@@ -170,7 +170,7 @@ uninstall: ## Uninstall app from connected device/emulator
 	$(ADB) uninstall $(APP_ID) 2>/dev/null || true
 	$(ADB) uninstall $(APP_ID_DEBUG) 2>/dev/null || true
 
-grant-permissions: ## Grant permissions via adb (accessibility + notifications)
+grant-permissions: ## Grant permissions via adb (accessibility + notifications + camera + microphone)
 	@echo "=== Granting permissions via adb ==="
 	@echo ""
 	@echo "1. Enabling Accessibility Service..."
@@ -180,6 +180,14 @@ grant-permissions: ## Grant permissions via adb (accessibility + notifications)
 	@echo ""
 	@echo "2. Granting POST_NOTIFICATIONS permission..."
 	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.POST_NOTIFICATIONS
+	@echo "   Done."
+	@echo ""
+	@echo "3. Granting CAMERA permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.CAMERA
+	@echo "   Done."
+	@echo ""
+	@echo "4. Granting RECORD_AUDIO permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.RECORD_AUDIO
 	@echo "   Done."
 	@echo ""
 
