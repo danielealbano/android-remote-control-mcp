@@ -232,7 +232,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Extract PR numbers from auto-generated notes (capped at 100)
-          PR_NUMBERS=$(grep -oE '#[0-9]+' auto-notes.md | sed 's/#//' | sort -un | head -100)
+          PR_NUMBERS=$(grep -oE '(#|/pull/)[0-9]+' auto-notes.md | grep -oE '[0-9]+' | sort -un | head -100)
 
           if [ -z "$PR_NUMBERS" ]; then
             echo "No PRs found in auto-generated notes"
