@@ -86,6 +86,14 @@
             android:exported="true">
         </receiver>
 
+        <!-- ADB Service Trampoline (headless start/stop via adb shell am start) -->
+        <activity
+            android:name=".services.mcp.AdbServiceTrampolineActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
     </application>
 
 </manifest>
