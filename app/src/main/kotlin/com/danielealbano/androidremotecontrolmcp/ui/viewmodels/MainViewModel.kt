@@ -112,23 +112,26 @@ class MainViewModel
         private val _storageError = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val storageError: SharedFlow<String> = _storageError.asSharedFlow()
 
-        @Volatile
-        private var isInitialLoad = true
-
         init {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.serverConfig.collect { config ->
                     _serverConfig.value = config
-                    if (isInitialLoad) {
-                        _portInput.value = config.port.toString()
-                        _hostnameInput.value = config.certificateHostname
-                        _ngrokAuthtokenInput.value = config.ngrokAuthtoken
-                        _ngrokDomainInput.value = config.ngrokDomain
-                        _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
-                        _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
-                        _deviceSlugInput.value = config.deviceSlug
-                        isInitialLoad = false
-                    }
+                    // Always sync text input fields from the authoritative config so that
+                    // external changes (e.g. ADB broadcast) are reflected in the UI.
+                    // StateFlow deduplicates equal values, so user-initiated saves that
+                    // round-trip through DataStore do not cause extra recompositions.
+                    _portInput.value = config.port.toString()
+                    _portError.value = null
+                    _hostnameInput.value = config.certificateHostname
+                    _hostnameError.value = null
+                    _ngrokAuthtokenInput.value = config.ngrokAuthtoken
+                    _ngrokDomainInput.value = config.ngrokDomain
+                    _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
+                    _fileSizeLimitError.value = null
+                    _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
+                    _downloadTimeoutError.value = null
+                    _deviceSlugInput.value = config.deviceSlug
+                    _deviceSlugError.value = null
                 }
             }
 

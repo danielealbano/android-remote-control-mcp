@@ -196,7 +196,7 @@ grant-permissions: ## Grant permissions via adb (accessibility + notifications +
 APP_ID_TARGET ?= $(APP_ID_DEBUG)
 
 start-server: ## Launch MainActivity on device (debug build by default)
-	$(ADB) shell am start -n $(APP_ID_TARGET)/.ui.MainActivity
+	$(ADB) shell am start -n $(APP_ID_TARGET)/$(APP_ID).ui.MainActivity
 
 forward-port: ## Set up adb port forwarding (device -> host)
 	$(ADB) forward tcp:$(DEFAULT_PORT) tcp:$(DEFAULT_PORT)
