@@ -45,7 +45,7 @@ enum class ScrollAmount(
 /**
  * Interface for executing accessibility actions on nodes and the screen.
  *
- * Provides three categories of actions:
+ * Provides four categories of actions:
  * 1. **Node actions**: Click, long-click, set text, scroll on specific accessibility nodes.
  * 2. **Coordinate-based actions**: Tap, long press, double tap, swipe, scroll at screen coordinates.
  * 3. **Global actions**: Back, home, recents, notifications, quick settings.

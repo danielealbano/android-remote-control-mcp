@@ -11,12 +11,31 @@ import android.view.accessibility.AccessibilityNodeInfo
  * the regenerated nodeId will differ from the original. Storing [depth], [index], and [parentId]
  * allows the consumer to re-generate the nodeId and detect identity changes (S1 fix).
  */
-data class CachedNode(
+class CachedNode(
     val node: AccessibilityNodeInfo,
     val depth: Int,
     val index: Int,
     val parentId: String,
-)
+) {
+    override fun toString(): String = "CachedNode(node=$node, depth=$depth, index=$index, parentId=$parentId)"
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CachedNode) return false
+        return depth == other.depth &&
+            index == other.index &&
+            parentId == other.parentId &&
+            node === other.node
+    }
+
+    override fun hashCode(): Int {
+        var result = System.identityHashCode(node)
+        result = 31 * result + depth
+        result = 31 * result + index
+        result = 31 * result + parentId.hashCode()
+        return result
+    }
+}
 
 /**
  * Cache for real [AccessibilityNodeInfo] references obtained during tree parsing.

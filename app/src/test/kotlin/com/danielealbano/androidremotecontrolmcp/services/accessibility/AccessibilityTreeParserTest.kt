@@ -1,12 +1,15 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.graphics.Rect
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.runs
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -256,6 +259,47 @@ class AccessibilityTreeParserTest {
             // Assert
             @Suppress("DEPRECATION")
             verify(exactly = 1) { child.recycle() }
+        }
+
+        @Test
+        @DisplayName("truncates subtree when MAX_TREE_DEPTH is exceeded")
+        fun truncatesSubtreeAtMaxDepth() {
+            // Arrange - mock Log since truncation logs a warning
+            mockkStatic(Log::class)
+            every { Log.w(any(), any<String>()) } returns 0
+
+            try {
+                // Build a chain of nodes deeper than MAX_TREE_DEPTH
+                val targetDepth = AccessibilityTreeParser.MAX_TREE_DEPTH + 2
+                var deepest = createMockNode(text = "DeepLeaf")
+                for (i in targetDepth - 1 downTo 1) {
+                    deepest =
+                        createMockNode(
+                            className = "android.widget.FrameLayout",
+                            childCount = 1,
+                            children = listOf(deepest),
+                        )
+                }
+
+                // Act
+                val result = parser.parseTree(deepest)
+
+                // Assert - walk the tree and verify it stops at MAX_TREE_DEPTH
+                var node = result
+                var depth = 0
+                while (node.children.isNotEmpty()) {
+                    node = node.children[0]
+                    depth++
+                }
+
+                // The tree should be truncated at MAX_TREE_DEPTH (node at depth 100 has no children)
+                assertTrue(
+                    depth <= AccessibilityTreeParser.MAX_TREE_DEPTH,
+                    "Expected tree depth <= ${AccessibilityTreeParser.MAX_TREE_DEPTH} but was $depth",
+                )
+            } finally {
+                unmockkStatic(Log::class)
+            }
         }
     }
 

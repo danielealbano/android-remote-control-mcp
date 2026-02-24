@@ -83,26 +83,7 @@ class FindElementsTool
                         "elements",
                         buildJsonArray {
                             elements.forEach { element ->
-                                add(
-                                    buildJsonObject {
-                                        put("element_id", element.id)
-                                        put("text", element.text)
-                                        put("contentDescription", element.contentDescription)
-                                        put("resourceId", element.resourceId)
-                                        put("className", element.className)
-                                        putJsonObject("bounds") {
-                                            put("left", element.bounds.left)
-                                            put("top", element.bounds.top)
-                                            put("right", element.bounds.right)
-                                            put("bottom", element.bounds.bottom)
-                                        }
-                                        put("clickable", element.clickable)
-                                        put("longClickable", element.longClickable)
-                                        put("scrollable", element.scrollable)
-                                        put("editable", element.editable)
-                                        put("enabled", element.enabled)
-                                    },
-                                )
+                                add(McpToolUtils.buildElementJson(element))
                             }
                         },
                     )
@@ -157,7 +138,7 @@ class FindElementsTool
 
         companion object {
             private const val TAG = "MCP:FindElementsTool"
-            private const val TOOL_NAME = "find_elements"
+            const val TOOL_NAME = "find_elements"
         }
     }
 
@@ -215,7 +196,7 @@ class ClickElementTool
 
         companion object {
             private const val TAG = "MCP:ClickElementTool"
-            private const val TOOL_NAME = "click_element"
+            const val TOOL_NAME = "click_element"
         }
     }
 
@@ -273,7 +254,7 @@ class LongClickElementTool
 
         companion object {
             private const val TAG = "MCP:LongClickElementTool"
-            private const val TOOL_NAME = "long_click_element"
+            const val TOOL_NAME = "long_click_element"
         }
     }
 
@@ -471,7 +452,7 @@ class ScrollToElementTool
 
         companion object {
             private const val TAG = "MCP:ScrollToElementTool"
-            private const val TOOL_NAME = "scroll_to_element"
+            const val TOOL_NAME = "scroll_to_element"
             private const val MAX_SCROLL_ATTEMPTS = 5
             private const val SCROLL_SETTLE_DELAY_MS = 300L
         }

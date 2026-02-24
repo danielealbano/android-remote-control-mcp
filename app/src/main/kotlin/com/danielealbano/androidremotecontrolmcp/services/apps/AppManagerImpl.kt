@@ -38,14 +38,15 @@ class AppManagerImpl
                         AppFilter.USER -> (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0
                         AppFilter.SYSTEM -> (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                     }
-                }.filter { appInfo ->
+                }.map { appInfo ->
+                    appInfo to pm.getApplicationLabel(appInfo).toString()
+                }.filter { (_, label) ->
                     if (nameQuery != null) {
-                        pm.getApplicationLabel(appInfo).toString().contains(nameQuery, ignoreCase = true)
+                        label.contains(nameQuery, ignoreCase = true)
                     } else {
                         true
                     }
-                }.map { appInfo ->
-                    val name = pm.getApplicationLabel(appInfo).toString()
+                }.map { (appInfo, label) ->
                     val (versionName, versionCode) =
                         try {
                             val packageInfo = pm.getPackageInfo(appInfo.packageName, 0)
@@ -55,7 +56,7 @@ class AppManagerImpl
                         }
                     AppInfo(
                         packageId = appInfo.packageName,
-                        name = name,
+                        name = label,
                         versionName = versionName,
                         versionCode = versionCode,
                         isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
@@ -77,6 +78,9 @@ class AppManagerImpl
                 Result.success(Unit)
             } catch (e: ActivityNotFoundException) {
                 Log.e(TAG, "Activity not found for package: $packageId", e)
+                Result.failure(e)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Security exception launching package: $packageId", e)
                 Result.failure(e)
             }
 

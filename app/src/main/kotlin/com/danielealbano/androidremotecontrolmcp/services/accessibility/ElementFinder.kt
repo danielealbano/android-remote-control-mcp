@@ -34,6 +34,7 @@ enum class FindBy {
  * @property scrollable Whether the element is scrollable.
  * @property editable Whether the element is an editable text field.
  * @property enabled Whether the element is enabled.
+ * @property visible Whether the element is visible to the user.
  */
 @Serializable
 data class ElementInfo(
@@ -48,6 +49,7 @@ data class ElementInfo(
     val scrollable: Boolean = false,
     val editable: Boolean = false,
     val enabled: Boolean = false,
+    val visible: Boolean = false,
 )
 
 /**
@@ -203,5 +205,6 @@ class ElementFinder
                 scrollable = node.scrollable,
                 editable = node.editable,
                 enabled = node.enabled,
+                visible = node.visible,
             )
     }

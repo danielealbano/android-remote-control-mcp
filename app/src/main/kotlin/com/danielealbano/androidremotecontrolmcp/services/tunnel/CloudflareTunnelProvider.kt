@@ -163,7 +163,6 @@ class CloudflareTunnelProvider
             private const val TAG = "MCP:CloudflareTunnel"
             internal val TUNNEL_URL_REGEX =
                 Regex("https://[-a-zA-Z0-9]+\\.trycloudflare\\.com")
-            internal const val TUNNEL_READY_TIMEOUT_MS = 30_000L
             internal const val SHUTDOWN_TIMEOUT_MS = 5_000L
             private const val PROCESS_MONITOR_INITIAL_DELAY_MS = 1_000L
         }

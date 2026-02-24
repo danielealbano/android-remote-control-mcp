@@ -36,7 +36,11 @@ class McpAccessibilityService : AccessibilityService() {
     }
 
     private var serviceScope: CoroutineScope? = null
+
+    @Volatile
     private var currentPackageName: String? = null
+
+    @Volatile
     private var currentActivityName: String? = null
 
     override fun onServiceConnected() {
@@ -219,6 +223,9 @@ class McpAccessibilityService : AccessibilityService() {
                     AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR
                 notificationTimeout = NOTIFICATION_TIMEOUT_MS
             }
+        if (serviceInfo == null) {
+            Log.w(TAG, "serviceInfo is null, cannot configure accessibility service settings")
+        }
     }
 
     /**

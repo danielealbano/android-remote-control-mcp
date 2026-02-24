@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -59,13 +60,14 @@ fun ServerLogsSection(
                     modifier = Modifier.padding(vertical = 16.dp),
                 )
             } else {
+                val reversedLogs = remember(logs) { logs.reversed() }
                 LazyColumn(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .heightIn(max = MAX_LOG_LIST_HEIGHT_DP.dp),
                 ) {
-                    items(logs.reversed()) { entry ->
+                    items(reversedLogs) { entry ->
                         ServerLogEntryRow(entry = entry)
                         HorizontalDivider()
                     }
@@ -77,7 +79,7 @@ fun ServerLogsSection(
 
 @Composable
 private fun ServerLogEntryRow(entry: ServerLogEntry) {
-    val timeFormat = SimpleDateFormat(TIME_FORMAT_PATTERN, Locale.getDefault())
+    val timeFormat = remember { SimpleDateFormat(TIME_FORMAT_PATTERN, Locale.getDefault()) }
     val timeString = timeFormat.format(Date(entry.timestamp))
 
     when (entry.type) {

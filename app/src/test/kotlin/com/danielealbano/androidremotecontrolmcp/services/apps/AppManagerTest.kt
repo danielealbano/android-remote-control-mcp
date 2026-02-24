@@ -278,6 +278,25 @@ class AppManagerTest {
                 assertTrue(result.isFailure)
                 assertTrue(result.exceptionOrNull() is ActivityNotFoundException)
             }
+
+        @Test
+        fun `openApp returns failure on SecurityException`() =
+            runTest {
+                // Arrange
+                val mockIntent = mockk<Intent>(relaxed = true)
+                every {
+                    mockPackageManager.getLaunchIntentForPackage("com.restricted.app")
+                } returns mockIntent
+                every { mockIntent.addFlags(any()) } returns mockIntent
+                every { mockContext.startActivity(any()) } throws SecurityException("Permission denied")
+
+                // Act
+                val result = appManager.openApp("com.restricted.app")
+
+                // Assert
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is SecurityException)
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────

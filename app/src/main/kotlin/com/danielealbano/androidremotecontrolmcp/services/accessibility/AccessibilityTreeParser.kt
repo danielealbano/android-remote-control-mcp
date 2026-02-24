@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.graphics.Rect
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.serialization.Serializable
@@ -175,11 +176,6 @@ class AccessibilityTreeParser
 
             val nodeId = generateNodeId(node, bounds, depth, index, parentId)
 
-            // Store real node reference + metadata in cache map (if caching is active).
-            // Metadata (depth, index, parentId) is needed by ActionExecutorImpl to
-            // re-verify node identity after refresh() (S1 fix).
-            nodeMap?.put(nodeId, CachedNode(node, depth, index, parentId))
-
             val className = node.className?.toString()
             val text = node.text?.toString()
             val contentDescription = node.contentDescription?.toString()
@@ -191,6 +187,42 @@ class AccessibilityTreeParser
             val editable = node.isEditable
             val enabled = node.isEnabled
             val visible = isNodeVisible(node)
+
+            // Max depth protection: return current node as leaf without recursing into children
+            if (depth >= MAX_TREE_DEPTH) {
+                Log.w(TAG, "Maximum tree depth ($MAX_TREE_DEPTH) reached, truncating subtree")
+
+                val leafNode =
+                    AccessibilityNodeData(
+                        id = nodeId,
+                        className = className,
+                        text = text,
+                        contentDescription = contentDescription,
+                        resourceId = resourceId,
+                        bounds = bounds,
+                        clickable = clickable,
+                        longClickable = longClickable,
+                        focusable = focusable,
+                        scrollable = scrollable,
+                        editable = editable,
+                        enabled = enabled,
+                        visible = visible,
+                        children = emptyList(),
+                    )
+
+                // Store real node reference in cache map (if caching is active)
+                nodeMap?.put(
+                    nodeId,
+                    CachedNode(node, depth, index, parentId),
+                )
+
+                if (recycleNode && nodeMap == null) {
+                    @Suppress("DEPRECATION")
+                    node.recycle()
+                }
+
+                return leafNode
+            }
 
             val children = mutableListOf<AccessibilityNodeData>()
             val childCount = node.childCount
@@ -210,6 +242,29 @@ class AccessibilityTreeParser
                 }
             }
 
+            val nodeData =
+                AccessibilityNodeData(
+                    id = nodeId,
+                    className = className,
+                    text = text,
+                    contentDescription = contentDescription,
+                    resourceId = resourceId,
+                    bounds = bounds,
+                    clickable = clickable,
+                    longClickable = longClickable,
+                    focusable = focusable,
+                    scrollable = scrollable,
+                    editable = editable,
+                    enabled = enabled,
+                    visible = visible,
+                    children = children,
+                )
+
+            // Store real node reference + metadata in cache map (if caching is active).
+            // Metadata (depth, index, parentId) is needed by ActionExecutorImpl to
+            // re-verify node identity after refresh() (S1 fix).
+            nodeMap?.put(nodeId, CachedNode(node, depth, index, parentId))
+
             // Defensive: nodeMap == null is redundant with recycleNode in normal flow,
             // but guards against direct parseNode calls with recycleNode=true + non-null nodeMap.
             if (recycleNode && nodeMap == null) {
@@ -217,22 +272,7 @@ class AccessibilityTreeParser
                 node.recycle()
             }
 
-            return AccessibilityNodeData(
-                id = nodeId,
-                className = className,
-                text = text,
-                contentDescription = contentDescription,
-                resourceId = resourceId,
-                bounds = bounds,
-                clickable = clickable,
-                longClickable = longClickable,
-                focusable = focusable,
-                scrollable = scrollable,
-                editable = editable,
-                enabled = enabled,
-                visible = visible,
-                children = children,
-            )
+            return nodeData
         }
 
         /**
@@ -263,8 +303,10 @@ class AccessibilityTreeParser
         }
 
         companion object {
+            private const val TAG = "MCP:TreeParser"
             private const val ROOT_PARENT_ID = "root"
             private const val HASH_RADIX = 16
+            internal const val MAX_TREE_DEPTH = 100
 
             /** Maps [AccessibilityWindowInfo] type constants to human-readable labels. */
             fun mapWindowType(type: Int): String =

@@ -65,7 +65,8 @@ class ScreenshotEncoder
             quality: Int,
         ): ByteArray {
             val clampedQuality = quality.coerceIn(MIN_QUALITY, MAX_QUALITY)
-            val outputStream = ByteArrayOutputStream()
+            val estimatedSize = bitmap.width * bitmap.height / JPEG_SIZE_ESTIMATE_DIVISOR
+            val outputStream = ByteArrayOutputStream(estimatedSize)
             val success = bitmap.compress(Bitmap.CompressFormat.JPEG, clampedQuality, outputStream)
             check(success) { "Failed to compress bitmap to JPEG" }
             return outputStream.toByteArray()
@@ -165,5 +166,8 @@ class ScreenshotEncoder
         companion object {
             private const val MIN_QUALITY = 1
             private const val MAX_QUALITY = 100
+
+            /** Rough divisor to estimate JPEG byte size from pixel count (width * height / 4). */
+            private const val JPEG_SIZE_ESTIMATE_DIVISOR = 4
         }
     }

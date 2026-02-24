@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 
@@ -43,11 +44,17 @@ object NetworkUtils {
      * the port is available. If it throws, the port is in use.
      *
      * @param port The TCP port to check (1-65535).
+     * @param bindAddress Optional specific address to bind to. When `null`,
+     *   binds to all interfaces (wildcard address).
      * @return `true` if the port is available, `false` otherwise.
      */
-    fun isPortAvailable(port: Int): Boolean =
+    fun isPortAvailable(
+        port: Int,
+        bindAddress: String? = null,
+    ): Boolean =
         try {
-            ServerSocket(port).use { true }
+            val address = bindAddress?.let { InetAddress.getByName(it) }
+            ServerSocket(port, 0, address).use { true }
         } catch (
             @Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception,
         ) {

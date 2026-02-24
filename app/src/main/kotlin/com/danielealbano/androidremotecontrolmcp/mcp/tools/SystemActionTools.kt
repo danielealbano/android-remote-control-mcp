@@ -19,6 +19,8 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
@@ -308,7 +310,13 @@ class OpenQuickSettingsHandler
 class GetDeviceLogsHandler
     @Inject
     constructor() {
-        @Suppress("TooGenericExceptionCaught", "SwallowedException", "ThrowsCount")
+        @Suppress(
+            "TooGenericExceptionCaught",
+            "SwallowedException",
+            "ThrowsCount",
+            "LongMethod",
+            "CyclomaticComplexMethod",
+        )
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val lastLines = parseLastLines(arguments)
             val since = arguments?.get("since")?.jsonPrimitive?.contentOrNull
@@ -323,15 +331,51 @@ class GetDeviceLogsHandler
                 )
             }
 
+            if (tag != null && !TAG_REGEX.matches(tag)) {
+                throw McpToolException.InvalidParams(
+                    "tag contains invalid characters. Allowed: letters, digits, '.', '_', ':', '*', '-'. Got: '$tag'",
+                )
+            }
+
+            if (packageName != null && !PACKAGE_NAME_REGEX.matches(packageName)) {
+                throw McpToolException.InvalidParams(
+                    "package_name contains invalid characters. " +
+                        "Must start with a letter and contain only letters, digits, '.', '_'. " +
+                        "Got: '$packageName'",
+                )
+            }
+
+            if (since != null && !TIMESTAMP_REGEX.matches(since)) {
+                throw McpToolException.InvalidParams(
+                    "since must be an ISO 8601 timestamp (e.g., '2024-01-15T10:30:00'). Got: '$since'",
+                )
+            }
+
+            if (until != null && !TIMESTAMP_REGEX.matches(until)) {
+                throw McpToolException.InvalidParams(
+                    "until must be an ISO 8601 timestamp (e.g., '2024-01-15T10:30:00'). Got: '$until'",
+                )
+            }
+
             return try {
                 val pid = if (packageName != null) resolvePid(packageName) else null
                 // Request one extra line to reliably detect truncation
                 val requestLines = lastLines + 1
                 val command = buildLogcatCommand(requestLines, since, tag, levelStr, pid)
                 val process = Runtime.getRuntime().exec(command.toTypedArray())
-                val output = process.inputStream.bufferedReader().readText()
-                val exitCode = process.waitFor()
+                val outputFuture =
+                    CompletableFuture.supplyAsync {
+                        process.inputStream.bufferedReader().readText()
+                    }
+                val completed = process.waitFor(LOGCAT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
+                if (!completed) {
+                    process.destroyForcibly()
+                    throw McpToolException.Timeout("Logcat command timed out after ${LOGCAT_TIMEOUT_SECONDS}s")
+                }
+
+                val output = outputFuture.get(PROCESS_IO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                val exitCode = process.exitValue()
                 if (exitCode != 0 && output.isEmpty()) {
                     val errorOutput = process.errorStream.bufferedReader().readText()
                     throw McpToolException.ActionFailed(
@@ -419,13 +463,20 @@ class GetDeviceLogsHandler
         private fun resolvePid(packageName: String): Int? =
             try {
                 val process = Runtime.getRuntime().exec(arrayOf("pidof", "-s", packageName))
-                val output =
-                    process.inputStream
-                        .bufferedReader()
-                        .readText()
-                        .trim()
-                process.waitFor()
-                output.toIntOrNull()
+                val outputFuture =
+                    CompletableFuture.supplyAsync {
+                        process.inputStream
+                            .bufferedReader()
+                            .readText()
+                            .trim()
+                    }
+                val completed = process.waitFor(PIDOF_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    null
+                } else {
+                    outputFuture.get(PROCESS_IO_TIMEOUT_SECONDS, TimeUnit.SECONDS).toIntOrNull()
+                }
             } catch (e: Exception) {
                 null
             }
@@ -437,6 +488,11 @@ class GetDeviceLogsHandler
          * Logcat timestamps are in `MM-DD HH:MM:SS.mmm` format. The comparison
          * is best-effort: the year component from ISO 8601 is dropped, and
          * the month-day + time portion is compared lexicographically.
+         *
+         * **Cross-year limitation**: Logcat timestamps do not include the year, so
+         * filtering across year boundaries (e.g., December 31 to January 1) may be
+         * inaccurate because the lexicographic comparison treats "01-01" as before
+         * "12-31" regardless of the actual year.
          */
         private fun filterByUntil(
             lines: List<String>,
@@ -455,6 +511,10 @@ class GetDeviceLogsHandler
         /**
          * Converts an ISO 8601 timestamp to logcat's `MM-DD HH:MM:SS.mmm` format
          * for lexicographic comparison.
+         *
+         * **Cross-year limitation**: The year component is dropped because logcat
+         * timestamps do not include the year. This means cross-year boundary
+         * comparisons (e.g., 2024-12-31 vs 2025-01-01) may be inaccurate.
          *
          * @return The converted timestamp, or null if parsing fails.
          */
@@ -482,7 +542,10 @@ class GetDeviceLogsHandler
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Retrieves device logcat logs filtered by time range, tag, level, or package name.",
+                description =
+                    "Retrieves device logcat logs filtered by time range, tag, level, or package name. " +
+                        "Note: logcat timestamps do not include the year, so filtering across year " +
+                        "boundaries (e.g., December to January) may be inaccurate.",
                 inputSchema =
                     ToolSchema(
                         properties =
@@ -536,7 +599,13 @@ class GetDeviceLogsHandler
             private const val LOGCAT_TIMESTAMP_LENGTH = 18
             private const val ISO_PARTS_COUNT = 2
             private const val DATE_PARTS_COUNT = 3
+            private const val LOGCAT_TIMEOUT_SECONDS = 30L
+            private const val PROCESS_IO_TIMEOUT_SECONDS = 5L
+            private const val PIDOF_TIMEOUT_SECONDS = 5L
             private val VALID_LEVELS = setOf("V", "D", "I", "W", "E", "F")
+            private val TAG_REGEX = Regex("^[a-zA-Z0-9._:*-]+$")
+            private val PACKAGE_NAME_REGEX = Regex("^[a-zA-Z][a-zA-Z0-9._]*$")
+            private val TIMESTAMP_REGEX = Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?$")
         }
     }
 

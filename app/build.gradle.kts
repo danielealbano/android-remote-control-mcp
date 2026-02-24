@@ -77,6 +77,11 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    lint {
+        // QUERY_ALL_PACKAGES is required for app management tools (list/launch/force-stop)
+        disable += "QueryAllPackagesPermission"
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

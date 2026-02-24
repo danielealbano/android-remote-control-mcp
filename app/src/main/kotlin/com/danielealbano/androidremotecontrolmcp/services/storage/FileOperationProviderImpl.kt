@@ -98,6 +98,7 @@ class FileOperationProviderImpl
             offset: Int,
             limit: Int,
         ): FileReadResult {
+            require(offset >= 1) { "offset must be >= 1, got $offset" }
             val documentFile =
                 resolveDocumentFile(locationId, path)
                     ?: throw McpToolException.ActionFailed(
@@ -367,29 +368,39 @@ class FileOperationProviderImpl
                 // Ensure parent directories and create the destination file
                 val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
 
-                // Stream to file, checking cumulative size
+                // Stream to file, checking cumulative size.
+                // Wrap in try-catch to clean up the orphan file on any error.
                 var totalBytesWritten = 0L
-                context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
-                    connection.inputStream.use { inputStream ->
-                        val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                        var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            totalBytesWritten += bytesRead
-                            if (totalBytesWritten > limitBytes) {
-                                // Clean up partial file
-                                outputStream.close()
-                                documentFile.delete()
-                                throw McpToolException.ActionFailed(
-                                    "Download exceeds the configured file size limit of " +
-                                        "${config.fileSizeLimitMb} MB.",
-                                )
+                try {
+                    context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
+                        connection.inputStream.use { inputStream ->
+                            val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                            var bytesRead: Int
+                            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                totalBytesWritten += bytesRead
+                                if (totalBytesWritten > limitBytes) {
+                                    // Clean up partial file
+                                    outputStream.close()
+                                    documentFile.delete()
+                                    throw McpToolException.ActionFailed(
+                                        "Download exceeds the configured file size limit of " +
+                                            "${config.fileSizeLimitMb} MB.",
+                                    )
+                                }
+                                outputStream.write(buffer, 0, bytesRead)
                             }
-                            outputStream.write(buffer, 0, bytesRead)
                         }
-                    }
-                } ?: throw McpToolException.ActionFailed(
-                    "Failed to open file for writing: $path in location '$locationId'",
-                )
+                    } ?: throw McpToolException.ActionFailed(
+                        "Failed to open file for writing: $path in location '$locationId'",
+                    )
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    documentFile.delete()
+                    throw e
+                }
 
                 Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
                 return totalBytesWritten

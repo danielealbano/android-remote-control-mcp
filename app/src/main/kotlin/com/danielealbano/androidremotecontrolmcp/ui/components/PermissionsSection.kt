@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,8 +29,11 @@ import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 
-private val EnabledColor = Color(0xFF4CAF50)
-private val DisabledColor = Color(0xFFF44336)
+@Composable
+private fun enabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF4CAF50)
+
+@Composable
+private fun disabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFFEF5350) else Color(0xFFF44336)
 
 @Suppress("LongMethod")
 @Composable
@@ -141,7 +145,7 @@ private fun PermissionRow(
                 } else {
                     "$label disabled"
                 },
-            tint = if (isEnabled) EnabledColor else DisabledColor,
+            tint = if (isEnabled) enabledColor() else disabledColor(),
             modifier = Modifier.size(24.dp),
         )
         Spacer(modifier = Modifier.width(8.dp))

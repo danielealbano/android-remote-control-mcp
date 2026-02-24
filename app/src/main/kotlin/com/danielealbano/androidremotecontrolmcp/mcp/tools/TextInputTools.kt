@@ -347,7 +347,7 @@ class TypeAppendTextTool
 
         companion object {
             private const val TAG = "MCP:TypeAppendTextTool"
-            private const val TOOL_NAME = "type_append_text"
+            const val TOOL_NAME = "type_append_text"
         }
     }
 
@@ -462,9 +462,11 @@ class TypeInsertTextTool
                                     put("type", "integer")
                                     put(
                                         "description",
-                                        "0-based character offset for cursor " +
-                                            "position. Must be within " +
-                                            "[0, current text length].",
+                                        "0-based character offset (UTF-16 code units) " +
+                                            "for cursor position. Must be within " +
+                                            "[0, current text length]. Note: emoji " +
+                                            "and other supplementary characters count " +
+                                            "as 2 units.",
                                     )
                                 }
                                 putJsonObject("typing_speed") {
@@ -494,7 +496,7 @@ class TypeInsertTextTool
 
         companion object {
             private const val TAG = "MCP:TypeInsertTextTool"
-            private const val TOOL_NAME = "type_insert_text"
+            const val TOOL_NAME = "type_insert_text"
         }
     }
 
@@ -701,7 +703,7 @@ class TypeReplaceTextTool
 
         companion object {
             private const val TAG = "MCP:TypeReplaceTextTool"
-            private const val TOOL_NAME = "type_replace_text"
+            const val TOOL_NAME = "type_replace_text"
         }
     }
 
@@ -818,7 +820,7 @@ class TypeClearTextTool
 
         companion object {
             private const val TAG = "MCP:TypeClearTextTool"
-            private const val TOOL_NAME = "type_clear_text"
+            const val TOOL_NAME = "type_clear_text"
         }
     }
 
@@ -986,7 +988,7 @@ class PressKeyTool
 
         companion object {
             private const val TAG = "MCP:PressKeyTool"
-            private const val TOOL_NAME = "press_key"
+            const val TOOL_NAME = "press_key"
             private val ALLOWED_KEYS = setOf("ENTER", "BACK", "DEL", "HOME", "TAB", "SPACE")
         }
     }

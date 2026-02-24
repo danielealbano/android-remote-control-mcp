@@ -113,7 +113,7 @@ class McpServerService : Service() {
     @Inject lateinit var cameraProvider: CameraProvider
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val serverStarting = AtomicBoolean(false)
+    private val serverActive = AtomicBoolean(false)
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
 
@@ -136,7 +136,7 @@ class McpServerService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START, null -> {
-                if (!serverStarting.compareAndSet(false, true)) {
+                if (!serverActive.compareAndSet(false, true)) {
                     Log.w(TAG, "Server already starting or running, ignoring duplicate start request")
                 } else {
                     coroutineScope.launch {
@@ -258,7 +258,7 @@ class McpServerService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start MCP server", e)
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
-            serverStarting.set(false)
+            serverActive.set(false)
         }
     }
 
@@ -312,7 +312,10 @@ class McpServerService : Service() {
         tunnelObserverJob?.cancel()
         tunnelObserverJob = null
 
-        // Stop tunnel first (with ANR-safe timeout)
+        // Stop tunnel first (with ANR-safe timeout).
+        // Worst-case blocking time: TUNNEL_STOP_TIMEOUT_MS (3s) + SHUTDOWN_GRACE_PERIOD_MS (1s)
+        // + SHUTDOWN_TIMEOUT_MS (5s) = ~9s total. This is well within the Android service
+        // onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
         @Suppress("TooGenericExceptionCaught")
         try {
             runBlocking {
@@ -337,7 +340,7 @@ class McpServerService : Service() {
             Log.e(TAG, "Error during server shutdown", e)
         }
         mcpServer = null
-        serverStarting.set(false)
+        serverActive.set(false)
 
         // Cancel coroutine scope
         coroutineScope.cancel()

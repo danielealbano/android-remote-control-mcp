@@ -6,14 +6,16 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.coroutines.resume
 
 /**
  * Executes accessibility actions on nodes and the screen.
  *
- * Provides three categories of actions:
+ * Provides four categories of actions:
  * 1. **Node actions**: Click, long-click, set text, scroll on specific accessibility nodes.
  * 2. **Coordinate-based actions**: Tap, long press, double tap, swipe, scroll at screen coordinates.
  * 3. **Global actions**: Back, home, recents, notifications, quick settings.
@@ -207,10 +209,10 @@ class ActionExecutorImpl
         /**
          * Performs a double tap at the specified coordinates.
          *
-         * Uses a [GestureDescription] with two sequential tap strokes at the same
-         * coordinates, separated by [DOUBLE_TAP_GAP_MS]. This is more reliable than
-         * dispatching two separate gestures because Android recognizes the two strokes
-         * within a single gesture dispatch as a double-tap pattern.
+         * Dispatches two separate single-tap gestures sequentially with a small delay
+         * between them. Using two separate gesture dispatches (rather than two strokes
+         * in a single GestureDescription) avoids Android's multi-touch interpretation
+         * and ensures the system recognizes the double-tap pattern reliably.
          */
         @Suppress("ReturnCount")
         override suspend fun doubleTap(
@@ -219,37 +221,14 @@ class ActionExecutorImpl
         ): Result<Unit> {
             validateCoordinates(x, y)?.let { return it }
 
-            val service =
-                McpAccessibilityService.instance
-                    ?: return Result.failure(
-                        IllegalStateException("Accessibility service is not available"),
-                    )
+            val firstResult = tap(x, y)
+            if (firstResult.isFailure) {
+                return firstResult
+            }
 
-            val firstTapPath = Path().apply { moveTo(x, y) }
-            val secondTapPath = Path().apply { moveTo(x, y) }
+            delay(DOUBLE_TAP_GAP_MS)
 
-            val firstTapStroke =
-                GestureDescription.StrokeDescription(
-                    firstTapPath,
-                    0L,
-                    TAP_DURATION_MS,
-                )
-            val secondTapStartTime = TAP_DURATION_MS + DOUBLE_TAP_GAP_MS
-            val secondTapStroke =
-                GestureDescription.StrokeDescription(
-                    secondTapPath,
-                    secondTapStartTime,
-                    TAP_DURATION_MS,
-                )
-
-            val gesture =
-                GestureDescription
-                    .Builder()
-                    .addStroke(firstTapStroke)
-                    .addStroke(secondTapStroke)
-                    .build()
-
-            return dispatchGesture(service, gesture, "doubleTap($x, $y)")
+            return tap(x, y)
         }
 
         /**
@@ -475,6 +454,13 @@ class ActionExecutorImpl
             scale: Float,
             duration: Long,
         ): Result<Unit> {
+            require(scale > 0f) { "Scale must be positive, got $scale" }
+
+            if (scale == 1.0f) {
+                Log.w(TAG, "pinch() called with scale=1.0 (no-op), returning success")
+                return Result.success(Unit)
+            }
+
             validateCoordinates(centerX, centerY)?.let { return it }
 
             val service =
@@ -483,18 +469,28 @@ class ActionExecutorImpl
                         IllegalStateException("Accessibility service is not available"),
                     )
 
+            val screenInfo = service.getScreenInfo()
+            val screenWidth = screenInfo.width.toFloat()
+            val screenHeight = screenInfo.height.toFloat()
+
             val startDistance = PINCH_BASE_DISTANCE
             val endDistance = PINCH_BASE_DISTANCE * scale
 
+            val finger1StartX = (centerX - startDistance).coerceIn(0f, screenWidth)
+            val finger1EndX = (centerX - endDistance).coerceIn(0f, screenWidth)
+            val finger2StartX = (centerX + startDistance).coerceIn(0f, screenWidth)
+            val finger2EndX = (centerX + endDistance).coerceIn(0f, screenWidth)
+            val clampedCenterY = centerY.coerceIn(0f, screenHeight)
+
             val finger1Path =
                 Path().apply {
-                    moveTo(centerX - startDistance, centerY)
-                    lineTo(centerX - endDistance, centerY)
+                    moveTo(finger1StartX, clampedCenterY)
+                    lineTo(finger1EndX, clampedCenterY)
                 }
             val finger2Path =
                 Path().apply {
-                    moveTo(centerX + startDistance, centerY)
-                    lineTo(centerX + endDistance, centerY)
+                    moveTo(finger2StartX, clampedCenterY)
+                    lineTo(finger2EndX, clampedCenterY)
                 }
 
             val stroke1 = GestureDescription.StrokeDescription(finger1Path, 0L, duration)
@@ -780,7 +776,7 @@ class ActionExecutorImpl
             )
         }
 
-        private suspend fun performGlobalAction(
+        private fun performGlobalAction(
             action: Int,
             actionName: String,
         ): Result<Unit> {
@@ -824,40 +820,47 @@ class ActionExecutorImpl
             gesture: GestureDescription,
             description: String,
         ): Result<Unit> =
-            suspendCancellableCoroutine { continuation ->
-                val callback =
-                    object :
-                        android.accessibilityservice.AccessibilityService.GestureResultCallback() {
-                        override fun onCompleted(gestureDescription: GestureDescription?) {
-                            Log.d(TAG, "Gesture completed: $description")
-                            if (continuation.isActive) {
-                                continuation.resume(Result.success(Unit))
+            withTimeoutOrNull(GESTURE_TIMEOUT_MS) {
+                suspendCancellableCoroutine { continuation ->
+                    val callback =
+                        object :
+                            android.accessibilityservice.AccessibilityService.GestureResultCallback() {
+                            override fun onCompleted(gestureDescription: GestureDescription?) {
+                                Log.d(TAG, "Gesture completed: $description")
+                                if (continuation.isActive) {
+                                    continuation.resume(Result.success(Unit))
+                                }
+                            }
+
+                            override fun onCancelled(gestureDescription: GestureDescription?) {
+                                Log.w(TAG, "Gesture cancelled: $description")
+                                if (continuation.isActive) {
+                                    continuation.resume(
+                                        Result.failure(
+                                            RuntimeException("Gesture cancelled: $description"),
+                                        ),
+                                    )
+                                }
                             }
                         }
 
-                        override fun onCancelled(gestureDescription: GestureDescription?) {
-                            Log.w(TAG, "Gesture cancelled: $description")
-                            if (continuation.isActive) {
-                                continuation.resume(
-                                    Result.failure(
-                                        RuntimeException("Gesture cancelled: $description"),
-                                    ),
-                                )
-                            }
+                    val dispatched = service.dispatchGesture(gesture, callback, null)
+                    if (!dispatched) {
+                        Log.e(TAG, "Failed to dispatch gesture: $description")
+                        if (continuation.isActive) {
+                            continuation.resume(
+                                Result.failure(
+                                    RuntimeException("Failed to dispatch gesture: $description"),
+                                ),
+                            )
                         }
-                    }
-
-                val dispatched = service.dispatchGesture(gesture, callback, null)
-                if (!dispatched) {
-                    Log.e(TAG, "Failed to dispatch gesture: $description")
-                    if (continuation.isActive) {
-                        continuation.resume(
-                            Result.failure(
-                                RuntimeException("Failed to dispatch gesture: $description"),
-                            ),
-                        )
                     }
                 }
+            } ?: run {
+                Log.e(TAG, "Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description")
+                Result.failure(
+                    RuntimeException("Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description"),
+                )
             }
 
         /**
@@ -885,6 +888,12 @@ class ActionExecutorImpl
 
                 val found = walkAndMatch(realChild, parsedChild, targetNodeId, recycleOnMismatch = true)
                 if (found != null) {
+                    // Recycle the current intermediate node — it is NOT the target.
+                    // The target (found) is deeper in the subtree or is realChild itself.
+                    if (recycleOnMismatch) {
+                        @Suppress("DEPRECATION")
+                        realNode.recycle()
+                    }
                     return found
                 }
             }
@@ -917,5 +926,6 @@ class ActionExecutorImpl
             private const val DOUBLE_TAP_GAP_MS = 100L
             private const val PINCH_BASE_DISTANCE = 100f
             private const val MIN_SCROLL_DISTANCE = 1f
+            private const val GESTURE_TIMEOUT_MS = 10_000L
         }
     }

@@ -55,7 +55,12 @@ class PinchTool
 
             McpToolUtils.validatePositiveRange(duration, "duration", McpToolUtils.MAX_DURATION_MS)
 
-            val zoomType = if (scale > 1f) "in" else "out"
+            val zoomType =
+                when {
+                    scale > 1f -> "in"
+                    scale < 1f -> "out"
+                    else -> "none (no-op)"
+                }
             Log.d(TAG, "Executing pinch (zoom $zoomType) at ($centerX, $centerY) scale=$scale, ${duration}ms")
             val result = actionExecutor.pinch(centerX, centerY, scale, duration)
             return McpToolUtils.handleActionResult(
@@ -142,6 +147,12 @@ class CustomGestureTool
                 throw McpToolException.InvalidParams("Parameter 'paths' must not be empty")
             }
 
+            if (pathsArray.size > MAX_PATHS) {
+                throw McpToolException.InvalidParams(
+                    "Too many paths (max $MAX_PATHS), got: ${pathsArray.size}",
+                )
+            }
+
             val paths = parsePaths(pathsArray)
 
             Log.d(TAG, "Executing custom gesture with ${paths.size} path(s)")
@@ -167,6 +178,13 @@ class CustomGestureTool
                 if (pointsArray.size < MIN_POINTS_PER_PATH) {
                     throw McpToolException.InvalidParams(
                         "Path at index $pathIndex must have at least 2 points, has ${pointsArray.size}",
+                    )
+                }
+
+                if (pointsArray.size > MAX_POINTS_PER_PATH) {
+                    throw McpToolException.InvalidParams(
+                        "Path at index $pathIndex has too many points (max $MAX_POINTS_PER_PATH), " +
+                            "has ${pointsArray.size}",
                     )
                 }
 
@@ -363,6 +381,8 @@ class CustomGestureTool
             const val TOOL_NAME = "custom_gesture"
             private const val TAG = "MCP:CustomGestureTool"
             private const val MIN_POINTS_PER_PATH = 2
+            private const val MAX_PATHS = 10
+            private const val MAX_POINTS_PER_PATH = 100
         }
     }
 

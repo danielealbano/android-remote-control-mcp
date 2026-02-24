@@ -37,6 +37,9 @@ class OpenAppHandler
         @Suppress("TooGenericExceptionCaught")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val packageId = McpToolUtils.requireString(arguments, "package_id")
+            if (packageId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'package_id' must not be empty")
+            }
 
             Log.d(TAG, "Executing open_app for package: $packageId")
             val result = appManager.openApp(packageId)
@@ -194,6 +197,9 @@ class CloseAppHandler
         @Suppress("TooGenericExceptionCaught")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val packageId = McpToolUtils.requireString(arguments, "package_id")
+            if (packageId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'package_id' must not be empty")
+            }
 
             Log.d(TAG, "Executing close_app for package: $packageId")
             val result = appManager.closeApp(packageId)

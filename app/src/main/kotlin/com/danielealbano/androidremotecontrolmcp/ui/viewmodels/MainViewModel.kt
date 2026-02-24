@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -24,6 +23,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAcces
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -112,17 +112,23 @@ class MainViewModel
         private val _storageError = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val storageError: SharedFlow<String> = _storageError.asSharedFlow()
 
+        @Volatile
+        private var isInitialLoad = true
+
         init {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.serverConfig.collect { config ->
                     _serverConfig.value = config
-                    _portInput.value = config.port.toString()
-                    _hostnameInput.value = config.certificateHostname
-                    _ngrokAuthtokenInput.value = config.ngrokAuthtoken
-                    _ngrokDomainInput.value = config.ngrokDomain
-                    _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
-                    _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
-                    _deviceSlugInput.value = config.deviceSlug
+                    if (isInitialLoad) {
+                        _portInput.value = config.port.toString()
+                        _hostnameInput.value = config.certificateHostname
+                        _ngrokAuthtokenInput.value = config.ngrokAuthtoken
+                        _ngrokDomainInput.value = config.ngrokDomain
+                        _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
+                        _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
+                        _deviceSlugInput.value = config.deviceSlug
+                        isInitialLoad = false
+                    }
                 }
             }
 
@@ -164,8 +170,8 @@ class MainViewModel
                 return
             }
 
-            if (port < MIN_PORT || port > MAX_PORT) {
-                _portError.value = "Port must be between $MIN_PORT and $MAX_PORT"
+            if (port < ServerConfig.MIN_PORT || port > ServerConfig.MAX_PORT) {
+                _portError.value = "Port must be between ${ServerConfig.MIN_PORT} and ${ServerConfig.MAX_PORT}"
                 return
             }
 
@@ -208,13 +214,9 @@ class MainViewModel
         fun updateCertificateHostname(hostname: String) {
             _hostnameInput.value = hostname
 
-            if (hostname.isBlank()) {
-                _hostnameError.value = "Hostname is required"
-                return
-            }
-
-            if (!HOSTNAME_PATTERN.matches(hostname)) {
-                _hostnameError.value = "Invalid hostname format"
+            val result = settingsRepository.validateCertificateHostname(hostname)
+            if (result.isFailure) {
+                _hostnameError.value = result.exceptionOrNull()?.message
                 return
             }
 
@@ -225,7 +227,7 @@ class MainViewModel
         }
 
         fun startServer(context: Context) {
-            Log.i(TAG, "Starting MCP server via McpServerService")
+            Logger.i(TAG, "Starting MCP server via McpServerService")
             _serverStatus.value = ServerStatus.Starting
             val intent =
                 Intent(context, McpServerService::class.java).apply {
@@ -235,7 +237,7 @@ class MainViewModel
         }
 
         fun stopServer(context: Context) {
-            Log.i(TAG, "Stopping MCP server via McpServerService")
+            Logger.i(TAG, "Stopping MCP server via McpServerService")
             _serverStatus.value = ServerStatus.Stopping
             val intent =
                 Intent(context, McpServerService::class.java).apply {
@@ -300,7 +302,7 @@ class MainViewModel
                 try {
                     _storageLocations.value = storageLocationProvider.getAllLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to refresh storage locations", e)
+                    Logger.e(TAG, "Failed to refresh storage locations", e)
                 }
             }
         }
@@ -315,7 +317,7 @@ class MainViewModel
                     storageLocationProvider.addLocation(treeUri, description)
                     refreshStorageLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to add storage location", e)
+                    Logger.e(TAG, "Failed to add storage location", e)
                     _storageError.tryEmit("Failed to add storage location: ${e.message}")
                 }
             }
@@ -328,7 +330,7 @@ class MainViewModel
                     storageLocationProvider.removeLocation(locationId)
                     refreshStorageLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to remove storage location $locationId", e)
+                    Logger.e(TAG, "Failed to remove storage location $locationId", e)
                     _storageError.tryEmit("Failed to remove storage location: ${e.message}")
                 }
             }
@@ -344,7 +346,7 @@ class MainViewModel
                     storageLocationProvider.updateLocationDescription(locationId, description)
                     refreshStorageLocations()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to update description for $locationId", e)
+                    Logger.e(TAG, "Failed to update description for $locationId", e)
                     _storageError.tryEmit("Failed to update description: ${e.message}")
                 }
             }
@@ -364,7 +366,7 @@ class MainViewModel
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to update allowWrite for $locationId", e)
+                    Logger.e(TAG, "Failed to update allowWrite for $locationId", e)
                     refreshStorageLocations()
                     _storageError.tryEmit("Failed to update write permission: ${e.message}")
                 }
@@ -385,7 +387,7 @@ class MainViewModel
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to update allowDelete for $locationId", e)
+                    Logger.e(TAG, "Failed to update allowDelete for $locationId", e)
                     refreshStorageLocations()
                     _storageError.tryEmit("Failed to update delete permission: ${e.message}")
                 }
@@ -491,24 +493,19 @@ class MainViewModel
         }
 
         fun addServerLogEntry(entry: ServerLogEntry) {
-            val currentLogs = _serverLogs.value.toMutableList()
-            currentLogs.add(entry)
-            if (currentLogs.size > MAX_LOG_ENTRIES) {
-                _serverLogs.value = currentLogs.drop(currentLogs.size - MAX_LOG_ENTRIES)
-            } else {
-                _serverLogs.value = currentLogs
+            _serverLogs.update { currentLogs ->
+                val updated = currentLogs + entry
+                if (updated.size > MAX_LOG_ENTRIES) {
+                    updated.drop(updated.size - MAX_LOG_ENTRIES)
+                } else {
+                    updated
+                }
             }
         }
 
         companion object {
             private const val TAG = "MCP:MainViewModel"
-            private const val MIN_PORT = 1
-            private const val MAX_PORT = 65535
             private const val MAX_LOG_ENTRIES = 100
             private const val CLIPBOARD_LABEL = "MCP Remote Control"
-            private val HOSTNAME_PATTERN =
-                Regex(
-                    "^[a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?)*$",
-                )
         }
     }
