@@ -5,6 +5,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.request.path
 import io.ktor.server.response.respondText
 import io.modelcontextprotocol.kotlin.sdk.types.McpJson
 import kotlinx.serialization.Serializable
@@ -68,7 +69,7 @@ val BearerTokenAuthPlugin =
             val call = context
 
             // Skip authentication for excluded paths (e.g., /health)
-            val requestPath = call.request.local.uri
+            val requestPath = call.request.path()
             if (excludedPaths.any { requestPath == it }) {
                 return@intercept
             }

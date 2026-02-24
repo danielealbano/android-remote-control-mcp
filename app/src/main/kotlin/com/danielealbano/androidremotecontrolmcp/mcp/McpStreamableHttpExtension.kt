@@ -54,7 +54,7 @@ private const val SESSION_IDLE_TIMEOUT_MS = 300_000L
  * @param block Provider that returns the [Server] instance for a session.
  *   May return the same instance across sessions.
  */
-@Suppress("LongMethod")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 fun Application.mcpStreamableHttp(block: () -> Server) {
     val transports = ConcurrentHashMap<String, StreamableHttpServerTransport>()
     val lastActivityTimes = ConcurrentHashMap<String, Long>()
@@ -77,6 +77,10 @@ fun Application.mcpStreamableHttp(block: () -> Server) {
                     .map { it.key }
 
             for (sessionId in staleSessionIds) {
+                // Re-check timestamp to avoid closing a session that became active since the scan
+                val currentLastActivity = lastActivityTimes[sessionId]
+                if (currentLastActivity == null || now - currentLastActivity <= SESSION_IDLE_TIMEOUT_MS) continue
+
                 val transport = transports.remove(sessionId)
                 lastActivityTimes.remove(sessionId)
                 if (transport != null) {
@@ -95,7 +99,7 @@ fun Application.mcpStreamableHttp(block: () -> Server) {
                 val sessionId = call.request.headers[MCP_SESSION_ID_HEADER]
                 val transport: StreamableHttpServerTransport
 
-                if (sessionId != null) {
+                if (!sessionId.isNullOrEmpty()) {
                     // Existing session — update activity timestamp
                     transport = transports[sessionId] ?: run {
                         call.respondText(
@@ -119,33 +123,51 @@ fun Application.mcpStreamableHttp(block: () -> Server) {
                         return@post
                     }
 
-                    // New session — create transport + server
-                    transport = StreamableHttpServerTransport(enableJsonResponse = true)
+                    // New session — create transport + server.
+                    // Wrap in try-catch so that if block() or createSession() throws,
+                    // we decrement activeSessionCount to avoid permanently leaking a slot.
+                    try {
+                        transport = StreamableHttpServerTransport(enableJsonResponse = true)
 
-                    transport.setOnSessionInitialized { initializedSessionId ->
-                        transports[initializedSessionId] = transport
-                        lastActivityTimes[initializedSessionId] = System.currentTimeMillis()
-                        Log.d(TAG, "Session initialized: $initializedSessionId")
-                    }
-
-                    transport.setOnSessionClosed { closedSessionId ->
-                        transports.remove(closedSessionId)
-                        lastActivityTimes.remove(closedSessionId)
-                        activeSessionCount.decrementAndGet()
-                        Log.d(TAG, "Session closed: $closedSessionId")
-                    }
-
-                    val server = block()
-                    server.onClose {
-                        transport.sessionId?.let {
-                            if (transports.remove(it) != null) {
-                                lastActivityTimes.remove(it)
-                                activeSessionCount.decrementAndGet()
-                            }
+                        transport.setOnSessionInitialized { initializedSessionId ->
+                            transports[initializedSessionId] = transport
+                            lastActivityTimes[initializedSessionId] = System.currentTimeMillis()
+                            Log.d(TAG, "Session initialized: $initializedSessionId")
                         }
-                        Log.d(TAG, "Server connection closed for sessionId: ${transport.sessionId}")
+
+                        transport.setOnSessionClosed { closedSessionId ->
+                            transports.remove(closedSessionId)
+                            lastActivityTimes.remove(closedSessionId)
+                            activeSessionCount.decrementAndGet()
+                            Log.d(TAG, "Session closed: $closedSessionId")
+                        }
+
+                        val server = block()
+                        server.onClose {
+                            transport.sessionId?.let {
+                                if (transports.remove(it) != null) {
+                                    lastActivityTimes.remove(it)
+                                    activeSessionCount.decrementAndGet()
+                                }
+                            }
+                            Log.d(
+                                TAG,
+                                "Server connection closed for sessionId: ${transport.sessionId}",
+                            )
+                        }
+                        server.createSession(transport)
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") e: Exception,
+                    ) {
+                        activeSessionCount.decrementAndGet()
+                        Log.e(TAG, "Failed to create session", e)
+                        call.respondText(
+                            """{"error":"Internal server error"}""",
+                            ContentType.Application.Json,
+                            HttpStatusCode.InternalServerError,
+                        )
+                        return@post
                     }
-                    server.createSession(transport)
                 }
 
                 // session=null because we're in JSON-only mode (no ServerSSESession)

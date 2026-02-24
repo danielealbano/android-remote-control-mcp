@@ -394,6 +394,7 @@ class FileOperationProviderImpl
                         "Failed to open file for writing: $path in location '$locationId'",
                     )
                 } catch (e: McpToolException) {
+                    documentFile.delete()
                     throw e
                 } catch (
                     @Suppress("TooGenericExceptionCaught") e: Exception,
