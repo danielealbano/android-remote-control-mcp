@@ -285,6 +285,94 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docum
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
 | Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
 
+### Headless Setup via ADB
+
+The app can be fully configured and controlled from the command line without opening the UI. This is useful for automated setups, CI pipelines, or headless devices.
+
+Replace `<app-id>` with the application ID for your build:
+- **Debug**: `com.danielealbano.androidremotecontrolmcp.debug`
+- **Release**: `com.danielealbano.androidremotecontrolmcp`
+
+#### Grant Permissions
+
+```bash
+# Enable Accessibility Service (required for UI introspection, actions, and screenshots)
+adb shell settings put secure enabled_accessibility_services \
+  <app-id>/com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
+
+# Grant notification permission (Android 13+)
+adb shell pm grant <app-id> android.permission.POST_NOTIFICATIONS
+
+# Grant camera permission
+adb shell pm grant <app-id> android.permission.CAMERA
+
+# Grant microphone permission
+adb shell pm grant <app-id> android.permission.RECORD_AUDIO
+```
+
+#### Configure the App
+
+All extras are optional — only the ones provided are updated. The app does **not** need to be open.
+
+```bash
+adb shell am broadcast \
+  -a com.danielealbano.androidremotecontrolmcp.ADB_CONFIGURE \
+  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbConfigReceiver \
+  --es bearer_token "my-secret-token" \
+  --es binding_address "0.0.0.0" \
+  --ei port 8080 \
+  --ez auto_start_on_boot true \
+  --ez https_enabled false \
+  --es certificate_source "AUTO_GENERATED" \
+  --es certificate_hostname "mcp.local" \
+  --ez tunnel_enabled false \
+  --es tunnel_provider "CLOUDFLARE" \
+  --es ngrok_authtoken "your-ngrok-token" \
+  --es ngrok_domain "your-domain.ngrok-free.app" \
+  --ei file_size_limit_mb 50 \
+  --ez allow_http_downloads false \
+  --ez allow_unverified_https_certs false \
+  --ei download_timeout_seconds 60 \
+  --es device_slug "pixel8"
+```
+
+| Extra | Type | Description |
+|-------|------|-------------|
+| `bearer_token` | string | Authentication token for MCP requests |
+| `binding_address` | string | `127.0.0.1` (localhost) or `0.0.0.0` (network) |
+| `port` | int | HTTP/HTTPS server port (1-65535) |
+| `auto_start_on_boot` | boolean | Start MCP server when device boots |
+| `https_enabled` | boolean | Enable HTTPS with TLS |
+| `certificate_source` | string | `AUTO_GENERATED` or `CUSTOM` |
+| `certificate_hostname` | string | Hostname for auto-generated certificate |
+| `tunnel_enabled` | boolean | Enable remote access tunnel |
+| `tunnel_provider` | string | `CLOUDFLARE` or `NGROK` |
+| `ngrok_authtoken` | string | ngrok authentication token |
+| `ngrok_domain` | string | ngrok custom domain (optional) |
+| `file_size_limit_mb` | int | Max file size for file operations (1-500) |
+| `allow_http_downloads` | boolean | Allow non-HTTPS downloads |
+| `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |
+| `download_timeout_seconds` | int | Download timeout (10-300) |
+| `device_slug` | string | Device identifier for tool name prefix |
+
+#### Start the MCP Server
+
+The server must be started via a trampoline Activity (required on Android 12+ to gain foreground service exemption). This works even when the app is force-stopped.
+
+```bash
+adb shell am start \
+  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
+  --es action start
+```
+
+#### Stop the MCP Server
+
+```bash
+adb shell am start \
+  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
+  --es action stop
+```
+
 ### Using with adb Port Forwarding (Recommended)
 
 When the server is bound to `127.0.0.1` (default, most secure):
