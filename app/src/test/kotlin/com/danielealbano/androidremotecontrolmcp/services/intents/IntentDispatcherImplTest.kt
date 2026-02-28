@@ -1,7 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.intents
 
 import android.content.ActivityNotFoundException
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -275,6 +274,25 @@ class IntentDispatcherImplTest {
             }
 
         @Test
+        fun `sendIntent with null value and type override returns failure`() =
+            runTest {
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            extras = mapOf("key" to null),
+                            extrasTypes = mapOf("key" to "string"),
+                        ),
+                    )
+
+                assertTrue(result.isFailure)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("is null but type override") == true,
+                )
+            }
+
+        @Test
         fun `sendIntent with unsupported extras_types value returns failure`() =
             runTest {
                 val result =
@@ -498,6 +516,42 @@ class IntentDispatcherImplTest {
                     result.exceptionOrNull()?.message?.contains("Invalid component format") == true,
                 )
             }
+
+        @Test
+        fun `sendIntent with empty package in component returns failure`() =
+            runTest {
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            component = "/com.example.Activity",
+                        ),
+                    )
+
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("must not be empty") == true,
+                )
+            }
+
+        @Test
+        fun `sendIntent with empty class in component returns failure`() =
+            runTest {
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            component = "com.example.app/",
+                        ),
+                    )
+
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("must not be empty") == true,
+                )
+            }
     }
 
     // ─── sendIntent exception handling tests ─────────────────────────────
@@ -568,6 +622,28 @@ class IntentDispatcherImplTest {
                     result.exceptionOrNull()?.message?.contains("background start restriction") == true,
                 )
             }
+
+        @Test
+        fun `sendIntent wraps unexpected exception in Result failure with sanitized message`() =
+            runTest {
+                every { mockContext.startActivity(any()) } throws
+                    RuntimeException("Internal android.app.ActivityThread crash detail")
+
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                        ),
+                    )
+
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalStateException)
+                assertEquals(
+                    "Intent dispatch failed unexpectedly",
+                    result.exceptionOrNull()?.message,
+                )
+            }
     }
 
     // ─── sendIntent data and type tests ──────────────────────────────────
@@ -576,7 +652,7 @@ class IntentDispatcherImplTest {
     @DisplayName("sendIntent data and type")
     inner class SendIntentDataAndType {
         @Test
-        fun `sendIntent with data and type uses setDataAndType`() =
+        fun `sendIntent with data sets intent data`() =
             runTest {
                 val result =
                     dispatcher.sendIntent(
@@ -700,6 +776,22 @@ class IntentDispatcherImplTest {
                 assertTrue(result.exceptionOrNull() is IllegalArgumentException)
                 assertEquals(
                     "Permission denied: not allowed to open URI",
+                    result.exceptionOrNull()?.message,
+                )
+            }
+
+        @Test
+        fun `openUri wraps unexpected exception in Result failure with sanitized message`() =
+            runTest {
+                every { mockContext.startActivity(any()) } throws
+                    RuntimeException("Internal crash detail")
+
+                val result = dispatcher.openUri("https://example.com")
+
+                assertTrue(result.isFailure)
+                assertTrue(result.exceptionOrNull() is IllegalStateException)
+                assertEquals(
+                    "Failed to open URI unexpectedly",
                     result.exceptionOrNull()?.message,
                 )
             }

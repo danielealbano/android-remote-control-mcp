@@ -187,6 +187,9 @@ class McpProtocolIntegrationTest {
                 "android_open_app",
                 "android_list_apps",
                 "android_close_app",
+                // Intent tools
+                "android_send_intent",
+                "android_open_uri",
             )
     }
 }

@@ -1,9 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
-import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.intents.SendIntentRequest
+import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
@@ -20,6 +20,15 @@ import javax.inject.Inject
 // send_intent
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * MCP tool handler for `send_intent`.
+ *
+ * Sends an Android intent. Supports starting activities, sending broadcasts, and
+ * starting services with optional action, data, component, extras, and flags.
+ *
+ * **Input**: `{ "type": "activity|broadcast|service", "action": "...", ... }`
+ * **Output**: `{ "content": [{ "type": "text", "text": "Intent sent successfully: ..." }] }`
+ */
 class SendIntentHandler
     @Inject
     constructor(
@@ -27,7 +36,7 @@ class SendIntentHandler
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val type = McpToolUtils.requireString(arguments, "type")
-            if (type !in listOf("activity", "broadcast", "service")) {
+            if (type !in VALID_TYPES) {
                 throw McpToolException.InvalidParams(
                     "type must be 'activity', 'broadcast', or 'service'",
                 )
@@ -49,12 +58,16 @@ class SendIntentHandler
             val extrasTypes = extractExtrasTypes(arguments)
             val flags = extractFlags(arguments)
 
-            Log.d(TAG, "Executing send_intent: type=$type, action=$action")
+            Logger.d(TAG, "Executing send_intent: type=$type, action=$action")
             val result =
                 intentDispatcher.sendIntent(
                     SendIntentRequest(type, action, data, component, extras, extrasTypes, flags),
                 )
-            return McpToolUtils.handleActionResult(result, "Intent sent successfully: type=$type, action=$action")
+            val actionLabel = action ?: "(none)"
+            return McpToolUtils.handleActionResult(
+                result,
+                "Intent sent successfully: type=$type, action=$actionLabel",
+            )
         }
 
         private fun extractExtras(arguments: JsonObject?): Map<String, Any?>? {
@@ -74,7 +87,7 @@ class SendIntentHandler
                 is JsonPrimitive -> convertPrimitive(value)
                 is JsonArray -> convertStringArray(key, value)
                 else -> {
-                    Log.w(TAG, "Skipping unsupported extra type for key: $key")
+                    Logger.w(TAG, "Skipping unsupported extra type for key: $key")
                     null
                 }
             }
@@ -83,8 +96,18 @@ class SendIntentHandler
             when {
                 value.isString -> value.content
                 value.content == "true" || value.content == "false" -> value.content.toBooleanStrict()
-                value.content.contains('.') -> value.content.toDoubleOrNull() ?: value.content
-                else -> value.content.toLongOrNull() ?: value.content
+                value.content.contains('.') -> {
+                    value.content.toDoubleOrNull()
+                        ?: throw IllegalArgumentException(
+                            "Cannot parse numeric extra: '${value.content}'",
+                        )
+                }
+                else -> {
+                    value.content.toLongOrNull()
+                        ?: throw IllegalArgumentException(
+                            "Cannot parse numeric extra: '${value.content}'",
+                        )
+                }
             }
 
         private fun convertStringArray(
@@ -96,7 +119,7 @@ class SendIntentHandler
                     (element as? JsonPrimitive)?.takeIf { it.isString }?.content
                 }
             if (stringList.size != array.size) {
-                Log.w(TAG, "Skipping non-string array extra: $key")
+                Logger.w(TAG, "Skipping non-string array extra: $key")
                 return null
             }
             return stringList
@@ -189,6 +212,7 @@ class SendIntentHandler
         companion object {
             const val TOOL_NAME = "send_intent"
             private const val TAG = "MCP:SendIntentTool"
+            private val VALID_TYPES = setOf("activity", "broadcast", "service")
             private const val TOOL_DESCRIPTION =
                 "Send an Android intent. Supports starting activities, " +
                     "sending broadcasts, and starting services. Use for opening specific " +
@@ -200,6 +224,15 @@ class SendIntentHandler
 // open_uri
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * MCP tool handler for `open_uri`.
+ *
+ * Opens a URI using Android's `ACTION_VIEW`. Handles https, http, tel, mailto,
+ * geo, content URLs, deep links, and custom app schemes.
+ *
+ * **Input**: `{ "uri": "<string>", "package_name": "<string>?", "mime_type": "<string>?" }`
+ * **Output**: `{ "content": [{ "type": "text", "text": "URI opened successfully: ..." }] }`
+ */
 class OpenUriHandler
     @Inject
     constructor(
@@ -216,7 +249,7 @@ class OpenUriHandler
                     .optionalString(arguments, "mime_type", "")
                     .ifEmpty { null }
 
-            Log.d(TAG, "Executing open_uri: $uri")
+            Logger.d(TAG, "Executing open_uri")
             val result = intentDispatcher.openUri(uri, packageName, mimeType)
             return McpToolUtils.handleActionResult(result, "URI opened successfully: $uri")
         }

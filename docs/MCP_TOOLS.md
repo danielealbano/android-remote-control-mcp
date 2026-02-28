@@ -2923,3 +2923,9 @@ Opens a URI using Android's `ACTION_VIEW`. Handles `https://`, `http://`, `tel:`
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `uri`
 - **Action failed**: No app found to handle URI; permission denied
+
+### Security Considerations
+
+- **Arbitrary dispatch**: `android_send_intent` can start any exported activity, send broadcasts, and start services on the device. Bearer token authentication is the primary security gate — ensure a strong token is configured.
+- **FLAG_GRANT_* acceptance**: The `flags` parameter accepts all `Intent.FLAG_*` constants via reflection, including `FLAG_GRANT_READ_URI_PERMISSION` and `FLAG_GRANT_WRITE_URI_PERMISSION`. These flags can grant temporary URI permission access to the target component. This is intentional for full intent control but callers should be aware of the permission implications.
+- **URI logging**: Intent data URIs and `open_uri` URIs are truncated to `scheme://host/...` in logs to avoid leaking sensitive path/query parameters.

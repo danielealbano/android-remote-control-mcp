@@ -312,6 +312,101 @@ class IntentToolsTest {
                     handler.execute(params)
                 }
             }
+
+        @Test
+        fun `send_intent with nested JsonObject extra skips unsupported value`() =
+            runTest {
+                coEvery {
+                    mockIntentDispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            extras = mapOf("valid" to "text"),
+                        ),
+                    )
+                } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("action", "android.intent.action.VIEW")
+                        putJsonObject("extras") {
+                            put("valid", "text")
+                            putJsonObject("nested") {
+                                put("inner", "value")
+                            }
+                        }
+                    }
+                val result = handler.execute(params)
+
+                assertEquals(1, result.content.size)
+                coVerify {
+                    mockIntentDispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            extras = mapOf("valid" to "text"),
+                        ),
+                    )
+                }
+            }
+
+        @Test
+        fun `send_intent with all parameters passes combined request to dispatcher`() =
+            runTest {
+                coEvery {
+                    mockIntentDispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            data = "https://example.com",
+                            component = "com.example/com.example.Activity",
+                            extras = mapOf("id" to 42L, "name" to "test"),
+                            extrasTypes = mapOf("id" to "long"),
+                            flags = listOf("FLAG_ACTIVITY_CLEAR_TOP"),
+                        ),
+                    )
+                } returns Result.success(Unit)
+
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("action", "android.intent.action.VIEW")
+                        put("data", "https://example.com")
+                        put("component", "com.example/com.example.Activity")
+                        putJsonObject("extras") {
+                            put("id", 42)
+                            put("name", "test")
+                        }
+                        putJsonObject("extras_types") {
+                            put("id", "long")
+                        }
+                        put(
+                            "flags",
+                            buildJsonArray {
+                                add(JsonPrimitive("FLAG_ACTIVITY_CLEAR_TOP"))
+                            },
+                        )
+                    }
+                val result = handler.execute(params)
+
+                assertEquals(1, result.content.size)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Intent sent successfully"))
+                coVerify {
+                    mockIntentDispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            data = "https://example.com",
+                            component = "com.example/com.example.Activity",
+                            extras = mapOf("id" to 42L, "name" to "test"),
+                            extrasTypes = mapOf("id" to "long"),
+                            flags = listOf("FLAG_ACTIVITY_CLEAR_TOP"),
+                        ),
+                    )
+                }
+            }
     }
 
     // ─── OpenUriHandler ──────────────────────────────────────────────────
