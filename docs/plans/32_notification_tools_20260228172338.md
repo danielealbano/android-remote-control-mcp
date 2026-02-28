@@ -468,11 +468,11 @@ Test cases:
 The notification listener requires manual permission grant via Settings. Add permission check to `PermissionUtils`, `MainViewModel`, and `PermissionsSection` UI following the existing pattern for accessibility/camera/microphone permissions.
 
 ### Acceptance Criteria
-- [ ] `PermissionUtils.isNotificationListenerEnabled()` checks if `McpNotificationListenerService` is enabled
-- [ ] `MainViewModel` exposes `isNotificationListenerEnabled` state
-- [ ] `PermissionsSection` shows notification listener permission row
-- [ ] Button opens notification listener settings
-- [ ] Unit tests for permission check
+- [x] `PermissionUtils.isNotificationListenerEnabled()` checks if `McpNotificationListenerService` is enabled
+- [x] `MainViewModel` exposes `isNotificationListenerEnabled` state
+- [x] `PermissionsSection` shows notification listener permission row
+- [x] Button opens notification listener settings
+- [x] Unit tests for permission check
 
 ---
 
@@ -511,8 +511,8 @@ The notification listener requires manual permission grant via Settings. Add per
 ```
 
 **Definition of Done**:
-- [ ] Check reads `enabled_notification_listeners` setting
-- [ ] Open settings method launches correct settings page
+- [x] Check reads `enabled_notification_listeners` setting
+- [x] Open settings method launches correct settings page
 
 ---
 
@@ -538,7 +538,7 @@ The notification listener requires manual permission grant via Settings. Add per
 **Action 2.2.3**: Add import for `McpNotificationListenerService`.
 
 **Definition of Done**:
-- [ ] State exposed and refreshed with other permissions
+- [x] State exposed and refreshed with other permissions
 
 ---
 
@@ -589,9 +589,9 @@ PermissionRow(
 ```
 
 **Definition of Done**:
-- [ ] Permission row added to UI
-- [ ] String resource added
-- [ ] Preview updated
+- [x] Permission row added to UI
+- [x] String resource added
+- [x] Preview updated
 
 ---
 
@@ -605,7 +605,7 @@ PermissionRow(
 The callback should call `PermissionUtils.openNotificationListenerSettings(context)`.
 
 **Definition of Done**:
-- [ ] New permission state and callback wired from ViewModel through HomeScreen to PermissionsSection
+- [x] New permission state and callback wired from ViewModel through HomeScreen to PermissionsSection
 
 ---
 
@@ -619,7 +619,7 @@ The callback should call `PermissionUtils.openNotificationListenerSettings(conte
 - `isNotificationListenerEnabled returns false when setting is null`
 
 **Definition of Done**:
-- [ ] 3 test cases added and passing
+- [x] 3 test cases added and passing
 
 ---
 

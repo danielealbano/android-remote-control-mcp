@@ -40,10 +40,12 @@ private fun disabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFFEF5350
 fun PermissionsSection(
     isAccessibilityEnabled: Boolean,
     isNotificationPermissionGranted: Boolean,
+    isNotificationListenerEnabled: Boolean,
     isCameraPermissionGranted: Boolean,
     isMicrophonePermissionGranted: Boolean,
     onOpenAccessibilitySettings: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
+    onOpenNotificationListenerSettings: () -> Unit,
     onRequestCameraPermission: () -> Unit,
     onRequestMicrophonePermission: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,6 +89,21 @@ fun PermissionsSection(
                     },
                 onAction = onRequestNotificationPermission,
                 actionEnabled = !isNotificationPermissionGranted,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PermissionRow(
+                label = stringResource(R.string.permission_notification_listener),
+                isEnabled = isNotificationListenerEnabled,
+                buttonText =
+                    if (isNotificationListenerEnabled) {
+                        stringResource(R.string.permission_enabled)
+                    } else {
+                        stringResource(R.string.permission_enable)
+                    },
+                onAction = onOpenNotificationListenerSettings,
+                actionEnabled = !isNotificationListenerEnabled,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -170,10 +187,12 @@ private fun PermissionsSectionPreview() {
         PermissionsSection(
             isAccessibilityEnabled = false,
             isNotificationPermissionGranted = false,
+            isNotificationListenerEnabled = false,
             isCameraPermissionGranted = false,
             isMicrophonePermissionGranted = false,
             onOpenAccessibilitySettings = {},
             onRequestNotificationPermission = {},
+            onOpenNotificationListenerSettings = {},
             onRequestCameraPermission = {},
             onRequestMicrophonePermission = {},
         )
