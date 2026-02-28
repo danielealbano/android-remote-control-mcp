@@ -20,6 +20,8 @@ import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcherImpl
+import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
+import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ApiLevelProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.DefaultApiLevelProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
@@ -132,4 +134,8 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindIntentDispatcher(impl: IntentDispatcherImpl): IntentDispatcher
+
+    @Binds
+    @Singleton
+    abstract fun bindNotificationProvider(impl: NotificationProviderImpl): NotificationProvider
 }
