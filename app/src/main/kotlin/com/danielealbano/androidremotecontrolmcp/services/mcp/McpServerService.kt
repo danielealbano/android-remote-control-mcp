@@ -21,6 +21,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
@@ -35,6 +36,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
+import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -111,6 +113,8 @@ class McpServerService : Service() {
     @Inject lateinit var nodeCache: AccessibilityNodeCache
 
     @Inject lateinit var cameraProvider: CameraProvider
+
+    @Inject lateinit var intentDispatcher: IntentDispatcher
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverActive = AtomicBoolean(false)
@@ -302,6 +306,7 @@ class McpServerService : Service() {
         registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
         registerAppManagementTools(server, appManager, toolNamePrefix)
         registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix)
+        registerIntentTools(server, intentDispatcher, toolNamePrefix)
     }
 
     override fun onDestroy() {

@@ -189,7 +189,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 45 tools across 10 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 47 tools across 11 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -309,6 +309,19 @@ The MCP server exposes 45 tools across 10 categories. For full JSON-RPC schemas,
 | `android_save_camera_video` | Record video and save to storage (max 30s), returns thumbnail | `camera_id` (string), `location_id` (string), `path` (string), `duration` (int, 1-30) | `resolution` (string, WIDTHxHEIGHT), `audio` (boolean, default true), `flash_mode` (string: off/on/auto, default auto) |
 
 **Errors**: All camera tools return `McpToolException.PermissionDenied` if CAMERA permission is not granted. `android_save_camera_video` also requires RECORD_AUDIO permission when audio is enabled. Save tools delegate write permission checks to `FileOperationProvider.createFileUri()`. Invalid parameters (resolution format, quality range, duration range, flash mode) return `McpToolException.InvalidParams`.
+
+### 11. Intent Tools (2 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `android_send_intent` | Send an Android intent (activity, broadcast, or service) | `type` (string: activity/broadcast/service) | `action` (string), `data` (string), `component` (string, package/class), `extras` (object), `extras_types` (object), `flags` (string[]) |
+| `android_open_uri` | Open a URI using ACTION_VIEW | `uri` (string) | `package_name` (string), `mime_type` (string) |
+
+**Extras type inference**: String values → `String`, integers fitting Int range → `Int`, integers exceeding Int range → `Long`, decimals → `Double`, booleans → `Boolean`, string arrays → `StringArrayList`. Use `extras_types` to override (supported: `"string"`, `"int"`, `"long"`, `"float"`, `"double"`, `"boolean"`).
+
+**Flags**: Resolved dynamically via `Intent::class.java.fields` reflection. `FLAG_ACTIVITY_NEW_TASK` auto-added for `type = "activity"`.
+
+**Errors**: Invalid type/component/flag → `McpToolException.InvalidParams`. No handler found / permission denied / background start restriction → `McpToolException.ActionFailed` with sanitized message.
 
 ---
 
@@ -717,7 +730,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 45 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 47 tools
 
 ---
 
