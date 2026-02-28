@@ -24,7 +24,7 @@ Verify that the ENTIRE implemented codebase matches the approved plan EXACTLY. Y
 - You MUST NOT suggest fixes — report findings only. The user decides how to address them.
 - You MUST compare the plan against the actual implementation action by action, across ALL user stories.
 - Line offsets may drift — do NOT flag line offset drift as an issue.
-- Cross-reference against `docs/PROJECT.md` and `docs/ARCHITECTURE.md` for architectural compliance verification.
+- Cross-reference against `docs/PROJECT.md` and `docs/ARCHITECTURE.md` for architectural compliance verification, but do NOT flag documented/accepted design decisions as issues.
 
 ## Review Methodology
 
