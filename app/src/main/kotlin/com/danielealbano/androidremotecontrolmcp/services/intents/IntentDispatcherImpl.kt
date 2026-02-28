@@ -14,34 +14,28 @@ class IntentDispatcherImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : IntentDispatcher {
 
-    override suspend fun sendIntent(
-        type: String,
-        action: String?,
-        data: String?,
-        component: String?,
-        extras: Map<String, Any?>?,
-        extrasTypes: Map<String, String>?,
-        flags: List<String>?,
-    ): Result<Unit> {
-        if (type !in VALID_TYPES) {
+    override suspend fun sendIntent(request: SendIntentRequest): Result<Unit> {
+        if (request.type !in VALID_TYPES) {
             return Result.failure(
-                IllegalArgumentException("Invalid intent type: '$type'. Must be one of: activity, broadcast, service"),
+                IllegalArgumentException(
+                    "Invalid intent type: '${request.type}'. Must be one of: activity, broadcast, service",
+                ),
             )
         }
 
         return try {
             val intent = Intent()
 
-            if (action != null) {
-                intent.action = action
+            if (request.action != null) {
+                intent.action = request.action
             }
 
-            if (data != null) {
-                intent.data = Uri.parse(data)
+            if (request.data != null) {
+                intent.data = Uri.parse(request.data)
             }
 
-            if (component != null) {
-                val componentResult = parseComponent(component)
+            if (request.component != null) {
+                val componentResult = parseComponent(request.component)
                 if (componentResult.isFailure) {
                     return componentResult.map { }
                 }
@@ -49,8 +43,8 @@ class IntentDispatcherImpl @Inject constructor(
             }
 
             // Resolve and apply flags; auto-add FLAG_ACTIVITY_NEW_TASK for "activity"
-            val allFlags = flags.orEmpty().toMutableList()
-            if (type == TYPE_ACTIVITY && FLAG_ACTIVITY_NEW_TASK !in allFlags) {
+            val allFlags = request.flags.orEmpty().toMutableList()
+            if (request.type == TYPE_ACTIVITY && FLAG_ACTIVITY_NEW_TASK !in allFlags) {
                 allFlags.add(FLAG_ACTIVITY_NEW_TASK)
             }
             if (allFlags.isNotEmpty()) {
@@ -62,18 +56,18 @@ class IntentDispatcherImpl @Inject constructor(
             }
 
             // Apply extras
-            extras?.forEach { (key, value) ->
-                putExtraWithInference(intent, key, value, extrasTypes?.get(key))
+            request.extras?.forEach { (key, value) ->
+                putExtraWithInference(intent, key, value, request.extrasTypes?.get(key))
             }
 
             // Dispatch
-            when (type) {
+            when (request.type) {
                 TYPE_ACTIVITY -> context.startActivity(intent)
                 TYPE_BROADCAST -> context.sendBroadcast(intent)
                 TYPE_SERVICE -> context.startService(intent)
             }
 
-            Logger.i(TAG, "Intent dispatched: type=$type, action=$action")
+            Logger.i(TAG, "Intent dispatched: type=${request.type}, action=${request.action}")
             Result.success(Unit)
         } catch (e: ActivityNotFoundException) {
             Logger.w(TAG, "No activity found to handle intent", e)
