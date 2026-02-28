@@ -628,13 +628,13 @@ The callback should call `PermissionUtils.openNotificationListenerSettings(conte
 `NotificationTools.kt` with 6 tool handlers.
 
 ### Acceptance Criteria
-- [ ] All 6 tools registered with schemas matching agreed spec
-- [ ] Permission check: all tools verify `notificationProvider.isReady()` before proceeding
-- [ ] Empty string validation on all ID/text parameters (consistent with `OpenAppHandler` pattern)
-- [ ] `Log.d` tracing in all handlers
-- [ ] `duration_ms` upper bound validation (7 days max)
-- [ ] `requireLong` follows `requireInt`/`optionalLong` pattern exactly (isString check, consistent error messages)
-- [ ] Unit tests for all handlers
+- [x] All 6 tools registered with schemas matching agreed spec
+- [x] Permission check: all tools verify `notificationProvider.isReady()` before proceeding
+- [x] Empty string validation on all ID/text parameters (consistent with `OpenAppHandler` pattern)
+- [x] `Log.d` tracing in all handlers
+- [x] `duration_ms` upper bound validation (7 days max)
+- [x] `requireLong` follows `requireInt`/`optionalLong` pattern exactly (isString check, consistent error messages)
+- [x] Unit tests for all handlers
 
 ---
 
@@ -992,12 +992,12 @@ fun registerNotificationTools(
 ```
 
 **Definition of Done**:
-- [ ] All 6 handlers implemented with permission check
-- [ ] All handlers validate non-empty `notification_id`/`action_id`/`text` (consistent with `OpenAppHandler` pattern)
-- [ ] All handlers include `Log.d` tracing with `TAG` constant
-- [ ] `notification_snooze` validates `duration_ms` upper bound (7 days max)
-- [ ] Schemas match agreed spec
-- [ ] Registration function created
+- [x] All 6 handlers implemented with permission check
+- [x] All handlers validate non-empty `notification_id`/`action_id`/`text` (consistent with `OpenAppHandler` pattern)
+- [x] All handlers include `Log.d` tracing with `TAG` constant
+- [x] `notification_snooze` validates `duration_ms` upper bound (7 days max)
+- [x] Schemas match agreed spec
+- [x] Registration function created
 
 ---
 
@@ -1048,10 +1048,10 @@ fun requireLong(
 ```
 
 **Definition of Done**:
-- [ ] `requireLong` added following `requireInt`/`optionalLong` pattern exactly
-- [ ] Rejects string-encoded numbers via `primitive.isString` check
-- [ ] Rejects fractional values via `doubleVal != longVal.toDouble()` check
-- [ ] Error messages consistent with existing `requireInt`/`requireFloat` (colon after "parameter", includes invalid value)
+- [x] `requireLong` added following `requireInt`/`optionalLong` pattern exactly
+- [x] Rejects string-encoded numbers via `primitive.isString` check
+- [x] Rejects fractional values via `doubleVal != longVal.toDouble()` check
+- [x] Error messages consistent with existing `requireInt`/`requireFloat` (colon after "parameter", includes invalid value)
 
 ---
 
@@ -1095,7 +1095,7 @@ Test cases:
 - `notification_list with negative limit returns all notifications`
 
 **Definition of Done**:
-- [ ] All 31 test cases implemented and passing
+- [x] All 31 test cases implemented and passing
 
 ---
 
@@ -1113,7 +1113,7 @@ Test cases:
 - `requireLong accepts integer-equivalent float` (e.g., `5.0` → `5L`)
 
 **Definition of Done**:
-- [ ] 7 test cases added and passing
+- [x] 7 test cases added and passing
 
 ---
 
