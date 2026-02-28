@@ -1214,10 +1214,10 @@ Test cases:
 ## User Story 5: Update Documentation
 
 ### Acceptance Criteria
-- [ ] `MCP_TOOLS.md` has full section for Notification Tools, including security consideration about notification content exposure
-- [ ] `PROJECT.md` tool table updated
-- [ ] `ARCHITECTURE.md` updated (component diagram, permission model table, service lifecycle docs)
-- [ ] Tool count updated (47 → 53, accounting for Plan 31's 2 tools)
+- [x] `MCP_TOOLS.md` has full section for Notification Tools, including security consideration about notification content exposure
+- [x] `PROJECT.md` tool table updated
+- [x] `ARCHITECTURE.md` updated (component diagram, permission model table, service lifecycle docs)
+- [x] Tool count updated (47 → 53, accounting for Plan 31's 2 tools)
 
 ---
 
@@ -1235,9 +1235,9 @@ Test cases:
 - **Security consideration**: Notification tools expose notification content (titles, text, app names, action labels) to MCP clients. This is inherent to the feature's purpose. Ensure bearer token authentication is enabled in production to restrict access.
 
 **Definition of Done**:
-- [ ] Full documentation for all 6 tools
-- [ ] Security consideration documented
-- [ ] Overview and count updated
+- [x] Full documentation for all 6 tools
+- [x] Security consideration documented
+- [x] Overview and count updated
 
 ---
 
@@ -1261,7 +1261,7 @@ Test cases:
 **Action 5.2.2**: Update tool count. Add note about notification listener permission requirement.
 
 **Definition of Done**:
-- [ ] Tool table added, count updated
+- [x] Tool table added, count updated
 
 ---
 
@@ -1280,10 +1280,10 @@ Test cases:
 **Action 5.3.5**: Validate Mermaid diagrams with `mmdc`.
 
 **Definition of Done**:
-- [ ] Component diagram updated and validated
-- [ ] Permission model table updated
-- [ ] Service lifecycle documented
-- [ ] Tool categories updated
+- [x] Component diagram updated and validated
+- [x] Permission model table updated
+- [x] Service lifecycle documented
+- [x] Tool categories updated
 
 ---
 
@@ -1296,7 +1296,7 @@ Test cases:
 - `refreshPermissionStatus updates isNotificationListenerEnabled when service is not enabled`
 
 **Definition of Done**:
-- [ ] 2 test cases added and passing
+- [x] 2 test cases added and passing
 
 ---
 

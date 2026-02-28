@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -13,6 +14,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import io.mockk.Runs
 import io.mockk.clearMocks
 import io.mockk.coEvery
@@ -20,7 +22,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1003,5 +1007,55 @@ class MainViewModelTest {
             advanceUntilIdle()
 
             assertEquals("test_device", viewModel.deviceSlugInput.value)
+        }
+
+    // ─── Notification Listener Permission Tests ─────────────────────────
+
+    @Test
+    fun `refreshPermissionStatus updates isNotificationListenerEnabled when service is enabled`() =
+        runTest {
+            advanceUntilIdle()
+
+            val context = mockk<Context>()
+            mockkObject(PermissionUtils)
+            try {
+                every { PermissionUtils.isAccessibilityServiceEnabled(context, any()) } returns false
+                every { PermissionUtils.isNotificationPermissionGranted(context) } returns false
+                every { PermissionUtils.isCameraPermissionGranted(context) } returns false
+                every { PermissionUtils.isMicrophonePermissionGranted(context) } returns false
+                every { PermissionUtils.isNotificationListenerEnabled(context, any()) } returns true
+                coEvery { storageLocationProvider.getAllLocations() } returns emptyList()
+
+                viewModel.refreshPermissionStatus(context)
+                advanceUntilIdle()
+
+                assertEquals(true, viewModel.isNotificationListenerEnabled.value)
+            } finally {
+                unmockkObject(PermissionUtils)
+            }
+        }
+
+    @Test
+    fun `refreshPermissionStatus updates isNotificationListenerEnabled when service is not enabled`() =
+        runTest {
+            advanceUntilIdle()
+
+            val context = mockk<Context>()
+            mockkObject(PermissionUtils)
+            try {
+                every { PermissionUtils.isAccessibilityServiceEnabled(context, any()) } returns false
+                every { PermissionUtils.isNotificationPermissionGranted(context) } returns false
+                every { PermissionUtils.isCameraPermissionGranted(context) } returns false
+                every { PermissionUtils.isMicrophonePermissionGranted(context) } returns false
+                every { PermissionUtils.isNotificationListenerEnabled(context, any()) } returns false
+                coEvery { storageLocationProvider.getAllLocations() } returns emptyList()
+
+                viewModel.refreshPermissionStatus(context)
+                advanceUntilIdle()
+
+                assertEquals(false, viewModel.isNotificationListenerEnabled.value)
+            } finally {
+                unmockkObject(PermissionUtils)
+            }
         }
 }
