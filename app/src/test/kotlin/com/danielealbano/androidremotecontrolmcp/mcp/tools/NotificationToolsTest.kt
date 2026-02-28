@@ -17,7 +17,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -31,8 +30,6 @@ class NotificationToolsTest {
         notificationId: String = "abc123",
         packageName: String = "com.example.app",
         appName: String = "Example",
-        title: String? = "Test Title",
-        text: String? = "Test text",
         actions: List<NotificationActionData> = emptyList(),
     ): NotificationData =
         NotificationData(
@@ -40,8 +37,8 @@ class NotificationToolsTest {
             key = "0|com.example.app|1|null|10001",
             packageName = packageName,
             appName = appName,
-            title = title,
-            text = text,
+            title = "Test Title",
+            text = "Test text",
             bigText = null,
             subText = null,
             timestamp = 1700000000000L,

@@ -5,7 +5,6 @@ import android.service.notification.StatusBarNotification
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 
 class McpNotificationListenerService : NotificationListenerService() {
-
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
@@ -45,7 +44,10 @@ class McpNotificationListenerService : NotificationListenerService() {
         cancelAllNotifications()
     }
 
-    fun snoozeNotificationByKey(key: String, durationMs: Long) {
+    fun snoozeNotificationByKey(
+        key: String,
+        durationMs: Long,
+    ) {
         snoozeNotification(key, durationMs)
     }
 

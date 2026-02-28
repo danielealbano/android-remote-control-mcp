@@ -223,6 +223,7 @@ class NotificationSnoozeHandler
     constructor(
         private val notificationProvider: NotificationProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!notificationProvider.isReady()) {
                 throw McpToolException.PermissionDenied(
@@ -347,6 +348,7 @@ class NotificationReplyHandler
     constructor(
         private val notificationProvider: NotificationProvider,
     ) {
+        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             if (!notificationProvider.isReady()) {
                 throw McpToolException.PermissionDenied(

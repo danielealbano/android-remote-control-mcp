@@ -26,10 +26,25 @@ data class NotificationActionData(
 
 interface NotificationProvider {
     fun isReady(): Boolean
-    suspend fun getNotifications(packageName: String? = null, limit: Int? = null): List<NotificationData>
+
+    suspend fun getNotifications(
+        packageName: String? = null,
+        limit: Int? = null,
+    ): List<NotificationData>
+
     suspend fun openNotification(notificationId: String): Result<Unit>
+
     suspend fun dismissNotification(notificationId: String): Result<Unit>
-    suspend fun snoozeNotification(notificationId: String, durationMs: Long): Result<Unit>
+
+    suspend fun snoozeNotification(
+        notificationId: String,
+        durationMs: Long,
+    ): Result<Unit>
+
     suspend fun executeAction(actionId: String): Result<Unit>
-    suspend fun replyToAction(actionId: String, text: String): Result<Unit>
+
+    suspend fun replyToAction(
+        actionId: String,
+        text: String,
+    ): Result<Unit>
 }

@@ -136,13 +136,13 @@ class PermissionUtilsTest {
                 Settings.Secure.getString(mockContentResolver, "enabled_notification_listeners")
             } returns serviceName
 
+            val serviceClass =
+                Class.forName(
+                    "com.danielealbano.androidremotecontrolmcp" +
+                        ".services.notifications.McpNotificationListenerService",
+                )
             assertTrue(
-                PermissionUtils.isNotificationListenerEnabled(
-                    mockContext,
-                    Class.forName(
-                        "com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService",
-                    ),
-                ),
+                PermissionUtils.isNotificationListenerEnabled(mockContext, serviceClass),
             )
         }
 
