@@ -25,12 +25,13 @@ This document provides a comprehensive reference for all MCP tools available in 
 12. [File Tools](#8-file-tools)
 13. [App Management Tools](#9-app-management-tools)
 14. [Camera Tools](#10-camera-tools)
+15. [Intent Tools](#11-intent-tools)
 
 ---
 
 ## Overview
 
-The MCP server exposes 45 tools via the JSON-RPC 2.0 protocol, organized into 10 categories:
+The MCP server exposes 47 tools via the JSON-RPC 2.0 protocol, organized into 11 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -44,6 +45,7 @@ The MCP server exposes 45 tools via the JSON-RPC 2.0 protocol, organized into 10
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
 | Camera | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | 27 |
+| Intent | `android_send_intent`, `android_open_uri` | 31 |
 
 ## Tool Naming Convention
 
@@ -2738,3 +2740,186 @@ Records a video from the specified camera and saves it to a storage location. Ma
 - **Invalid params**: Missing `camera_id`, `location_id`, `path`, or `duration`; duration out of range (1-30); invalid resolution format; invalid flash mode
 - **Permission denied**: CAMERA permission not granted; RECORD_AUDIO permission not granted (when audio=true); storage location not authorized; write not permitted
 - **Action failed**: Camera not found, recording failed
+
+---
+
+## 11. Intent Tools
+
+Intent tools allow sending Android intents for starting activities, sending broadcasts, and starting services. `android_send_intent` provides full intent control (action, data, component, extras with type inference/overrides, flags via reflection). `android_open_uri` is a convenience `ACTION_VIEW` wrapper for URIs.
+
+### `android_send_intent`
+
+Sends an Android intent. Supports starting activities, sending broadcasts, and starting services. Use for opening specific settings pages, triggering app-specific actions, or sending broadcasts.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `type` | string | Yes | Intent delivery type: `"activity"`, `"broadcast"`, or `"service"` |
+| `action` | string | No | Intent action (e.g., `"android.intent.action.VIEW"`) |
+| `data` | string | No | Data URI for the intent |
+| `component` | string | No | Target component as `"package/class"` (e.g., `"com.example.app/com.example.app.MyActivity"`) |
+| `extras` | object | No | Key-value extras. Values auto-typed: string→String, integer→Int/Long, decimal→Double, boolean→Boolean, string array→StringArrayList |
+| `extras_types` | object | No | Type overrides for extras keys. Supported: `"string"`, `"int"`, `"long"`, `"float"`, `"double"`, `"boolean"` |
+| `flags` | array | No | Intent flag names (e.g., `"FLAG_ACTIVITY_CLEAR_TOP"`). `FLAG_ACTIVITY_NEW_TASK` auto-added for activity type |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "type": { "type": "string", "description": "The intent delivery type: 'activity', 'broadcast', or 'service'" },
+    "action": { "type": "string", "description": "The intent action (e.g., 'android.intent.action.VIEW')" },
+    "data": { "type": "string", "description": "Data URI for the intent" },
+    "component": { "type": "string", "description": "Target component as 'package/class'" },
+    "extras": { "type": "object", "description": "Key-value extras with auto type inference" },
+    "extras_types": { "type": "object", "description": "Type overrides for extras keys" },
+    "flags": { "type": "array", "items": { "type": "string" }, "description": "Intent flag names" }
+  },
+  "required": ["type"]
+}
+```
+
+**Example Request** (open Wi-Fi settings):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_send_intent",
+    "arguments": {
+      "type": "activity",
+      "action": "android.settings.WIFI_SETTINGS"
+    }
+  }
+}
+```
+
+**Example Request** (start activity with extras and type override):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_send_intent",
+    "arguments": {
+      "type": "activity",
+      "action": "android.intent.action.VIEW",
+      "data": "https://example.com",
+      "extras": { "referrer": "mcp", "count": 42 },
+      "extras_types": { "count": "long" },
+      "flags": ["FLAG_ACTIVITY_CLEAR_TOP"]
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Intent sent successfully: type=activity, action=android.settings.WIFI_SETTINGS"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `type`; `type` not one of `"activity"`, `"broadcast"`, `"service"`; invalid component format; unknown flag name; unsupported `extras_types` value; extras conversion failure
+- **Action failed**: No activity found to handle intent; permission denied; background start restriction (API 26+ for `startService`)
+
+### `android_open_uri`
+
+Opens a URI using Android's `ACTION_VIEW`. Handles `https://`, `http://`, `tel:`, `mailto:`, `geo:`, `content://` URLs, deep links, and custom app schemes (e.g., `whatsapp://send?phone=...`).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `uri` | string | Yes | The URI to open |
+| `package_name` | string | No | Force a specific app to handle the URI |
+| `mime_type` | string | No | MIME type hint (useful for `content://` URIs) |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "uri": { "type": "string", "description": "The URI to open" },
+    "package_name": { "type": "string", "description": "Force a specific app to handle the URI" },
+    "mime_type": { "type": "string", "description": "MIME type hint (useful for content:// URIs)" }
+  },
+  "required": ["uri"]
+}
+```
+
+**Example Request** (open a URL):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_open_uri",
+    "arguments": {
+      "uri": "https://example.com"
+    }
+  }
+}
+```
+
+**Example Request** (open URL in specific browser):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_open_uri",
+    "arguments": {
+      "uri": "https://example.com",
+      "package_name": "com.android.chrome"
+    }
+  }
+}
+```
+
+**Example Request** (open content URI with MIME type):
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_open_uri",
+    "arguments": {
+      "uri": "content://media/external/images/1",
+      "mime_type": "image/jpeg"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "URI opened successfully: https://example.com"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing `uri`
+- **Action failed**: No app found to handle URI; permission denied

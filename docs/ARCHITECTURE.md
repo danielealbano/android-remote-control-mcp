@@ -32,6 +32,7 @@ graph TB
             StorageProv["StorageLocationProvider"]
             FileOps["FileOperationProvider"]
             AppMgr["AppManager"]
+            IntentDisp["IntentDispatcher"]
         end
 
         subgraph CameraSvc["Camera Services"]
