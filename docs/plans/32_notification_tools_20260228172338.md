@@ -1120,9 +1120,9 @@ Test cases:
 ## User Story 4: Wire into MCP Server and Integration Tests
 
 ### Acceptance Criteria
-- [ ] `NotificationProvider` injected in `McpServerService`
-- [ ] `McpIntegrationTestHelper` updated
-- [ ] Integration tests cover all 6 tools
+- [x] `NotificationProvider` injected in `McpServerService`
+- [x] `McpIntegrationTestHelper` updated
+- [x] Integration tests cover all 6 tools
 
 ---
 
@@ -1147,7 +1147,7 @@ Test cases:
 ```
 
 **Definition of Done**:
-- [ ] Import, field, and registration call added
+- [x] Import, field, and registration call added
 
 ---
 
@@ -1177,7 +1177,7 @@ Test cases:
 ```
 
 **Definition of Done**:
-- [ ] All four locations updated
+- [x] All four locations updated
 
 ---
 
@@ -1207,7 +1207,7 @@ Test cases:
 - `notification_open with no contentIntent returns error`
 
 **Definition of Done**:
-- [ ] All 17 integration test cases implemented and passing
+- [x] All 17 integration test cases implemented and passing
 
 ---
 
