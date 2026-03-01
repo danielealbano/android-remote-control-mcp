@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
@@ -53,6 +54,8 @@ class E2ECameraTest {
 
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+        private const val MAX_PHOTO_ATTEMPTS = 3
+        private const val PHOTO_RETRY_DELAY_MS = 5_000L
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient
@@ -258,7 +261,7 @@ class E2ECameraTest {
     fun `take_camera_photo returns valid ImageContent with base64 JPEG`() = runBlocking {
         val cameraId = requireCameraId()
 
-        val result = mcpClient.callTool(
+        val result = callToolWithRetry(
             "${TOOL_PREFIX}take_camera_photo",
             mapOf("camera_id" to cameraId),
         )
@@ -280,7 +283,7 @@ class E2ECameraTest {
     fun `take_camera_photo with custom resolution returns ImageContent`() = runBlocking {
         val cameraId = requireCameraId()
 
-        val result = mcpClient.callTool(
+        val result = callToolWithRetry(
             "${TOOL_PREFIX}take_camera_photo",
             mapOf(
                 "camera_id" to cameraId,
@@ -303,7 +306,7 @@ class E2ECameraTest {
     fun `take_camera_photo with flash_mode off returns ImageContent`() = runBlocking {
         val cameraId = requireCameraId()
 
-        val result = mcpClient.callTool(
+        val result = callToolWithRetry(
             "${TOOL_PREFIX}take_camera_photo",
             mapOf(
                 "camera_id" to cameraId,
@@ -323,7 +326,7 @@ class E2ECameraTest {
     fun `take_camera_photo with quality 50 returns ImageContent`() = runBlocking {
         val cameraId = requireCameraId()
 
-        val result = mcpClient.callTool(
+        val result = callToolWithRetry(
             "${TOOL_PREFIX}take_camera_photo",
             mapOf(
                 "camera_id" to cameraId,
@@ -459,6 +462,37 @@ class E2ECameraTest {
     // ─────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Calls an MCP tool with retry logic for transient failures (McpException,
+     * timeouts) that occur on slow CI emulators — especially camera operations.
+     */
+    private suspend fun callToolWithRetry(
+        name: String,
+        arguments: Map<String, Any?> = emptyMap(),
+    ): CallToolResult {
+        var lastException: Exception? = null
+        for (attempt in 1..MAX_PHOTO_ATTEMPTS) {
+            try {
+                val result = mcpClient.callTool(name, arguments)
+                if (result.isError != true) return result
+                if (attempt < MAX_PHOTO_ATTEMPTS) {
+                    val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+                    println("[E2E Camera] $name attempt $attempt returned error: $errorText — retrying")
+                    Thread.sleep(PHOTO_RETRY_DELAY_MS)
+                } else {
+                    return result
+                }
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < MAX_PHOTO_ATTEMPTS) {
+                    println("[E2E Camera] $name attempt $attempt threw ${e::class.simpleName} — retrying")
+                    Thread.sleep(PHOTO_RETRY_DELAY_MS)
+                }
+            }
+        }
+        throw lastException!!
+    }
 
     /**
      * Returns the cached back camera ID, running list_cameras first if needed.
