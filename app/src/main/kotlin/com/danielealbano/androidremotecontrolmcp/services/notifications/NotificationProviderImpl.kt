@@ -34,7 +34,8 @@ class NotificationProviderImpl
                         } else {
                             list.asIterable()
                         }
-                    }.sortedByDescending { it.postTime }
+                    }.filter { sbn -> hasContent(sbn.notification) }
+                    .sortedByDescending { it.postTime }
                     .let { if (limit != null) it.take(limit) else it }
             return notifications.map { toNotificationData(it, appNameCache) }
         }
@@ -196,6 +197,15 @@ class NotificationProviderImpl
                 }
             }
             return null
+        }
+
+        private fun hasContent(notification: Notification): Boolean {
+            val extras = notification.extras
+            val hasTitle = extras.getCharSequence(Notification.EXTRA_TITLE) != null
+            val hasText = extras.getCharSequence(Notification.EXTRA_TEXT) != null
+            val hasBigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT) != null
+            val hasActions = notification.actions != null && notification.actions.size > 0
+            return hasTitle || hasText || hasBigText || hasActions
         }
 
         companion object {

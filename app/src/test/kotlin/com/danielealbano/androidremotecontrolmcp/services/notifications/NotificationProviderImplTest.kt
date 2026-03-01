@@ -235,6 +235,70 @@ class NotificationProviderImplTest {
             }
 
         @Test
+        @DisplayName("filters out notifications with no title, no text, no bigText, and no actions")
+        fun `getNotifications filters out empty content notifications`() =
+            runTest {
+                val sbnWithContent = createMockSbn(key = "key1", postTime = 2000L, title = "Title", text = "Text")
+                val sbnEmpty =
+                    createMockSbn(
+                        key = "key2",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = null,
+                        actions = null,
+                    )
+                setServiceInstance(sbnWithContent, sbnEmpty)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals("Title", result[0].title)
+            }
+
+        @Test
+        @DisplayName("keeps notifications with only bigText")
+        fun `getNotifications keeps notifications with only bigText`() =
+            runTest {
+                val sbn =
+                    createMockSbn(
+                        key = "key1",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = "Big text content",
+                    )
+                setServiceInstance(sbn)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals("Big text content", result[0].bigText)
+            }
+
+        @Test
+        @DisplayName("keeps notifications with only actions")
+        fun `getNotifications keeps notifications with only actions`() =
+            runTest {
+                val action = createMockAction(actionTitle = "Reply")
+                val sbn =
+                    createMockSbn(
+                        key = "key1",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = null,
+                        actions = arrayOf(action),
+                    )
+                setServiceInstance(sbn)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals(1, result[0].actions.size)
+            }
+
+        @Test
         @DisplayName("returns empty list when no notifications")
         fun `getNotifications returns empty list when no notifications`() =
             runTest {
@@ -704,6 +768,7 @@ class NotificationProviderImplTest {
             runTest {
                 val extras = mockk<Bundle>(relaxed = true)
                 every { extras.getCharSequence(any()) } returns null
+                every { extras.getCharSequence(Notification.EXTRA_TITLE) } returns "Title"
 
                 val notification =
                     mockk<Notification>(relaxed = true).apply {
