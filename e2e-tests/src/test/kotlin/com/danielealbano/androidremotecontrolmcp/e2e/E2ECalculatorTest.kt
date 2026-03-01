@@ -49,6 +49,12 @@ class E2ECalculatorTest {
         private const val ELEMENT_WAIT_TIMEOUT_MS = 10_000L
 
         /**
+         * Maximum time to wait for the calculator app to become visible
+         * in the screen state after launching via monkey command.
+         */
+        private const val APP_LAUNCH_TIMEOUT_MS = 15_000L
+
+        /**
          * Simple Calculator package name (installed from test resources).
          */
         private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
@@ -58,6 +64,18 @@ class E2ECalculatorTest {
          * to document the empty device_slug assumption.
          */
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+
+        /**
+         * Maximum number of retry attempts for operations that may fail
+         * transiently on slow CI emulators (accessibility service unavailable,
+         * screenshot capture, etc.).
+         */
+        private const val MAX_RETRY_ATTEMPTS = 3
+
+        /**
+         * Delay between retry attempts in milliseconds.
+         */
+        private const val RETRY_DELAY_MS = 3_000L
     }
 
     @Test
@@ -80,19 +98,15 @@ class E2ECalculatorTest {
         mcpClient.callTool("${TOOL_PREFIX}press_home")
         Thread.sleep(1_000)
 
-        // Step 2: Launch Simple Calculator app via monkey command
+        // Step 2: Launch Simple Calculator app via monkey command and poll for visibility
         AndroidContainerSetup.launchCalculator(container)
-        Thread.sleep(5_000)
-
-        // Step 3: Verify Calculator is visible in screen state
-        val tree = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
-        val treeStr = (tree.content[0] as TextContent).text
-        println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
-        assertTrue(
-            treeStr.contains("Calculator", ignoreCase = true) ||
-                treeStr.contains(CALCULATOR_PACKAGE, ignoreCase = true),
-            "Screen state should contain Calculator app. Excerpt: ${treeStr.take(500)}",
+        val treeStrOrNull = waitForAppVisible(CALCULATOR_PACKAGE, "Calculator", APP_LAUNCH_TIMEOUT_MS)
+        assertNotNull(
+            treeStrOrNull,
+            "Calculator should be visible in screen state within ${APP_LAUNCH_TIMEOUT_MS}ms",
         )
+        val treeStr = treeStrOrNull!!
+        println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
         // Verify new note lines
         assertTrue(
             treeStr.contains("note:flags: on=onscreen off=offscreen"),
@@ -158,11 +172,12 @@ class E2ECalculatorTest {
             mapOf("include_screenshot" to true),
         )
 
-        if (result.isError == true || result.content.size < 2) {
+        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+            if (result.isError != true && result.content.size >= 2) break
             val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
-            println("[E2E Calculator] Screenshot first attempt failed (isError=${result.isError}, " +
-                "content.size=${result.content.size}): $errorText — retrying after 3s")
-            Thread.sleep(3_000)
+            println("[E2E Calculator] Screenshot attempt $attempt failed (isError=${result.isError}, " +
+                "content.size=${result.content.size}): $errorText — retrying after ${RETRY_DELAY_MS}ms")
+            Thread.sleep(RETRY_DELAY_MS)
             result = mcpClient.callTool(
                 "${TOOL_PREFIX}get_screen_state",
                 mapOf("include_screenshot" to true),
@@ -196,6 +211,36 @@ class E2ECalculatorTest {
         assertNotNull(data, "Screenshot data should not be null")
         assertFalse(data.isEmpty(), "Screenshot data should not be empty")
         assertTrue(data.length > 100, "Screenshot data should be substantial (got ${data.length} chars)")
+    }
+
+    /**
+     * Polls get_screen_state until the app identified by [packageName] or [appLabel]
+     * is visible, or [timeoutMs] elapses. Returns the screen state text on success,
+     * or null if the app was not visible within the timeout.
+     */
+    private suspend fun waitForAppVisible(
+        packageName: String,
+        appLabel: String,
+        timeoutMs: Long,
+    ): String? {
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            try {
+                val tree = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
+                if (tree.isError != true) {
+                    val text = (tree.content[0] as? TextContent)?.text ?: ""
+                    if (text.contains(appLabel, ignoreCase = true) ||
+                        text.contains(packageName, ignoreCase = true)
+                    ) {
+                        return text
+                    }
+                }
+            } catch (_: Exception) {
+                // Transient error, retry
+            }
+            Thread.sleep(1_000)
+        }
+        return null
     }
 
     /**

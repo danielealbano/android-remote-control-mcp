@@ -20,7 +20,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-start on boot
 - Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 45 MCP Tools across 10 Categories
+### 53 MCP Tools across 12 Categories
 
 All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full naming convention.
 
@@ -36,6 +36,8 @@ All tool names use the `android_` prefix by default (e.g., `android_tap`). When 
 | **File Operations** (8) | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | File system access via Storage Access Framework (SAF) |
 | **App Management** (3) | `android_open_app`, `android_list_apps`, `android_close_app` | Launch, list, and close applications |
 | **Camera** (6) | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | Camera photo/video capture via CameraX, list capabilities and resolutions |
+| **Intent** (2) | `android_send_intent`, `android_open_uri` | Send explicit/implicit intents and open URIs via the system |
+| **Notification** (6) | `android_notification_list`, `android_notification_open`, `android_notification_dismiss`, `android_notification_snooze`, `android_notification_action`, `android_notification_reply` | Read, interact with, and manage device notifications via NotificationListenerService |
 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with input/output schemas and examples.
 
@@ -185,7 +187,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 45 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 53 MCP tool handlers.
 
 ### Integration Tests
 
@@ -193,7 +195,7 @@ Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree p
 make test-integration
 ```
 
-Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 10 tool categories, and error handling.
+Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 12 tool categories, and error handling.
 
 > **Note**: Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables. Copy `.env.example` to `.env` and fill in the required values. The Makefile sources `.env` automatically.
 
@@ -241,7 +243,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"45 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"53 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end
@@ -263,11 +265,22 @@ graph TB
             CamProv["CameraProvider\n(CameraX)"]
         end
 
+        subgraph IntentSvc["Intent Services"]
+            IntentDisp["IntentDispatcher"]
+        end
+
+        subgraph NotifSvc["Notification Services"]
+            NotifProv["NotificationProvider"]
+            NotifListener["McpNotificationListenerService"]
+        end
+
         MainActivity["MainActivity (Compose UI)"]
 
         Tools --> Accessibility
         Tools --> Storage
         Tools --> CameraSvc
+        Tools --> IntentSvc
+        Tools --> NotifSvc
         MainActivity -->|"StateFlow (status)"| McpServerService
     end
 ```
@@ -444,6 +457,7 @@ Enable the tunnel in the app's "Remote Access" section. The public URL is displa
 - **Receive Boot Completed**: For auto-start on boot
 - **Query All Packages**: For listing installed applications (`android_list_apps`)
 - **Kill Background Processes**: For closing background applications (`android_close_app`)
+- **Notification Listener**: Required for notification tools (user must enable manually in Settings > Notifications > Notification access)
 - **Storage Access Framework**: Per-location authorization via system file picker (for file tools)
 - No root access required
 

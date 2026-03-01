@@ -11,6 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementAction
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNotificationTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
@@ -28,6 +29,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInpu
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
+import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -122,6 +124,7 @@ object McpIntegrationTestHelper {
             cameraProvider = mockk(relaxed = true),
             nodeCache = mockk(relaxed = true),
             intentDispatcher = mockk(relaxed = true),
+            notificationProvider = mockk(relaxed = true),
         )
 
     /**
@@ -182,6 +185,7 @@ object McpIntegrationTestHelper {
         registerAppManagementTools(server, deps.appManager, toolNamePrefix)
         registerCameraTools(server, deps.cameraProvider, deps.fileOperationProvider, toolNamePrefix)
         registerIntentTools(server, deps.intentDispatcher, toolNamePrefix)
+        registerNotificationTools(server, deps.notificationProvider, toolNamePrefix)
     }
 
     /**
@@ -333,4 +337,5 @@ data class MockDependencies(
     val cameraProvider: CameraProvider,
     val nodeCache: AccessibilityNodeCache,
     val intentDispatcher: IntentDispatcher,
+    val notificationProvider: NotificationProvider,
 )

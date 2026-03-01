@@ -32,6 +32,17 @@ class E2EErrorHandlingTest {
          * to document the empty device_slug assumption.
          */
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+
+        /**
+         * Maximum number of retry attempts for operations that may fail
+         * transiently on slow CI emulators (accessibility service unavailable, etc.).
+         */
+        private const val MAX_RETRY_ATTEMPTS = 3
+
+        /**
+         * Delay between retry attempts in milliseconds.
+         */
+        private const val RETRY_DELAY_MS = 5_000L
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient
@@ -86,10 +97,11 @@ class E2EErrorHandlingTest {
         // Retry — accessibility service may be transiently unavailable after
         // camera timeout operations on slow CI emulators.
         var result = mcpClient.callTool("${TOOL_PREFIX}press_home")
-        if (result.isError == true) {
+        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+            if (result.isError != true) break
             val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
-            println("[E2E ErrorHandling] press_home failed: $errorText — retrying after 3s")
-            Thread.sleep(3_000)
+            println("[E2E ErrorHandling] press_home attempt $attempt failed: $errorText — retrying after ${RETRY_DELAY_MS}ms")
+            Thread.sleep(RETRY_DELAY_MS)
             result = mcpClient.callTool("${TOOL_PREFIX}press_home")
         }
         assertNotEquals(
@@ -123,16 +135,17 @@ class E2EErrorHandlingTest {
     @Test
     fun `click on non-existent element returns error result`() = runBlocking {
         // If accessibility service is transiently unavailable, the error message
-        // won't contain the element ID. Retry once to allow recovery.
+        // won't contain the element ID. Retry to allow recovery.
         var result = mcpClient.callTool(
             "${TOOL_PREFIX}click_element",
             mapOf("element_id" to "nonexistent_element_id_12345"),
         )
         assertEquals(true, result.isError)
         var text = (result.content[0] as TextContent).text
-        if (!text.contains("nonexistent_element_id_12345")) {
-            println("[E2E ErrorHandling] click_element error didn't mention element ID: $text — retrying after 3s")
-            Thread.sleep(3_000)
+        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+            if (text.contains("nonexistent_element_id_12345")) break
+            println("[E2E ErrorHandling] click_element attempt $attempt error didn't mention element ID: $text — retrying after ${RETRY_DELAY_MS}ms")
+            Thread.sleep(RETRY_DELAY_MS)
             result = mcpClient.callTool(
                 "${TOOL_PREFIX}click_element",
                 mapOf("element_id" to "nonexistent_element_id_12345"),

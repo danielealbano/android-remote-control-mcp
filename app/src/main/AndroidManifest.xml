@@ -71,6 +71,16 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- Notification Listener Service -->
+        <service
+            android:name=".services.notifications.McpNotificationListenerService"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Boot Completed Receiver -->
         <receiver
             android:name=".services.mcp.BootCompletedReceiver"
