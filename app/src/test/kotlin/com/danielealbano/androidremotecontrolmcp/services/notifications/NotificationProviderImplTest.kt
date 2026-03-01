@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -235,6 +236,70 @@ class NotificationProviderImplTest {
             }
 
         @Test
+        @DisplayName("filters out notifications with no title, no text, no bigText, and no actions")
+        fun `getNotifications filters out empty content notifications`() =
+            runTest {
+                val sbnWithContent = createMockSbn(key = "key1", postTime = 2000L, title = "Title", text = "Text")
+                val sbnEmpty =
+                    createMockSbn(
+                        key = "key2",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = null,
+                        actions = null,
+                    )
+                setServiceInstance(sbnWithContent, sbnEmpty)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals("Title", result[0].title)
+            }
+
+        @Test
+        @DisplayName("keeps notifications with only bigText")
+        fun `getNotifications keeps notifications with only bigText`() =
+            runTest {
+                val sbn =
+                    createMockSbn(
+                        key = "key1",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = "Big text content",
+                    )
+                setServiceInstance(sbn)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals("Big text content", result[0].bigText)
+            }
+
+        @Test
+        @DisplayName("keeps notifications with only actions")
+        fun `getNotifications keeps notifications with only actions`() =
+            runTest {
+                val action = createMockAction(actionTitle = "Reply")
+                val sbn =
+                    createMockSbn(
+                        key = "key1",
+                        postTime = 1000L,
+                        title = null,
+                        text = null,
+                        bigText = null,
+                        actions = arrayOf(action),
+                    )
+                setServiceInstance(sbn)
+
+                val result = provider.getNotifications()
+
+                assertEquals(1, result.size)
+                assertEquals(1, result[0].actions.size)
+            }
+
+        @Test
         @DisplayName("returns empty list when no notifications")
         fun `getNotifications returns empty list when no notifications`() =
             runTest {
@@ -324,7 +389,17 @@ class NotificationProviderImplTest {
                 val result = provider.openNotification(hash)
 
                 assertTrue(result.isSuccess)
-                verify { pendingIntent.send() }
+                verify {
+                    pendingIntent.send(
+                        mockContext,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -357,7 +432,9 @@ class NotificationProviderImplTest {
             runTest {
                 val pendingIntent =
                     mockk<PendingIntent> {
-                        every { send() } throws PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val sbn = createMockSbn(key = "key1", contentIntent = pendingIntent)
                 setServiceInstance(sbn)
@@ -484,7 +561,17 @@ class NotificationProviderImplTest {
                 val result = provider.executeAction(actionId)
 
                 assertTrue(result.isSuccess)
-                verify { actionPendingIntent.send() }
+                verify {
+                    actionPendingIntent.send(
+                        mockContext,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -522,7 +609,9 @@ class NotificationProviderImplTest {
             runTest {
                 val actionPendingIntent =
                     mockk<PendingIntent> {
-                        every { send() } throws PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val action =
                     createMockAction(
@@ -569,7 +658,17 @@ class NotificationProviderImplTest {
                 val result = provider.replyToAction(actionId, "Hello")
 
                 assertTrue(result.isSuccess)
-                verify { actionPendingIntent.send(mockContext, 0, any()) }
+                verify {
+                    actionPendingIntent.send(
+                        mockContext,
+                        0,
+                        any<Intent>(),
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -608,8 +707,9 @@ class NotificationProviderImplTest {
             runTest {
                 val actionPendingIntent =
                     mockk<PendingIntent> {
-                        every { send(any<Context>(), any(), any<android.content.Intent>()) } throws
-                            PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val remoteInput =
                     mockk<RemoteInput> {
@@ -704,6 +804,7 @@ class NotificationProviderImplTest {
             runTest {
                 val extras = mockk<Bundle>(relaxed = true)
                 every { extras.getCharSequence(any()) } returns null
+                every { extras.getCharSequence(Notification.EXTRA_TITLE) } returns "Title"
 
                 val notification =
                     mockk<Notification>(relaxed = true).apply {

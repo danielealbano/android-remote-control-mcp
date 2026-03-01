@@ -1,11 +1,13 @@
 package com.danielealbano.androidremotecontrolmcp.services.notifications
 
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
@@ -34,7 +36,8 @@ class NotificationProviderImpl
                         } else {
                             list.asIterable()
                         }
-                    }.sortedByDescending { it.postTime }
+                    }.filter { sbn -> hasContent(sbn.notification) }
+                    .sortedByDescending { it.postTime }
                     .let { if (limit != null) it.take(limit) else it }
             return notifications.map { toNotificationData(it, appNameCache) }
         }
@@ -50,7 +53,7 @@ class NotificationProviderImpl
                 sbn.notification.contentIntent
                     ?: return Result.failure(IllegalStateException("Notification has no content intent"))
             return try {
-                pendingIntent.send()
+                pendingIntent.send(context, 0, null, null, null, null, buildBalOptions())
                 Result.success(Unit)
             } catch (e: PendingIntent.CanceledException) {
                 Result.failure(e)
@@ -101,7 +104,7 @@ class NotificationProviderImpl
                 action.actionIntent
                     ?: return Result.failure(IllegalStateException("Action has no pending intent"))
             return try {
-                pendingIntent.send()
+                pendingIntent.send(context, 0, null, null, null, null, buildBalOptions())
                 Result.success(Unit)
             } catch (e: PendingIntent.CanceledException) {
                 Result.failure(e)
@@ -129,7 +132,7 @@ class NotificationProviderImpl
             }
             RemoteInput.addResultsToIntent(remoteInputs, replyIntent, resultsBundle)
             return try {
-                pendingIntent.send(context, 0, replyIntent)
+                pendingIntent.send(context, 0, replyIntent, null, null, null, buildBalOptions())
                 Result.success(Unit)
             } catch (e: PendingIntent.CanceledException) {
                 Result.failure(e)
@@ -209,4 +212,26 @@ class NotificationProviderImpl
                 actionIndex: Int,
             ): String = "%08x".format("$key::$actionIndex".hashCode())
         }
+    }
+
+private fun hasContent(notification: Notification): Boolean {
+    val extras = notification.extras
+    val hasTitle = extras.getCharSequence(Notification.EXTRA_TITLE) != null
+    val hasText = extras.getCharSequence(Notification.EXTRA_TEXT) != null
+    val hasBigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT) != null
+    val hasActions = notification.actions != null && notification.actions.size > 0
+    return hasTitle || hasText || hasBigText || hasActions
+}
+
+private fun buildBalOptions(): Bundle? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        ActivityOptions
+            .makeBasic()
+            .apply {
+                setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
+                )
+            }.toBundle()
+    } else {
+        null
     }

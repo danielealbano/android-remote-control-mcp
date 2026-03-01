@@ -60,3 +60,6 @@ test-results/
 
 # Native binaries in jniLibs (build artifacts — cloudflared from make compile-cloudflared, ngrok from Gradle extractNgrokNative)
 app/src/main/jniLibs/
+
+# MCP client configuration (contains tokens)
+.mcp.json
