@@ -21,6 +21,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
@@ -78,6 +79,9 @@ class MainViewModel
 
         private val _isMicrophonePermissionGranted = MutableStateFlow(false)
         val isMicrophonePermissionGranted: StateFlow<Boolean> = _isMicrophonePermissionGranted.asStateFlow()
+
+        private val _isNotificationListenerEnabled = MutableStateFlow(false)
+        val isNotificationListenerEnabled: StateFlow<Boolean> = _isNotificationListenerEnabled.asStateFlow()
 
         private val _tunnelStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
         val tunnelStatus: StateFlow<TunnelStatus> = _tunnelStatus.asStateFlow()
@@ -270,6 +274,11 @@ class MainViewModel
                 PermissionUtils.isCameraPermissionGranted(context)
             _isMicrophonePermissionGranted.value =
                 PermissionUtils.isMicrophonePermissionGranted(context)
+            _isNotificationListenerEnabled.value =
+                PermissionUtils.isNotificationListenerEnabled(
+                    context,
+                    McpNotificationListenerService::class.java,
+                )
             refreshStorageLocations()
         }
 

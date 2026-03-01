@@ -189,7 +189,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 47 tools across 11 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 53 tools across 12 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -322,6 +322,23 @@ The MCP server exposes 47 tools across 11 categories. For full JSON-RPC schemas,
 **Flags**: Resolved dynamically via `Intent::class.java.fields` reflection. `FLAG_ACTIVITY_NEW_TASK` auto-added for `type = "activity"`.
 
 **Errors**: Invalid type/component/flag → `McpToolException.InvalidParams`. No handler found / permission denied / background start restriction → `McpToolException.ActionFailed` with sanitized message.
+
+### 12. Notification Tools (6 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `android_notification_list` | List active notifications with structured data | — | `package_name`, `limit` |
+| `android_notification_open` | Open/tap a notification | `notification_id` | — |
+| `android_notification_dismiss` | Dismiss a notification | `notification_id` | — |
+| `android_notification_snooze` | Snooze a notification for a duration | `notification_id`, `duration_ms` | — |
+| `android_notification_action` | Execute a notification action button | `action_id` | — |
+| `android_notification_reply` | Reply to a notification with text | `action_id`, `text` | — |
+
+**Permission**: Requires "Notification Listener" special permission (Settings > Apps > Special app access > Notification access). This is NOT a runtime permission — the user must manually enable it in Settings.
+
+**ID scheme**: `notification_id` = 6 hex chars (SHA-256 hash of notification key), `action_id` = 6 hex chars (SHA-256 hash of notification key + "::" + action index). Both returned by `android_notification_list`.
+
+**Errors**: All tools return `McpToolException.PermissionDenied` if notification listener is not enabled. ID-based tools return `McpToolException.ActionFailed` if the notification/action is not found. `android_notification_snooze` validates `duration_ms` (positive, max 604800000 = 7 days).
 
 ---
 
@@ -730,7 +747,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 47 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 53 tools
 
 ---
 

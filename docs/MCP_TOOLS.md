@@ -26,12 +26,13 @@ This document provides a comprehensive reference for all MCP tools available in 
 13. [App Management Tools](#9-app-management-tools)
 14. [Camera Tools](#10-camera-tools)
 15. [Intent Tools](#11-intent-tools)
+16. [Notification Tools](#12-notification-tools)
 
 ---
 
 ## Overview
 
-The MCP server exposes 47 tools via the JSON-RPC 2.0 protocol, organized into 11 categories:
+The MCP server exposes 53 tools via the JSON-RPC 2.0 protocol, organized into 12 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -46,6 +47,7 @@ The MCP server exposes 47 tools via the JSON-RPC 2.0 protocol, organized into 11
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
 | Camera | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | 27 |
 | Intent | `android_send_intent`, `android_open_uri` | 31 |
+| Notification | `android_notification_list`, `android_notification_open`, `android_notification_dismiss`, `android_notification_snooze`, `android_notification_action`, `android_notification_reply` | 32 |
 
 ## Tool Naming Convention
 
@@ -2929,3 +2931,327 @@ Opens a URI using Android's `ACTION_VIEW`. Handles `https://`, `http://`, `tel:`
 - **Arbitrary dispatch**: `android_send_intent` can start any exported activity, send broadcasts, and start services on the device. Bearer token authentication is the primary security gate — ensure a strong token is configured.
 - **FLAG_GRANT_* acceptance**: The `flags` parameter accepts all `Intent.FLAG_*` constants via reflection, including `FLAG_GRANT_READ_URI_PERMISSION` and `FLAG_GRANT_WRITE_URI_PERMISSION`. These flags can grant temporary URI permission access to the target component. This is intentional for full intent control but callers should be aware of the permission implications.
 - **URI logging**: Intent data URIs and `open_uri` URIs are truncated to `scheme://host/...` in logs to avoid leaking sensitive path/query parameters.
+
+---
+
+## 12. Notification Tools
+
+Notification tools provide read and interaction access to Android notifications via `NotificationListenerService`. Requires the "Notification Listener" special permission (Settings > Apps > Special app access > Notification access) — this is NOT a runtime permission.
+
+**ID Scheme**: Each notification gets a `notification_id` (6 hex chars, SHA-256 hash of the notification key). Each action button gets an `action_id` (6 hex chars, SHA-256 hash of notification key + "::" + action index). Use `android_notification_list` to retrieve these IDs.
+
+> **Note**: Android limits notifications to a maximum of 3 action buttons per notification.
+
+### `android_notification_list`
+
+Lists active notifications with structured data (app name, title, text, actions, timestamp). Returns `notification_id` for each notification and `action_id` for each action button.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `package_name` | string | No | Filter by source app package name |
+| `limit` | integer | No | Maximum number of notifications to return |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "package_name": { "type": "string", "description": "Filter by source app package name" },
+    "limit": { "type": "integer", "description": "Maximum number of notifications to return" }
+  },
+  "required": []
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_list",
+    "arguments": {}
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"notifications\":[{\"notification_id\":\"a1b2c3\",\"package_name\":\"com.example.messenger\",\"app_name\":\"Messenger\",\"title\":\"Alice\",\"text\":\"Hey, are you free?\",\"big_text\":null,\"sub_text\":null,\"timestamp\":1700000000000,\"is_ongoing\":false,\"is_clearable\":true,\"category\":null,\"group_key\":null,\"actions\":[{\"action_id\":\"d4e5f6\",\"title\":\"Reply\",\"accepts_text\":true},{\"action_id\":\"a7b8c9\",\"title\":\"Mark as read\",\"accepts_text\":false}]}],\"count\":1}"
+      }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Permission denied**: Notification listener not enabled
+
+### `android_notification_open`
+
+Opens/taps a notification (fires its content intent). Use `notification_id` from `android_notification_list`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `notification_id` | string | Yes | The `notification_id` from `android_notification_list` |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "notification_id": { "type": "string", "description": "The notification_id from notification_list" }
+  },
+  "required": ["notification_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_open",
+    "arguments": {
+      "notification_id": "a1b2c3"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Notification opened" }]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `notification_id`
+- **Action failed**: Notification not found; notification has no content intent; PendingIntent cancelled
+- **Permission denied**: Notification listener not enabled
+
+### `android_notification_dismiss`
+
+Dismisses/removes a notification. Use `notification_id` from `android_notification_list`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `notification_id` | string | Yes | The `notification_id` from `android_notification_list` |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "notification_id": { "type": "string", "description": "The notification_id from notification_list" }
+  },
+  "required": ["notification_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_dismiss",
+    "arguments": {
+      "notification_id": "a1b2c3"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Notification dismissed" }]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `notification_id`
+- **Action failed**: Notification not found; SecurityException
+- **Permission denied**: Notification listener not enabled
+
+### `android_notification_snooze`
+
+Snoozes a notification for a specified duration. The notification reappears after the specified time.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `notification_id` | string | Yes | The `notification_id` from `android_notification_list` |
+| `duration_ms` | integer | Yes | Snooze duration in milliseconds (must be positive, max 604800000 = 7 days) |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "notification_id": { "type": "string", "description": "The notification_id from notification_list" },
+    "duration_ms": { "type": "integer", "description": "Snooze duration in milliseconds (must be positive, max 604800000 = 7 days)" }
+  },
+  "required": ["notification_id", "duration_ms"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_snooze",
+    "arguments": {
+      "notification_id": "a1b2c3",
+      "duration_ms": 3600000
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Notification snoozed for 3600000ms" }]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `notification_id`; missing `duration_ms`; non-positive `duration_ms`; `duration_ms` exceeds 604800000 (7 days)
+- **Action failed**: Notification not found; SecurityException
+- **Permission denied**: Notification listener not enabled
+
+### `android_notification_action`
+
+Executes a notification action button. Use `action_id` from `android_notification_list`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_id` | string | Yes | The `action_id` from `android_notification_list` |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "action_id": { "type": "string", "description": "The action_id from notification_list" }
+  },
+  "required": ["action_id"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_action",
+    "arguments": {
+      "action_id": "a7b8c9"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Notification action executed" }]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `action_id`
+- **Action failed**: Action not found; action has no PendingIntent; PendingIntent cancelled
+- **Permission denied**: Notification listener not enabled
+
+### `android_notification_reply`
+
+Replies to a notification action that accepts text input (e.g., messaging apps). Use `action_id` from `android_notification_list` where `accepts_text` is `true`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_id` | string | Yes | The `action_id` from `android_notification_list` (must have `accepts_text=true`) |
+| `text` | string | Yes | The reply text to send |
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "action_id": { "type": "string", "description": "The action_id from notification_list (must have accepts_text=true)" },
+    "text": { "type": "string", "description": "The reply text to send" }
+  },
+  "required": ["action_id", "text"]
+}
+```
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_notification_reply",
+    "arguments": {
+      "action_id": "d4e5f6",
+      "text": "I'll be there in 10 minutes!"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Reply sent" }]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `action_id`; missing or empty `text`
+- **Action failed**: Action not found; action does not accept text input; action has no PendingIntent; PendingIntent cancelled
+- **Permission denied**: Notification listener not enabled
+
+### Security Considerations
+
+- **Notification content exposure**: Notification tools expose notification content (titles, text, app names, action labels) to MCP clients. This is inherent to the feature's purpose. Ensure bearer token authentication is enabled in production to restrict access.
+- **Reply capability**: `android_notification_reply` can send text replies through any notification that accepts text input, including messaging apps. This grants the MCP client the ability to send messages on behalf of the user.

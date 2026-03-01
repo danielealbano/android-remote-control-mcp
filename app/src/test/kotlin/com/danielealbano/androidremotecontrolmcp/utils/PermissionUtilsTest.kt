@@ -123,4 +123,60 @@ class PermissionUtilsTest {
             assertFalse(PermissionUtils.isNotificationPermissionGranted(mockContext))
         }
     }
+
+    @Nested
+    @DisplayName("openNotificationListenerSettings")
+    inner class OpenNotificationListenerSettings {
+        @Test
+        fun `starts activity with notification listener settings intent`() {
+            PermissionUtils.openNotificationListenerSettings(mockContext)
+
+            verify { mockContext.startActivity(any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("isNotificationListenerEnabled")
+    inner class IsNotificationListenerEnabled {
+        @Test
+        fun `returns true when service is in enabled_notification_listeners`() {
+            val serviceName =
+                "com.danielealbano.androidremotecontrolmcp/" +
+                    "com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService"
+            every {
+                Settings.Secure.getString(mockContentResolver, "enabled_notification_listeners")
+            } returns serviceName
+
+            val serviceClass =
+                Class.forName(
+                    "com.danielealbano.androidremotecontrolmcp" +
+                        ".services.notifications.McpNotificationListenerService",
+                )
+            assertTrue(
+                PermissionUtils.isNotificationListenerEnabled(mockContext, serviceClass),
+            )
+        }
+
+        @Test
+        fun `returns false when service is not in list`() {
+            every {
+                Settings.Secure.getString(mockContentResolver, "enabled_notification_listeners")
+            } returns "com.other.package/com.other.Service"
+
+            assertFalse(
+                PermissionUtils.isNotificationListenerEnabled(mockContext, Any::class.java),
+            )
+        }
+
+        @Test
+        fun `returns false when setting is null`() {
+            every {
+                Settings.Secure.getString(mockContentResolver, "enabled_notification_listeners")
+            } returns null
+
+            assertFalse(
+                PermissionUtils.isNotificationListenerEnabled(mockContext, Any::class.java),
+            )
+        }
+    }
 }

@@ -35,6 +35,10 @@ graph TB
             IntentDisp["IntentDispatcher"]
         end
 
+        subgraph NotifSvc["McpNotificationListenerService (System-managed)"]
+            NotifProv["NotificationProvider"]
+        end
+
         subgraph CameraSvc["Camera Services"]
             CamProv["CameraProvider\n(CameraX)"]
             SvcLifecycle["ServiceLifecycleOwner"]
@@ -62,6 +66,7 @@ graph TB
         SDK -->|"Singleton\n(companion object)"| AccSvc
         SDK --> StorageSvc
         SDK --> CameraSvc
+        SDK --> NotifSvc
     end
 ```
 
@@ -99,6 +104,16 @@ graph TB
      e. Clears singleton instance
      f. Updates `ServerStatus.Stopped` via companion-level StateFlow
 
+### McpNotificationListenerService Lifecycle
+
+- **Type**: Android `NotificationListenerService` (system-managed)
+- **Lifecycle**: Runs as long as enabled in Settings > Notification access
+- **Singleton**: Stores `instance` in `@Volatile` companion property
+- **Connected**: `onListenerConnected()` sets singleton instance
+- **Disconnected**: `onListenerDisconnected()` clears singleton instance
+- **Destroyed**: `onDestroy()` clears singleton instance
+- **Memory**: `onLowMemory()` and `onTrimMemory()` logged for diagnostics
+
 ### Auto-Start on Boot
 
 1. Device boots -> Android delivers `BOOT_COMPLETED` broadcast
@@ -133,6 +148,7 @@ graph TB
 
 - SDK `Server` tool registry: thread-safe (managed by MCP SDK)
 - `McpAccessibilityService.instance`: `@Volatile` singleton
+- `McpNotificationListenerService.instance`: `@Volatile` singleton
 - `McpServer.running`: `AtomicBoolean`
 - Accessibility node access: Must be on main thread (Android requirement)
 
@@ -227,6 +243,7 @@ running requires a restart (UI disables config editing when server is running).
 | CAMERA                   | Runtime       | System dialog                      | Camera photo/video tools  |
 | RECORD_AUDIO             | Runtime       | System dialog                      | Video recording with audio|
 | SAF tree URI permissions | Special       | User grants via system file picker | File operations per storage location |
+| Notification Listener    | Special       | User enables in Settings > Notification access | Reading/interacting with notifications |
 
 ---
 
