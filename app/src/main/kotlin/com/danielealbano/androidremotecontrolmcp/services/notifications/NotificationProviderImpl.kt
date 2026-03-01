@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.security.MessageDigest
 import javax.inject.Inject
 
 class NotificationProviderImpl
@@ -25,6 +24,7 @@ class NotificationProviderImpl
             limit: Int?,
         ): List<NotificationData> {
             val service = requireService()
+            val appNameCache = mutableMapOf<String, String>()
             val notifications =
                 service
                     .getNotifications()
@@ -32,11 +32,11 @@ class NotificationProviderImpl
                         if (packageName != null) {
                             list.filter { sbn -> sbn.packageName == packageName }
                         } else {
-                            list.toList()
+                            list.asIterable()
                         }
                     }.sortedByDescending { it.postTime }
                     .let { if (limit != null) it.take(limit) else it }
-            return notifications.map { toNotificationData(it) }
+            return notifications.map { toNotificationData(it, appNameCache) }
         }
 
         @Suppress("ReturnCount")
@@ -140,19 +140,24 @@ class NotificationProviderImpl
             McpNotificationListenerService.instance
                 ?: error("Notification listener service not available")
 
-        private fun toNotificationData(sbn: StatusBarNotification): NotificationData {
+        private fun toNotificationData(
+            sbn: StatusBarNotification,
+            appNameCache: MutableMap<String, String>,
+        ): NotificationData {
             val notification = sbn.notification
             val extras = notification.extras
-            val pm = context.packageManager
             val appName =
-                try {
-                    pm
-                        .getApplicationLabel(
-                            pm.getApplicationInfo(sbn.packageName, PackageManager.ApplicationInfoFlags.of(0)),
-                        ).toString()
-                } catch (_: PackageManager.NameNotFoundException) {
-                    Logger.d(TAG, "App not found for ${sbn.packageName}, using package name")
-                    sbn.packageName
+                appNameCache.getOrPut(sbn.packageName) {
+                    val pm = context.packageManager
+                    try {
+                        pm
+                            .getApplicationLabel(
+                                pm.getApplicationInfo(sbn.packageName, PackageManager.ApplicationInfoFlags.of(0)),
+                            ).toString()
+                    } catch (_: PackageManager.NameNotFoundException) {
+                        Logger.d(TAG, "App not found for ${sbn.packageName}, using package name")
+                        sbn.packageName
+                    }
                 }
             val actions =
                 notification.actions?.mapIndexed { index, action ->
@@ -165,7 +170,6 @@ class NotificationProviderImpl
                 } ?: emptyList()
             return NotificationData(
                 notificationId = computeNotificationHash(sbn.key),
-                key = sbn.key,
                 packageName = sbn.packageName,
                 appName = appName,
                 title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
@@ -196,23 +200,13 @@ class NotificationProviderImpl
 
         companion object {
             private const val TAG = "MCP:NotificationProvider"
-            private const val HASH_BYTE_LENGTH = 3
+            const val HASH_HEX_LENGTH = 8
 
-            fun computeNotificationHash(key: String): String =
-                MessageDigest
-                    .getInstance("SHA-256")
-                    .digest(key.toByteArray())
-                    .take(HASH_BYTE_LENGTH)
-                    .joinToString("") { "%02x".format(it) }
+            fun computeNotificationHash(key: String): String = "%08x".format(key.hashCode())
 
             fun computeActionHash(
                 key: String,
                 actionIndex: Int,
-            ): String =
-                MessageDigest
-                    .getInstance("SHA-256")
-                    .digest("$key::$actionIndex".toByteArray())
-                    .take(HASH_BYTE_LENGTH)
-                    .joinToString("") { "%02x".format(it) }
+            ): String = "%08x".format("$key::$actionIndex".hashCode())
         }
     }

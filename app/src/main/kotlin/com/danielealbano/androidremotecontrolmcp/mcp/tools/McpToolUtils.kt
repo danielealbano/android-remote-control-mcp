@@ -130,6 +130,11 @@ internal object McpToolUtils {
                 ?: throw McpToolException.InvalidParams(
                     "Parameter '$name' must be a number, got: '${primitive.content}'",
                 )
+        if (doubleVal < Long.MIN_VALUE.toDouble() || doubleVal > Long.MAX_VALUE.toDouble()) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' value exceeds long range",
+            )
+        }
         val longVal = doubleVal.toLong()
         if (doubleVal != longVal.toDouble()) {
             throw McpToolException.InvalidParams(

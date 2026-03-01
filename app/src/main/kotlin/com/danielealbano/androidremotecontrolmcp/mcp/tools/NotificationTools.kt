@@ -1,8 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
-import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
+import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProviderImpl
+import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
@@ -12,6 +13,30 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
+
+private val HEX_ID_PATTERN = Regex("[0-9a-f]{${NotificationProviderImpl.HASH_HEX_LENGTH}}")
+
+private fun validateNotificationId(notificationId: String) {
+    if (notificationId.isEmpty()) {
+        throw McpToolException.InvalidParams("Parameter 'notification_id' must not be empty")
+    }
+    if (!notificationId.matches(HEX_ID_PATTERN)) {
+        throw McpToolException.InvalidParams(
+            "Parameter 'notification_id' must be a ${NotificationProviderImpl.HASH_HEX_LENGTH}-char hex string",
+        )
+    }
+}
+
+private fun validateActionId(actionId: String) {
+    if (actionId.isEmpty()) {
+        throw McpToolException.InvalidParams("Parameter 'action_id' must not be empty")
+    }
+    if (!actionId.matches(HEX_ID_PATTERN)) {
+        throw McpToolException.InvalidParams(
+            "Parameter 'action_id' must be a ${NotificationProviderImpl.HASH_HEX_LENGTH}-char hex string",
+        )
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // notification_list
@@ -36,7 +61,7 @@ class NotificationListHandler
                 McpToolUtils
                     .optionalInt(arguments, "limit", 0)
                     .let { if (it <= 0) null else it }
-            Log.d(TAG, "Executing notification_list, package=$packageName, limit=$limit")
+            Logger.d(TAG, "Executing notification_list, package=$packageName, limit=$limit")
             val notifications = notificationProvider.getNotifications(packageName, limit)
             val json =
                 buildJsonObject {
@@ -126,10 +151,8 @@ class NotificationOpenHandler
                 )
             }
             val notificationId = McpToolUtils.requireString(arguments, "notification_id")
-            if (notificationId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'notification_id' must not be empty")
-            }
-            Log.d(TAG, "Executing notification_open for id: $notificationId")
+            validateNotificationId(notificationId)
+            Logger.d(TAG, "Executing notification_open for id: $notificationId")
             val result = notificationProvider.openNotification(notificationId)
             return McpToolUtils.handleActionResult(result, "Notification opened")
         }
@@ -179,10 +202,8 @@ class NotificationDismissHandler
                 )
             }
             val notificationId = McpToolUtils.requireString(arguments, "notification_id")
-            if (notificationId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'notification_id' must not be empty")
-            }
-            Log.d(TAG, "Executing notification_dismiss for id: $notificationId")
+            validateNotificationId(notificationId)
+            Logger.d(TAG, "Executing notification_dismiss for id: $notificationId")
             val result = notificationProvider.dismissNotification(notificationId)
             return McpToolUtils.handleActionResult(result, "Notification dismissed")
         }
@@ -231,9 +252,7 @@ class NotificationSnoozeHandler
                 )
             }
             val notificationId = McpToolUtils.requireString(arguments, "notification_id")
-            if (notificationId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'notification_id' must not be empty")
-            }
+            validateNotificationId(notificationId)
             val durationMs = McpToolUtils.requireLong(arguments, "duration_ms")
             if (durationMs <= 0) {
                 throw McpToolException.InvalidParams("duration_ms must be positive")
@@ -243,7 +262,7 @@ class NotificationSnoozeHandler
                     "duration_ms must not exceed $MAX_SNOOZE_DURATION_MS (7 days)",
                 )
             }
-            Log.d(TAG, "Executing notification_snooze for id: $notificationId, duration: ${durationMs}ms")
+            Logger.d(TAG, "Executing notification_snooze for id: $notificationId, duration: ${durationMs}ms")
             val result = notificationProvider.snoozeNotification(notificationId, durationMs)
             return McpToolUtils.handleActionResult(result, "Notification snoozed for ${durationMs}ms")
         }
@@ -302,10 +321,8 @@ class NotificationActionHandler
                 )
             }
             val actionId = McpToolUtils.requireString(arguments, "action_id")
-            if (actionId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'action_id' must not be empty")
-            }
-            Log.d(TAG, "Executing notification_action for id: $actionId")
+            validateActionId(actionId)
+            Logger.d(TAG, "Executing notification_action for id: $actionId")
             val result = notificationProvider.executeAction(actionId)
             return McpToolUtils.handleActionResult(result, "Notification action executed")
         }
@@ -356,14 +373,17 @@ class NotificationReplyHandler
                 )
             }
             val actionId = McpToolUtils.requireString(arguments, "action_id")
-            if (actionId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'action_id' must not be empty")
-            }
+            validateActionId(actionId)
             val text = McpToolUtils.requireString(arguments, "text")
             if (text.isEmpty()) {
                 throw McpToolException.InvalidParams("Parameter 'text' must not be empty")
             }
-            Log.d(TAG, "Executing notification_reply for id: $actionId")
+            if (text.length > MAX_REPLY_TEXT_LENGTH) {
+                throw McpToolException.InvalidParams(
+                    "Parameter 'text' must not exceed $MAX_REPLY_TEXT_LENGTH characters",
+                )
+            }
+            Logger.d(TAG, "Executing notification_reply for id: $actionId")
             val result = notificationProvider.replyToAction(actionId, text)
             return McpToolUtils.handleActionResult(result, "Reply sent")
         }
@@ -402,6 +422,7 @@ class NotificationReplyHandler
         companion object {
             const val TOOL_NAME = "notification_reply"
             private const val TAG = "MCP:NotificationReplyHandler"
+            private const val MAX_REPLY_TEXT_LENGTH = 10_000
         }
     }
 

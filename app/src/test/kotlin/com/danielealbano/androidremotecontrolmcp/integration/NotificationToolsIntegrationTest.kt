@@ -28,13 +28,12 @@ class NotificationToolsIntegrationTest {
     }
 
     private fun sampleNotification(
-        notificationId: String = "abc123",
+        notificationId: String = "aabbcc01",
         packageName: String = "com.example.app",
         actions: List<NotificationActionData> = emptyList(),
     ): NotificationData =
         NotificationData(
             notificationId = notificationId,
-            key = "0|com.example.app|1|null|10001",
             packageName = packageName,
             appName = "Example",
             title = "Test Title",
@@ -56,7 +55,7 @@ class NotificationToolsIntegrationTest {
             every { deps.notificationProvider.isReady() } returns true
             val action =
                 NotificationActionData(
-                    actionId = "def456",
+                    actionId = "11223344",
                     index = 0,
                     title = "Reply",
                     acceptsText = true,
@@ -74,10 +73,10 @@ class NotificationToolsIntegrationTest {
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("\"notification_id\""))
-                assertTrue(text.contains("\"abc123\""))
+                assertTrue(text.contains("\"aabbcc01\""))
                 assertTrue(text.contains("\"count\":1"))
                 assertTrue(text.contains("\"action_id\""))
-                assertTrue(text.contains("\"def456\""))
+                assertTrue(text.contains("\"11223344\""))
             }
         }
 
@@ -149,14 +148,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.openNotification("abc123")
+                deps.notificationProvider.openNotification("aabbcc01")
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_open",
-                        arguments = mapOf("notification_id" to "abc123"),
+                        arguments = mapOf("notification_id" to "aabbcc01"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -170,14 +169,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.openNotification("unknown")
-            } returns Result.failure(IllegalArgumentException("Notification not found: unknown"))
+                deps.notificationProvider.openNotification("deadbeef")
+            } returns Result.failure(IllegalArgumentException("Notification not found: deadbeef"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_open",
-                        arguments = mapOf("notification_id" to "unknown"),
+                        arguments = mapOf("notification_id" to "deadbeef"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -195,7 +194,7 @@ class NotificationToolsIntegrationTest {
                 val result =
                     client.callTool(
                         name = "android_notification_open",
-                        arguments = mapOf("notification_id" to "abc123"),
+                        arguments = mapOf("notification_id" to "aabbcc01"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -209,14 +208,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.openNotification("abc123")
+                deps.notificationProvider.openNotification("aabbcc01")
             } returns Result.failure(IllegalStateException("Notification has no content intent"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_open",
-                        arguments = mapOf("notification_id" to "abc123"),
+                        arguments = mapOf("notification_id" to "aabbcc01"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -230,14 +229,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.dismissNotification("abc123")
+                deps.notificationProvider.dismissNotification("aabbcc01")
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_dismiss",
-                        arguments = mapOf("notification_id" to "abc123"),
+                        arguments = mapOf("notification_id" to "aabbcc01"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -251,14 +250,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.dismissNotification("unknown")
-            } returns Result.failure(IllegalArgumentException("Notification not found: unknown"))
+                deps.notificationProvider.dismissNotification("deadbeef")
+            } returns Result.failure(IllegalArgumentException("Notification not found: deadbeef"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_dismiss",
-                        arguments = mapOf("notification_id" to "unknown"),
+                        arguments = mapOf("notification_id" to "deadbeef"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -272,7 +271,7 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.snoozeNotification("abc123", 60000L)
+                deps.notificationProvider.snoozeNotification("aabbcc01", 60000L)
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
@@ -281,7 +280,7 @@ class NotificationToolsIntegrationTest {
                         name = "android_notification_snooze",
                         arguments =
                             mapOf(
-                                "notification_id" to "abc123",
+                                "notification_id" to "aabbcc01",
                                 "duration_ms" to 60000,
                             ),
                     )
@@ -301,7 +300,7 @@ class NotificationToolsIntegrationTest {
                 val result =
                     client.callTool(
                         name = "android_notification_snooze",
-                        arguments = mapOf("notification_id" to "abc123"),
+                        arguments = mapOf("notification_id" to "aabbcc01"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -321,7 +320,7 @@ class NotificationToolsIntegrationTest {
                         name = "android_notification_snooze",
                         arguments =
                             mapOf(
-                                "notification_id" to "abc123",
+                                "notification_id" to "aabbcc01",
                                 "duration_ms" to 0,
                             ),
                     )
@@ -337,14 +336,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.executeAction("def456")
+                deps.notificationProvider.executeAction("11223344")
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_action",
-                        arguments = mapOf("action_id" to "def456"),
+                        arguments = mapOf("action_id" to "11223344"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -358,14 +357,14 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.executeAction("unknown")
-            } returns Result.failure(IllegalArgumentException("Action not found: unknown"))
+                deps.notificationProvider.executeAction("deadbeef")
+            } returns Result.failure(IllegalArgumentException("Action not found: deadbeef"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
                         name = "android_notification_action",
-                        arguments = mapOf("action_id" to "unknown"),
+                        arguments = mapOf("action_id" to "deadbeef"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -379,7 +378,7 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.replyToAction("def456", "Hello")
+                deps.notificationProvider.replyToAction("11223344", "Hello")
             } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
@@ -388,7 +387,7 @@ class NotificationToolsIntegrationTest {
                         name = "android_notification_reply",
                         arguments =
                             mapOf(
-                                "action_id" to "def456",
+                                "action_id" to "11223344",
                                 "text" to "Hello",
                             ),
                     )
@@ -404,7 +403,7 @@ class NotificationToolsIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             every { deps.notificationProvider.isReady() } returns true
             coEvery {
-                deps.notificationProvider.replyToAction("def456", "Hello")
+                deps.notificationProvider.replyToAction("11223344", "Hello")
             } returns Result.failure(IllegalStateException("Action does not accept text input"))
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
@@ -413,7 +412,7 @@ class NotificationToolsIntegrationTest {
                         name = "android_notification_reply",
                         arguments =
                             mapOf(
-                                "action_id" to "def456",
+                                "action_id" to "11223344",
                                 "text" to "Hello",
                             ),
                     )

@@ -40,10 +40,6 @@ class McpNotificationListenerService : NotificationListenerService() {
         cancelNotification(key)
     }
 
-    fun dismissAllNotifications() {
-        cancelAllNotifications()
-    }
-
     fun snoozeNotificationByKey(
         key: String,
         durationMs: Long,

@@ -27,14 +27,13 @@ class NotificationToolsTest {
     private fun createNotificationProvider(): NotificationProvider = mockk()
 
     private fun sampleNotification(
-        notificationId: String = "abc123",
+        notificationId: String = "aabbcc01",
         packageName: String = "com.example.app",
         appName: String = "Example",
         actions: List<NotificationActionData> = emptyList(),
     ): NotificationData =
         NotificationData(
             notificationId = notificationId,
-            key = "0|com.example.app|1|null|10001",
             packageName = packageName,
             appName = appName,
             title = "Test Title",
@@ -77,7 +76,7 @@ class NotificationToolsTest {
                 every { provider.isReady() } returns true
                 val action =
                     NotificationActionData(
-                        actionId = "def456",
+                        actionId = "11223344",
                         index = 0,
                         title = "Reply",
                         acceptsText = true,
@@ -93,12 +92,12 @@ class NotificationToolsTest {
                 val notifications = json["notifications"]?.jsonArray
                 assertEquals(1, notifications?.size)
                 val n = notifications!![0].jsonObject
-                assertEquals("abc123", n["notification_id"]?.jsonPrimitive?.content)
+                assertEquals("aabbcc01", n["notification_id"]?.jsonPrimitive?.content)
                 assertEquals("com.example.app", n["package_name"]?.jsonPrimitive?.content)
                 val actions = n["actions"]?.jsonArray
                 assertEquals(1, actions?.size)
                 val a = actions!![0].jsonObject
-                assertEquals("def456", a["action_id"]?.jsonPrimitive?.content)
+                assertEquals("11223344", a["action_id"]?.jsonPrimitive?.content)
                 assertEquals("Reply", a["title"]?.jsonPrimitive?.content)
                 assertEquals("true", a["accepts_text"]?.jsonPrimitive?.content)
             }
@@ -200,7 +199,7 @@ class NotificationToolsTest {
                 val handler = NotificationOpenHandler(provider)
 
                 assertThrows<McpToolException.PermissionDenied> {
-                    handler.execute(buildJsonObject { put("notification_id", "abc123") })
+                    handler.execute(buildJsonObject { put("notification_id", "aabbcc01") })
                 }
             }
 
@@ -210,10 +209,10 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.openNotification("abc123") } returns Result.success(Unit)
+                coEvery { provider.openNotification("aabbcc01") } returns Result.success(Unit)
                 val handler = NotificationOpenHandler(provider)
 
-                val result = handler.execute(buildJsonObject { put("notification_id", "abc123") })
+                val result = handler.execute(buildJsonObject { put("notification_id", "aabbcc01") })
                 val text = (result.content[0] as TextContent).text
                 assertEquals("Notification opened", text)
             }
@@ -250,12 +249,25 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.openNotification("unknown") } returns
-                    Result.failure(IllegalArgumentException("Notification not found: unknown"))
+                coEvery { provider.openNotification("deadbeef") } returns
+                    Result.failure(IllegalArgumentException("Notification not found: deadbeef"))
                 val handler = NotificationOpenHandler(provider)
 
                 assertThrows<McpToolException.ActionFailed> {
-                    handler.execute(buildJsonObject { put("notification_id", "unknown") })
+                    handler.execute(buildJsonObject { put("notification_id", "deadbeef") })
+                }
+            }
+
+        @Test
+        @DisplayName("invalid hex notification_id throws InvalidParams")
+        fun invalidHexNotificationIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationOpenHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(buildJsonObject { put("notification_id", "GGGGGGGG") })
                 }
             }
     }
@@ -273,12 +285,38 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.dismissNotification("abc123") } returns Result.success(Unit)
+                coEvery { provider.dismissNotification("aabbcc01") } returns Result.success(Unit)
                 val handler = NotificationDismissHandler(provider)
 
-                val result = handler.execute(buildJsonObject { put("notification_id", "abc123") })
+                val result = handler.execute(buildJsonObject { put("notification_id", "aabbcc01") })
                 val text = (result.content[0] as TextContent).text
                 assertEquals("Notification dismissed", text)
+            }
+
+        @Test
+        @DisplayName("when not ready throws PermissionDenied")
+        fun whenNotReadyThrowsPermissionDenied() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns false
+                val handler = NotificationDismissHandler(provider)
+
+                assertThrows<McpToolException.PermissionDenied> {
+                    handler.execute(buildJsonObject { put("notification_id", "aabbcc01") })
+                }
+            }
+
+        @Test
+        @DisplayName("missing notification_id throws InvalidParams")
+        fun missingNotificationIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationDismissHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(buildJsonObject {})
+                }
             }
 
         @Test
@@ -287,12 +325,25 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.dismissNotification("unknown") } returns
-                    Result.failure(IllegalArgumentException("Notification not found: unknown"))
+                coEvery { provider.dismissNotification("deadbeef") } returns
+                    Result.failure(IllegalArgumentException("Notification not found: deadbeef"))
                 val handler = NotificationDismissHandler(provider)
 
                 assertThrows<McpToolException.ActionFailed> {
-                    handler.execute(buildJsonObject { put("notification_id", "unknown") })
+                    handler.execute(buildJsonObject { put("notification_id", "deadbeef") })
+                }
+            }
+
+        @Test
+        @DisplayName("invalid hex notification_id throws InvalidParams")
+        fun invalidHexNotificationIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationDismissHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(buildJsonObject { put("notification_id", "GGGGGGGG") })
                 }
             }
 
@@ -323,12 +374,12 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.snoozeNotification("abc123", 60000L) } returns Result.success(Unit)
+                coEvery { provider.snoozeNotification("aabbcc01", 60000L) } returns Result.success(Unit)
                 val handler = NotificationSnoozeHandler(provider)
 
                 val args =
                     buildJsonObject {
-                        put("notification_id", "abc123")
+                        put("notification_id", "aabbcc01")
                         put("duration_ms", 60000)
                     }
                 val result = handler.execute(args)
@@ -376,7 +427,7 @@ class NotificationToolsTest {
                 val handler = NotificationSnoozeHandler(provider)
 
                 assertThrows<McpToolException.InvalidParams> {
-                    handler.execute(buildJsonObject { put("notification_id", "abc123") })
+                    handler.execute(buildJsonObject { put("notification_id", "aabbcc01") })
                 }
             }
 
@@ -391,7 +442,7 @@ class NotificationToolsTest {
                 assertThrows<McpToolException.InvalidParams> {
                     handler.execute(
                         buildJsonObject {
-                            put("notification_id", "abc123")
+                            put("notification_id", "aabbcc01")
                             put("duration_ms", 0)
                         },
                     )
@@ -409,8 +460,82 @@ class NotificationToolsTest {
                 assertThrows<McpToolException.InvalidParams> {
                     handler.execute(
                         buildJsonObject {
-                            put("notification_id", "abc123")
+                            put("notification_id", "aabbcc01")
                             put("duration_ms", 604_800_001)
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("when not ready throws PermissionDenied")
+        fun whenNotReadyThrowsPermissionDenied() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns false
+                val handler = NotificationSnoozeHandler(provider)
+
+                assertThrows<McpToolException.PermissionDenied> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("notification_id", "aabbcc01")
+                            put("duration_ms", 60000)
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("negative duration_ms throws InvalidParams")
+        fun negativeDurationMsThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationSnoozeHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("notification_id", "aabbcc01")
+                            put("duration_ms", -1)
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("duration_ms at max returns success")
+        fun durationMsAtMaxReturnsSuccess() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                coEvery { provider.snoozeNotification("aabbcc01", 604_800_000L) } returns Result.success(Unit)
+                val handler = NotificationSnoozeHandler(provider)
+
+                val result =
+                    handler.execute(
+                        buildJsonObject {
+                            put("notification_id", "aabbcc01")
+                            put("duration_ms", 604_800_000)
+                        },
+                    )
+                val text = (result.content[0] as TextContent).text
+                assertEquals("Notification snoozed for 604800000ms", text)
+            }
+
+        @Test
+        @DisplayName("invalid hex notification_id throws InvalidParams")
+        fun invalidHexNotificationIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationSnoozeHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("notification_id", "GGGGGGGG")
+                            put("duration_ms", 60000)
                         },
                     )
                 }
@@ -430,10 +555,10 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.executeAction("def456") } returns Result.success(Unit)
+                coEvery { provider.executeAction("11223344") } returns Result.success(Unit)
                 val handler = NotificationActionHandler(provider)
 
-                val result = handler.execute(buildJsonObject { put("action_id", "def456") })
+                val result = handler.execute(buildJsonObject { put("action_id", "11223344") })
                 val text = (result.content[0] as TextContent).text
                 assertEquals("Notification action executed", text)
             }
@@ -465,17 +590,43 @@ class NotificationToolsTest {
             }
 
         @Test
+        @DisplayName("when not ready throws PermissionDenied")
+        fun whenNotReadyThrowsPermissionDenied() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns false
+                val handler = NotificationActionHandler(provider)
+
+                assertThrows<McpToolException.PermissionDenied> {
+                    handler.execute(buildJsonObject { put("action_id", "11223344") })
+                }
+            }
+
+        @Test
         @DisplayName("unknown action_id returns error")
         fun unknownActionIdReturnsError() =
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.executeAction("unknown") } returns
-                    Result.failure(IllegalArgumentException("Action not found: unknown"))
+                coEvery { provider.executeAction("deadbeef") } returns
+                    Result.failure(IllegalArgumentException("Action not found: deadbeef"))
                 val handler = NotificationActionHandler(provider)
 
                 assertThrows<McpToolException.ActionFailed> {
-                    handler.execute(buildJsonObject { put("action_id", "unknown") })
+                    handler.execute(buildJsonObject { put("action_id", "deadbeef") })
+                }
+            }
+
+        @Test
+        @DisplayName("invalid hex action_id throws InvalidParams")
+        fun invalidHexActionIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationActionHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(buildJsonObject { put("action_id", "GGGGGGGG") })
                 }
             }
     }
@@ -493,12 +644,12 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.replyToAction("def456", "Hello") } returns Result.success(Unit)
+                coEvery { provider.replyToAction("11223344", "Hello") } returns Result.success(Unit)
                 val handler = NotificationReplyHandler(provider)
 
                 val args =
                     buildJsonObject {
-                        put("action_id", "def456")
+                        put("action_id", "11223344")
                         put("text", "Hello")
                     }
                 val result = handler.execute(args)
@@ -546,7 +697,7 @@ class NotificationToolsTest {
                 val handler = NotificationReplyHandler(provider)
 
                 assertThrows<McpToolException.InvalidParams> {
-                    handler.execute(buildJsonObject { put("action_id", "def456") })
+                    handler.execute(buildJsonObject { put("action_id", "11223344") })
                 }
             }
 
@@ -561,7 +712,7 @@ class NotificationToolsTest {
                 assertThrows<McpToolException.InvalidParams> {
                     handler.execute(
                         buildJsonObject {
-                            put("action_id", "def456")
+                            put("action_id", "11223344")
                             put("text", "")
                         },
                     )
@@ -574,15 +725,69 @@ class NotificationToolsTest {
             runTest {
                 val provider = createNotificationProvider()
                 every { provider.isReady() } returns true
-                coEvery { provider.replyToAction("def456", "Hello") } returns
+                coEvery { provider.replyToAction("11223344", "Hello") } returns
                     Result.failure(IllegalStateException("Action does not accept text input"))
                 val handler = NotificationReplyHandler(provider)
 
                 assertThrows<McpToolException.ActionFailed> {
                     handler.execute(
                         buildJsonObject {
-                            put("action_id", "def456")
+                            put("action_id", "11223344")
                             put("text", "Hello")
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("when not ready throws PermissionDenied")
+        fun whenNotReadyThrowsPermissionDenied() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns false
+                val handler = NotificationReplyHandler(provider)
+
+                assertThrows<McpToolException.PermissionDenied> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("action_id", "11223344")
+                            put("text", "Hello")
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("invalid hex action_id throws InvalidParams")
+        fun invalidHexActionIdThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationReplyHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("action_id", "GGGGGGGG")
+                            put("text", "Hello")
+                        },
+                    )
+                }
+            }
+
+        @Test
+        @DisplayName("text exceeds max length throws InvalidParams")
+        fun textExceedsMaxLengthThrowsInvalidParams() =
+            runTest {
+                val provider = createNotificationProvider()
+                every { provider.isReady() } returns true
+                val handler = NotificationReplyHandler(provider)
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(
+                        buildJsonObject {
+                            put("action_id", "11223344")
+                            put("text", "a".repeat(10_001))
                         },
                     )
                 }

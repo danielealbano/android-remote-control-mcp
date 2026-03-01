@@ -125,6 +125,17 @@ class PermissionUtilsTest {
     }
 
     @Nested
+    @DisplayName("openNotificationListenerSettings")
+    inner class OpenNotificationListenerSettings {
+        @Test
+        fun `starts activity with notification listener settings intent`() {
+            PermissionUtils.openNotificationListenerSettings(mockContext)
+
+            verify { mockContext.startActivity(any()) }
+        }
+    }
+
+    @Nested
     @DisplayName("isNotificationListenerEnabled")
     inner class IsNotificationListenerEnabled {
         @Test

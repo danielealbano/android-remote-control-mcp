@@ -2,7 +2,6 @@ package com.danielealbano.androidremotecontrolmcp.services.notifications
 
 data class NotificationData(
     val notificationId: String,
-    val key: String,
     val packageName: String,
     val appName: String,
     val title: String?,

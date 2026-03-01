@@ -245,34 +245,33 @@ class NotificationProviderImplTest {
 
         @Test
         @DisplayName("when service is null throws IllegalStateException")
-        fun `getNotifications when service is null throws IllegalStateException`() =
-            runTest {
-                every { McpNotificationListenerService.instance } returns null
-                assertThrows(IllegalStateException::class.java) {
-                    kotlinx.coroutines.test.runTest {
-                        provider.getNotifications()
-                    }
+        fun `getNotifications when service is null throws IllegalStateException`() {
+            every { McpNotificationListenerService.instance } returns null
+            assertThrows(IllegalStateException::class.java) {
+                runTest {
+                    provider.getNotifications()
                 }
             }
+        }
     }
 
     @Nested
     @DisplayName("Hash functions")
     inner class HashTests {
         @Test
-        @DisplayName("computeNotificationHash produces 6 hex chars")
-        fun `computeNotificationHash produces 6 hex chars`() {
+        @DisplayName("computeNotificationHash produces 8 hex chars")
+        fun `computeNotificationHash produces 8 hex chars`() {
             val hash = NotificationProviderImpl.computeNotificationHash("test_key")
-            assertEquals(6, hash.length)
-            assertTrue(hash.matches(Regex("[0-9a-f]{6}")))
+            assertEquals(8, hash.length)
+            assertTrue(hash.matches(Regex("[0-9a-f]{8}")))
         }
 
         @Test
-        @DisplayName("computeActionHash produces 6 hex chars")
-        fun `computeActionHash produces 6 hex chars`() {
+        @DisplayName("computeActionHash produces 8 hex chars")
+        fun `computeActionHash produces 8 hex chars`() {
             val hash = NotificationProviderImpl.computeActionHash("test_key", 0)
-            assertEquals(6, hash.length)
-            assertTrue(hash.matches(Regex("[0-9a-f]{6}")))
+            assertEquals(8, hash.length)
+            assertTrue(hash.matches(Regex("[0-9a-f]{8}")))
         }
 
         @Test
