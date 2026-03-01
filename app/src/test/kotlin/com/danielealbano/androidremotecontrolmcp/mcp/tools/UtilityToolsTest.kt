@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
@@ -21,6 +22,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowDa
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
 import io.mockk.verify
@@ -328,14 +330,39 @@ class UtilityToolsTest {
     @Nested
     @DisplayName("WaitForIdleTool")
     inner class WaitForIdleToolTests {
-        private val tool = WaitForIdleTool(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+        private val tool = WaitForIdleTool(mockAccessibilityServiceProvider)
+
+        private fun mockRawNode(
+            className: String = "android.widget.FrameLayout",
+            text: String? = null,
+            bounds: BoundsData = BoundsData(0, 0, 1080, 2400),
+            children: List<AccessibilityNodeInfo> = emptyList(),
+        ): AccessibilityNodeInfo {
+            val node = mockk<AccessibilityNodeInfo>()
+            every { node.className } returns className
+            every { node.text } returns text
+            val rectSlot = slot<Rect>()
+            every { node.getBoundsInScreen(capture(rectSlot)) } answers {
+                rectSlot.captured.left = bounds.left
+                rectSlot.captured.top = bounds.top
+                rectSlot.captured.right = bounds.right
+                rectSlot.captured.bottom = bounds.bottom
+            }
+            every { node.childCount } returns children.size
+            for (i in children.indices) {
+                every { node.getChild(i) } returns children[i]
+            }
+            return node
+        }
 
         @Test
         fun `detects idle when tree does not change`() =
             runTest {
-                // Same tree returned each time -> idle detected
-                val params = buildJsonObject { put("timeout", 5000) }
+                // Same raw node returned each time -> idle detected
+                val stableRoot = mockRawNode()
+                every { mockWindowInfo.root } returns stableRoot
 
+                val params = buildJsonObject { put("timeout", 5000) }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 val parsed = Json.parseToJsonElement(text).jsonObject
@@ -346,9 +373,11 @@ class UtilityToolsTest {
         @Test
         fun `match_percentage defaults to 100 when not provided`() =
             runTest {
-                // Same tree each time -> idle at 100% similarity
-                val params = buildJsonObject { put("timeout", 5000) }
+                // Same raw node each time -> idle at 100% similarity
+                val stableRoot = mockRawNode()
+                every { mockWindowInfo.root } returns stableRoot
 
+                val params = buildJsonObject { put("timeout", 5000) }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 val parsed = Json.parseToJsonElement(text).jsonObject
@@ -363,27 +392,26 @@ class UtilityToolsTest {
                     var clockMs = 0L
                     every { SystemClock.elapsedRealtime() } answers { clockMs }
 
-                    // Return trees that differ slightly each time (1 node text changes out of 11 total)
+                    // Build raw tree with 10 stable children + 1 changing child
                     var callCount = 0
-                    every { mockTreeParser.parseTree(any(), any(), any()) } answers {
+                    every { mockWindowInfo.root } answers {
                         callCount++
-                        clockMs += 600L
-                        AccessibilityNodeData(
-                            id = "node_root",
-                            className = "android.widget.FrameLayout",
-                            bounds = BoundsData(0, 0, 1080, 2400),
-                            visible = true,
-                            children =
-                                (0 until 10).map { i ->
-                                    AccessibilityNodeData(
-                                        id = "node_$i",
-                                        className = "android.widget.TextView",
-                                        text = if (i == 0) "changing_$callCount" else "stable_$i",
-                                        bounds = BoundsData(0, i * 100, 1080, (i + 1) * 100),
-                                        visible = true,
-                                    )
-                                },
-                        )
+                        clockMs += 300L
+                        val stableChildren =
+                            (1 until 10).map { i ->
+                                mockRawNode(
+                                    className = "android.widget.TextView",
+                                    text = "stable_$i",
+                                    bounds = BoundsData(0, i * 100, 1080, (i + 1) * 100),
+                                )
+                            }
+                        val changingChild =
+                            mockRawNode(
+                                className = "android.widget.TextView",
+                                text = "changing_$callCount",
+                                bounds = BoundsData(0, 0, 1080, 100),
+                            )
+                        mockRawNode(children = listOf(changingChild) + stableChildren)
                     }
 
                     // With match_percentage=80, the minor change should still be considered idle
@@ -435,18 +463,12 @@ class UtilityToolsTest {
                     var clockMs = 0L
                     every { SystemClock.elapsedRealtime() } answers { clockMs }
 
-                    // Return different trees each time to force timeout
+                    // Return different raw tree each time to force timeout
                     var callCount = 0
-                    every { mockTreeParser.parseTree(any(), any(), any()) } answers {
+                    every { mockWindowInfo.root } answers {
                         callCount++
                         clockMs += 600L
-                        AccessibilityNodeData(
-                            id = "node_root",
-                            className = "android.widget.FrameLayout",
-                            text = "changing_$callCount",
-                            bounds = BoundsData(0, 0, 1080, 2400),
-                            visible = true,
-                        )
+                        mockRawNode(text = "changing_$callCount")
                     }
 
                     val params = buildJsonObject { put("timeout", 1000) }

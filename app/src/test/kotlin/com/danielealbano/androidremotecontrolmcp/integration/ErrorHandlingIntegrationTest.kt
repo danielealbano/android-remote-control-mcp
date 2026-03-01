@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -13,6 +14,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
@@ -209,32 +211,35 @@ class ErrorHandlingIntegrationTest {
 
                 val deps = McpIntegrationTestHelper.createMockDependencies()
                 every { deps.accessibilityServiceProvider.isReady() } returns true
-                val mockRootNode = mockk<android.view.accessibility.AccessibilityNodeInfo>()
                 val mockWin = mockk<AccessibilityWindowInfo>(relaxed = true)
                 every { mockWin.id } returns 0
-                every { mockWin.root } returns mockRootNode
                 every { mockWin.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
                 every { mockWin.title } returns "Test"
                 every { mockWin.layer } returns 0
                 every { mockWin.isFocused } returns true
-                every { mockRootNode.packageName } returns "com.example"
                 every {
                     deps.accessibilityServiceProvider.getAccessibilityWindows()
                 } returns listOf(mockWin)
                 every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
                 every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
                 every { deps.accessibilityServiceProvider.getScreenInfo() } returns sampleScreenInfo
+                // Return a different raw root node each poll to force timeout
                 var callCount = 0
-                every { deps.treeParser.parseTree(any(), any(), any()) } answers {
+                every { mockWin.root } answers {
                     callCount++
                     clockMs += 600L
-                    AccessibilityNodeData(
-                        id = "node_root",
-                        className = "android.widget.FrameLayout",
-                        text = "changing_text_$callCount",
-                        bounds = BoundsData(0, 0, 1080, 2400),
-                        visible = true,
-                    )
+                    val node = mockk<android.view.accessibility.AccessibilityNodeInfo>()
+                    every { node.className } returns "android.widget.FrameLayout"
+                    every { node.text } returns "changing_text_$callCount"
+                    val rectSlot = slot<Rect>()
+                    every { node.getBoundsInScreen(capture(rectSlot)) } answers {
+                        rectSlot.captured.left = 0
+                        rectSlot.captured.top = 0
+                        rectSlot.captured.right = 1080
+                        rectSlot.captured.bottom = 2400
+                    }
+                    every { node.childCount } returns 0
+                    node
                 }
 
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->

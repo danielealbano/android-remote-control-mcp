@@ -1,8 +1,15 @@
+@file:Suppress("DEPRECATION")
+
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.graphics.Rect
+import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -322,6 +329,132 @@ class TreeFingerprintTest {
                 )
 
             assertFalse(fpBefore.contentEquals(fpAfter))
+        }
+    }
+
+    @Nested
+    @DisplayName("generateFromRawNodes")
+    inner class GenerateFromRawNodesTests {
+        private fun rawNode(
+            className: String? = "android.widget.FrameLayout",
+            text: String? = null,
+            bounds: BoundsData = BoundsData(0, 0, 100, 100),
+            children: List<AccessibilityNodeInfo> = emptyList(),
+        ): AccessibilityNodeInfo {
+            val mock = mockk<AccessibilityNodeInfo>()
+            every { mock.className } returns className
+            every { mock.text } returns text
+            val rectSlot = slot<Rect>()
+            every { mock.getBoundsInScreen(capture(rectSlot)) } answers {
+                rectSlot.captured.left = bounds.left
+                rectSlot.captured.top = bounds.top
+                rectSlot.captured.right = bounds.right
+                rectSlot.captured.bottom = bounds.bottom
+            }
+            every { mock.childCount } returns children.size
+            for (i in children.indices) {
+                every { mock.getChild(i) } returns children[i]
+            }
+            return mock
+        }
+
+        @Test
+        fun `returns array of size FINGERPRINT_SIZE`() {
+            val root = rawNode()
+            val result = fingerprint.generateFromRawNodes(listOf(root))
+            assertEquals(TreeFingerprint.FINGERPRINT_SIZE, result.size)
+        }
+
+        @Test
+        fun `same raw tree produces identical fingerprint`() {
+            val root = rawNode(text = "Hello")
+            val first = fingerprint.generateFromRawNodes(listOf(root))
+            val second = fingerprint.generateFromRawNodes(listOf(root))
+            assertArrayEquals(first, second)
+        }
+
+        @Test
+        fun `single node increments exactly one bucket`() {
+            val root = rawNode()
+            val result = fingerprint.generateFromRawNodes(listOf(root))
+            assertEquals(1, result.sum())
+        }
+
+        @Test
+        fun `parent with children increments one bucket per node`() {
+            val child1 = rawNode(className = "android.widget.TextView", text = "A")
+            val child2 = rawNode(className = "android.widget.Button", text = "B")
+            val root = rawNode(children = listOf(child1, child2))
+            val result = fingerprint.generateFromRawNodes(listOf(root))
+            assertEquals(3, result.sum())
+        }
+
+        @Test
+        fun `different raw trees produce different fingerprints`() {
+            val tree1 = rawNode(text = "Hello")
+            val tree2 = rawNode(text = "World")
+            val fp1 = fingerprint.generateFromRawNodes(listOf(tree1))
+            val fp2 = fingerprint.generateFromRawNodes(listOf(tree2))
+            assertFalse(fp1.contentEquals(fp2))
+        }
+
+        @Test
+        fun `deep tree counts all descendants`() {
+            val greatGrandchild = rawNode(text = "leaf")
+            val grandchild = rawNode(children = listOf(greatGrandchild))
+            val child = rawNode(children = listOf(grandchild))
+            val root = rawNode(children = listOf(child))
+            val result = fingerprint.generateFromRawNodes(listOf(root))
+            assertEquals(4, result.sum())
+        }
+
+        @Test
+        fun `multiple root nodes combine fingerprints`() {
+            val root1 = rawNode(text = "A")
+            val root2 = rawNode(text = "B")
+            val fp1 = fingerprint.generateFromRawNodes(listOf(root1))
+            val fp2 = fingerprint.generateFromRawNodes(listOf(root2))
+            val combined = fingerprint.generateFromRawNodes(listOf(root1, root2))
+            assertEquals(fp1.sum() + fp2.sum(), combined.sum())
+        }
+
+        @Test
+        fun `matches parsed tree fingerprint for equivalent structure`() {
+            // Build equivalent trees: raw AccessibilityNodeInfo and parsed AccessibilityNodeData
+            val bounds = BoundsData(10, 20, 300, 400)
+            val rawChild =
+                rawNode(
+                    className = "android.widget.TextView",
+                    text = "Child",
+                    bounds = bounds,
+                )
+            val rawRoot =
+                rawNode(
+                    className = "android.widget.FrameLayout",
+                    text = "Root",
+                    bounds = bounds,
+                    children = listOf(rawChild),
+                )
+
+            val parsedChild =
+                node(
+                    className = "android.widget.TextView",
+                    text = "Child",
+                    bounds = bounds,
+                )
+            val parsedRoot =
+                node(
+                    className = "android.widget.FrameLayout",
+                    text = "Root",
+                    bounds = bounds,
+                    children = listOf(parsedChild),
+                )
+
+            val rawFp = fingerprint.generateFromRawNodes(listOf(rawRoot))
+            val parsedFp = fingerprint.generate(parsedRoot)
+
+            // Both paths should produce identical fingerprints for the same data
+            assertArrayEquals(parsedFp, rawFp)
         }
     }
 }
