@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -388,7 +389,17 @@ class NotificationProviderImplTest {
                 val result = provider.openNotification(hash)
 
                 assertTrue(result.isSuccess)
-                verify { pendingIntent.send() }
+                verify {
+                    pendingIntent.send(
+                        mockContext,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -421,7 +432,9 @@ class NotificationProviderImplTest {
             runTest {
                 val pendingIntent =
                     mockk<PendingIntent> {
-                        every { send() } throws PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val sbn = createMockSbn(key = "key1", contentIntent = pendingIntent)
                 setServiceInstance(sbn)
@@ -548,7 +561,17 @@ class NotificationProviderImplTest {
                 val result = provider.executeAction(actionId)
 
                 assertTrue(result.isSuccess)
-                verify { actionPendingIntent.send() }
+                verify {
+                    actionPendingIntent.send(
+                        mockContext,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -586,7 +609,9 @@ class NotificationProviderImplTest {
             runTest {
                 val actionPendingIntent =
                     mockk<PendingIntent> {
-                        every { send() } throws PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val action =
                     createMockAction(
@@ -633,7 +658,17 @@ class NotificationProviderImplTest {
                 val result = provider.replyToAction(actionId, "Hello")
 
                 assertTrue(result.isSuccess)
-                verify { actionPendingIntent.send(mockContext, 0, any()) }
+                verify {
+                    actionPendingIntent.send(
+                        mockContext,
+                        0,
+                        any<Intent>(),
+                        null,
+                        null,
+                        null,
+                        any(),
+                    )
+                }
             }
 
         @Test
@@ -672,8 +707,9 @@ class NotificationProviderImplTest {
             runTest {
                 val actionPendingIntent =
                     mockk<PendingIntent> {
-                        every { send(any<Context>(), any(), any<android.content.Intent>()) } throws
-                            PendingIntent.CanceledException()
+                        every {
+                            send(any(), any(), any(), any(), any(), any(), any())
+                        } throws PendingIntent.CanceledException()
                     }
                 val remoteInput =
                     mockk<RemoteInput> {
