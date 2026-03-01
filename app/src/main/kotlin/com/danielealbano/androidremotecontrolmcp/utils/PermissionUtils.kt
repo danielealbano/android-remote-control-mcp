@@ -90,4 +90,46 @@ object PermissionUtils {
             context,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Checks whether a specific notification listener service is currently enabled.
+     *
+     * Reads the `Settings.Secure` `enabled_notification_listeners` system setting
+     * and checks if the given service class is listed.
+     *
+     * @param context Application context.
+     * @param serviceClass The notification listener service class to check.
+     * @return `true` if the service is enabled, `false` otherwise.
+     */
+    fun isNotificationListenerEnabled(
+        context: Context,
+        serviceClass: Class<*>,
+    ): Boolean {
+        val expectedComponentName =
+            "${context.packageName}/${serviceClass.canonicalName}"
+
+        val enabledListeners =
+            Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners",
+            ) ?: return false
+
+        return enabledListeners
+            .split(ENABLED_SERVICES_SEPARATOR)
+            .any { it.equals(expectedComponentName, ignoreCase = true) }
+    }
+
+    /**
+     * Opens the Android Notification Listener Settings screen.
+     *
+     * @param context Application context. Uses [Intent.FLAG_ACTIVITY_NEW_TASK]
+     *   so this can be called from non-Activity contexts.
+     */
+    fun openNotificationListenerSettings(context: Context) {
+        val intent =
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        context.startActivity(intent)
+    }
 }

@@ -60,6 +60,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.StorageLocationsSection
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
+import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +86,7 @@ fun HomeScreen(
     val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
     val isCameraPermissionGranted by viewModel.isCameraPermissionGranted.collectAsStateWithLifecycle()
     val isMicrophonePermissionGranted by viewModel.isMicrophonePermissionGranted.collectAsStateWithLifecycle()
+    val isNotificationListenerEnabled by viewModel.isNotificationListenerEnabled.collectAsStateWithLifecycle()
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
     val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
@@ -260,6 +262,7 @@ fun HomeScreen(
             PermissionsSection(
                 isAccessibilityEnabled = isAccessibilityEnabled,
                 isNotificationPermissionGranted = isNotificationPermissionGranted,
+                isNotificationListenerEnabled = isNotificationListenerEnabled,
                 isCameraPermissionGranted = isCameraPermissionGranted,
                 isMicrophonePermissionGranted = isMicrophonePermissionGranted,
                 onOpenAccessibilitySettings = {
@@ -268,6 +271,9 @@ fun HomeScreen(
                     )
                 },
                 onRequestNotificationPermission = onRequestNotificationPermission,
+                onOpenNotificationListenerSettings = {
+                    PermissionUtils.openNotificationListenerSettings(context)
+                },
                 onRequestCameraPermission = onRequestCameraPermission,
                 onRequestMicrophonePermission = onRequestMicrophonePermission,
             )

@@ -218,6 +218,80 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // requireLong
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("requireLong")
+    inner class RequireLongTests {
+        @Test
+        @DisplayName("valid integer returns Long")
+        fun validIntegerReturnsLong() {
+            val params = buildJsonObject { put("duration", 60000) }
+            assertEquals(60000L, McpToolUtils.requireLong(params, "duration"))
+        }
+
+        @Test
+        @DisplayName("missing param throws InvalidParams")
+        fun missingParamThrowsInvalidParams() {
+            val params = buildJsonObject { put("other", 100) }
+
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireLong(params, "duration")
+            }
+        }
+
+        @Test
+        @DisplayName("null params throws InvalidParams")
+        fun nullParamsThrowsInvalidParams() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireLong(null, "duration")
+            }
+        }
+
+        @Test
+        @DisplayName("non-number throws InvalidParams")
+        fun nonNumberThrowsInvalidParams() {
+            val params = buildJsonObject { put("duration", true) }
+
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireLong(params, "duration")
+            }
+        }
+
+        @Test
+        @DisplayName("decimal throws InvalidParams")
+        fun decimalThrowsInvalidParams() {
+            val params = buildJsonObject { put("duration", 3.5) }
+
+            val exception =
+                assertThrows<McpToolException.InvalidParams> {
+                    McpToolUtils.requireLong(params, "duration")
+                }
+            assertTrue(exception.message!!.contains("integer"))
+        }
+
+        @Test
+        @DisplayName("rejects string-encoded number")
+        fun rejectsStringEncodedNumber() {
+            val params = buildJsonObject { put("duration", "60000") }
+
+            val exception =
+                assertThrows<McpToolException.InvalidParams> {
+                    McpToolUtils.requireLong(params, "duration")
+                }
+            assertTrue(exception.message!!.contains("got string"))
+        }
+
+        @Test
+        @DisplayName("accepts integer-equivalent float")
+        fun acceptsIntegerEquivalentFloat() {
+            val params = buildJsonObject { put("duration", 5.0) }
+            assertEquals(5L, McpToolUtils.requireLong(params, "duration"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // requireString
     // ─────────────────────────────────────────────────────────────────────
 

@@ -32,6 +32,17 @@ class E2EScreenshotTest {
          * to document the empty device_slug assumption.
          */
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
+
+        /**
+         * Maximum number of retry attempts for screenshot capture that may fail
+         * transiently on slow CI emulators (accessibility service unavailable, etc.).
+         */
+        private const val MAX_RETRY_ATTEMPTS = 3
+
+        /**
+         * Delay between retry attempts in milliseconds.
+         */
+        private const val RETRY_DELAY_MS = 5_000L
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient
@@ -50,11 +61,12 @@ class E2EScreenshotTest {
             mapOf("include_screenshot" to true),
         )
 
-        if (result.isError == true || result.content.size < 2) {
+        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+            if (result.isError != true && result.content.size >= 2) break
             val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
-            println("[E2E Screenshot] First attempt failed (isError=${result.isError}, " +
-                "content.size=${result.content.size}): $errorText — retrying after 3s")
-            Thread.sleep(3_000)
+            println("[E2E Screenshot] Attempt $attempt failed (isError=${result.isError}, " +
+                "content.size=${result.content.size}): $errorText — retrying after ${RETRY_DELAY_MS}ms")
+            Thread.sleep(RETRY_DELAY_MS)
             result = mcpClient.callTool(
                 "${TOOL_PREFIX}get_screen_state",
                 mapOf("include_screenshot" to true),
