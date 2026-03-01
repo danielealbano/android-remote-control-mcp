@@ -498,5 +498,54 @@ class UtilityToolsTest {
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
+
+        @Test
+        fun `throws permission denied when accessibility service not ready`() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns false
+                val params = buildJsonObject { put("timeout", 5000) }
+
+                assertThrows<McpToolException.PermissionDenied> { tool.execute(params) }
+            }
+
+        @Test
+        fun `falls back to root node when no accessibility windows available`() =
+            runTest {
+                every {
+                    mockAccessibilityServiceProvider.getAccessibilityWindows()
+                } returns emptyList()
+                val stableRoot = mockRawNode()
+                every { mockAccessibilityServiceProvider.getRootNode() } returns stableRoot
+
+                val params = buildJsonObject { put("timeout", 5000) }
+                val result = tool.execute(params)
+                val text = extractTextContent(result)
+                val parsed = Json.parseToJsonElement(text).jsonObject
+                assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
+            }
+
+        @Test
+        fun `times out when all windows return null root nodes`() =
+            runTest {
+                mockkStatic(SystemClock::class)
+                try {
+                    var clockMs = 0L
+                    every { SystemClock.elapsedRealtime() } answers { clockMs }
+                    every { mockWindowInfo.root } returns null
+                    every {
+                        mockAccessibilityServiceProvider.getAccessibilityWindows()
+                    } answers {
+                        clockMs += 600L
+                        listOf(mockWindowInfo)
+                    }
+
+                    val params = buildJsonObject { put("timeout", 1000) }
+                    val result = tool.execute(params)
+                    val text = extractTextContent(result)
+                    assertTrue(text.contains("timed out"))
+                } finally {
+                    unmockkStatic(SystemClock::class)
+                }
+            }
     }
 }
