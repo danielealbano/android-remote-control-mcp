@@ -255,11 +255,13 @@ class NotificationSnoozeHandler
             validateNotificationId(notificationId)
             val durationMs = McpToolUtils.requireLong(arguments, "duration_ms")
             if (durationMs <= 0) {
-                throw McpToolException.InvalidParams("duration_ms must be positive")
+                throw McpToolException.InvalidParams(
+                    "Parameter 'duration_ms' must be positive, got: $durationMs",
+                )
             }
             if (durationMs > MAX_SNOOZE_DURATION_MS) {
                 throw McpToolException.InvalidParams(
-                    "duration_ms must not exceed $MAX_SNOOZE_DURATION_MS (7 days)",
+                    "Parameter 'duration_ms' must not exceed $MAX_SNOOZE_DURATION_MS (7 days), got: $durationMs",
                 )
             }
             Logger.d(TAG, "Executing notification_snooze for id: $notificationId, duration: ${durationMs}ms")
