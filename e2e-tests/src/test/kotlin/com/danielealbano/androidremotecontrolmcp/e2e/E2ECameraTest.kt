@@ -55,7 +55,7 @@ class E2ECameraTest {
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
         private const val MAX_PHOTO_ATTEMPTS = 3
-        private const val PHOTO_RETRY_DELAY_MS = 5_000L
+        private const val PHOTO_RETRY_DELAY_MS = 10_000L
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient

@@ -42,7 +42,7 @@ class E2EScreenshotTest {
         /**
          * Delay between retry attempts in milliseconds.
          */
-        private const val RETRY_DELAY_MS = 3_000L
+        private const val RETRY_DELAY_MS = 5_000L
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient
