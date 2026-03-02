@@ -1,5 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.graphics.Rect
+import android.view.accessibility.AccessibilityNodeInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import kotlin.math.abs
@@ -93,6 +95,30 @@ class TreeFingerprint {
         return similarity.coerceIn(0, FULL_MATCH_PERCENTAGE)
     }
 
+    /**
+     * Generates a combined [FINGERPRINT_SIZE]-slot histogram fingerprint by walking
+     * raw [AccessibilityNodeInfo] trees directly, without creating intermediate
+     * [AccessibilityNodeData] objects or populating any cache.
+     *
+     * This is significantly faster than [generate] for use cases that only need
+     * fingerprint comparison (e.g., idle detection) because it skips node ID
+     * generation, property extraction for unused fields, and cache population.
+     *
+     * Child nodes obtained via [AccessibilityNodeInfo.getChild] are not recycled
+     * (safe on API 33+ where recycle() is a no-op).
+     *
+     * @param rootNodes the root [AccessibilityNodeInfo] for each on-screen window
+     * @return an [IntArray] of size [FINGERPRINT_SIZE] representing the combined fingerprint
+     */
+    fun generateFromRawNodes(rootNodes: List<AccessibilityNodeInfo>): IntArray {
+        val fingerprint = IntArray(FINGERPRINT_SIZE)
+        val rect = Rect()
+        for (rootNode in rootNodes) {
+            populateFingerprintFromRaw(rootNode, fingerprint, 0, rect)
+        }
+        return fingerprint
+    }
+
     private fun populateFingerprint(
         node: AccessibilityNodeData,
         fingerprint: IntArray,
@@ -103,6 +129,37 @@ class TreeFingerprint {
 
         for (child in node.children) {
             populateFingerprint(child, fingerprint)
+        }
+    }
+
+    private fun populateFingerprintFromRaw(
+        node: AccessibilityNodeInfo,
+        fingerprint: IntArray,
+        depth: Int,
+        rect: Rect,
+    ) {
+        node.getBoundsInScreen(rect)
+        val childCount = node.childCount
+
+        var hash = HASH_SEED
+        hash = HASH_MULTIPLIER * hash + (node.className?.hashCode() ?: 0)
+        hash = HASH_MULTIPLIER * hash + (node.text?.hashCode() ?: 0)
+        // Compute bounds hash matching BoundsData.hashCode() (Kotlin data class)
+        var boundsHash = rect.left
+        boundsHash = HASH_MULTIPLIER * boundsHash + rect.top
+        boundsHash = HASH_MULTIPLIER * boundsHash + rect.right
+        boundsHash = HASH_MULTIPLIER * boundsHash + rect.bottom
+        hash = HASH_MULTIPLIER * hash + boundsHash
+        hash = HASH_MULTIPLIER * hash + childCount
+
+        val index = (hash and INDEX_MASK) % FINGERPRINT_SIZE
+        fingerprint[index]++
+
+        if (depth < MAX_RAW_TREE_DEPTH) {
+            for (i in 0 until childCount) {
+                val child = node.getChild(i) ?: continue
+                populateFingerprintFromRaw(child, fingerprint, depth + 1, rect)
+            }
         }
     }
 
@@ -127,5 +184,8 @@ class TreeFingerprint {
 
         /** Mask to ensure non-negative index from hash code. */
         private const val INDEX_MASK = 0x7FFFFFFF
+
+        /** Maximum tree depth for raw node traversal (matches AccessibilityTreeParser.MAX_TREE_DEPTH). */
+        private const val MAX_RAW_TREE_DEPTH = 100
     }
 }

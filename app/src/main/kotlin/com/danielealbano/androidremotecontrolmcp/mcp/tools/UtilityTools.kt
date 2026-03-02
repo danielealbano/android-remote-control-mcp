@@ -319,17 +319,17 @@ class WaitForElementTool
  * MCP tool: wait_for_idle
  *
  * Waits for the UI to become idle by comparing accessibility tree fingerprints
- * across consecutive snapshots. Uses a 256-slot histogram fingerprint and
- * normalized difference to compute a similarity percentage. Considers UI idle
- * when two consecutive snapshots (separated by [IDLE_CHECK_INTERVAL_MS]) meet
- * the [DEFAULT_MATCH_PERCENTAGE] threshold (or the caller-provided `match_percentage`).
+ * across consecutive snapshots. Uses a lightweight path that walks raw
+ * [android.view.accessibility.AccessibilityNodeInfo] trees directly, without
+ * creating intermediate data objects or populating the node cache. Considers UI
+ * idle when two consecutive snapshots (separated by [IDLE_CHECK_INTERVAL_MS])
+ * meet the [DEFAULT_MATCH_PERCENTAGE] threshold (or the caller-provided
+ * `match_percentage`).
  */
 class WaitForIdleTool
     @Inject
     constructor(
-        private val treeParser: AccessibilityTreeParser,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
-        private val nodeCache: AccessibilityNodeCache,
     ) {
         private val treeFingerprint = TreeFingerprint()
 
@@ -370,8 +370,7 @@ class WaitForIdleTool
 
             while (SystemClock.elapsedRealtime() - startTime < timeout) {
                 try {
-                    val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val currentFingerprint = treeFingerprint.generate(multiWindowResult.windows)
+                    val currentFingerprint = generateCurrentFingerprint()
 
                     if (previousFingerprint != null) {
                         val similarity = treeFingerprint.compare(previousFingerprint, currentFingerprint)
@@ -420,6 +419,45 @@ class WaitForIdleTool
             return McpToolUtils.textResult(Json.encodeToString(resultJson))
         }
 
+        @Suppress("ThrowsCount")
+        private fun generateCurrentFingerprint(): IntArray {
+            if (!accessibilityServiceProvider.isReady()) {
+                throw McpToolException.PermissionDenied(
+                    "Accessibility service not enabled or not ready. " +
+                        "Please enable it in Android Settings > Accessibility.",
+                )
+            }
+
+            val accessibilityWindows = accessibilityServiceProvider.getAccessibilityWindows()
+
+            if (accessibilityWindows.isNotEmpty()) {
+                try {
+                    val rootNodes =
+                        accessibilityWindows.mapNotNull { window ->
+                            window.root
+                        }
+                    if (rootNodes.isEmpty()) {
+                        throw McpToolException.ActionFailed("All windows returned null root nodes.")
+                    }
+                    return treeFingerprint.generateFromRawNodes(rootNodes)
+                } finally {
+                    for (w in accessibilityWindows) {
+                        @Suppress("DEPRECATION")
+                        w.recycle()
+                    }
+                }
+            }
+
+            // Fallback to single root node
+            val rootNode =
+                accessibilityServiceProvider.getRootNode()
+                    ?: throw McpToolException.ActionFailed(
+                        "No windows available and no active window root node. " +
+                            "The screen may be transitioning.",
+                    )
+            return treeFingerprint.generateFromRawNodes(listOf(rootNode))
+        }
+
         fun register(
             server: Server,
             toolNamePrefix: String,
@@ -453,7 +491,7 @@ class WaitForIdleTool
         companion object {
             private const val TAG = "MCP:WaitForIdleTool"
             const val TOOL_NAME = "wait_for_idle"
-            private const val IDLE_CHECK_INTERVAL_MS = 500L
+            private const val IDLE_CHECK_INTERVAL_MS = 250L
             private const val MAX_TIMEOUT_MS = 30000L
             private const val DEFAULT_MATCH_PERCENTAGE = 100
 
@@ -586,7 +624,7 @@ fun registerUtilityTools(
     SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
     WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
         .register(server, toolNamePrefix)
-    WaitForIdleTool(treeParser, accessibilityServiceProvider, nodeCache)
+    WaitForIdleTool(accessibilityServiceProvider)
         .register(server, toolNamePrefix)
     GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
         .register(server, toolNamePrefix)

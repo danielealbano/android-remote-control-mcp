@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.view.accessibility.AccessibilityNodeInfo
