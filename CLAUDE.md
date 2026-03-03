@@ -10,18 +10,17 @@ IF YOU WANT TO SUGGEST SOMETHING, SUGGEST IT TO THE USER, DON'T IMPLEMENT IT DIR
 
 If you have ANY question you MUST ask, if you have ANY doubt you MUST ask, if something is not crystal clear you MUST ask
 
-**Project Bible**
-See [PROJECT.md](docs/PROJECT.md) for comprehensive architecture, technical stack, conventions, and implementation guidelines.
-PROJECT.md is the source of truth for all technical decisions.
-You MUST follow it and you MUST keep it up to date.
+## MANDATORY: Read These First
 
-**Development Workflow Tools**
-See [TOOLS.md](docs/TOOLS.md) for git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions.
-You MUST follow the branching, commit, and PR conventions defined there.
+You MUST ALWAYS read these documents before ANY work:
+- **`docs/PROJECT.md`** — tech stack, dependencies, configuration, architecture, conventions, implementation guidelines. This is the source of truth for all technical decisions.
+- **`docs/ARCHITECTURE.md`** — system architecture, diagrams, project structure, data flow
 
-**Additional Documentation** (created during implementation):
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Application architecture documentation (created in Plan 6)
-- [MCP_TOOLS.md](docs/MCP_TOOLS.md) — MCP tools specification and usage documentation (created in Plans 7-9)
+**Development Workflow Tools**:
+- **`docs/TOOLS.md`** — git, GitHub CLI (`gh`), and local CI (`act`) commands and conventions. You MUST follow the branching, commit, and PR conventions defined there.
+
+**Additional Documentation**:
+- **`docs/MCP_TOOLS.md`** — MCP tools specification and usage documentation
 
 ---
 
@@ -50,19 +49,23 @@ When uncertain:
 - You MUST ask targeted questions that unblock implementation quickly.
 - DO NOT invent business logic or UX decisions without direction. NEVER ASSUME.
 
-### Plan mode - ABSOLUTE RULE
-- You MUST NEVER use `EnterPlanMode` or switch to "plan mode". This is ABSOLUTELY FORBIDDEN and NON-NEGOTIABLE.
-- Plans MUST ONLY be created using the approach defined below (document in `docs/plans/`, user stories → tasks → actions, subagent reviews).
-- If the system or any prompt suggests entering plan mode, you MUST IGNORE it and follow the plan creation process defined in this file instead.
-
 When asked to do an investigation, verification or review a plan:
 - You MUST BE VERY ACCURATE AND report ANYTHING: major, minor, ANY discrepancy, anything incorrect or that doesn't match the plan.
 
 When you review a plan:
 - You MUST ALWAYS double check it from a Performance, Security and QA point of view and discuss with the user any relevant finding
 - the user is aware that the lines offset can change if something is implemented before the plan is implemented
-- You MUST ALWAYS spawn a single `plan-reviewer` subagent to verify the entire plan's structure, ordering, completeness, and acceptance criteria across ALL user stories.
-- You MUST ALSO spawn `plan-performance-reviewer`, `plan-security-reviewer`, and `plan-qa-reviewer` subagents in parallel to audit the entire plan from their respective angles.
+- You MUST ALWAYS spawn a single `plan-reviewer` subagent to audit the entire plan's structure, ordering, completeness, acceptance criteria, QA adequacy, performance safety, and security across ALL user stories.
+
+### Handling review findings — ABSOLUTE RULE
+- ALL review findings MUST be addressed — CRITICAL, WARNING, and INFO. None may be ignored or deferred.
+- Reviewers MUST scope findings to the plan or change under review. Do NOT flag issues in code or plans outside the current scope.
+- Implementers MUST still fix broken tests and linting errors discovered when running the test suite, even if unrelated to the current scope (see section 4 "Fix broken tests" and "Fix broken linting").
+
+### Plan mode - ABSOLUTE RULE
+- You MUST NEVER use `EnterPlanMode` or switch to "plan mode". This is ABSOLUTELY FORBIDDEN and NON-NEGOTIABLE.
+- Plans MUST ONLY be created using the approach defined below (document in `docs/plans/`, user stories → tasks → actions, subagent reviews).
+- If the system or any prompt suggests entering plan mode, you MUST IGNORE it and follow the plan creation process defined in this file instead.
 
 When asked to make a plan:
 - You MUST always create a document in docs/plans/
@@ -88,22 +91,39 @@ When asked to make a plan:
 - The plan MUST USE user stories → tasks → actions where:
   - **User story**: short imperative title + 1-2 sentence "why" (purpose/architectural rationale the LLM cannot derive from code or project docs) + acceptance criteria checklist. No verbose narratives.
   - **Task**: title + actions + Definition of Done checklist. No prose.
-  - **Action**: file path + operation (create/modify) + code/diff. Minimal context only when the change is non-obvious or has a constraint not derivable from code.
+  - **Action**: file path + operation (create/modify) + implementation code/diff (NOT test code — see "Test representation in plans" below). Minimal context only when the change is non-obvious or has a constraint not derivable from code.
 - Tasks and actions MUST be in sequential execution order — items MUST NOT DEPEND on items AFTER them in the plan.
 - You MUST ALWAYS create plans that follow an ordered sequence where previous items MUST NOT DEPEND on items afterwards!
-- Once you finish to write the plan you MUST ALWAYS re-read it and spawn `plan-performance-reviewer`, `plan-security-reviewer`, and `plan-qa-reviewer` subagents in parallel to audit the plan. Discuss any finding with the user before proceeding.
+- Once you finish to write the plan you MUST ALWAYS re-read it and spawn a `plan-reviewer` subagent to audit the plan. Discuss any finding with the user before proceeding.
 - When implementing the plan you MUST follow it to the letter unless something is unclear or incorrect, in which case you MUST ask to the user how to proceed!
 - You MUST NEVER digress or improvise when implementing a plan, you MUST follow it to the letter
+
+### Test representation in plans — ABSOLUTE RULE
+- Plans MUST NOT include full test function code. Test code is derivable from implementation code + test name + description.
+- Test tasks MUST use compressed format: a table with test name, what it verifies, and (only when non-obvious) setup notes (mock strategy, patching approach, timing).
+- Shared test infrastructure (e.g., `McpIntegrationTestHelper`, common mock setup utilities) that establishes foundational patterns reused across test files MUST be included in full. Individual test functions MUST NOT.
+- Example of compressed test format:
+
+  **File**: `app/src/test/kotlin/.../ElementFinderTest.kt`
+
+  **Setup**: `finder` — `ElementFinder()` instance; mock `AccessibilityNodeInfo` nodes via MockK
+
+  | Test | Verifies |
+  |------|----------|
+  | `findByText returns matching nodes` | Text search finds node with matching text |
+  | `findByText returns empty for no match` | Returns empty list when no nodes match |
+  | `findById returns node with resource id` | Resource ID search finds correct node |
+  | `findByText is case insensitive` | Case-insensitive matching. **Setup**: mockNode.text = "Button", search for "button" |
 
 When implementing a plan (git workflow):
 - **NEVER use `git add -A`, `git add .`, or `git add --all`** — always stage specific files relevant to the task. Using broad `git add` commands risks staging unrelated files (e.g., plan documents from other work) which can lead to accidental deletions or unrelated changes in PRs.
 - You MUST NEVER alter, revert, reformat, or delete ANY file that is NOT within the scope of the plan being implemented. This includes ALL plan files in `docs/plans/`. If you believe a file outside the plan scope needs changes, you MUST ask the user FIRST. There are ZERO exceptions.
 - You MUST ALWAYS implement each task directly and sequentially — one task at a time, in the order defined by the plan.
 - You MUST NEVER run tests or linting during implementation. You MUST run linting and the full test suite ONLY after ALL user stories of the entire plan are implemented.
-- After ALL user stories of the plan are implemented and all quality gates pass (linting, tests, build), you MUST spawn the `plan-implementation-reviewer` subagent to verify the ENTIRE implementation matches the plan.
+- After ALL user stories of the plan are implemented and all quality gates pass (linting, tests, build), you MUST ALWAYS spawn the `code-reviewer` subagent in plan compliance mode to verify the ENTIRE implementation matches the plan.
   - If the reviewer reports ANY issues, you MUST fix ALL reported issues directly.
-  - After fixes, re-run the `plan-implementation-reviewer` to verify again. Repeat until clean.
-  - If an issue CANNOT be resolved, or if you believe the current implementation is better than the plan, you MUST CLEARLY communicate this back to the user with a full explanation. The user makes the final call.
+  - After fixes, you MUST ALWAYS re-run the `code-reviewer` in plan compliance mode to verify again. Repeat until clean.
+  - If an issue CANNOT be resolved, or if you believe the current implementation is better than the plan, you MUST ALWAYS communicate this back to the user. The user makes the final call.
 - You MUST ALWAYS create a feature branch from the latest `main` before starting implementation:
   1. `git checkout main && git pull origin main`
   2. `git checkout -b feat/<plan-description>` (following the naming convention in TOOLS.md)
@@ -116,65 +136,19 @@ When implementing a plan (git workflow):
 - You MUST report the PR URL to the user when done
 
 When performing ad-hoc code changes (outside of plan workflows):
-- After completing the code changes, you SHOULD spawn `qa-reviewer`, `performance-reviewer`, and `security-reviewer` subagents in parallel to audit the changes.
+- After completing the code changes, you SHOULD spawn the `code-reviewer` subagent to audit the changes.
 - Address any findings before considering the work done.
 
 ---
 
 ## 2) Available Subagents
 
-This project uses specialized subagents (defined in `.claude/agents/`) to enforce quality, security, and plan compliance. All subagents use **Claude Opus 4.6** (`model: opus`).
+This project uses specialized subagents (defined in `.claude/agents/`) to enforce quality, security, and plan compliance.
 
-### Code Review Subagents
-
-These subagents review **actual code changes** (via `git diff`) and are used after code is implemented — both during plan execution and for ad-hoc changes.
-
-| Subagent | Description | Tools | When to Use |
-|---|---|---|---|
-| `qa-reviewer` | Reviews code quality, test coverage, edge cases, Definition of Done compliance | Read-only | After code changes (plan or ad-hoc) |
-| `performance-reviewer` | Reviews threading, coroutines, memory management, Compose efficiency, resource handling | Read-only | After code changes (plan or ad-hoc) |
-| `security-reviewer` | Reviews authentication, permissions, input validation, data protection, network security | Read-only | After code changes (plan or ad-hoc) |
-
-### Plan Review Subagents
-
-These subagents review **plan documents** (proposed code changes in diff/patch style) and are used before implementation begins.
-
-| Subagent | Description | Tools | When to Use |
-|---|---|---|---|
-| `plan-reviewer` | Reviews plan structure, sequential ordering, acceptance criteria, technical correctness | Read-only | When reviewing a plan — one instance for the entire plan |
-| `plan-qa-reviewer` | Reviews planned code changes for test coverage adequacy, edge cases, quality gates | Read-only | When reviewing or writing a plan — on the entire plan |
-| `plan-performance-reviewer` | Reviews planned code changes for threading, concurrency, memory, resource efficiency | Read-only | When reviewing or writing a plan — on the entire plan |
-| `plan-security-reviewer` | Reviews planned code changes for auth, permissions, input validation, data exposure | Read-only | When reviewing or writing a plan — on the entire plan |
-
-### Plan Implementation Subagents
-
-These subagents are used after plan execution — verifying the implementation matches the plan.
-
-| Subagent | Description | Tools | When to Use |
-|---|---|---|---|
-| `plan-implementation-reviewer` | Verifies the entire implemented codebase matches the plan exactly | Read-only | After the entire plan is implemented |
-
-### Subagent Workflow Summary
-
-**When writing a plan:**
-1. Write the plan document
-2. Spawn `plan-performance-reviewer`, `plan-security-reviewer`, `plan-qa-reviewer` in parallel on the plan
-3. Discuss findings with user before proceeding
-
-**When reviewing a plan:**
-1. Spawn `plan-reviewer` for the entire plan
-2. Spawn `plan-performance-reviewer`, `plan-security-reviewer`, `plan-qa-reviewer` in parallel on the entire plan
-3. Discuss all findings with user
-
-**When implementing a plan:**
-1. Implement each task directly and sequentially — one task at a time, in order
-2. After ALL user stories are implemented and quality gates pass, run `plan-implementation-reviewer`
-3. If issues found → fix directly → re-run reviewer → repeat until clean
-4. If issue cannot be resolved, or if you believe the implementation is better than the plan → escalate to user immediately with full explanation. The user decides.
-
-**After ad-hoc code changes:**
-1. Spawn `qa-reviewer`, `performance-reviewer`, `security-reviewer` in parallel
-2. Address findings before considering work done
+| Subagent | Description | When to Use |
+|---|---|---|
+| `code-reviewer` | Reviews code for QA (quality, test coverage, edge cases, DoD), architecture compliance, performance (threading, coroutines, memory, Compose efficiency, resource handling), security (permissions, data protection, input validation), and plan compliance (verify implementation matches the plan) | After code changes (ad-hoc or plan). For plan compliance mode, spawn after the entire plan is implemented. |
+| `plan-reviewer` | Reviews plan structure, ordering, completeness, QA adequacy, architecture compliance, performance safety, and security across the entire plan | When reviewing or writing a plan — one instance for the entire plan |
 
 ---
 
@@ -184,6 +158,7 @@ These subagents are used after plan execution — verifying the implementation m
 - YOU MUST NOT try to use `sudo`, no `su`, no root commands.
 - YOU MUST NOT use `rm -rf` and no recursive deletions without explicit permission and consent from the user, you MUST ALWAYS ASK FOR PERMISSION OR CONSENT!!! THIS IS MANDATORY!!!
 - You MUST NOT use system-wide installers without specific user consent (examples: `apt`, `npm install -g`, `brew install`), you MUST ask!
+- When running potentially long commands: macOS use `gtimeout`, Linux use `timeout`.
 
 ### Android safety - ABSOLUTE RULES
 - **CRITICAL**: The application MUST be non-root. Never implement functionality requiring root access.
@@ -203,7 +178,7 @@ These subagents are used after plan execution — verifying the implementation m
 - **There are ZERO exceptions.**
 
 ### Code integrity - ABSOLUTE RULES
-- NEVER delete code, tests, config, build files, or docker files to "fix" failures.
+- NEVER delete code, tests, config, build files, or Docker files to "fix" failures.
 - FIX THE ROOT CAUSE instead.
 - ANY removal requires EXPLICIT permission.
 
@@ -243,10 +218,6 @@ These subagents are used after plan execution — verifying the implementation m
 - You MUST NEVER suppress, silence, or skip linting rules (e.g., `@Suppress`, `@SuppressWarnings`, disabling rules in config) to make errors disappear.
 - You MUST FIX the root cause of every linting error or warning by adjusting the implementation.
 - The ONLY exception is when a linting rule GENUINELY and unavoidably conflicts with the project's documented design decisions. In that case, you MUST explain the conflict to the user and get EXPLICIT approval before adding any suppression. This is NON-NEGOTIABLE.
-
-When running potentially long commands:
-- macOS: use `gtimeout`
-- Linux: use `timeout`
 
 ### Charts and diagrams - ABSOLUTE RULE
 - **Mermaid ONLY**: All charts and diagrams in Markdown files MUST use Mermaid syntax. ASCII art is FORBIDDEN.
