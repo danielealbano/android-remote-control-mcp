@@ -10,6 +10,7 @@ import app.cash.turbine.test
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import io.mockk.every
 import io.mockk.mockkStatic
@@ -1180,5 +1181,83 @@ class SettingsRepositoryImplTest {
                     assertFalse(result[0].allowDelete)
                 }
         }
+    }
+
+    @Nested
+    @DisplayName("tool permissions")
+    inner class ToolPermissions {
+        @Test
+        fun `updateToolPermissionsConfig with disabled tools persists`() =
+            runTest {
+                val config = ToolPermissionsConfig(disabledTools = setOf("tap", "swipe"))
+                repository.updateToolPermissionsConfig(config)
+
+                val result = repository.getServerConfig()
+                assertEquals(setOf("tap", "swipe"), result.toolPermissionsConfig.disabledTools)
+            }
+
+        @Test
+        fun `updateToolPermissionsConfig with disabled params persists`() =
+            runTest {
+                val config =
+                    ToolPermissionsConfig(
+                        disabledParams = mapOf("get_screen_state" to setOf("include_screenshot")),
+                    )
+                repository.updateToolPermissionsConfig(config)
+
+                val result = repository.getServerConfig()
+                assertEquals(
+                    mapOf("get_screen_state" to setOf("include_screenshot")),
+                    result.toolPermissionsConfig.disabledParams,
+                )
+            }
+
+        @Test
+        fun `empty config round-trip`() =
+            runTest {
+                repository.updateToolPermissionsConfig(ToolPermissionsConfig())
+
+                val result = repository.getServerConfig()
+                assertEquals(ToolPermissionsConfig(), result.toolPermissionsConfig)
+            }
+
+        @Test
+        fun `corrupt JSON in DataStore falls back to default`() =
+            runTest {
+                dataStore.edit { prefs ->
+                    prefs[stringPreferencesKey("tool_permissions")] = "not-json"
+                }
+
+                val result = repository.getServerConfig()
+                assertEquals(ToolPermissionsConfig(), result.toolPermissionsConfig)
+            }
+
+        @Test
+        fun `updateToolEnabled toggle on then off`() =
+            runTest {
+                repository.updateToolEnabled("tap", false)
+                var result = repository.getServerConfig()
+                assertTrue(result.toolPermissionsConfig.disabledTools.contains("tap"))
+
+                repository.updateToolEnabled("tap", true)
+                result = repository.getServerConfig()
+                assertFalse(result.toolPermissionsConfig.disabledTools.contains("tap"))
+            }
+
+        @Test
+        fun `updateParamEnabled toggle removes empty key`() =
+            runTest {
+                repository.updateParamEnabled("get_screen_state", "include_screenshot", false)
+                var result = repository.getServerConfig()
+                assertTrue(
+                    result.toolPermissionsConfig.disabledParams.containsKey("get_screen_state"),
+                )
+
+                repository.updateParamEnabled("get_screen_state", "include_screenshot", true)
+                result = repository.getServerConfig()
+                assertFalse(
+                    result.toolPermissionsConfig.disabledParams.containsKey("get_screen_state"),
+                )
+            }
     }
 }

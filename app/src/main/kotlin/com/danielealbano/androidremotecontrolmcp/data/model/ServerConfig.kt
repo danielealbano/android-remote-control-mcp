@@ -42,6 +42,7 @@ data class ServerConfig(
     val allowUnverifiedHttpsCerts: Boolean = false,
     val downloadTimeoutSeconds: Int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
     val deviceSlug: String = "",
+    val toolPermissionsConfig: ToolPermissionsConfig = ToolPermissionsConfig(),
 ) {
     companion object {
         /** Default server port. */

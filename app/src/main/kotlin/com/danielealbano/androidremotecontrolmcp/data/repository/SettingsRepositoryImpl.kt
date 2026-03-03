@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -163,6 +164,40 @@ class SettingsRepositoryImpl
         override suspend fun updateDeviceSlug(slug: String) {
             dataStore.edit { prefs ->
                 prefs[DEVICE_SLUG_KEY] = slug
+            }
+        }
+
+        override suspend fun updateToolPermissionsConfig(config: ToolPermissionsConfig) {
+            dataStore.edit { prefs ->
+                prefs[TOOL_PERMISSIONS_KEY] = config.toJson()
+            }
+        }
+
+        override suspend fun updateToolEnabled(toolName: String, enabled: Boolean) {
+            dataStore.edit { prefs ->
+                val current = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY])
+                val updated =
+                    if (enabled) {
+                        current.copy(disabledTools = current.disabledTools - toolName)
+                    } else {
+                        current.copy(disabledTools = current.disabledTools + toolName)
+                    }
+                prefs[TOOL_PERMISSIONS_KEY] = updated.toJson()
+            }
+        }
+
+        override suspend fun updateParamEnabled(toolName: String, paramName: String, enabled: Boolean) {
+            dataStore.edit { prefs ->
+                val current = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY])
+                val currentParams = current.disabledParams[toolName] ?: emptySet()
+                val newParams = if (enabled) currentParams - paramName else currentParams + paramName
+                val newDisabledParams =
+                    if (newParams.isEmpty()) {
+                        current.disabledParams - toolName
+                    } else {
+                        current.disabledParams + (toolName to newParams)
+                    }
+                prefs[TOOL_PERMISSIONS_KEY] = current.copy(disabledParams = newDisabledParams).toJson()
             }
         }
 
@@ -336,6 +371,7 @@ class SettingsRepositoryImpl
                     prefs[DOWNLOAD_TIMEOUT_KEY]
                         ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
                 deviceSlug = prefs[DEVICE_SLUG_KEY] ?: "",
+                toolPermissionsConfig = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY]),
             )
         }
 
@@ -458,6 +494,7 @@ class SettingsRepositoryImpl
             private val ALLOW_UNVERIFIED_HTTPS_KEY = booleanPreferencesKey("allow_unverified_https_certs")
             private val DOWNLOAD_TIMEOUT_KEY = intPreferencesKey("download_timeout_seconds")
             private val DEVICE_SLUG_KEY = stringPreferencesKey("device_slug")
+            private val TOOL_PERMISSIONS_KEY = stringPreferencesKey("tool_permissions")
             private val AUTHORIZED_LOCATIONS_KEY = stringPreferencesKey("authorized_storage_locations")
 
             /**

@@ -84,6 +84,14 @@ class ServerConfigTest {
             val config = ServerConfig()
             assertEquals("", config.deviceSlug)
         }
+
+        @Test
+        fun `default toolPermissionsConfig has empty sets`() {
+            val config = ServerConfig()
+            assertEquals(ToolPermissionsConfig(), config.toolPermissionsConfig)
+            assertTrue(config.toolPermissionsConfig.disabledTools.isEmpty())
+            assertTrue(config.toolPermissionsConfig.disabledParams.isEmpty())
+        }
     }
 
     @Nested
