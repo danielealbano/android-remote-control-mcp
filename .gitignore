@@ -63,3 +63,6 @@ app/src/main/jniLibs/
 
 # MCP client configuration (contains tokens)
 .mcp.json
+
+# Claude Code local settings
+.claude/settings.json

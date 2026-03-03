@@ -8,7 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import com.danielealbano.androidremotecontrolmcp.ui.screens.HomeScreen
+import com.danielealbano.androidremotecontrolmcp.ui.screens.MainScreen
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AndroidRemoteControlMcpTheme {
-                HomeScreen(
+                MainScreen(
                     onRequestNotificationPermission = ::requestNotificationPermission,
                     onRequestCameraPermission = ::requestCameraPermission,
                     onRequestMicrophonePermission = ::requestMicrophonePermission,

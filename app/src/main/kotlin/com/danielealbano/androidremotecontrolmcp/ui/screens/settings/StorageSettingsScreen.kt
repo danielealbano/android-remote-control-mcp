@@ -1,102 +1,93 @@
 @file:Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 
-package com.danielealbano.androidremotecontrolmcp.ui.screens
+package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
-import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
-import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
-import com.danielealbano.androidremotecontrolmcp.ui.components.ConfigurationSection
-import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
-import com.danielealbano.androidremotecontrolmcp.ui.components.PermissionsSection
-import com.danielealbano.androidremotecontrolmcp.ui.components.RemoteAccessSection
-import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
-import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
-import com.danielealbano.androidremotecontrolmcp.ui.components.StorageLocationsSection
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
-import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
-import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    onRequestNotificationPermission: () -> Unit = {},
-    onRequestCameraPermission: () -> Unit = {},
-    onRequestMicrophonePermission: () -> Unit = {},
+fun StorageSettingsScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val serverConfig by viewModel.serverConfig.collectAsStateWithLifecycle()
-    val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
-    val portInput by viewModel.portInput.collectAsStateWithLifecycle()
-    val portError by viewModel.portError.collectAsStateWithLifecycle()
-    val hostnameInput by viewModel.hostnameInput.collectAsStateWithLifecycle()
-    val hostnameError by viewModel.hostnameError.collectAsStateWithLifecycle()
-    val deviceSlugInput by viewModel.deviceSlugInput.collectAsStateWithLifecycle()
-    val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
-    val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
-    val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
-    val isCameraPermissionGranted by viewModel.isCameraPermissionGranted.collectAsStateWithLifecycle()
-    val isMicrophonePermissionGranted by viewModel.isMicrophonePermissionGranted.collectAsStateWithLifecycle()
-    val isNotificationListenerEnabled by viewModel.isNotificationListenerEnabled.collectAsStateWithLifecycle()
-    val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
-    val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
-    val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
-    val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
     val storageLocations by viewModel.storageLocations.collectAsStateWithLifecycle()
     val fileSizeLimitInput by viewModel.fileSizeLimitInput.collectAsStateWithLifecycle()
     val fileSizeLimitError by viewModel.fileSizeLimitError.collectAsStateWithLifecycle()
     val downloadTimeoutInput by viewModel.downloadTimeoutInput.collectAsStateWithLifecycle()
     val downloadTimeoutError by viewModel.downloadTimeoutError.collectAsStateWithLifecycle()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.storageError.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    // Dialog state
     var showAddDialog by remember { mutableStateOf(false) }
     var addDialogDescription by remember { mutableStateOf("") }
     var addDialogSelectedUri by remember { mutableStateOf<Uri?>(null) }
@@ -112,17 +103,6 @@ fun HomeScreen(
     var deleteDialogLocation by remember { mutableStateOf<StorageLocation?>(null) }
 
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(Unit) {
-        viewModel.storageError.collect { message ->
-            snackbarHostState.showSnackbar(message)
-        }
-    }
-
-    val isServerRunning =
-        serverStatus is ServerStatus.Running ||
-            serverStatus is ServerStatus.Starting
 
     val documentTreeLauncher =
         rememberLauncherForActivityResult(
@@ -141,160 +121,159 @@ fun HomeScreen(
             }
         }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    viewModel.refreshPermissionStatus(context)
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = {
-                    Text(text = stringResource(R.string.app_bar_title))
+                title = { Text(stringResource(R.string.settings_storage_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
                 },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
+                windowInsets = WindowInsets(0),
             )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ServerStatusCard(
-                status = serverStatus,
-                onStartClick = { viewModel.startServer(context) },
-                onStopClick = { viewModel.stopServer(context) },
-            )
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_locations_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = stringResource(R.string.storage_locations_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-            ConfigurationSection(
-                bindingAddress = serverConfig.bindingAddress,
-                portInput = portInput,
-                portError = portError,
-                deviceSlugInput = deviceSlugInput,
-                deviceSlugError = deviceSlugError,
-                bearerToken = serverConfig.bearerToken,
-                autoStartEnabled = serverConfig.autoStartOnBoot,
-                httpsEnabled = serverConfig.httpsEnabled,
-                certificateSource = serverConfig.certificateSource,
-                hostnameInput = hostnameInput,
-                hostnameError = hostnameError,
-                isServerRunning = isServerRunning,
-                onBindingAddressChange = viewModel::updateBindingAddress,
-                onPortChange = viewModel::updatePort,
-                onDeviceSlugChange = viewModel::updateDeviceSlug,
-                onRegenerateToken = viewModel::generateNewBearerToken,
-                onCopyToken = { viewModel.copyToClipboard(context, serverConfig.bearerToken) },
-                onAutoStartChange = viewModel::updateAutoStartOnBoot,
-                onHttpsEnabledChange = viewModel::updateHttpsEnabled,
-                onCertificateSourceChange = viewModel::updateCertificateSource,
-                onHostnameChange = viewModel::updateCertificateHostname,
-            )
+                Spacer(modifier = Modifier.height(12.dp))
 
-            StorageLocationsSection(
-                storageLocations = storageLocations,
-                fileSizeLimitInput = fileSizeLimitInput,
-                fileSizeLimitError = fileSizeLimitError,
-                downloadTimeoutInput = downloadTimeoutInput,
-                downloadTimeoutError = downloadTimeoutError,
-                allowHttpDownloads = serverConfig.allowHttpDownloads,
-                allowUnverifiedHttpsCerts = serverConfig.allowUnverifiedHttpsCerts,
-                isServerRunning = isServerRunning,
-                onAddLocation = {
+                OutlinedButton(onClick = {
                     addDialogDescription = ""
                     addDialogSelectedUri = null
                     addDialogSelectedName = null
                     addDialogDuplicateError = false
                     addDialogDuplicateChecking = false
                     showAddDialog = true
-                },
-                onEditDescription = { location ->
-                    editDialogLocation = location
-                    editDialogDescription = location.description
-                    showEditDialog = true
-                },
-                onDeleteLocation = { location ->
-                    deleteDialogLocation = location
-                    showDeleteDialog = true
-                },
-                onAllowWriteChange = { location, enabled ->
-                    viewModel.updateLocationAllowWrite(location.id, enabled)
-                },
-                onAllowDeleteChange = { location, enabled ->
-                    viewModel.updateLocationAllowDelete(location.id, enabled)
-                },
-                onFileSizeLimitChange = viewModel::updateFileSizeLimit,
-                onDownloadTimeoutChange = viewModel::updateDownloadTimeout,
-                onAllowHttpDownloadsChange = viewModel::updateAllowHttpDownloads,
-                onAllowUnverifiedHttpsCertsChange = viewModel::updateAllowUnverifiedHttpsCerts,
-            )
+                }) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.storage_location_add_button))
+                }
 
-            RemoteAccessSection(
-                tunnelEnabled = serverConfig.tunnelEnabled,
-                tunnelProvider = serverConfig.tunnelProvider,
-                ngrokAuthtoken = ngrokAuthtokenInput,
-                ngrokDomain = ngrokDomainInput,
-                tunnelStatus = tunnelStatus,
-                isServerRunning = isServerRunning,
-                onTunnelEnabledChange = viewModel::updateTunnelEnabled,
-                onTunnelProviderChange = viewModel::updateTunnelProvider,
-                onNgrokAuthtokenChange = viewModel::updateNgrokAuthtoken,
-                onNgrokDomainChange = viewModel::updateNgrokDomain,
-            )
+                Spacer(modifier = Modifier.height(12.dp))
 
-            PermissionsSection(
-                isAccessibilityEnabled = isAccessibilityEnabled,
-                isNotificationPermissionGranted = isNotificationPermissionGranted,
-                isNotificationListenerEnabled = isNotificationListenerEnabled,
-                isCameraPermissionGranted = isCameraPermissionGranted,
-                isMicrophonePermissionGranted = isMicrophonePermissionGranted,
-                onOpenAccessibilitySettings = {
-                    context.startActivity(
-                        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+                if (storageLocations.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.storage_location_no_locations),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                },
-                onRequestNotificationPermission = onRequestNotificationPermission,
-                onOpenNotificationListenerSettings = {
-                    PermissionUtils.openNotificationListenerSettings(context)
-                },
-                onRequestCameraPermission = onRequestCameraPermission,
-                onRequestMicrophonePermission = onRequestMicrophonePermission,
-            )
+                } else {
+                    storageLocations.forEach { location ->
+                        StorageLocationRow(
+                            location = location,
+                            onEdit = {
+                                editDialogLocation = location
+                                editDialogDescription = location.description
+                                showEditDialog = true
+                            },
+                            onDelete = {
+                                deleteDialogLocation = location
+                                showDeleteDialog = true
+                            },
+                            onAllowWriteChange = { enabled ->
+                                viewModel.updateLocationAllowWrite(location.id, enabled)
+                            },
+                            onAllowDeleteChange = { enabled ->
+                                viewModel.updateLocationAllowDelete(location.id, enabled)
+                            },
+                        )
+                    }
+                }
 
-            ServerLogsSection(
-                logs = serverLogs,
-            )
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
 
-            ConnectionInfoCard(
-                bindingAddress = serverConfig.bindingAddress,
-                ipAddress = NetworkUtils.getDeviceIpAddress(context) ?: "N/A",
-                port = serverConfig.port,
-                httpsEnabled = serverConfig.httpsEnabled,
-                bearerToken = serverConfig.bearerToken,
-                tunnelUrl = (tunnelStatus as? TunnelStatus.Connected)?.url,
-                onCopyAll = { connectionString ->
-                    viewModel.copyToClipboard(context, connectionString)
-                },
-                onShare = { text -> viewModel.shareText(context, text) },
-            )
+                OutlinedTextField(
+                    value = fileSizeLimitInput,
+                    onValueChange = viewModel::updateFileSizeLimit,
+                    label = { Text(stringResource(R.string.storage_file_size_limit_label)) },
+                    isError = fileSizeLimitError != null,
+                    supportingText = fileSizeLimitError?.let { { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = downloadTimeoutInput,
+                    onValueChange = viewModel::updateDownloadTimeout,
+                    label = { Text(stringResource(R.string.storage_download_timeout_label)) },
+                    isError = downloadTimeoutError != null,
+                    supportingText = downloadTimeoutError?.let { { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.storage_allow_http_downloads_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.storage_allow_http_downloads_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = serverConfig.allowHttpDownloads,
+                        onCheckedChange = viewModel::updateAllowHttpDownloads,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.storage_allow_unverified_https_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.storage_allow_unverified_https_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = serverConfig.allowUnverifiedHttpsCerts,
+                        onCheckedChange = viewModel::updateAllowUnverifiedHttpsCerts,
+                    )
+                }
+            }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     // Add Storage Location Dialog
@@ -464,5 +443,109 @@ fun HomeScreen(
                 }
             },
         )
+    }
+}
+
+@Suppress("LongMethod")
+@Composable
+private fun StorageLocationRow(
+    location: StorageLocation,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onAllowWriteChange: (Boolean) -> Unit,
+    onAllowDeleteChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = location.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = location.path,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (location.description.isNotEmpty()) {
+                    Text(
+                        text = location.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontStyle = FontStyle.Italic,
+                    )
+                }
+            }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.storage_location_edit_dialog_title),
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.storage_location_delete_dialog_title),
+                )
+            }
+        }
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 0.dp, top = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowWrite,
+                        role = Role.Switch,
+                        onValueChange = onAllowWriteChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_write_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowWrite,
+                    onCheckedChange = null,
+                )
+            }
+            Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowDelete,
+                        role = Role.Switch,
+                        onValueChange = onAllowDeleteChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_delete_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowDelete,
+                    onCheckedChange = null,
+                )
+            }
+        }
     }
 }

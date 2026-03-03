@@ -1,23 +1,28 @@
-@file:Suppress("FunctionNaming", "UnusedPrivateMember", "LongMethod", "LongParameterList")
+@file:Suppress("FunctionNaming", "LongMethod")
 
-package com.danielealbano.androidremotecontrolmcp.ui.components
+package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,42 +42,52 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
-import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
 private const val STATUS_INDICATOR_SIZE_DP = 16
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RemoteAccessSection(
-    tunnelEnabled: Boolean,
-    tunnelProvider: TunnelProviderType,
-    ngrokAuthtoken: String,
-    ngrokDomain: String,
-    tunnelStatus: TunnelStatus,
-    isServerRunning: Boolean,
-    onTunnelEnabledChange: (Boolean) -> Unit,
-    onTunnelProviderChange: (TunnelProviderType) -> Unit,
-    onNgrokAuthtokenChange: (String) -> Unit,
-    onNgrokDomainChange: (String) -> Unit,
+fun TunnelSettingsScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: MainViewModel = hiltViewModel(),
 ) {
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-    ) {
+    val serverConfig by viewModel.serverConfig.collectAsStateWithLifecycle()
+    val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
+    val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
+    val ngrokAuthtokenInput by viewModel.ngrokAuthtokenInput.collectAsStateWithLifecycle()
+    val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
+
+    val isEnabled =
+        serverStatus !is ServerStatus.Running &&
+            serverStatus !is ServerStatus.Starting
+
+    Column(modifier = modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text(stringResource(R.string.settings_tunnel_title)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                }
+            },
+            windowInsets = WindowInsets(0),
+        )
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
-            Text(
-                text = stringResource(R.string.remote_access_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+            // Tunnel Enable/Disable Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -82,36 +98,78 @@ fun RemoteAccessSection(
                     modifier = Modifier.weight(1f),
                 )
                 Switch(
-                    checked = tunnelEnabled,
-                    onCheckedChange = onTunnelEnabledChange,
-                    enabled = !isServerRunning,
+                    checked = serverConfig.tunnelEnabled,
+                    onCheckedChange = viewModel::updateTunnelEnabled,
+                    enabled = isEnabled,
                 )
             }
 
-            AnimatedVisibility(visible = tunnelEnabled) {
+            AnimatedVisibility(visible = serverConfig.tunnelEnabled) {
                 Column {
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Tunnel Provider Selector
                     Text(
                         text = stringResource(R.string.remote_access_provider_label),
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    TunnelProviderSelector(
-                        selected = tunnelProvider,
-                        enabled = !isServerRunning,
-                        onSelect = onTunnelProviderChange,
-                    )
+                    Column(modifier = Modifier.selectableGroup()) {
+                        TunnelProviderType.entries.forEach { provider ->
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .selectable(
+                                            selected = provider == serverConfig.tunnelProvider,
+                                            onClick = { viewModel.updateTunnelProvider(provider) },
+                                            role = Role.RadioButton,
+                                            enabled = isEnabled,
+                                        ).padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(
+                                    selected = provider == serverConfig.tunnelProvider,
+                                    onClick = null,
+                                    enabled = isEnabled,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text =
+                                        when (provider) {
+                                            TunnelProviderType.CLOUDFLARE ->
+                                                stringResource(R.string.remote_access_provider_cloudflare)
+                                            TunnelProviderType.NGROK ->
+                                                stringResource(R.string.remote_access_provider_ngrok)
+                                        },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text =
+                                        when (provider) {
+                                            TunnelProviderType.CLOUDFLARE ->
+                                                stringResource(R.string.remote_access_provider_cloudflare_desc)
+                                            TunnelProviderType.NGROK ->
+                                                stringResource(R.string.remote_access_provider_ngrok_desc)
+                                        },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
 
-                    AnimatedVisibility(visible = tunnelProvider == TunnelProviderType.NGROK) {
+                    // ngrok-specific fields
+                    AnimatedVisibility(visible = serverConfig.tunnelProvider == TunnelProviderType.NGROK) {
                         Column {
                             Spacer(modifier = Modifier.height(8.dp))
                             NgrokConfigFields(
-                                authtoken = ngrokAuthtoken,
-                                domain = ngrokDomain,
-                                enabled = !isServerRunning,
-                                onAuthtokenChange = onNgrokAuthtokenChange,
-                                onDomainChange = onNgrokDomainChange,
+                                authtoken = ngrokAuthtokenInput,
+                                domain = ngrokDomainInput,
+                                enabled = isEnabled,
+                                onAuthtokenChange = viewModel::updateNgrokAuthtoken,
+                                onDomainChange = viewModel::updateNgrokDomain,
                             )
                         }
                     }
@@ -125,73 +183,16 @@ fun RemoteAccessSection(
 }
 
 @Composable
-private fun TunnelProviderSelector(
-    selected: TunnelProviderType,
-    enabled: Boolean,
-    onSelect: (TunnelProviderType) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.selectableGroup(),
-    ) {
-        TunnelProviderType.entries.forEach { provider ->
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = provider == selected,
-                            onClick = { onSelect(provider) },
-                            role = Role.RadioButton,
-                            enabled = enabled,
-                        ).padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(
-                    selected = provider == selected,
-                    onClick = null,
-                    enabled = enabled,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text =
-                        when (provider) {
-                            TunnelProviderType.CLOUDFLARE ->
-                                stringResource(R.string.remote_access_provider_cloudflare)
-                            TunnelProviderType.NGROK ->
-                                stringResource(R.string.remote_access_provider_ngrok)
-                        },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text =
-                        when (provider) {
-                            TunnelProviderType.CLOUDFLARE ->
-                                stringResource(R.string.remote_access_provider_cloudflare_desc)
-                            TunnelProviderType.NGROK ->
-                                stringResource(R.string.remote_access_provider_ngrok_desc)
-                        },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun NgrokConfigFields(
     authtoken: String,
     domain: String,
     enabled: Boolean,
     onAuthtokenChange: (String) -> Unit,
     onDomainChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var showAuthtoken by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier) {
+    Column {
         Text(
             text = stringResource(R.string.remote_access_ngrok_authtoken_label),
             style = MaterialTheme.typography.labelLarge,
@@ -301,28 +302,5 @@ private fun TunnelStatusIndicator(
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun RemoteAccessSectionPreview() {
-    AndroidRemoteControlMcpTheme {
-        RemoteAccessSection(
-            tunnelEnabled = true,
-            tunnelProvider = TunnelProviderType.CLOUDFLARE,
-            ngrokAuthtoken = "",
-            ngrokDomain = "",
-            tunnelStatus =
-                TunnelStatus.Connected(
-                    url = "https://random-words.trycloudflare.com",
-                    providerType = TunnelProviderType.CLOUDFLARE,
-                ),
-            isServerRunning = false,
-            onTunnelEnabledChange = {},
-            onTunnelProviderChange = {},
-            onNgrokAuthtokenChange = {},
-            onNgrokDomainChange = {},
-        )
     }
 }

@@ -1,33 +1,50 @@
-@file:Suppress("FunctionNaming", "LongParameterList", "MagicNumber", "UnusedPrivateMember")
+@file:Suppress("FunctionNaming", "LongMethod", "MagicNumber", "LongParameterList")
 
-package com.danielealbano.androidremotecontrolmcp.ui.components
+package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
+import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 
 @Composable
 private fun enabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF4CAF50)
@@ -35,34 +52,56 @@ private fun enabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFF81C784)
 @Composable
 private fun disabledColor(): Color = if (isSystemInDarkTheme()) Color(0xFFEF5350) else Color(0xFFF44336)
 
-@Suppress("LongMethod")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PermissionsSection(
-    isAccessibilityEnabled: Boolean,
-    isNotificationPermissionGranted: Boolean,
-    isNotificationListenerEnabled: Boolean,
-    isCameraPermissionGranted: Boolean,
-    isMicrophonePermissionGranted: Boolean,
-    onOpenAccessibilitySettings: () -> Unit,
+fun PermissionsSettingsScreen(
+    onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
-    onOpenNotificationListenerSettings: () -> Unit,
     onRequestCameraPermission: () -> Unit,
     onRequestMicrophonePermission: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: MainViewModel = hiltViewModel(),
 ) {
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-    ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
+    val isNotificationPermissionGranted by viewModel.isNotificationPermissionGranted.collectAsStateWithLifecycle()
+    val isNotificationListenerEnabled by viewModel.isNotificationListenerEnabled.collectAsStateWithLifecycle()
+    val isCameraPermissionGranted by viewModel.isCameraPermissionGranted.collectAsStateWithLifecycle()
+    val isMicrophonePermissionGranted by viewModel.isMicrophonePermissionGranted.collectAsStateWithLifecycle()
+
+    // Refresh permissions on ON_RESUME
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewModel.refreshPermissionStatus(context)
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text(stringResource(R.string.settings_permissions_title)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                }
+            },
+            windowInsets = WindowInsets(0),
+        )
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
-            Text(
-                text = stringResource(R.string.permissions_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             PermissionRow(
                 label = stringResource(R.string.permission_accessibility),
                 isEnabled = isAccessibilityEnabled,
@@ -72,7 +111,9 @@ fun PermissionsSection(
                     } else {
                         stringResource(R.string.permission_enable)
                     },
-                onAction = onOpenAccessibilitySettings,
+                onAction = {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                },
                 actionEnabled = !isAccessibilityEnabled,
             )
 
@@ -102,7 +143,9 @@ fun PermissionsSection(
                     } else {
                         stringResource(R.string.permission_enable)
                     },
-                onAction = onOpenNotificationListenerSettings,
+                onAction = {
+                    PermissionUtils.openNotificationListenerSettings(context)
+                },
                 actionEnabled = !isNotificationListenerEnabled,
             )
 
@@ -177,24 +220,5 @@ private fun PermissionRow(
         ) {
             Text(text = buttonText)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PermissionsSectionPreview() {
-    AndroidRemoteControlMcpTheme {
-        PermissionsSection(
-            isAccessibilityEnabled = false,
-            isNotificationPermissionGranted = false,
-            isNotificationListenerEnabled = false,
-            isCameraPermissionGranted = false,
-            isMicrophonePermissionGranted = false,
-            onOpenAccessibilitySettings = {},
-            onRequestNotificationPermission = {},
-            onOpenNotificationListenerSettings = {},
-            onRequestCameraPermission = {},
-            onRequestMicrophonePermission = {},
-        )
     }
 }
