@@ -55,7 +55,7 @@ fun ConnectionInfoCard(
             BindingAddress.NETWORK -> ipAddress
         }
     val scheme = if (httpsEnabled) "https" else "http"
-    val serverUrl = "$scheme://$displayAddress:$port"
+    val serverUrl = "$scheme://$displayAddress:$port/mcp"
     val displayToken = if (showToken) bearerToken else TOKEN_MASK
 
     ElevatedCard(
@@ -86,7 +86,7 @@ fun ConnectionInfoCard(
             tunnelUrl?.let { url ->
                 ConnectionInfoRow(
                     label = stringResource(R.string.remote_access_public_url_label),
-                    value = url,
+                    value = "$url/mcp",
                 )
             }
 
@@ -125,9 +125,9 @@ fun ConnectionInfoCard(
 
             val connectionString =
                 buildString {
-                    val tokenValue = if (showToken) bearerToken else TOKEN_MASK
-                    append("URL: $serverUrl\nToken: $tokenValue")
-                    tunnelUrl?.let { append("\nPublic URL: $it") }
+                    append("URL: $serverUrl")
+                    tunnelUrl?.let { append("\nTunnel: $it/mcp") }
+                    append("\nBearer Token: $bearerToken")
                 }
             Row(
                 modifier = Modifier.align(Alignment.End),
