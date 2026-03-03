@@ -1,8 +1,9 @@
-@file:Suppress("FunctionNaming", "LongMethod")
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
@@ -23,10 +24,22 @@ fun SettingsScreen(
     onRequestNotificationPermission: () -> Unit,
     onRequestCameraPermission: () -> Unit,
     onRequestMicrophonePermission: () -> Unit,
+    pendingRoute: String? = null,
+    onPendingRouteConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
+
+    LaunchedEffect(pendingRoute) {
+        if (pendingRoute != null) {
+            navController.navigate(pendingRoute) {
+                launchSingleTop = true
+            }
+            onPendingRouteConsumed()
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = SettingsRoute.Index.route,

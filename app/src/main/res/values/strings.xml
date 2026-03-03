@@ -24,7 +24,7 @@
     <string name="settings_security_title">Security</string>
     <string name="settings_security_subtitle">HTTPS, certificate</string>
     <string name="settings_tunnel_title">Tunnel</string>
-    <string name="settings_tunnel_subtitle">Cloudflare, ngrok, downloads</string>
+    <string name="settings_tunnel_subtitle">Cloudflare, ngrok</string>
     <string name="settings_mcp_tools_title">MCP Tools</string>
     <string name="settings_mcp_tools_subtitle">Enable or disable tools</string>
     <string name="settings_mcp_tools_placeholder">Tool permissions — available in next update</string>
@@ -95,6 +95,9 @@
     <string name="permission_camera">Camera</string>
     <string name="permission_microphone">Microphone</string>
     <string name="permission_notification_listener">Notification Listener</string>
+
+    <!-- Permission Warning -->
+    <string name="permission_warning_message">Some permissions are not granted. Tap to review.</string>
 
     <!-- Server Logs -->
     <string name="server_logs_title">Server Logs</string>
