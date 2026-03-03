@@ -53,13 +53,14 @@ fun MainScreen(
     ) { paddingValues ->
         when (selectedTabRoute) {
             TopLevelRoute.Server.route -> ServerScreen(modifier = Modifier.padding(paddingValues))
-            TopLevelRoute.Settings.route -> SettingsScreen(
-                onRequestNotificationPermission = onRequestNotificationPermission,
-                onRequestCameraPermission = onRequestCameraPermission,
-                onRequestMicrophonePermission = onRequestMicrophonePermission,
-                modifier = Modifier.padding(paddingValues),
-                viewModel = viewModel,
-            )
+            TopLevelRoute.Settings.route ->
+                SettingsScreen(
+                    onRequestNotificationPermission = onRequestNotificationPermission,
+                    onRequestCameraPermission = onRequestCameraPermission,
+                    onRequestMicrophonePermission = onRequestMicrophonePermission,
+                    modifier = Modifier.padding(paddingValues),
+                    viewModel = viewModel,
+                )
             TopLevelRoute.About.route -> AboutScreen(modifier = Modifier.padding(paddingValues))
             else -> ServerScreen(modifier = Modifier.padding(paddingValues))
         }

@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
@@ -49,9 +48,6 @@ fun ServerScreen(
     val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
 
-    val isServerRunning =
-        serverStatus is ServerStatus.Running ||
-            serverStatus is ServerStatus.Starting
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
 
@@ -61,10 +57,11 @@ fun ServerScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             ServerStatusCard(
                 status = serverStatus,
@@ -86,10 +83,11 @@ fun ServerScreen(
                     Toast.makeText(context, copiedToClipboardMessage, Toast.LENGTH_SHORT).show()
                 },
                 onShare = { text ->
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, text)
-                    }
+                    val intent =
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
                     context.startActivity(Intent.createChooser(intent, null))
                 },
             )

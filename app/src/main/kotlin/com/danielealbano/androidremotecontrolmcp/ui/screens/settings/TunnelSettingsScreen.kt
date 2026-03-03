@@ -81,10 +81,11 @@ fun TunnelSettingsScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             // Tunnel Enable/Disable Toggle
             Row(
@@ -116,15 +117,15 @@ fun TunnelSettingsScreen(
                     Column(modifier = Modifier.selectableGroup()) {
                         TunnelProviderType.entries.forEach { provider ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .selectable(
-                                        selected = provider == serverConfig.tunnelProvider,
-                                        onClick = { viewModel.updateTunnelProvider(provider) },
-                                        role = Role.RadioButton,
-                                        enabled = isEnabled,
-                                    )
-                                    .padding(vertical = 4.dp),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .selectable(
+                                            selected = provider == serverConfig.tunnelProvider,
+                                            onClick = { viewModel.updateTunnelProvider(provider) },
+                                            role = Role.RadioButton,
+                                            enabled = isEnabled,
+                                        ).padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 RadioButton(
@@ -134,22 +135,24 @@ fun TunnelSettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = when (provider) {
-                                        TunnelProviderType.CLOUDFLARE ->
-                                            stringResource(R.string.remote_access_provider_cloudflare)
-                                        TunnelProviderType.NGROK ->
-                                            stringResource(R.string.remote_access_provider_ngrok)
-                                    },
+                                    text =
+                                        when (provider) {
+                                            TunnelProviderType.CLOUDFLARE ->
+                                                stringResource(R.string.remote_access_provider_cloudflare)
+                                            TunnelProviderType.NGROK ->
+                                                stringResource(R.string.remote_access_provider_ngrok)
+                                        },
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = when (provider) {
-                                        TunnelProviderType.CLOUDFLARE ->
-                                            stringResource(R.string.remote_access_provider_cloudflare_desc)
-                                        TunnelProviderType.NGROK ->
-                                            stringResource(R.string.remote_access_provider_ngrok_desc)
-                                    },
+                                    text =
+                                        when (provider) {
+                                            TunnelProviderType.CLOUDFLARE ->
+                                                stringResource(R.string.remote_access_provider_cloudflare_desc)
+                                            TunnelProviderType.NGROK ->
+                                                stringResource(R.string.remote_access_provider_ngrok_desc)
+                                        },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -186,11 +189,10 @@ private fun NgrokConfigFields(
     enabled: Boolean,
     onAuthtokenChange: (String) -> Unit,
     onDomainChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var showAuthtoken by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier) {
+    Column {
         Text(
             text = stringResource(R.string.remote_access_ngrok_authtoken_label),
             style = MaterialTheme.typography.labelLarge,

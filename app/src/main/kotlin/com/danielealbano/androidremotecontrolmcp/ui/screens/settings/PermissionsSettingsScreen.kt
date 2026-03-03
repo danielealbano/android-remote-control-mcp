@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "LongMethod", "MagicNumber")
+@file:Suppress("FunctionNaming", "LongMethod", "MagicNumber", "LongParameterList")
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
@@ -96,10 +96,11 @@ fun PermissionsSettingsScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             PermissionRow(
                 label = stringResource(R.string.permission_accessibility),
@@ -190,9 +191,10 @@ private fun PermissionRow(
     actionEnabled: Boolean,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
