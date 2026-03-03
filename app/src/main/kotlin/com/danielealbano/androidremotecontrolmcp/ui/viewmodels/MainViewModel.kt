@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
@@ -30,10 +31,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -515,9 +519,34 @@ class MainViewModel
             }
         }
 
+        val toolPermissionsConfig: StateFlow<ToolPermissionsConfig> =
+            settingsRepository.serverConfig
+                .map { it.toolPermissionsConfig }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_TIMEOUT_MS), ToolPermissionsConfig())
+
+        fun updateToolEnabled(
+            toolName: String,
+            enabled: Boolean,
+        ) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateToolEnabled(toolName, enabled)
+            }
+        }
+
+        fun updateParamEnabled(
+            toolName: String,
+            paramName: String,
+            enabled: Boolean,
+        ) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateParamEnabled(toolName, paramName, enabled)
+            }
+        }
+
         companion object {
             private const val TAG = "MCP:MainViewModel"
             private const val MAX_LOG_ENTRIES = 100
             private const val CLIPBOARD_LABEL = "MCP Remote Control"
+            private const val FLOW_TIMEOUT_MS = 5_000L
         }
     }

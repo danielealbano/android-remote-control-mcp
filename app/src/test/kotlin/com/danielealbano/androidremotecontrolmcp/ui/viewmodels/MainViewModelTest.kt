@@ -8,6 +8,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
@@ -1057,5 +1058,52 @@ class MainViewModelTest {
             } finally {
                 unmockkObject(PermissionUtils)
             }
+        }
+
+    // --- Tool Permissions Tests ---
+
+    @Test
+    fun `updateToolEnabled false delegates to repository`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateToolEnabled("tap", false)
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.updateToolEnabled("tap", false) }
+        }
+
+    @Test
+    fun `updateToolEnabled true delegates to repository`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateToolEnabled("tap", true)
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.updateToolEnabled("tap", true) }
+        }
+
+    @Test
+    fun `updateParamEnabled delegates to repository`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateParamEnabled("get_screen_state", "include_screenshot", false)
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.updateParamEnabled("get_screen_state", "include_screenshot", false) }
+        }
+
+    @Test
+    fun `toolPermissionsConfig emits updated config`() =
+        runTest {
+            advanceUntilIdle()
+
+            val updatedPerms = ToolPermissionsConfig(disabledTools = setOf("tap"))
+            configFlow.value = configFlow.value.copy(toolPermissionsConfig = updatedPerms)
+            advanceUntilIdle()
+
+            assertEquals(updatedPerms, viewModel.toolPermissionsConfig.value)
         }
 }
