@@ -173,7 +173,10 @@ class SettingsRepositoryImpl
             }
         }
 
-        override suspend fun updateToolEnabled(toolName: String, enabled: Boolean) {
+        override suspend fun updateToolEnabled(
+            toolName: String,
+            enabled: Boolean,
+        ) {
             dataStore.edit { prefs ->
                 val current = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY])
                 val updated =
@@ -186,7 +189,11 @@ class SettingsRepositoryImpl
             }
         }
 
-        override suspend fun updateParamEnabled(toolName: String, paramName: String, enabled: Boolean) {
+        override suspend fun updateParamEnabled(
+            toolName: String,
+            paramName: String,
+            enabled: Boolean,
+        ) {
             dataStore.edit { prefs ->
                 val current = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY])
                 val currentParams = current.disabledParams[toolName] ?: emptySet()

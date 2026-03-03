@@ -16,8 +16,10 @@ data class ToolPermissionsConfig(
 ) {
     fun isToolEnabled(toolName: String): Boolean = toolName !in disabledTools
 
-    fun isParamEnabled(toolName: String, paramName: String): Boolean =
-        paramName !in (disabledParams[toolName] ?: emptySet())
+    fun isParamEnabled(
+        toolName: String,
+        paramName: String,
+    ): Boolean = paramName !in (disabledParams[toolName] ?: emptySet())
 
     fun toJson(): String =
         buildJsonObject {
@@ -37,12 +39,14 @@ data class ToolPermissionsConfig(
             try {
                 val obj = Json.parseToJsonElement(json).jsonObject
                 val disabledTools =
-                    obj["disabledTools"]?.jsonArray
+                    obj["disabledTools"]
+                        ?.jsonArray
                         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                         ?.toSet()
                         ?: emptySet()
                 val disabledParams =
-                    obj["disabledParams"]?.jsonObject
+                    obj["disabledParams"]
+                        ?.jsonObject
                         ?.mapValues { (_, v) ->
                             v.jsonArray.mapNotNull { it.jsonPrimitive.contentOrNull }.toSet()
                         }

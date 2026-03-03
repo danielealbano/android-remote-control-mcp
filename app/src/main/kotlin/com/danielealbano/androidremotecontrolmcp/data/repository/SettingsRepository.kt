@@ -158,10 +158,17 @@ interface SettingsRepository {
     suspend fun updateToolPermissionsConfig(config: ToolPermissionsConfig)
 
     /** Enables or disables a specific tool. */
-    suspend fun updateToolEnabled(toolName: String, enabled: Boolean)
+    suspend fun updateToolEnabled(
+        toolName: String,
+        enabled: Boolean,
+    )
 
     /** Enables or disables a specific parameter for a tool. */
-    suspend fun updateParamEnabled(toolName: String, paramName: String, enabled: Boolean)
+    suspend fun updateParamEnabled(
+        toolName: String,
+        paramName: String,
+        enabled: Boolean,
+    )
 
     /**
      * Data class representing a stored storage location record.

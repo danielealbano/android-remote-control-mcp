@@ -1,8 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import android.graphics.Bitmap
 import android.net.Uri
-import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
@@ -10,7 +8,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenIn
 import com.danielealbano.androidremotecontrolmcp.services.camera.VideoRecordingResult
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
@@ -89,24 +86,58 @@ class ToolPermissionsIntegrationTest {
         runTest {
             val allToolNames =
                 setOf(
-                    "tap", "long_press", "double_tap", "swipe", "scroll",
-                    "press_back", "press_home", "press_recents",
-                    "open_notifications", "open_quick_settings", "get_device_logs",
-                    "pinch", "custom_gesture",
-                    "find_elements", "click_element", "long_click_element", "scroll_to_element",
-                    "type_append_text", "type_insert_text", "type_replace_text",
-                    "type_clear_text", "press_key",
-                    "get_clipboard", "set_clipboard", "wait_for_element",
-                    "wait_for_idle", "get_element_details",
-                    "list_storage_locations", "list_files", "read_file", "write_file",
-                    "append_file", "file_replace", "download_from_url", "delete_file",
-                    "open_app", "list_apps", "close_app",
-                    "list_cameras", "list_camera_photo_resolutions",
-                    "list_camera_video_resolutions", "take_camera_photo",
-                    "save_camera_photo", "save_camera_video",
-                    "send_intent", "open_uri",
-                    "notification_list", "notification_open", "notification_dismiss",
-                    "notification_snooze", "notification_action", "notification_reply",
+                    "tap",
+                    "long_press",
+                    "double_tap",
+                    "swipe",
+                    "scroll",
+                    "press_back",
+                    "press_home",
+                    "press_recents",
+                    "open_notifications",
+                    "open_quick_settings",
+                    "get_device_logs",
+                    "pinch",
+                    "custom_gesture",
+                    "find_elements",
+                    "click_element",
+                    "long_click_element",
+                    "scroll_to_element",
+                    "type_append_text",
+                    "type_insert_text",
+                    "type_replace_text",
+                    "type_clear_text",
+                    "press_key",
+                    "get_clipboard",
+                    "set_clipboard",
+                    "wait_for_element",
+                    "wait_for_idle",
+                    "get_element_details",
+                    "list_storage_locations",
+                    "list_files",
+                    "read_file",
+                    "write_file",
+                    "append_file",
+                    "file_replace",
+                    "download_from_url",
+                    "delete_file",
+                    "open_app",
+                    "list_apps",
+                    "close_app",
+                    "list_cameras",
+                    "list_camera_photo_resolutions",
+                    "list_camera_video_resolutions",
+                    "take_camera_photo",
+                    "save_camera_photo",
+                    "save_camera_video",
+                    "send_intent",
+                    "open_uri",
+                    "notification_list",
+                    "notification_open",
+                    "notification_dismiss",
+                    "notification_snooze",
+                    "notification_action",
+                    "notification_reply",
                     "get_screen_state",
                 )
             val perms = ToolPermissionsConfig(disabledTools = allToolNames)
