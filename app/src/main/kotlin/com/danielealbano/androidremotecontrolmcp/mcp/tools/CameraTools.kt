@@ -3,6 +3,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
@@ -436,6 +437,8 @@ class SaveCameraVideoHandler
         private val cameraProvider: CameraProvider,
         private val fileOperationProvider: FileOperationProvider,
     ) {
+        @Volatile private var audioParamEnabled: Boolean = true
+
         @Suppress("CyclomaticComplexMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val cameraId = McpToolUtils.requireString(arguments, "camera_id")
@@ -443,7 +446,12 @@ class SaveCameraVideoHandler
             val path = McpToolUtils.requireString(arguments, "path")
             val duration = McpToolUtils.requireInt(arguments, "duration")
             val resolution = parseOptionalResolution(arguments, "resolution")
-            val audio = McpToolUtils.optionalBoolean(arguments, "audio", true)
+            val audio =
+                if (audioParamEnabled) {
+                    McpToolUtils.optionalBoolean(arguments, "audio", true)
+                } else {
+                    false
+                }
             val flashMode =
                 McpToolUtils.optionalString(
                     arguments,
@@ -483,7 +491,9 @@ class SaveCameraVideoHandler
         fun register(
             server: Server,
             toolNamePrefix: String,
+            audioParamEnabled: Boolean = true,
         ) {
+            this.audioParamEnabled = audioParamEnabled
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
@@ -523,13 +533,15 @@ class SaveCameraVideoHandler
                                             "Default: 720p closest match.",
                                     )
                                 }
-                                putJsonObject("audio") {
-                                    put("type", "boolean")
-                                    put(
-                                        "description",
-                                        "Whether to record audio. Default: true. " +
-                                            "Requires RECORD_AUDIO permission.",
-                                    )
+                                if (audioParamEnabled) {
+                                    putJsonObject("audio") {
+                                        put("type", "boolean")
+                                        put(
+                                            "description",
+                                            "Whether to record audio. Default: true. " +
+                                                "Requires RECORD_AUDIO permission.",
+                                        )
+                                    }
                                 }
                                 putJsonObject("flash_mode") {
                                     put("type", "string")
@@ -648,11 +660,28 @@ fun registerCameraTools(
     cameraProvider: CameraProvider,
     fileOperationProvider: FileOperationProvider,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    ListCamerasHandler(cameraProvider).register(server, toolNamePrefix)
-    ListCameraPhotoResolutionsHandler(cameraProvider).register(server, toolNamePrefix)
-    ListCameraVideoResolutionsHandler(cameraProvider).register(server, toolNamePrefix)
-    TakeCameraPhotoHandler(cameraProvider).register(server, toolNamePrefix)
-    SaveCameraPhotoHandler(cameraProvider, fileOperationProvider).register(server, toolNamePrefix)
-    SaveCameraVideoHandler(cameraProvider, fileOperationProvider).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(ListCamerasHandler.TOOL_NAME)) {
+        ListCamerasHandler(cameraProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ListCameraPhotoResolutionsHandler.TOOL_NAME)) {
+        ListCameraPhotoResolutionsHandler(cameraProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ListCameraVideoResolutionsHandler.TOOL_NAME)) {
+        ListCameraVideoResolutionsHandler(cameraProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(TakeCameraPhotoHandler.TOOL_NAME)) {
+        TakeCameraPhotoHandler(cameraProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(SaveCameraPhotoHandler.TOOL_NAME)) {
+        SaveCameraPhotoHandler(cameraProvider, fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(SaveCameraVideoHandler.TOOL_NAME)) {
+        SaveCameraVideoHandler(cameraProvider, fileOperationProvider).register(
+            server,
+            toolNamePrefix,
+            audioParamEnabled = perms.isParamEnabled(SaveCameraVideoHandler.TOOL_NAME, "audio"),
+        )
+    }
 }

@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.graphics.Bitmap
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -49,11 +50,17 @@ class GetScreenStateHandler
         private val screenshotEncoder: ScreenshotEncoder,
         private val nodeCache: AccessibilityNodeCache,
     ) {
+        @Volatile private var includeScreenshotEnabled: Boolean = true
+
         @Suppress("ThrowsCount", "LongMethod", "TooGenericExceptionCaught")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // 1. Parse include_screenshot param FIRST (before expensive operations)
             val includeScreenshot =
-                arguments?.get("include_screenshot")?.jsonPrimitive?.booleanOrNull ?: false
+                if (includeScreenshotEnabled) {
+                    arguments?.get("include_screenshot")?.jsonPrimitive?.booleanOrNull ?: false
+                } else {
+                    false
+                }
 
             // 2. Get multi-window accessibility snapshot
             //    (getFreshWindows handles isReady check and fallback to single-window)
@@ -163,7 +170,9 @@ class GetScreenStateHandler
         fun register(
             server: Server,
             toolNamePrefix: String,
+            includeScreenshotParamEnabled: Boolean = true,
         ) {
+            includeScreenshotEnabled = includeScreenshotParamEnabled
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
@@ -176,14 +185,16 @@ class GetScreenStateHandler
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("include_screenshot") {
-                                    put("type", "boolean")
-                                    put(
-                                        "description",
-                                        "Include a low-resolution screenshot. " +
-                                            "Only request when the UI element list is not sufficient.",
-                                    )
-                                    put("default", false)
+                                if (includeScreenshotParamEnabled) {
+                                    putJsonObject("include_screenshot") {
+                                        put("type", "boolean")
+                                        put(
+                                            "description",
+                                            "Include a low-resolution screenshot. " +
+                                                "Only request when the UI element list is not sufficient.",
+                                        )
+                                        put("default", false)
+                                    }
                                 }
                             },
                         required = emptyList(),
@@ -218,14 +229,21 @@ fun registerScreenIntrospectionTools(
     screenshotEncoder: ScreenshotEncoder,
     nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    GetScreenStateHandler(
-        treeParser,
-        accessibilityServiceProvider,
-        screenCaptureProvider,
-        compactTreeFormatter,
-        screenshotAnnotator,
-        screenshotEncoder,
-        nodeCache,
-    ).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(GetScreenStateHandler.TOOL_NAME)) {
+        GetScreenStateHandler(
+            treeParser,
+            accessibilityServiceProvider,
+            screenCaptureProvider,
+            compactTreeFormatter,
+            screenshotAnnotator,
+            screenshotEncoder,
+            nodeCache,
+        ).register(
+            server,
+            toolNamePrefix,
+            includeScreenshotParamEnabled = perms.isParamEnabled(GetScreenStateHandler.TOOL_NAME, "include_screenshot"),
+        )
+    }
 }

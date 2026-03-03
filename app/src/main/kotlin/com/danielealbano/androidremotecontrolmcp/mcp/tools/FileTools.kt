@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
@@ -720,13 +721,30 @@ fun registerFileTools(
     storageLocationProvider: StorageLocationProvider,
     fileOperationProvider: FileOperationProvider,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    ListStorageLocationsHandler(storageLocationProvider).register(server, toolNamePrefix)
-    ListFilesHandler(fileOperationProvider).register(server, toolNamePrefix)
-    ReadFileHandler(fileOperationProvider).register(server, toolNamePrefix)
-    WriteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
-    AppendFileHandler(fileOperationProvider).register(server, toolNamePrefix)
-    FileReplaceHandler(fileOperationProvider).register(server, toolNamePrefix)
-    DownloadFromUrlHandler(fileOperationProvider).register(server, toolNamePrefix)
-    DeleteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(ListStorageLocationsHandler.TOOL_NAME)) {
+        ListStorageLocationsHandler(storageLocationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ListFilesHandler.TOOL_NAME)) {
+        ListFilesHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ReadFileHandler.TOOL_NAME)) {
+        ReadFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(WriteFileHandler.TOOL_NAME)) {
+        WriteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(AppendFileHandler.TOOL_NAME)) {
+        AppendFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(FileReplaceHandler.TOOL_NAME)) {
+        FileReplaceHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(DownloadFromUrlHandler.TOOL_NAME)) {
+        DownloadFromUrlHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(DeleteFileHandler.TOOL_NAME)) {
+        DeleteFileHandler(fileOperationProvider).register(server, toolNamePrefix)
+    }
 }

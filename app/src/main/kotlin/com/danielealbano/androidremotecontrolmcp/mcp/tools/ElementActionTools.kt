@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
 import android.view.accessibility.AccessibilityWindowInfo
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
@@ -641,15 +642,24 @@ fun registerElementActionTools(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
-    ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
-    LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
-    ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
+    if (perms.isToolEnabled(FindElementsTool.TOOL_NAME)) {
+        FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ClickElementTool.TOOL_NAME)) {
+        ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(LongClickElementTool.TOOL_NAME)) {
+        LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ScrollToElementTool.TOOL_NAME)) {
+        ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
 }
 
 /**
