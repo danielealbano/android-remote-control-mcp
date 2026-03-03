@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.ui.navigation.SettingsRoute
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.TopLevelRoute
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
@@ -32,6 +33,7 @@ fun MainScreen(
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     var selectedTabRoute by rememberSaveable { mutableStateOf(TopLevelRoute.Server.route) }
+    var pendingSettingsRoute by rememberSaveable { mutableStateOf<String?>(null) }
 
     Scaffold(
         bottomBar = {
@@ -52,17 +54,35 @@ fun MainScreen(
         },
     ) { paddingValues ->
         when (selectedTabRoute) {
-            TopLevelRoute.Server.route -> ServerScreen(modifier = Modifier.padding(paddingValues))
+            TopLevelRoute.Server.route ->
+                ServerScreen(
+                    onNavigateToPermissions = {
+                        pendingSettingsRoute = SettingsRoute.Permissions.route
+                        selectedTabRoute = TopLevelRoute.Settings.route
+                    },
+                    modifier = Modifier.padding(paddingValues),
+                    viewModel = viewModel,
+                )
             TopLevelRoute.Settings.route ->
                 SettingsScreen(
                     onRequestNotificationPermission = onRequestNotificationPermission,
                     onRequestCameraPermission = onRequestCameraPermission,
                     onRequestMicrophonePermission = onRequestMicrophonePermission,
+                    pendingRoute = pendingSettingsRoute,
+                    onPendingRouteConsumed = { pendingSettingsRoute = null },
                     modifier = Modifier.padding(paddingValues),
                     viewModel = viewModel,
                 )
             TopLevelRoute.About.route -> AboutScreen(modifier = Modifier.padding(paddingValues))
-            else -> ServerScreen(modifier = Modifier.padding(paddingValues))
+            else ->
+                ServerScreen(
+                    onNavigateToPermissions = {
+                        pendingSettingsRoute = SettingsRoute.Permissions.route
+                        selectedTabRoute = TopLevelRoute.Settings.route
+                    },
+                    modifier = Modifier.padding(paddingValues),
+                    viewModel = viewModel,
+                )
         }
     }
 }
