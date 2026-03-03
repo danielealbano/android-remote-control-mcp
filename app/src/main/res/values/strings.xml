@@ -13,6 +13,41 @@
     <!-- App Bar -->
     <string name="app_bar_title">MCP Remote Control</string>
 
+    <!-- Tabs -->
+    <string name="tab_server">Server</string>
+    <string name="tab_settings">Settings</string>
+    <string name="tab_about">About</string>
+
+    <!-- Settings Sub-pages -->
+    <string name="settings_general_title">General</string>
+    <string name="settings_general_subtitle">Port, address, token, auto-start</string>
+    <string name="settings_security_title">Security</string>
+    <string name="settings_security_subtitle">HTTPS, certificate</string>
+    <string name="settings_tunnel_title">Tunnel</string>
+    <string name="settings_tunnel_subtitle">Cloudflare, ngrok, downloads</string>
+    <string name="settings_mcp_tools_title">MCP Tools</string>
+    <string name="settings_mcp_tools_subtitle">Enable or disable tools</string>
+    <string name="settings_mcp_tools_placeholder">Tool permissions — available in next update</string>
+    <string name="settings_permissions_title">Permissions</string>
+    <string name="settings_permissions_subtitle">Accessibility, camera, microphone</string>
+    <string name="settings_storage_title">Storage</string>
+    <string name="settings_storage_subtitle">Storage locations, file limits</string>
+
+    <!-- About Screen -->
+    <string name="about_author_section">Author</string>
+    <string name="about_author_name">Daniele Salvatore Albano</string>
+    <string name="about_author_email">d.albano@gmail.com</string>
+    <string name="about_author_linkedin">linkedin.com/in/danielesalvatorealbano</string>
+    <string name="about_author_x">x.com/daniele_dll</string>
+    <string name="about_links_section">Links</string>
+    <string name="about_link_github">GitHub Repository</string>
+    <string name="about_link_license">MIT License</string>
+    <string name="about_link_issues">Report an Issue</string>
+    <string name="about_footer">Open Source • MIT License</string>
+
+    <!-- Clipboard -->
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+
     <!-- Server Status -->
     <string name="server_status_title">Server Status</string>
     <string name="server_status_running">Running</string>
