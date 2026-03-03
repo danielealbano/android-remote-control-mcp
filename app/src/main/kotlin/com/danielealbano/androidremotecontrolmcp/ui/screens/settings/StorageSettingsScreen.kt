@@ -133,10 +133,11 @@ fun StorageSettingsScreen(
                 windowInsets = WindowInsets(0),
             )
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
             ) {
                 Text(
                     text = stringResource(R.string.storage_locations_title),
@@ -313,10 +314,11 @@ fun StorageSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (addDialogSelectedName != null) {
                         Text(
-                            text = stringResource(
-                                R.string.storage_location_add_dialog_selected,
-                                addDialogSelectedName!!,
-                            ),
+                            text =
+                                stringResource(
+                                    R.string.storage_location_add_dialog_selected,
+                                    addDialogSelectedName!!,
+                                ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
@@ -454,9 +456,10 @@ private fun StorageLocationRow(
     onAllowDeleteChange: (Boolean) -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -496,18 +499,20 @@ private fun StorageLocationRow(
             }
         }
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 0.dp, top = 2.dp, bottom = 4.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 0.dp, top = 2.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(
-                modifier = Modifier.toggleable(
-                    value = location.allowWrite,
-                    role = Role.Switch,
-                    onValueChange = onAllowWriteChange,
-                ),
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowWrite,
+                        role = Role.Switch,
+                        onValueChange = onAllowWriteChange,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -522,11 +527,12 @@ private fun StorageLocationRow(
                 )
             }
             Row(
-                modifier = Modifier.toggleable(
-                    value = location.allowDelete,
-                    role = Role.Switch,
-                    onValueChange = onAllowDeleteChange,
-                ),
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowDelete,
+                        role = Role.Switch,
+                        onValueChange = onAllowDeleteChange,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

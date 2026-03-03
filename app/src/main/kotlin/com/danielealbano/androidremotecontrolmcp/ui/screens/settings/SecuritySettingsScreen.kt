@@ -68,10 +68,11 @@ fun SecuritySettingsScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             // HTTPS Toggle
             Row(
@@ -105,15 +106,15 @@ fun SecuritySettingsScreen(
                     Column(modifier = Modifier.selectableGroup()) {
                         CertificateSource.entries.forEach { source ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .selectable(
-                                        selected = source == serverConfig.certificateSource,
-                                        onClick = { viewModel.updateCertificateSource(source) },
-                                        role = Role.RadioButton,
-                                        enabled = isEnabled,
-                                    )
-                                    .padding(vertical = 4.dp),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .selectable(
+                                            selected = source == serverConfig.certificateSource,
+                                            onClick = { viewModel.updateCertificateSource(source) },
+                                            role = Role.RadioButton,
+                                            enabled = isEnabled,
+                                        ).padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 RadioButton(
@@ -123,12 +124,13 @@ fun SecuritySettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = when (source) {
-                                        CertificateSource.AUTO_GENERATED ->
-                                            stringResource(R.string.config_cert_auto_generated)
-                                        CertificateSource.CUSTOM ->
-                                            stringResource(R.string.config_cert_custom)
-                                    },
+                                    text =
+                                        when (source) {
+                                            CertificateSource.AUTO_GENERATED ->
+                                                stringResource(R.string.config_cert_auto_generated)
+                                            CertificateSource.CUSTOM ->
+                                                stringResource(R.string.config_cert_custom)
+                                        },
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                             }

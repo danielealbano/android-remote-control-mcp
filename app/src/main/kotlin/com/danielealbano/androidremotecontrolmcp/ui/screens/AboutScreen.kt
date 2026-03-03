@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -58,10 +57,11 @@ fun AboutScreen(modifier: Modifier = Modifier) {
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             // App icon + name + version
             Column(
@@ -109,12 +109,14 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.about_author_email),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
-                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:d.albano@gmail.com")
-                    }
-                    context.startActivity(intent)
-                },
+                modifier =
+                    Modifier.clickable {
+                        val intent =
+                            Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:d.albano@gmail.com")
+                            }
+                        context.startActivity(intent)
+                    },
             )
             Spacer(Modifier.height(4.dp))
 
@@ -122,9 +124,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.about_author_linkedin),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LINKEDIN_URL)))
-                },
+                modifier =
+                    Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LINKEDIN_URL)))
+                    },
             )
             Spacer(Modifier.height(4.dp))
 
@@ -132,9 +135,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.about_author_x),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(X_URL)))
-                },
+                modifier =
+                    Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(X_URL)))
+                    },
             )
 
             Spacer(Modifier.height(16.dp))
@@ -156,9 +160,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-                },
+                modifier =
+                    Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
+                    },
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.about_link_license)) },
@@ -168,9 +173,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LICENSE_URL)))
-                },
+                modifier =
+                    Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LICENSE_URL)))
+                    },
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.about_link_issues)) },
@@ -180,9 +186,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ISSUES_URL)))
-                },
+                modifier =
+                    Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ISSUES_URL)))
+                    },
             )
 
             Spacer(Modifier.height(24.dp))

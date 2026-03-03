@@ -40,9 +40,10 @@ fun SettingsIndexScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
         ) {
             SettingsEntry(
                 icon = Icons.Default.Tune,

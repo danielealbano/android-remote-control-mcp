@@ -109,10 +109,11 @@ fun GeneralSettingsScreen(
             windowInsets = WindowInsets(0),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
         ) {
             // Binding Address Selector
             Text(
@@ -134,17 +135,19 @@ fun GeneralSettingsScreen(
                                 viewModel.updateBindingAddress(address)
                             }
                         },
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = options.size,
-                        ),
+                        shape =
+                            SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = options.size,
+                            ),
                         enabled = isEnabled,
                     ) {
                         Text(
-                            text = when (address) {
-                                BindingAddress.LOCALHOST -> stringResource(R.string.config_binding_localhost)
-                                BindingAddress.NETWORK -> stringResource(R.string.config_binding_network)
-                            },
+                            text =
+                                when (address) {
+                                    BindingAddress.LOCALHOST -> stringResource(R.string.config_binding_localhost)
+                                    BindingAddress.NETWORK -> stringResource(R.string.config_binding_network)
+                                },
                         )
                     }
                 }
@@ -221,9 +224,10 @@ fun GeneralSettingsScreen(
                         }
                         IconButton(
                             onClick = { viewModel.copyToClipboard(context, serverConfig.bearerToken) },
-                            modifier = Modifier.semantics {
-                                contentDescription = "Copy bearer token"
-                            },
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = "Copy bearer token"
+                                },
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
@@ -233,9 +237,10 @@ fun GeneralSettingsScreen(
                         IconButton(
                             onClick = viewModel::generateNewBearerToken,
                             enabled = isEnabled,
-                            modifier = Modifier.semantics {
-                                contentDescription = "Regenerate bearer token"
-                            },
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = "Regenerate bearer token"
+                                },
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,

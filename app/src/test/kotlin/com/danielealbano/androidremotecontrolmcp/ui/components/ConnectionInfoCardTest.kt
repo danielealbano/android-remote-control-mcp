@@ -10,19 +10,22 @@ import org.junit.jupiter.api.Test
  * These test the data-formatting logic extracted from the composable.
  */
 class ConnectionInfoCardTest {
-
-    private fun buildServerUrl(scheme: String, displayAddress: String, port: Int): String =
-        "$scheme://$displayAddress:$port/mcp"
+    private fun buildServerUrl(
+        scheme: String,
+        displayAddress: String,
+        port: Int,
+    ): String = "$scheme://$displayAddress:$port/mcp"
 
     private fun buildConnectionString(
         serverUrl: String,
         bearerToken: String,
         tunnelUrl: String? = null,
-    ): String = buildString {
-        append("URL: $serverUrl")
-        tunnelUrl?.let { append("\nTunnel: $it/mcp") }
-        append("\nBearer Token: $bearerToken")
-    }
+    ): String =
+        buildString {
+            append("URL: $serverUrl")
+            tunnelUrl?.let { append("\nTunnel: $it/mcp") }
+            append("\nBearer Token: $bearerToken")
+        }
 
     @Test
     fun `serverUrl includes mcp suffix`() {
@@ -41,11 +44,12 @@ class ConnectionInfoCardTest {
     @Test
     fun `tunnelUrl includes mcp suffix in connection string`() {
         val tunnelUrl = "https://random-words.trycloudflare.com"
-        val connectionString = buildConnectionString(
-            serverUrl = "http://127.0.0.1:8080/mcp",
-            bearerToken = "test-token",
-            tunnelUrl = tunnelUrl,
-        )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "http://127.0.0.1:8080/mcp",
+                bearerToken = "test-token",
+                tunnelUrl = tunnelUrl,
+            )
         assertTrue(
             connectionString.contains("Tunnel: $tunnelUrl/mcp"),
             "Connection string should contain tunnel URL with /mcp suffix",
@@ -55,10 +59,11 @@ class ConnectionInfoCardTest {
     @Test
     fun `copyAll always uses real bearer token`() {
         val realToken = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        val connectionString = buildConnectionString(
-            serverUrl = "http://127.0.0.1:8080/mcp",
-            bearerToken = realToken,
-        )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "http://127.0.0.1:8080/mcp",
+                bearerToken = realToken,
+            )
         assertTrue(
             connectionString.contains("Bearer Token: $realToken"),
             "Connection string should contain the real bearer token",
@@ -71,10 +76,11 @@ class ConnectionInfoCardTest {
 
     @Test
     fun `connectionString format without tunnel`() {
-        val connectionString = buildConnectionString(
-            serverUrl = "http://127.0.0.1:8080/mcp",
-            bearerToken = "test-token-123",
-        )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "http://127.0.0.1:8080/mcp",
+                bearerToken = "test-token-123",
+            )
         assertEquals(
             "URL: http://127.0.0.1:8080/mcp\nBearer Token: test-token-123",
             connectionString,
@@ -83,11 +89,12 @@ class ConnectionInfoCardTest {
 
     @Test
     fun `connectionString format with tunnel`() {
-        val connectionString = buildConnectionString(
-            serverUrl = "http://127.0.0.1:8080/mcp",
-            bearerToken = "test-token-123",
-            tunnelUrl = "https://example.trycloudflare.com",
-        )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "http://127.0.0.1:8080/mcp",
+                bearerToken = "test-token-123",
+                tunnelUrl = "https://example.trycloudflare.com",
+            )
         assertEquals(
             "URL: http://127.0.0.1:8080/mcp\n" +
                 "Tunnel: https://example.trycloudflare.com/mcp\n" +
