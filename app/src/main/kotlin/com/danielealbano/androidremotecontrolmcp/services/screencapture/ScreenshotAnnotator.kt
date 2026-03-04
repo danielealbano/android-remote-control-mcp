@@ -11,7 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import javax.inject.Inject
 
 /**
- * Annotates a screenshot bitmap with bounding boxes and element ID labels
+ * Annotates a screenshot bitmap with bounding boxes and node ID labels
  * for on-screen UI elements.
  *
  * Used by [GetScreenStateHandler] when `include_screenshot=true` to help
@@ -20,7 +20,7 @@ import javax.inject.Inject
  * Drawing style follows Set-of-Mark prompting conventions:
  * - Red dashed bounding boxes (2px scaled)
  * - Semi-transparent red pill labels with white bold text
- * - Labels show the element ID hash (without `node_` prefix)
+ * - Labels show the node ID hash (without `node_` prefix)
  */
 class ScreenshotAnnotator
     @Inject
@@ -176,13 +176,13 @@ class ScreenshotAnnotator
         }
 
         /**
-         * Extracts the display label from an element ID by stripping the `node_` prefix.
+         * Extracts the display label from a node ID by stripping the `node_` prefix.
          */
-        internal fun extractLabel(elementId: String): String =
-            if (elementId.startsWith(NODE_ID_PREFIX)) {
-                elementId.removePrefix(NODE_ID_PREFIX)
+        internal fun extractLabel(nodeId: String): String =
+            if (nodeId.startsWith(NODE_ID_PREFIX)) {
+                nodeId.removePrefix(NODE_ID_PREFIX)
             } else {
-                elementId
+                nodeId
             }
 
         companion object {

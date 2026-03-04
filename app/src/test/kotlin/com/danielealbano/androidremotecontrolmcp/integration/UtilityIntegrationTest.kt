@@ -135,7 +135,7 @@ class UtilityIntegrationTest {
         }
 
     @Test
-    fun `get_element_details returns TSV with element_id header and correct values`() =
+    fun `get_node_details returns TSV with node_id header and correct values`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -151,22 +151,22 @@ class UtilityIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_get_element_details",
-                        arguments = mapOf("element_ids" to listOf("node_a", "node_b")),
+                        name = "android_get_node_details",
+                        arguments = mapOf("node_ids" to listOf("node_a", "node_b")),
                     )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
 
                 val textContent = (result.content[0] as TextContent).text
                 val lines = textContent.split("\n")
-                assertEquals("element_id\ttext\tdesc", lines[0])
+                assertEquals("node_id\ttext\tdesc", lines[0])
                 assertEquals("node_a\tHello World\tA button", lines[1])
                 assertEquals("node_b\t-\t-", lines[2])
             }
         }
 
     @Test
-    fun `wait_for_element success returns element_id in response`() =
+    fun `wait_for_node success returns node_id in response`() =
         runTest {
             mockkStatic(SystemClock::class)
             try {
@@ -199,7 +199,7 @@ class UtilityIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "android_wait_for_element",
+                            name = "android_wait_for_node",
                             arguments =
                                 mapOf(
                                     "by" to "text",
@@ -218,9 +218,9 @@ class UtilityIntegrationTest {
                     )
                     assertEquals(
                         "node_a",
-                        parsed["element"]
+                        parsed["node"]
                             ?.jsonObject
-                            ?.get("element_id")
+                            ?.get("node_id")
                             ?.jsonPrimitive
                             ?.content,
                     )

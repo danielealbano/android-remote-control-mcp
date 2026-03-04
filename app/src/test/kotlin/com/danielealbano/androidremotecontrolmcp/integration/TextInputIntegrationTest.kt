@@ -76,7 +76,7 @@ class TextInputIntegrationTest {
     }
 
     @Test
-    fun `type_append_text with element_id returns success with field content`() =
+    fun `type_append_text with node_id returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -99,7 +99,7 @@ class TextInputIntegrationTest {
                 val result =
                     client.callTool(
                         name = "android_type_append_text",
-                        arguments = mapOf("element_id" to "node_edit", "text" to "Hello"),
+                        arguments = mapOf("node_id" to "node_edit", "text" to "Hello"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -151,7 +151,7 @@ class TextInputIntegrationTest {
                         name = "android_type_insert_text",
                         arguments =
                             mapOf(
-                                "element_id" to "node_edit",
+                                "node_id" to "node_edit",
                                 "text" to " World",
                                 "offset" to 3,
                             ),
@@ -191,7 +191,7 @@ class TextInputIntegrationTest {
                         name = "android_type_replace_text",
                         arguments =
                             mapOf(
-                                "element_id" to "node_edit",
+                                "node_id" to "node_edit",
                                 "search" to "Hello",
                                 "new_text" to "Goodbye",
                             ),
@@ -226,7 +226,7 @@ class TextInputIntegrationTest {
                         name = "android_type_replace_text",
                         arguments =
                             mapOf(
-                                "element_id" to "node_edit",
+                                "node_id" to "node_edit",
                                 "search" to "NotFound",
                                 "new_text" to "X",
                             ),
@@ -258,7 +258,7 @@ class TextInputIntegrationTest {
                 val result =
                     client.callTool(
                         name = "android_type_clear_text",
-                        arguments = mapOf("element_id" to "node_edit"),
+                        arguments = mapOf("node_id" to "node_edit"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text

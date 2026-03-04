@@ -186,13 +186,13 @@ class UtilityToolsTest {
     }
 
     @Nested
-    @DisplayName("WaitForElementTool")
-    inner class WaitForElementToolTests {
+    @DisplayName("WaitForNodeTool")
+    inner class WaitForNodeToolTests {
         private val tool =
-            WaitForElementTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
+            WaitForNodeTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
-        fun `finds element on first attempt`() =
+        fun `finds node on first attempt`() =
             runTest {
                 every {
                     mockElementFinder.findElements(sampleWindows, FindBy.TEXT, "Result", false)
@@ -210,9 +210,9 @@ class UtilityToolsTest {
                 assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
                 assertEquals(
                     "node_abc",
-                    parsed["element"]
+                    parsed["node"]
                         ?.jsonObject
-                        ?.get("element_id")
+                        ?.get("node_id")
                         ?.jsonPrimitive
                         ?.content,
                 )
@@ -270,7 +270,7 @@ class UtilityToolsTest {
             }
 
         @Test
-        fun `finds element after multiple poll attempts`() =
+        fun `finds node after multiple poll attempts`() =
             runTest {
                 var callCount = 0
                 every {
@@ -294,7 +294,7 @@ class UtilityToolsTest {
             }
 
         @Test
-        fun `returns timed out message when element never found`() =
+        fun `returns timed out message when node never found`() =
             runTest {
                 mockkStatic(SystemClock::class)
                 try {

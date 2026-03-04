@@ -169,7 +169,7 @@ internal fun validateTextLength(
 }
 
 /**
- * Polls for TypeInputController readiness after clicking an element to focus it.
+ * Polls for TypeInputController readiness after clicking a node to focus it.
  * Uses a poll-retry loop instead of a fixed delay to minimize unnecessary waiting
  * while still giving the framework time to establish the InputConnection.
  *
@@ -182,12 +182,12 @@ internal fun validateTextLength(
  * consume real wall-clock time (~500ms). This is acceptable for a unit test.
  *
  * @param typeInputController The controller to check.
- * @param elementId The element ID (for error message).
+ * @param nodeId The node ID (for error message).
  * @throws McpToolException.ActionFailed if not ready after FOCUS_POLL_MAX_MS.
  */
 internal suspend fun awaitInputConnectionReady(
     typeInputController: TypeInputController,
-    elementId: String,
+    nodeId: String,
 ) {
     val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
     while (System.currentTimeMillis() < deadline) {
@@ -195,8 +195,8 @@ internal suspend fun awaitInputConnectionReady(
         delay(FOCUS_POLL_INTERVAL_MS)
     }
     throw McpToolException.ActionFailed(
-        "Input connection not available after focusing element '$elementId'. " +
-            "The element may not be an editable text field.",
+        "Input connection not available after focusing node '$nodeId'. " +
+            "The node may not be an editable text field.",
     )
 }
 
@@ -234,9 +234,9 @@ class TypeAppendTextTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId = McpToolUtils.requireString(arguments, "element_id")
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            val nodeId = McpToolUtils.requireString(arguments, "node_id")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val text = McpToolUtils.requireString(arguments, "text")
@@ -251,11 +251,11 @@ class TypeAppendTextTool
                 typeOperationMutex.withLock {
                     // Click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
-                    clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
+                    val clickResult = actionExecutor.clickNode(nodeId, result.windows)
+                    clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
                     // Poll-retry for InputConnection readiness (max 500ms, 50ms interval)
-                    awaitInputConnectionReady(typeInputController, elementId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Position cursor at end
                     // Note: offset + text.length gives the total text length only if
@@ -274,7 +274,7 @@ class TypeAppendTextTool
                         } ?: 0
                     if (!typeInputController.setSelection(textLength, textLength)) {
                         throw McpToolException.ActionFailed(
-                            "Failed to position cursor in element '$elementId' — input connection lost",
+                            "Failed to position cursor in node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -285,9 +285,9 @@ class TypeAppendTextTool
                     readFieldContent(typeInputController)
                 }
 
-            Log.d(TAG, "type_append_text: typed ${text.length} chars on element '$elementId'")
+            Log.d(TAG, "type_append_text: typed ${text.length} chars on node '$nodeId'")
             return McpToolUtils.textResult(
-                "Typed ${text.length} characters at end of element '$elementId'.\n" +
+                "Typed ${text.length} characters at end of node '$nodeId'.\n" +
                     "Field content: $fieldContent",
             )
         }
@@ -309,9 +309,9 @@ class TypeAppendTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Target element ID to type into")
+                                    put("description", "Target node ID to type into")
                                 }
                                 putJsonObject("text") {
                                     put("type", "string")
@@ -341,7 +341,7 @@ class TypeAppendTextTool
                                     )
                                 }
                             },
-                        required = listOf("element_id", "text"),
+                        required = listOf("node_id", "text"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -363,9 +363,9 @@ class TypeInsertTextTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId = McpToolUtils.requireString(arguments, "element_id")
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            val nodeId = McpToolUtils.requireString(arguments, "node_id")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val text = McpToolUtils.requireString(arguments, "text")
@@ -386,11 +386,11 @@ class TypeInsertTextTool
                 typeOperationMutex.withLock {
                     // Click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
-                    clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
+                    val clickResult = actionExecutor.clickNode(nodeId, result.windows)
+                    clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
                     // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, elementId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Validate offset against current text length
                     val surroundingText =
@@ -406,7 +406,7 @@ class TypeInsertTextTool
 
                     if (offset > textLength) {
                         throw McpToolException.InvalidParams(
-                            "offset ($offset) exceeds text length ($textLength) in element '$elementId'",
+                            "offset ($offset) exceeds text length ($textLength) in node '$nodeId'",
                         )
                     }
 
@@ -414,7 +414,7 @@ class TypeInsertTextTool
                     if (!typeInputController.setSelection(offset, offset)) {
                         throw McpToolException.ActionFailed(
                             "Failed to position cursor at offset $offset " +
-                                "in element '$elementId' — input connection lost",
+                                "in node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -425,9 +425,9 @@ class TypeInsertTextTool
                     readFieldContent(typeInputController)
                 }
 
-            Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$elementId'")
+            Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$nodeId'")
             return McpToolUtils.textResult(
-                "Typed ${text.length} characters at offset $offset in element '$elementId'.\n" +
+                "Typed ${text.length} characters at offset $offset in node '$nodeId'.\n" +
                     "Field content: $fieldContent",
             )
         }
@@ -447,9 +447,9 @@ class TypeInsertTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Target element ID to type into")
+                                    put("description", "Target node ID to type into")
                                 }
                                 putJsonObject("text") {
                                     put("type", "string")
@@ -490,7 +490,7 @@ class TypeInsertTextTool
                                     )
                                 }
                             },
-                        required = listOf("element_id", "text", "offset"),
+                        required = listOf("node_id", "text", "offset"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -518,7 +518,7 @@ class TypeInsertTextTool
  * without framework-level atomic read-select operations.
  *
  * Flow:
- * 1. Click element_id to focus
+ * 1. Click node_id to focus
  * 2. Get current text via getSurroundingText()
  * 3. Find first occurrence of search text — error if not found
  * 4. setSelection(startIndex, endIndex) to select found text
@@ -536,9 +536,9 @@ class TypeReplaceTextTool
     ) {
         @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId = McpToolUtils.requireString(arguments, "element_id")
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            val nodeId = McpToolUtils.requireString(arguments, "node_id")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val search = McpToolUtils.requireString(arguments, "search")
@@ -563,11 +563,11 @@ class TypeReplaceTextTool
                 typeOperationMutex.withLock {
                     // Click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
-                    clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
+                    val clickResult = actionExecutor.clickNode(nodeId, result.windows)
+                    clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
                     // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, elementId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Get current text and find the search string
                     val surroundingText =
@@ -576,14 +576,14 @@ class TypeReplaceTextTool
                             MAX_SURROUNDING_TEXT_LENGTH,
                             0,
                         ) ?: throw McpToolException.ActionFailed(
-                            "Unable to read text from element '$elementId'",
+                            "Unable to read text from node '$nodeId'",
                         )
 
                     val fullText = surroundingText.text.toString()
                     val searchIndex = fullText.indexOf(search)
                     if (searchIndex == -1) {
-                        throw McpToolException.ElementNotFound(
-                            "Search text (${search.length} chars) not found in element '$elementId'",
+                        throw McpToolException.NodeNotFound(
+                            "Search text (${search.length} chars) not found in node '$nodeId'",
                         )
                     }
 
@@ -594,7 +594,7 @@ class TypeReplaceTextTool
                     // Select the found text — check return value
                     if (!typeInputController.setSelection(absoluteStart, absoluteEnd)) {
                         throw McpToolException.ActionFailed(
-                            "Failed to select text in element '$elementId' — input connection lost",
+                            "Failed to select text in node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -604,7 +604,7 @@ class TypeReplaceTextTool
                         )
                     ) {
                         throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_DOWN) on element '$elementId' — input connection lost",
+                            "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
                         )
                     }
                     if (!typeInputController.sendKeyEvent(
@@ -612,7 +612,7 @@ class TypeReplaceTextTool
                         )
                     ) {
                         throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_UP) on element '$elementId' — input connection lost",
+                            "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -628,10 +628,10 @@ class TypeReplaceTextTool
             Log.d(
                 TAG,
                 "type_replace_text: replaced ${search.length} chars " +
-                    "with ${newText.length} chars on '$elementId'",
+                    "with ${newText.length} chars on '$nodeId'",
             )
             return McpToolUtils.textResult(
-                "Replaced ${search.length} characters with ${newText.length} characters in element '$elementId'.\n" +
+                "Replaced ${search.length} characters with ${newText.length} characters in node '$nodeId'.\n" +
                     "Field content: $fieldContent",
             )
         }
@@ -654,9 +654,9 @@ class TypeReplaceTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Target element ID")
+                                    put("description", "Target node ID")
                                 }
                                 putJsonObject("search") {
                                     put("type", "string")
@@ -697,7 +697,7 @@ class TypeReplaceTextTool
                                     )
                                 }
                             },
-                        required = listOf("element_id", "search", "new_text"),
+                        required = listOf("node_id", "search", "new_text"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -730,20 +730,20 @@ class TypeClearTextTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId = McpToolUtils.requireString(arguments, "element_id")
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            val nodeId = McpToolUtils.requireString(arguments, "node_id")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val fieldContent =
                 typeOperationMutex.withLock {
                     // Click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val clickResult = actionExecutor.clickNode(elementId, result.windows)
-                    clickResult.onFailure { e -> mapNodeActionException(e, elementId) }
+                    val clickResult = actionExecutor.clickNode(nodeId, result.windows)
+                    clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
                     // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, elementId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Check if field has text — skip clear if already empty
                     val surroundingText =
@@ -754,16 +754,16 @@ class TypeClearTextTool
                         )
                     val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
                     if (textLength == 0) {
-                        Log.d(TAG, "type_clear_text: field already empty on '$elementId'")
+                        Log.d(TAG, "type_clear_text: field already empty on '$nodeId'")
                         return McpToolUtils.textResult(
-                            "Text cleared from element '$elementId'.\nField content: ",
+                            "Text cleared from node '$nodeId'.\nField content: ",
                         )
                     }
 
                     // Select all text — check return value
                     if (!typeInputController.performContextMenuAction(android.R.id.selectAll)) {
                         throw McpToolException.ActionFailed(
-                            "Failed to select all text in element '$elementId' — input connection lost",
+                            "Failed to select all text in node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -773,7 +773,7 @@ class TypeClearTextTool
                         )
                     ) {
                         throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_DOWN) on element '$elementId' — input connection lost",
+                            "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
                         )
                     }
                     if (!typeInputController.sendKeyEvent(
@@ -781,7 +781,7 @@ class TypeClearTextTool
                         )
                     ) {
                         throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_UP) on element '$elementId' — input connection lost",
+                            "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
                         )
                     }
 
@@ -789,9 +789,9 @@ class TypeClearTextTool
                     readFieldContent(typeInputController)
                 }
 
-            Log.d(TAG, "type_clear_text: cleared text on element '$elementId'")
+            Log.d(TAG, "type_clear_text: cleared text on node '$nodeId'")
             return McpToolUtils.textResult(
-                "Text cleared from element '$elementId'.\nField content: $fieldContent",
+                "Text cleared from node '$nodeId'.\nField content: $fieldContent",
             )
         }
 
@@ -809,12 +809,12 @@ class TypeClearTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Target element ID to clear")
+                                    put("description", "Target node ID to clear")
                                 }
                             },
-                        required = listOf("element_id"),
+                        required = listOf("node_id"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -881,8 +881,8 @@ class PressKeyTool
         private fun pressEnter() {
             val focusedNode =
                 findFocusedEditableNode(accessibilityServiceProvider)
-                    ?: throw McpToolException.ElementNotFound(
-                        "No focused element found for ENTER key",
+                    ?: throw McpToolException.NodeNotFound(
+                        "No focused node found for ENTER key",
                     )
 
             try {
@@ -902,8 +902,8 @@ class PressKeyTool
         private fun pressDelete() {
             val focusedNode =
                 findFocusedEditableNode(accessibilityServiceProvider)
-                    ?: throw McpToolException.ElementNotFound(
-                        "No focused editable element found for DEL key",
+                    ?: throw McpToolException.NodeNotFound(
+                        "No focused editable node found for DEL key",
                     )
 
             try {
@@ -932,8 +932,8 @@ class PressKeyTool
         private fun appendCharToFocused(char: Char) {
             val focusedNode =
                 findFocusedEditableNode(accessibilityServiceProvider)
-                    ?: throw McpToolException.ElementNotFound(
-                        "No focused editable element found for key input",
+                    ?: throw McpToolException.NodeNotFound(
+                        "No focused editable node found for key input",
                     )
 
             try {

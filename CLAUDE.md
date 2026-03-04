@@ -340,7 +340,7 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - **Repositories** abstract data access:
   - `SettingsRepository`: DataStore access.
 - **MCP Tool Implementations** are isolated:
-  - Each tool category in separate file (e.g., `TouchActionTools.kt`, `ElementActionTools.kt`),
+  - Each tool category in separate file (e.g., `TouchActionTools.kt`, `NodeActionTools.kt`),
   - Tools are pure functions or classes, easily unit testable,
   - Tools receive dependencies via constructor injection (Hilt).
 

@@ -177,9 +177,9 @@ class GetScreenStateHandler
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Returns the current screen state: app info, screen dimensions, " +
-                        "and a compact UI element list (text/desc truncated to 100 chars, use " +
-                        "${toolNamePrefix}get_element_details to retrieve full values). Optionally includes a " +
-                        "low-resolution screenshot (only request the screenshot when the element " +
+                        "and a compact UI node list (text/desc truncated to 100 chars, use " +
+                        "${toolNamePrefix}get_node_details to retrieve full values). Optionally includes a " +
+                        "low-resolution screenshot (only request the screenshot when the node " +
                         "list alone is not sufficient to understand the screen layout).",
                 inputSchema =
                     ToolSchema(
@@ -191,7 +191,7 @@ class GetScreenStateHandler
                                         put(
                                             "description",
                                             "Include a low-resolution screenshot. " +
-                                                "Only request when the UI element list is not sufficient.",
+                                                "Only request when the UI node list is not sufficient.",
                                         )
                                         put("default", false)
                                     }

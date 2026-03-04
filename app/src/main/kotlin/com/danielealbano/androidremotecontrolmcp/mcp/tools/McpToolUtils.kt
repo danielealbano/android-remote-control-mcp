@@ -469,15 +469,15 @@ internal object McpToolUtils {
         }
 
     /**
-     * Builds a JSON object representation of an [ElementInfo] for MCP tool responses.
+     * Builds a JSON object representation of an [ElementInfo] for MCP node responses.
      *
-     * Shared by [FindElementsTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.FindElementsTool]
-     * and [WaitForElementTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.WaitForElementTool]
-     * to ensure consistent element serialization across tools.
+     * Shared by [FindNodesTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.FindNodesTool]
+     * and [WaitForNodeTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.WaitForNodeTool]
+     * to ensure consistent node serialization across tools.
      */
-    fun buildElementJson(element: ElementInfo): JsonObject =
+    fun buildNodeJson(element: ElementInfo): JsonObject =
         buildJsonObject {
-            put("element_id", element.id)
+            put("node_id", element.id)
             put("text", element.text)
             put("contentDescription", element.contentDescription)
             put("resourceId", element.resourceId)

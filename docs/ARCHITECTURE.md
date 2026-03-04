@@ -291,7 +291,7 @@ When `getWindows()` returns empty or fails, the system falls back to `rootInActi
 
 ### Cross-Window Action Execution
 
-When executing a node-based action (click, long-click, scroll-to-element):
+When executing a node-based action (click, long-click, scroll-to-node):
 1. The caller provides the `List<WindowData>` from the multi-window snapshot, each containing a `windowId` (from `AccessibilityWindowInfo.getId()`)
 2. `performNodeAction()` calls `getAccessibilityWindows()` to get the live window list
 3. For each `WindowData`, find the matching live `AccessibilityWindowInfo` by `getId()`

@@ -27,15 +27,15 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
-@DisplayName("GetElementDetailsTool")
-class GetElementDetailsToolTest {
+@DisplayName("GetNodeDetailsTool")
+class GetNodeDetailsToolTest {
     private lateinit var mockAccessibilityServiceProvider: AccessibilityServiceProvider
     private lateinit var mockTreeParser: AccessibilityTreeParser
     private lateinit var mockElementFinder: ElementFinder
     private lateinit var mockRootNode: AccessibilityNodeInfo
     private lateinit var mockNodeCache: AccessibilityNodeCache
     private lateinit var mockWindowInfo: AccessibilityWindowInfo
-    private lateinit var tool: GetElementDetailsTool
+    private lateinit var tool: GetNodeDetailsTool
 
     private val sampleTree =
         AccessibilityNodeData(
@@ -100,7 +100,7 @@ class GetElementDetailsToolTest {
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
 
-        tool = GetElementDetailsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
+        tool = GetNodeDetailsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
     }
 
     @AfterEach
@@ -109,8 +109,8 @@ class GetElementDetailsToolTest {
     }
 
     @Test
-    @DisplayName("returns text and desc for found elements")
-    fun returnsTextAndDescForFoundElements() =
+    @DisplayName("returns text and desc for found nodes")
+    fun returnsTextAndDescForFoundNodes() =
         runTest {
             every { mockElementFinder.findNodeById(sampleWindows, "node_a") } returns sampleTree.children[0]
             every { mockElementFinder.findNodeById(sampleWindows, "node_b") } returns sampleTree.children[1]
@@ -118,7 +118,7 @@ class GetElementDetailsToolTest {
             val params =
                 buildJsonObject {
                     put(
-                        "element_ids",
+                        "node_ids",
                         buildJsonArray {
                             add(JsonPrimitive("node_a"))
                             add(JsonPrimitive("node_b"))
@@ -129,14 +129,14 @@ class GetElementDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = text.lines()
-            assertEquals("element_id\ttext\tdesc", lines[0])
+            assertEquals("node_id\ttext\tdesc", lines[0])
             assertEquals("node_a\tHello World\tA button", lines[1])
             assertEquals("node_b\t-\t-", lines[2])
         }
 
     @Test
-    @DisplayName("returns not_found for missing element IDs")
-    fun returnsNotFoundForMissingElementIds() =
+    @DisplayName("returns not_found for missing node IDs")
+    fun returnsNotFoundForMissingNodeIds() =
         runTest {
             every { mockElementFinder.findNodeById(sampleWindows, "node_a") } returns sampleTree.children[0]
             every { mockElementFinder.findNodeById(sampleWindows, "node_missing") } returns null
@@ -144,7 +144,7 @@ class GetElementDetailsToolTest {
             val params =
                 buildJsonObject {
                     put(
-                        "element_ids",
+                        "node_ids",
                         buildJsonArray {
                             add(JsonPrimitive("node_a"))
                             add(JsonPrimitive("node_missing"))
@@ -167,7 +167,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_b")) })
+                    put("node_ids", buildJsonArray { add(JsonPrimitive("node_b")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -192,7 +192,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_special")) })
+                    put("node_ids", buildJsonArray { add(JsonPrimitive("node_special")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -217,7 +217,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_long")) })
+                    put("node_ids", buildJsonArray { add(JsonPrimitive("node_long")) })
                 }
             val result = tool.execute(params)
             val text = (result.content[0] as TextContent).text
@@ -227,8 +227,8 @@ class GetElementDetailsToolTest {
         }
 
     @Test
-    @DisplayName("throws InvalidParams when element_ids missing")
-    fun throwsInvalidParamsWhenElementIdsMissing() =
+    @DisplayName("throws InvalidParams when node_ids missing")
+    fun throwsInvalidParamsWhenNodeIdsMissing() =
         runTest {
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(null)
@@ -236,32 +236,32 @@ class GetElementDetailsToolTest {
         }
 
     @Test
-    @DisplayName("throws InvalidParams when element_ids is not array")
-    fun throwsInvalidParamsWhenElementIdsIsNotArray() =
+    @DisplayName("throws InvalidParams when node_ids is not array")
+    fun throwsInvalidParamsWhenNodeIdsIsNotArray() =
         runTest {
-            val params = buildJsonObject { put("element_ids", "not_an_array") }
+            val params = buildJsonObject { put("node_ids", "not_an_array") }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
             }
         }
 
     @Test
-    @DisplayName("throws InvalidParams when element_ids is empty array")
-    fun throwsInvalidParamsWhenElementIdsIsEmptyArray() =
+    @DisplayName("throws InvalidParams when node_ids is empty array")
+    fun throwsInvalidParamsWhenNodeIdsIsEmptyArray() =
         runTest {
-            val params = buildJsonObject { put("element_ids", buildJsonArray { }) }
+            val params = buildJsonObject { put("node_ids", buildJsonArray { }) }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
             }
         }
 
     @Test
-    @DisplayName("throws InvalidParams when element_ids contains non-string")
-    fun throwsInvalidParamsWhenElementIdsContainsNonString() =
+    @DisplayName("throws InvalidParams when node_ids contains non-string")
+    fun throwsInvalidParamsWhenNodeIdsContainsNonString() =
         runTest {
             val params =
                 buildJsonObject {
-                    put("element_ids", buildJsonArray { add(JsonPrimitive(123)) })
+                    put("node_ids", buildJsonArray { add(JsonPrimitive(123)) })
                 }
             assertThrows<McpToolException.InvalidParams> {
                 tool.execute(params)
@@ -276,7 +276,7 @@ class GetElementDetailsToolTest {
 
             val params =
                 buildJsonObject {
-                    put("element_ids", buildJsonArray { add(JsonPrimitive("node_a")) })
+                    put("node_ids", buildJsonArray { add(JsonPrimitive("node_a")) })
                 }
             assertThrows<McpToolException.PermissionDenied> {
                 tool.execute(params)

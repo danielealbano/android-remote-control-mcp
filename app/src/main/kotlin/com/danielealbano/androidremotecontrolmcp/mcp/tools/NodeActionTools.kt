@@ -35,12 +35,12 @@ import javax.inject.Inject
 import kotlin.random.Random
 
 /**
- * MCP tool: find_elements
+ * MCP tool: find_nodes
  *
- * Finds UI elements matching the specified criteria in the accessibility tree.
- * Returns an array of matching elements (may be empty — empty is NOT an error).
+ * Finds UI nodes matching the specified criteria in the accessibility tree.
+ * Returns an array of matching nodes (may be empty — empty is NOT an error).
  */
-class FindElementsTool
+class FindNodesTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -77,15 +77,15 @@ class FindElementsTool
             // Search across all windows
             val elements = elementFinder.findElements(result.windows, findBy, value, exactMatch)
 
-            Log.d(TAG, "find_elements: by=$byStr, value='$value', exactMatch=$exactMatch, found=${elements.size}")
+            Log.d(TAG, "find_nodes: by=$byStr, value='$value', exactMatch=$exactMatch, found=${elements.size}")
 
             val resultJson =
                 buildJsonObject {
                     put(
-                        "elements",
+                        "nodes",
                         buildJsonArray {
                             elements.forEach { element ->
-                                add(McpToolUtils.buildElementJson(element))
+                                add(McpToolUtils.buildNodeJson(element))
                             }
                         },
                     )
@@ -101,7 +101,7 @@ class FindElementsTool
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Find UI elements matching the specified criteria " +
+                    "Find UI nodes matching the specified criteria " +
                         "(text, content_desc, resource_id, class_name)",
                 inputSchema =
                     ToolSchema(
@@ -139,17 +139,17 @@ class FindElementsTool
         }
 
         companion object {
-            private const val TAG = "MCP:FindElementsTool"
-            const val TOOL_NAME = "find_elements"
+            private const val TAG = "MCP:FindNodesTool"
+            const val TOOL_NAME = "find_nodes"
         }
     }
 
 /**
- * MCP tool: click_element
+ * MCP tool: click_node
  *
- * Clicks the accessibility node identified by element_id.
+ * Clicks the accessibility node identified by node_id.
  */
-class ClickElementTool
+class ClickNodeTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -158,21 +158,21 @@ class ClickElementTool
         private val nodeCache: AccessibilityNodeCache,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId =
-                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
+            val nodeId =
+                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
 
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
-            val result = actionExecutor.clickNode(elementId, multiWindowResult.windows)
-            result.onFailure { e -> mapNodeActionException(e, elementId) }
+            val result = actionExecutor.clickNode(nodeId, multiWindowResult.windows)
+            result.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-            Log.d(TAG, "click_element: elementId=$elementId succeeded")
-            return McpToolUtils.textResult("Click performed on element '$elementId'")
+            Log.d(TAG, "click_node: nodeId=$nodeId succeeded")
+            return McpToolUtils.textResult("Click performed on node '$nodeId'")
         }
 
         fun register(
@@ -181,33 +181,33 @@ class ClickElementTool
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Click the specified accessibility node by element ID",
+                description = "Click the specified accessibility node by node ID",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
                                 }
                             },
-                        required = listOf("element_id"),
+                        required = listOf("node_id"),
                     ),
             ) { request -> execute(request.arguments) }
         }
 
         companion object {
-            private const val TAG = "MCP:ClickElementTool"
-            const val TOOL_NAME = "click_element"
+            private const val TAG = "MCP:ClickNodeTool"
+            const val TOOL_NAME = "click_node"
         }
     }
 
 /**
- * MCP tool: long_click_element
+ * MCP tool: long_click_node
  *
- * Long-clicks the accessibility node identified by element_id.
+ * Long-clicks the accessibility node identified by node_id.
  */
-class LongClickElementTool
+class LongClickNodeTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -216,21 +216,21 @@ class LongClickElementTool
         private val nodeCache: AccessibilityNodeCache,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId =
-                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
+            val nodeId =
+                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
 
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
-            val result = actionExecutor.longClickNode(elementId, multiWindowResult.windows)
-            result.onFailure { e -> mapNodeActionException(e, elementId) }
+            val result = actionExecutor.longClickNode(nodeId, multiWindowResult.windows)
+            result.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-            Log.d(TAG, "long_click_element: elementId=$elementId succeeded")
-            return McpToolUtils.textResult("Long-click performed on element '$elementId'")
+            Log.d(TAG, "long_click_node: nodeId=$nodeId succeeded")
+            return McpToolUtils.textResult("Long-click performed on node '$nodeId'")
         }
 
         fun register(
@@ -239,35 +239,35 @@ class LongClickElementTool
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Long-click the specified accessibility node by element ID",
+                description = "Long-click the specified accessibility node by node ID",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
                                 }
                             },
-                        required = listOf("element_id"),
+                        required = listOf("node_id"),
                     ),
             ) { request -> execute(request.arguments) }
         }
 
         companion object {
-            private const val TAG = "MCP:LongClickElementTool"
-            const val TOOL_NAME = "long_click_element"
+            private const val TAG = "MCP:LongClickNodeTool"
+            const val TOOL_NAME = "long_click_node"
         }
     }
 
 /**
- * MCP tool: tap_element
+ * MCP tool: tap_node
  *
  * Performs a gesture-based tap at a random point within the bounds of the
- * element identified by element_id. Unlike click_element (which uses the
+ * node identified by node_id. Unlike click_node (which uses the
  * accessibility ACTION_CLICK), this performs a coordinate-based touch gesture.
  */
-class TapElementTool
+class TapNodeTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -278,12 +278,12 @@ class TapElementTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId =
-                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
+            val nodeId =
+                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
 
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
             val insetPercentage =
@@ -298,8 +298,8 @@ class TapElementTool
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             val node =
-                elementFinder.findNodeById(multiWindowResult.windows, elementId)
-                    ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
+                elementFinder.findNodeById(multiWindowResult.windows, nodeId)
+                    ?: throw McpToolException.NodeNotFound("Node '$nodeId' not found")
 
             val bounds = node.bounds
             val width = bounds.right - bounds.left
@@ -320,12 +320,12 @@ class TapElementTool
                     )
                 }
 
-            Log.d(TAG, "tap_element: elementId=$elementId, tapAt=($tapX, $tapY)")
+            Log.d(TAG, "tap_node: nodeId=$nodeId, tapAt=($tapX, $tapY)")
 
             val result = actionExecutor.tap(tapX, tapY)
             return McpToolUtils.handleActionResult(
                 result,
-                "Tap executed at (${tapX.toInt()}, ${tapY.toInt()}) within element '$elementId'",
+                "Tap executed at (${tapX.toInt()}, ${tapY.toInt()}) within node '$nodeId'",
             )
         }
 
@@ -345,36 +345,36 @@ class TapElementTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Performs a gesture-based tap at a random point within the bounds of the " +
-                        "element identified by element_id. Unlike click_element (which uses the " +
+                        "node identified by node_id. Unlike click_node (which uses the " +
                         "accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. " +
-                        "The tap point is randomized within the element bounds, inset by a configurable " +
+                        "The tap point is randomized within the node bounds, inset by a configurable " +
                         "percentage (default 5%) from each edge to avoid hitting borders.",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
                                 }
                                 putJsonObject("inset_percentage") {
                                     put("type", "number")
                                     put("default", DEFAULT_INSET_PERCENTAGE.toDouble())
                                     put(
                                         "description",
-                                        "Percentage to inset from each edge of the element bounds " +
+                                        "Percentage to inset from each edge of the node bounds " +
                                             "(0.0-45.0). Default 5.0",
                                     )
                                 }
                             },
-                        required = listOf("element_id"),
+                        required = listOf("node_id"),
                     ),
             ) { request -> execute(request.arguments) }
         }
 
         companion object {
-            private const val TAG = "MCP:TapElementTool"
-            const val TOOL_NAME = "tap_element"
+            private const val TAG = "MCP:TapNodeTool"
+            const val TOOL_NAME = "tap_node"
             private const val DEFAULT_INSET_PERCENTAGE = 5.0f
             private const val MIN_INSET_PERCENTAGE = 0.0f
             private const val MAX_INSET_PERCENTAGE = 45.0f
@@ -384,12 +384,12 @@ class TapElementTool
     }
 
 /**
- * MCP tool: scroll_to_element
+ * MCP tool: scroll_to_node
  *
- * Scrolls to make the specified element visible by finding its nearest
+ * Scrolls to make the specified node visible by finding its nearest
  * scrollable ancestor and scrolling it. Retries up to [MAX_SCROLL_ATTEMPTS] times.
  */
-class ScrollToElementTool
+class ScrollToNodeTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -400,49 +400,49 @@ class ScrollToElementTool
     ) {
         @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val elementId =
-                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
+            val nodeId =
+                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
 
-            if (elementId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            if (nodeId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
             }
 
-            // Parse multi-window trees and find the element
+            // Parse multi-window trees and find the node
             var result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
             var node =
-                elementFinder.findNodeById(result.windows, elementId)
-                    ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
+                elementFinder.findNodeById(result.windows, nodeId)
+                    ?: throw McpToolException.NodeNotFound("Node '$nodeId' not found")
 
             // If already visible, return immediately
             if (node.visible) {
-                Log.d(TAG, "scroll_to_element: element '$elementId' already visible")
-                return McpToolUtils.textResult("Element '$elementId' is already visible")
+                Log.d(TAG, "scroll_to_node: node '$nodeId' already visible")
+                return McpToolUtils.textResult("Node '$nodeId' is already visible")
             }
 
             // Find the window tree containing the target node
             val containingTree =
-                findContainingTree(result.windows, elementId)
+                findContainingTree(result.windows, nodeId)
                     ?: throw McpToolException.ActionFailed(
-                        "Element '$elementId' not found in any window tree",
+                        "Node '$nodeId' not found in any window tree",
                     )
 
             // Find nearest scrollable ancestor within the same window tree
             val scrollableAncestorId =
-                findScrollableAncestor(containingTree, elementId)
+                findScrollableAncestor(containingTree, nodeId)
                     ?: throw McpToolException.ActionFailed(
-                        "No scrollable container found for element '$elementId'",
+                        "No scrollable container found for node '$nodeId'",
                     )
 
-            // Determine initial scroll direction from the element's position relative to
-            // the screen. Elements above the viewport (bounds.bottom <= 0) need UP scrolling;
-            // elements below or at unknown positions default to DOWN.
+            // Determine initial scroll direction from the node's position relative to
+            // the screen. Nodes above the viewport (bounds.bottom <= 0) need UP scrolling;
+            // nodes below or at unknown positions default to DOWN.
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
             val primaryDirection = determineScrollDirection(node, screenInfo)
             val oppositeDirection =
                 if (primaryDirection == ScrollDirection.DOWN) ScrollDirection.UP else ScrollDirection.DOWN
 
-            // Try primary direction first, then opposite if element not found
+            // Try primary direction first, then opposite if node not found
             var totalAttempts = 0
             for (direction in listOf(primaryDirection, oppositeDirection)) {
                 while (totalAttempts < MAX_SCROLL_ATTEMPTS) {
@@ -461,32 +461,32 @@ class ScrollToElementTool
 
                     // Re-parse and check visibility
                     result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    node = elementFinder.findNodeById(result.windows, elementId) ?: continue
+                    node = elementFinder.findNodeById(result.windows, nodeId) ?: continue
 
                     if (node.visible) {
                         Log.d(
                             TAG,
-                            "scroll_to_element: element '$elementId' became visible " +
+                            "scroll_to_node: node '$nodeId' became visible " +
                                 "after $totalAttempts scroll(s) (direction=$direction)",
                         )
                         return McpToolUtils.textResult(
-                            "Scrolled to element '$elementId' ($totalAttempts scroll(s))",
+                            "Scrolled to node '$nodeId' ($totalAttempts scroll(s))",
                         )
                     }
                 }
             }
 
             throw McpToolException.ActionFailed(
-                "Element '$elementId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
+                "Node '$nodeId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
             )
         }
 
         /**
-         * Determines the best initial scroll direction based on the element's position
+         * Determines the best initial scroll direction based on the node's position
          * relative to the screen viewport.
          *
-         * - If the element's bottom edge is at or above the top of the screen → UP
-         * - Otherwise (below viewport or unknown) → DOWN (most common case)
+         * - If the node's bottom edge is at or above the top of the screen -> UP
+         * - Otherwise (below viewport or unknown) -> DOWN (most common case)
          */
         internal fun determineScrollDirection(
             node: AccessibilityNodeData,
@@ -560,31 +560,31 @@ class ScrollToElementTool
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Scroll to make the specified element visible",
+                description = "Scroll to make the specified node visible",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_id") {
+                                putJsonObject("node_id") {
                                     put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
+                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
                                 }
                             },
-                        required = listOf("element_id"),
+                        required = listOf("node_id"),
                     ),
             ) { request -> execute(request.arguments) }
         }
 
         companion object {
-            private const val TAG = "MCP:ScrollToElementTool"
-            const val TOOL_NAME = "scroll_to_element"
+            private const val TAG = "MCP:ScrollToNodeTool"
+            const val TOOL_NAME = "scroll_to_node"
             private const val MAX_SCROLL_ATTEMPTS = 5
             private const val SCROLL_SETTLE_DELAY_MS = 300L
         }
     }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared Utilities for Element Action Tools
+// Shared Utilities for Node Action Tools
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -755,10 +755,10 @@ internal fun getFreshWindows(
 }
 
 /**
- * Registers all element action tools with the [Server].
+ * Registers all node action tools with the [Server].
  */
 @Suppress("LongParameterList")
-fun registerElementActionTools(
+fun registerNodeActionTools(
     server: Server,
     treeParser: AccessibilityTreeParser,
     elementFinder: ElementFinder,
@@ -768,24 +768,24 @@ fun registerElementActionTools(
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
-    if (perms.isToolEnabled(FindElementsTool.TOOL_NAME)) {
-        FindElementsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(FindNodesTool.TOOL_NAME)) {
+        FindNodesTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(ClickElementTool.TOOL_NAME)) {
-        ClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(ClickNodeTool.TOOL_NAME)) {
+        ClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(LongClickElementTool.TOOL_NAME)) {
-        LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(LongClickNodeTool.TOOL_NAME)) {
+        LongClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(TapElementTool.TOOL_NAME)) {
-        TapElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(TapNodeTool.TOOL_NAME)) {
+        TapNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(ScrollToElementTool.TOOL_NAME)) {
-        ScrollToElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(ScrollToNodeTool.TOOL_NAME)) {
+        ScrollToNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
 }
@@ -799,11 +799,11 @@ fun registerElementActionTools(
 @Suppress("ThrowsCount")
 internal fun mapNodeActionException(
     exception: Throwable,
-    elementId: String,
+    nodeId: String,
 ): Nothing {
     when (exception) {
-        is NoSuchElementException -> throw McpToolException.ElementNotFound(
-            "Element '$elementId' not found in accessibility tree",
+        is NoSuchElementException -> throw McpToolException.NodeNotFound(
+            "Node '$nodeId' not found in accessibility tree",
         )
         is IllegalStateException -> {
             if (exception.message?.contains("not available") == true) {
@@ -812,11 +812,11 @@ internal fun mapNodeActionException(
                 )
             }
             throw McpToolException.ActionFailed(
-                exception.message ?: "Action failed on element '$elementId'",
+                exception.message ?: "Action failed on node '$nodeId'",
             )
         }
         else -> throw McpToolException.ActionFailed(
-            "Action failed on element '$elementId': ${exception.message}",
+            "Action failed on node '$nodeId': ${exception.message}",
         )
     }
 }

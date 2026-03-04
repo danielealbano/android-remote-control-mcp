@@ -27,7 +27,7 @@ sealed class McpToolException(
         cause: Throwable? = null,
     ) : McpToolException(message, cause)
 
-    class ElementNotFound(
+    class NodeNotFound(
         message: String,
         cause: Throwable? = null,
     ) : McpToolException(message, cause)
