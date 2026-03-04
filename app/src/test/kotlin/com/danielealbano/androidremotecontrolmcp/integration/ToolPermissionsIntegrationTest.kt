@@ -281,6 +281,7 @@ class ToolPermissionsIntegrationTest {
                 "find_elements",
                 "click_element",
                 "long_click_element",
+                "tap_element",
                 "scroll_to_element",
                 "type_append_text",
                 "type_insert_text",
