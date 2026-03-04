@@ -43,6 +43,9 @@ Thumbs.db
 gen/
 out/
 
+# E2E test build artifacts
+e2e-tests/bin/
+
 # Android profiling
 *.hprof
 
