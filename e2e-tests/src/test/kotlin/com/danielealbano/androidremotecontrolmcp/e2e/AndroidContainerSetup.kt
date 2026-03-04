@@ -104,7 +104,6 @@ object AndroidContainerSetup {
                 "ro.debuggable=1",
                 "ro.secure=0",
             )
-            .withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
             .waitingFor(
                 object : AbstractWaitStrategy() {
                     override fun waitUntilReady() {
@@ -123,8 +122,14 @@ object AndroidContainerSetup {
                         while (System.currentTimeMillis() - startTime < timeoutMs) {
                             try {
                                 val output = runProcess("adb", "connect", serial, timeoutSeconds = 10L)
-                                if (output.contains("connected")) break
-                            } catch (_: Exception) { }
+                                if (output.contains("connected")) {
+                                    println("[E2E Setup] ADB connected to $serial")
+                                    break
+                                }
+                                println("[E2E Setup] ADB connect output: $output")
+                            } catch (e: Exception) {
+                                println("[E2E Setup] ADB connect failed: ${e::class.simpleName}: ${e.message}")
+                            }
                             Thread.sleep(POLL_INTERVAL_MS)
                         }
 
@@ -141,7 +146,10 @@ object AndroidContainerSetup {
                                     _adbSerial = serial
                                     return
                                 }
-                            } catch (_: Exception) { }
+                                println("[E2E Setup] boot_completed=$output")
+                            } catch (e: Exception) {
+                                println("[E2E Setup] getprop failed: ${e::class.simpleName}: ${e.message}")
+                            }
                             Thread.sleep(POLL_INTERVAL_MS)
                         }
 
@@ -151,6 +159,7 @@ object AndroidContainerSetup {
                     }
                 },
             )
+            .withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
             .withCreateContainerCmdModifier { cmd ->
                 cmd.withVolumes(Volume("/sys/fs/cgroup"))
                 cmd.hostConfig
