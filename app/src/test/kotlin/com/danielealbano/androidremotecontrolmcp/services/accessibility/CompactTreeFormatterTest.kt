@@ -145,8 +145,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only notes + metadata + header = 7 lines, no data rows
-            assertEquals(7, lines.size)
+            // notes + metadata + header = 7 lines + hierarchy: label = 8 lines, no data rows
+            assertEquals(8, lines.size)
         }
 
         @Test
@@ -169,8 +169,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Parent is filtered, child appears
-            assertEquals(8, lines.size)
+            // Parent is filtered, child appears + hierarchy: + hierarchy node
+            assertEquals(10, lines.size)
             assertTrue(lines[7].startsWith("node_child\t"))
         }
 
@@ -187,7 +187,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            assertEquals(8, lines.size)
+            // data row + hierarchy: + hierarchy node = 10 lines
+            assertEquals(10, lines.size)
             assertTrue(lines[7].contains("node_hidden"))
             // Check the flags column (last tab-separated field) starts with "off"
             val flags = lines[7].split("\t").last()
@@ -212,8 +213,8 @@ class CompactTreeFormatterTest {
                 )
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
-            // Only notes + metadata + header = 7 lines
-            assertEquals(7, lines.size)
+            // notes + metadata + header = 7 lines + hierarchy: label = 8 lines
+            assertEquals(8, lines.size)
         }
 
         @Test
@@ -228,6 +229,135 @@ class CompactTreeFormatterTest {
             val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
             val lines = output.lines()
             assertTrue(lines[7].contains("10,20,300,400"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // walkTree hierarchy
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("walkTree hierarchy")
+    inner class WalkHierarchyTests {
+        private fun extractHierarchy(output: String): List<String> {
+            val lines = output.lines()
+            val headerIdx = lines.indexOf(CompactTreeFormatter.HIERARCHY_HEADER)
+            return if (headerIdx >= 0) lines.drop(headerIdx + 1) else emptyList()
+        }
+
+        @Test
+        @DisplayName("hierarchy section present after elements")
+        fun hierarchySectionPresentAfterElements() {
+            val tree = makeNode(id = "node_a", text = "Hello", visible = true)
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val lines = output.lines()
+            val headerIdx = lines.indexOf(CompactTreeFormatter.HIERARCHY_HEADER)
+            assertTrue(headerIdx > 0, "hierarchy: header should be present")
+            // hierarchy: should come after the last element row
+            val lastElementRow = lines.indexOfLast { it.startsWith("node_") && it.contains("\t") }
+            assertTrue(headerIdx > lastElementRow, "hierarchy: should be after last element row")
+        }
+
+        @Test
+        @DisplayName("single kept node produces flat hierarchy")
+        fun singleKeptNodeProducesFlatHierarchy() {
+            val tree = makeNode(id = "node_a", text = "Hello", visible = true)
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(1, hierarchy.size)
+            assertEquals("node_a", hierarchy[0])
+        }
+
+        @Test
+        @DisplayName("parent-child nesting uses 2-space indentation")
+        fun parentChildNestingUses2SpaceIndentation() {
+            val child = makeNode(id = "node_child", text = "Child", visible = true)
+            val parent = makeNode(id = "node_parent", text = "Parent", visible = true, children = listOf(child))
+            val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(2, hierarchy.size)
+            assertEquals("node_parent", hierarchy[0])
+            assertEquals("  node_child", hierarchy[1])
+        }
+
+        @Test
+        @DisplayName("filtered parent promotes children to parent depth")
+        fun filteredParentPromotesChildrenToParentDepth() {
+            val child = makeNode(id = "node_child", text = "Child", visible = true)
+            val parent =
+                makeNode(
+                    id = "node_structural",
+                    className = "android.widget.FrameLayout",
+                    children = listOf(child),
+                )
+            val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(1, hierarchy.size)
+            assertEquals("node_child", hierarchy[0])
+        }
+
+        @Test
+        @DisplayName("deep nesting produces correct indentation levels")
+        fun deepNestingProducesCorrectIndentationLevels() {
+            val grandchild = makeNode(id = "node_gc", text = "GC", visible = true)
+            val child = makeNode(id = "node_c", text = "C", visible = true, children = listOf(grandchild))
+            val root = makeNode(id = "node_r", text = "R", visible = true, children = listOf(child))
+            val output = formatter.format(root, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(3, hierarchy.size)
+            assertEquals("node_r", hierarchy[0])
+            assertEquals("  node_c", hierarchy[1])
+            assertEquals("    node_gc", hierarchy[2])
+        }
+
+        @Test
+        @DisplayName("multiple children at same level")
+        fun multipleChildrenAtSameLevel() {
+            val child1 = makeNode(id = "node_c1", text = "C1", visible = true)
+            val child2 = makeNode(id = "node_c2", text = "C2", visible = true)
+            val parent = makeNode(id = "node_p", text = "P", visible = true, children = listOf(child1, child2))
+            val output = formatter.format(parent, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(3, hierarchy.size)
+            assertEquals("node_p", hierarchy[0])
+            assertEquals("  node_c1", hierarchy[1])
+            assertEquals("  node_c2", hierarchy[2])
+        }
+
+        @Test
+        @DisplayName("all nodes filtered produces only hierarchy label")
+        fun allNodesFilteredProducesOnlyHierarchyLabel() {
+            val tree =
+                makeNode(
+                    id = "node_root",
+                    className = "android.widget.FrameLayout",
+                    children =
+                        listOf(
+                            makeNode(id = "node_inner", className = "android.widget.LinearLayout"),
+                        ),
+                )
+            val output = formatter.format(tree, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertTrue(hierarchy.isEmpty(), "No hierarchy nodes expected when all are filtered")
+            assertTrue(output.contains(CompactTreeFormatter.HIERARCHY_HEADER))
+        }
+
+        @Test
+        @DisplayName("mixed kept and filtered in deep tree")
+        fun mixedKeptAndFilteredInDeepTree() {
+            val leaf = makeNode(id = "node_leaf", text = "Leaf", visible = true)
+            val mid =
+                makeNode(
+                    id = "node_mid",
+                    className = "android.widget.FrameLayout",
+                    children = listOf(leaf),
+                )
+            val root = makeNode(id = "node_root", text = "Root", visible = true, children = listOf(mid))
+            val output = formatter.format(root, "com.example", ".Main", defaultScreenInfo)
+            val hierarchy = extractHierarchy(output)
+            assertEquals(2, hierarchy.size)
+            assertEquals("node_root", hierarchy[0])
+            assertEquals("  node_leaf", hierarchy[1])
         }
     }
 
@@ -708,6 +838,47 @@ class CompactTreeFormatterTest {
                 )
             val header = formatter.buildWindowHeader(wd)
             assertTrue(header.contains("activity:com.example.MainActivity"))
+        }
+
+        @Test
+        @DisplayName("each window has hierarchy section")
+        fun eachWindowHasHierarchySection() {
+            val appTree = makeNode(id = "node_app", text = "App", clickable = true, visible = true)
+            val dialogTree = makeNode(id = "node_dialog", text = "Dialog", clickable = true, visible = true)
+            val result =
+                MultiWindowResult(
+                    windows =
+                        listOf(
+                            WindowData(
+                                windowId = 0,
+                                windowType = "APPLICATION",
+                                packageName = "com.example",
+                                title = "Main",
+                                layer = 0,
+                                focused = false,
+                                tree = appTree,
+                            ),
+                            WindowData(
+                                windowId = 1,
+                                windowType = "SYSTEM",
+                                packageName = "com.android.system",
+                                title = "Dialog",
+                                layer = 1,
+                                focused = true,
+                                tree = dialogTree,
+                            ),
+                        ),
+                )
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+            val lines = output.lines()
+            val hierarchyIndices = lines.indices.filter { lines[it] == CompactTreeFormatter.HIERARCHY_HEADER }
+            assertEquals(2, hierarchyIndices.size, "Each window should have its own hierarchy: section")
+            // First window hierarchy should contain node_app
+            val firstHierarchyNodeIdx = hierarchyIndices[0] + 1
+            assertTrue(lines[firstHierarchyNodeIdx] == "node_app")
+            // Second window hierarchy should contain node_dialog
+            val secondHierarchyNodeIdx = hierarchyIndices[1] + 1
+            assertTrue(lines[secondHierarchyNodeIdx] == "node_dialog")
         }
     }
 }

@@ -107,6 +107,7 @@ class ScreenIntrospectionIntegrationTest {
                 assertTrue(textContent.contains("node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags"))
                 assertTrue(textContent.contains("node_btn"))
                 assertTrue(textContent.contains("on,clk,ena"))
+                assertTrue(textContent.contains("hierarchy:"))
                 // Negative assertions: ensure old single-char flag format is gone
                 assertFalse(textContent.contains("\tvcn"))
                 assertFalse(textContent.contains("\tvclfsen"))
