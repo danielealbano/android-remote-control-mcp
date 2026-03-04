@@ -38,10 +38,10 @@ After migration, most `AndroidContainerSetup` methods no longer use the containe
 **Why**: GitHub Actions runners do not have `binder_linux` loaded by default.
 
 **Acceptance criteria**:
-- [ ] CI installs `linux-modules-extra-$(uname -r)` package
-- [ ] CI loads `binder_linux` (with devices param) and `fuse` modules via `sudo modprobe`
-- [ ] CI mounts binderfs at `/dev/binderfs/` if not already mounted
-- [ ] CI pre-pulls `redroid/redroid:13.0.0-latest` instead of `budtmo/docker-android:emulator_14.0`
+- [x] CI installs `linux-modules-extra-$(uname -r)` package
+- [x] CI loads `binder_linux` (with devices param) and `fuse` modules via `sudo modprobe`
+- [x] CI mounts binderfs at `/dev/binderfs/` if not already mounted
+- [x] CI pre-pulls `redroid/redroid:13.0.0-latest` instead of `budtmo/docker-android:emulator_14.0`
 - [ ] E2E tests run successfully on CI
 
 ### Task 1.1: Update CI workflow for redroid kernel module setup
@@ -75,10 +75,10 @@ Replace the "Pre-pull Docker Android image" step with two new steps:
 ```
 
 **Definition of Done**:
-- [ ] Old `docker pull budtmo/docker-android:emulator_14.0` step removed
-- [ ] New kernel module setup step loads binder_linux and fuse
-- [ ] New pre-pull step pulls `redroid/redroid:13.0.0-latest`
-- [ ] Binderfs mounted at `/dev/binderfs/`
+- [x] Old `docker pull budtmo/docker-android:emulator_14.0` step removed
+- [x] New kernel module setup step loads binder_linux and fuse
+- [x] New pre-pull step pulls `redroid/redroid:13.0.0-latest`
+- [x] Binderfs mounted at `/dev/binderfs/`
 
 ---
 

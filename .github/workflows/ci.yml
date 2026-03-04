@@ -163,8 +163,25 @@ jobs:
       - name: Build debug APK (required by E2E tests)
         run: ./gradlew assembleDebug
 
-      - name: Pre-pull Docker Android image
-        run: docker pull budtmo/docker-android:emulator_14.0
+      - name: Set up redroid kernel modules
+        run: |
+          # Install kernel module package (binder_linux is in linux-modules-extra)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq linux-modules-extra-$(uname -r)
+          # Load required kernel modules
+          sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
+          sudo modprobe fuse
+          # Mount binderfs if not already mounted
+          if ! mountpoint -q /dev/binderfs; then
+            sudo mkdir -p /dev/binderfs
+            sudo mount -t binder binder /dev/binderfs
+          fi
+          # Verify
+          ls -la /dev/binderfs/
+          lsmod | grep -E 'binder_linux|fuse'
+
+      - name: Pre-pull redroid image
+        run: docker pull redroid/redroid:13.0.0-latest
 
       - name: Run E2E tests
         run: ./gradlew :e2e-tests:test
