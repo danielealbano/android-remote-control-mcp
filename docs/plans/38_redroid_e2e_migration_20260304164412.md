@@ -1039,10 +1039,10 @@ Updated `createContainer()` body inside `withCreateContainerCmdModifier`:
 ```
 
 **Definition of Done**:
-- [ ] `unmask=/sys/fs/cgroup` present in security opts
-- [ ] `/sys/fs/cgroup` is anonymous volume (not host bind mount)
-- [ ] Unused `Bind` import removed
-- [ ] No other container config changes (devices, cgroup rules unchanged)
+- [x] `unmask=/sys/fs/cgroup` present in security opts
+- [x] `/sys/fs/cgroup` is anonymous volume (not host bind mount)
+- [x] Unused `Bind` import removed
+- [x] No other container config changes (devices, cgroup rules unchanged)
 
 ### Task R1.2b: Update build.gradle.kts env var forwarding for podman
 

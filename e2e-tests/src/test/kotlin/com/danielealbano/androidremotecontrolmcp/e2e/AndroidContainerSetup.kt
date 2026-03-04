@@ -1,6 +1,5 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
-import com.github.dockerjava.api.model.Bind
 import com.github.dockerjava.api.model.Capability
 import com.github.dockerjava.api.model.Device
 import com.github.dockerjava.api.model.Volume
@@ -110,6 +109,7 @@ object AndroidContainerSetup {
                     .withStartupTimeout(Duration.ofSeconds(120))
             )
             .withCreateContainerCmdModifier { cmd ->
+                cmd.withVolumes(Volume("/sys/fs/cgroup"))
                 cmd.hostConfig
                     ?.withMemory(MEMORY_BYTES)
                     ?.withMemorySwap(MEMORY_BYTES)
@@ -118,6 +118,7 @@ object AndroidContainerSetup {
                         listOf(
                             "seccomp=unconfined",
                             "apparmor=unconfined",
+                            "unmask=/sys/fs/cgroup",
                         )
                     )
                     ?.withDevices(
@@ -130,9 +131,6 @@ object AndroidContainerSetup {
                             "c $binderDevMajor:* rwm",
                             "c $fuseDevMajorMinor rwm",
                         )
-                    )
-                    ?.withBinds(
-                        Bind("/sys/fs/cgroup", Volume("/sys/fs/cgroup")),
                     )
             }
     }
