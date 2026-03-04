@@ -104,7 +104,7 @@ class E2EScreenshotTest {
             "Text should contain flags legend note line",
         )
         assertTrue(
-            text.contains("note:offscreen items require scroll_to_element before interaction"),
+            text.contains("note:offscreen items require scroll_to_node before interaction"),
             "Text should contain offscreen hint note line",
         )
         // Negative assertions: old single-char flags must not appear

@@ -135,7 +135,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStreamableHttpExtension.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `ElementActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -191,17 +191,17 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 The MCP server exposes 53 tools across 12 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
-> **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_elements`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
+> **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
 ### 1. Screen Introspection Tools (1 tool)
 
 | Tool | Description | Parameters | Output |
 |------|-------------|------------|--------|
-| `android_get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI elements | `include_screenshot` (boolean, optional, default false) | `TextContent` with compact TSV (text/desc truncated to 100 chars, comma-separated abbreviated flags with on/off visibility). Optionally includes `ImageContent` with annotated low-resolution JPEG screenshot (700px max, red bounding boxes with element ID labels). |
+| `android_get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI nodes | `include_screenshot` (boolean, optional, default false) | `TextContent` with compact TSV (text/desc truncated to 100 chars, comma-separated abbreviated flags with on/off visibility). Optionally includes `ImageContent` with annotated low-resolution JPEG screenshot (700px max, red bounding boxes with node ID labels). |
 
 **Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
-**Note**: `android_get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `android_get_element_details` to retrieve full values. Flags use comma-separated abbreviations with a legend in the TSV notes. When screenshot is included, it is annotated with red bounding boxes and element ID labels for on-screen elements.
+**Note**: `android_get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `android_get_node_details` to retrieve full values. Flags use comma-separated abbreviations with a legend in the TSV notes. When screenshot is included, it is annotated with red bounding boxes and node ID labels for on-screen nodes.
 
 ### 2. Touch Action Tools (5 tools)
 
@@ -215,25 +215,25 @@ The MCP server exposes 53 tools across 12 categories. For full JSON-RPC schemas,
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
-### 3. Element Action Tools (4 tools)
+### 3. Node Action Tools (4 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_find_elements` | Find UI elements by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
-| `android_click_element` | Click an accessibility node | `element_id` (string) | — |
-| `android_long_click_element` | Long-click an accessibility node | `element_id` (string) | — |
-| `android_scroll_to_element` | Scroll to make element visible | `element_id` (string) | — |
+| `android_find_nodes` | Find UI nodes by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
+| `android_click_node` | Click an accessibility node | `node_id` (string) | — |
+| `android_long_click_node` | Long-click an accessibility node | `node_id` (string) | — |
+| `android_scroll_to_node` | Scroll to make node visible | `node_id` (string) | — |
 
-**Errors**: Returns `CallToolResult(isError = true)` if element not found (ID invalid or stale) or element not clickable. `android_find_elements` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if node not found (ID invalid or stale) or node not clickable. `android_find_nodes` returns empty array (not error) when no matches found.
 
 ### 4. Text Input Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_type_append_text` | Type text at end of field via InputConnection | `element_id` (string), `text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
-| `android_type_insert_text` | Type text at specific position via InputConnection | `element_id` (string), `text` (string), `offset` (int) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
-| `android_type_replace_text` | Find and replace text in field via InputConnection | `element_id` (string), `search` (string), `new_text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
-| `android_type_clear_text` | Clear all text from field via select-all + delete | `element_id` (string) | — |
+| `android_type_append_text` | Type text at end of field via InputConnection | `node_id` (string), `text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_insert_text` | Type text at specific position via InputConnection | `node_id` (string), `text` (string), `offset` (int) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_replace_text` | Find and replace text in field via InputConnection | `node_id` (string), `search` (string), `new_text` (string) | `typing_speed` (int, ms, default 70), `typing_speed_variance` (int, ms, default 15) |
+| `android_type_clear_text` | Clear all text from field via select-all + delete | `node_id` (string) | — |
 | `android_press_key` | Press a specific key | `key` (string: ENTER/BACK/DEL/HOME/TAB/SPACE) | — |
 
 ### 5. System Action Tools (6 tools)
@@ -260,11 +260,11 @@ The MCP server exposes 53 tools across 12 categories. For full JSON-RPC schemas,
 |------|-------------|-----------------|-----------------|
 | `android_get_clipboard` | Get current clipboard content | — | — |
 | `android_set_clipboard` | Set clipboard content | `text` (string) | — |
-| `android_wait_for_element` | Wait until element appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
+| `android_wait_for_node` | Wait until node appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
 | `android_wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
-| `android_get_element_details` | Get full untruncated text/desc by element_ids | `element_ids` (array of strings) | — |
+| `android_get_node_details` | Get full untruncated text/desc by node_ids | `node_ids` (array of strings) | — |
 
-**Timeout behavior**: Both `android_wait_for_element` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
+**Timeout behavior**: Both `android_wait_for_node` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
 ### 8. File Tools (8 tools)
 
@@ -515,7 +515,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### E2E Tests
 
 - **Framework**: Testcontainers Kotlin (`budtmo/docker-android-x86:emulator_14.0`), JUnit 5, MCP Kotlin SDK Client
-- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, element not found)
+- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found)
 - **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` with trust-all TLS for self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
@@ -651,7 +651,7 @@ Per-location read/write/delete permissions are enforced by `FileOperationProvide
 ### MCP Defaults
 
 - **Screenshot Quality**: 80 (JPEG, 1-100)
-- **Timeout**: 5000ms (wait_for_element), 3000ms (wait_for_idle)
+- **Timeout**: 5000ms (wait_for_node), 3000ms (wait_for_idle)
 - **Long Press Duration**: 1000ms
 - **Swipe Duration**: 300ms
 - **Gesture Duration**: 300ms

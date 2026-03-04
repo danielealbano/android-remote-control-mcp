@@ -19,7 +19,7 @@ import java.net.URI
  * - Correct token (should succeed)
  * - Unknown tool names
  * - Invalid tool parameters
- * - Element not found errors
+ * - Node not found errors
  *
  * Uses [SharedAndroidContainer] singleton to share the Docker container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
@@ -139,29 +139,29 @@ class E2EErrorHandlingTest {
     }
 
     @Test
-    fun `click on non-existent element returns error result`() = runBlocking {
+    fun `click on non-existent node returns error result`() = runBlocking {
         // If accessibility service is transiently unavailable, the error message
-        // won't contain the element ID. Retry to allow recovery.
+        // won't contain the node ID. Retry to allow recovery.
         var result = mcpClient.callTool(
-            "${TOOL_PREFIX}click_element",
-            mapOf("element_id" to "nonexistent_element_id_12345"),
+            "${TOOL_PREFIX}click_node",
+            mapOf("node_id" to "nonexistent_element_id_12345"),
         )
         assertEquals(true, result.isError)
         var text = (result.content[0] as TextContent).text
         for (attempt in 1..MAX_RETRY_ATTEMPTS) {
             if (text.contains("nonexistent_element_id_12345")) break
-            println("[E2E ErrorHandling] click_element attempt $attempt error didn't mention element ID: $text — retrying after ${RETRY_DELAY_MS}ms")
+            println("[E2E ErrorHandling] click_node attempt $attempt error didn't mention node ID: $text — retrying after ${RETRY_DELAY_MS}ms")
             Thread.sleep(RETRY_DELAY_MS)
             result = mcpClient.callTool(
-                "${TOOL_PREFIX}click_element",
-                mapOf("element_id" to "nonexistent_element_id_12345"),
+                "${TOOL_PREFIX}click_node",
+                mapOf("node_id" to "nonexistent_element_id_12345"),
             )
             assertEquals(true, result.isError)
             text = (result.content[0] as TextContent).text
         }
         assertTrue(
             text.contains("nonexistent_element_id_12345"),
-            "Error should mention the element ID, got: $text",
+            "Error should mention the node ID, got: $text",
         )
     }
 }

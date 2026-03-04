@@ -19,7 +19,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 6. [System Action Tools](#2-system-action-tools)
 7. [Touch Action Tools](#3-touch-action-tools)
 8. [Gesture Tools](#4-gesture-tools)
-9. [Element Action Tools](#5-element-action-tools)
+9. [Node Action Tools](#5-node-action-tools)
 10. [Text Input Tools](#6-text-input-tools)
 11. [Utility Tools](#7-utility-tools)
 12. [File Tools](#8-file-tools)
@@ -40,9 +40,9 @@ The MCP server exposes 54 tools via the JSON-RPC 2.0 protocol, organized into 12
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | 7 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_tap_element`, `android_scroll_to_element` | 9, 35 |
+| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node` | 9, 35 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
-| Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | 9, 15 |
+| Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
 | Camera | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | 27 |
@@ -55,9 +55,9 @@ All MCP tool names are prefixed with `android_` by default. When a **device slug
 
 | Device Slug | Tool Name Example |
 |-------------|-------------------|
-| _(empty)_ | `android_tap`, `android_find_elements`, `android_get_screen_state` |
-| `pixel7` | `android_pixel7_tap`, `android_pixel7_find_elements`, `android_pixel7_get_screen_state` |
-| `work_phone` | `android_work_phone_tap`, `android_work_phone_find_elements`, `android_work_phone_get_screen_state` |
+| _(empty)_ | `android_tap`, `android_find_nodes`, `android_get_screen_state` |
+| `pixel7` | `android_pixel7_tap`, `android_pixel7_find_nodes`, `android_pixel7_get_screen_state` |
+| `work_phone` | `android_work_phone_tap`, `android_work_phone_find_nodes`, `android_work_phone_get_screen_state` |
 
 The device slug is configured in the app's **Configuration** section. Valid slugs contain only letters (a-z, A-Z), digits (0-9), and underscores. Maximum length is 20 characters. An empty slug is valid and results in the default `android_` prefix.
 
@@ -159,7 +159,7 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ### `android_get_screen_state`
 
-Returns the consolidated current screen state: screen dimensions and a compact filtered flat TSV list of UI elements from **all on-screen windows** (including system dialogs, permission popups, and IME keyboards). Optionally includes an annotated low-resolution screenshot with bounding boxes and element ID labels.
+Returns the consolidated current screen state: screen dimensions and a compact filtered flat TSV list of UI nodes from **all on-screen windows** (including system dialogs, permission popups, and IME keyboards). Optionally includes an annotated low-resolution screenshot with bounding boxes and node ID labels.
 
 Uses Android's multi-window accessibility API (`getWindows()`) to enumerate all interactive windows. Falls back to single-window mode via `rootInActiveWindow` when the multi-window API is unavailable (degraded mode).
 
@@ -172,7 +172,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
   "properties": {
     "include_screenshot": {
       "type": "boolean",
-      "description": "Include a low-resolution screenshot. Only request when the UI element list is not sufficient.",
+      "description": "Include a low-resolution screenshot. Only request when the UI node list is not sufficient.",
       "default": false
     }
   },
@@ -217,7 +217,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_element before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nelement_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
       }
     ]
   }
@@ -233,7 +233,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\n...\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nelement_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
+        "text": "note:structural-only nodes are omitted from the tree\n...\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n..."
       },
       {
         "type": "image",
@@ -254,16 +254,16 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
    - `note:structural-only nodes are omitted from the tree`
    - `note:certain elements are custom and will not be properly reported...`
    - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
-   - `note:offscreen items require scroll_to_element before interaction`
+   - `note:offscreen items require scroll_to_node before interaction`
 3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
 4. **Per-window sections** (repeated for each window):
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
-   - **TSV header**: `element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+   - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
 
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 
-Element IDs are deterministic hashes that incorporate the window ID internally (e.g., `node_a1b2`). The window ID influences the hash via the `rootParentId` parameter passed to `parseTree()`, ensuring identical nodes in different windows produce different IDs.
+Node IDs are deterministic hashes that incorporate the window ID internally (e.g., `node_a1b2`). The window ID influences the hash via the `rootParentId` parameter passed to `parseTree()`, ensuring identical nodes in different windows produce different IDs.
 
 #### Flags Reference
 
@@ -299,17 +299,17 @@ This filters out structural-only container nodes (e.g., bare `FrameLayout`, `Lin
 
 #### Text/Description Truncation
 
-Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `android_get_element_details` tool to retrieve full untruncated values by element_id.
+Both `text` and `desc` columns are truncated to **100 characters**. If truncated, the value ends with `...truncated`. Use the `android_get_node_details` tool to retrieve full untruncated values by node_id.
 
 #### Screenshot
 
 When `include_screenshot` is `true`, a low-resolution annotated JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). The screenshot is annotated with:
-- **Red dashed bounding boxes** (2px) around each on-screen element that appears in the TSV
-- **Semi-transparent red pill labels** with white bold text showing the element ID hash (e.g., `a3f2` for `node_a3f2`) at the top-left of each bounding box
+- **Red dashed bounding boxes** (2px) around each on-screen node that appears in the TSV
+- **Semi-transparent red pill labels** with white bold text showing the node ID hash (e.g., `a3f2` for `node_a3f2`) at the top-left of each bounding box
 
-Off-screen elements (marked with `off` flag in the TSV) do not have bounding boxes on the screenshot. Use the `scroll_to_element` tool to bring them into view first.
+Off-screen nodes (marked with `off` flag in the TSV) do not have bounding boxes on the screenshot. Use the `scroll_to_node` tool to bring them into view first.
 
-Only request the screenshot when the element list alone is not sufficient to understand the screen layout.
+Only request the screenshot when the node list alone is not sufficient to understand the screen layout.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Permission denied**: Accessibility service not enabled or not ready
@@ -1062,11 +1062,11 @@ Each path is an array of point objects:
 
 ---
 
-## 5. Element Action Tools
+## 5. Node Action Tools
 
-### `android_find_elements`
+### `android_find_nodes`
 
-Find UI elements matching the specified criteria in the accessibility tree.
+Find UI nodes matching the specified criteria in the accessibility tree.
 
 **Input Schema**:
 ```json
@@ -1092,12 +1092,12 @@ Find UI elements matching the specified criteria in the accessibility tree.
 }
 ```
 
-**Output**: JSON string containing an `elements` array (may be empty):
+**Output**: JSON string containing a `nodes` array (may be empty):
 ```json
 {
-  "elements": [
+  "nodes": [
     {
-      "element_id": "node_abc123",
+      "node_id": "node_abc123",
       "text": "Submit",
       "contentDescription": null,
       "resourceId": "com.example:id/submit_btn",
@@ -1120,7 +1120,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_find_elements", "arguments": { "by": "text", "value": "Submit" } }
+    "params": { "name": "android_find_nodes", "arguments": { "by": "text", "value": "Submit" } }
   }'
 ```
 
@@ -1130,22 +1130,22 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `android_click_element`
+### `android_click_node`
 
-Click the specified accessibility node by element ID.
+Click the specified accessibility node by node ID.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
   },
-  "required": ["element_id"]
+  "required": ["node_id"]
 }
 ```
 
-**Output**: `"Click performed on element '<element_id>'"`
+**Output**: `"Click performed on node '<node_id>'"`
 
 **Example**:
 ```bash
@@ -1154,34 +1154,34 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_click_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_click_node", "arguments": { "node_id": "node_abc123" } }
   }'
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id`
+- **Invalid params**: Missing or empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree
-- **Action failed**: Element is not clickable or click action failed
+- **Node not found**: Node not found in accessibility tree
+- **Action failed**: Node is not clickable or click action failed
 
 ---
 
-### `android_long_click_element`
+### `android_long_click_node`
 
-Long-click the specified accessibility node by element ID.
+Long-click the specified accessibility node by node ID.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
   },
-  "required": ["element_id"]
+  "required": ["node_id"]
 }
 ```
 
-**Output**: `"Long-click performed on element '<element_id>'"`
+**Output**: `"Long-click performed on node '<node_id>'"`
 
 **Example**:
 ```bash
@@ -1190,35 +1190,35 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_long_click_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_long_click_node", "arguments": { "node_id": "node_abc123" } }
   }'
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id`
+- **Invalid params**: Missing or empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found
-- **Action failed**: Element is not long-clickable or action failed
+- **Node not found**: Node not found
+- **Action failed**: Node is not long-clickable or action failed
 
 ---
 
-### `android_tap_element`
+### `android_tap_node`
 
-Performs a gesture-based tap at a random point within the bounds of the element identified by element_id. Unlike `click_element` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the element bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
+Performs a gesture-based tap at a random point within the bounds of the node identified by node_id. Unlike `click_node` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the node bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "element_id": { "type": "string", "description": "Node ID from find_elements" },
-    "inset_percentage": { "type": "number", "default": 5.0, "description": "Percentage to inset from each edge of the element bounds (0.0-45.0). Default 5.0" }
+    "node_id": { "type": "string", "description": "Node ID from find_nodes" },
+    "inset_percentage": { "type": "number", "default": 5.0, "description": "Percentage to inset from each edge of the node bounds (0.0-45.0). Default 5.0" }
   },
-  "required": ["element_id"]
+  "required": ["node_id"]
 }
 ```
 
-**Output**: `"Tap executed at (<x>, <y>) within element '<element_id>'"`
+**Output**: `"Tap executed at (<x>, <y>) within node '<node_id>'"`
 
 **Example**:
 ```bash
@@ -1227,34 +1227,34 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_tap_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_tap_node", "arguments": { "node_id": "node_abc123" } }
   }'
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id`, `inset_percentage` out of range (0.0-45.0)
+- **Invalid params**: Missing or empty `node_id`, `inset_percentage` out of range (0.0-45.0)
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree
 - **Action failed**: Tap gesture failed
 
 ---
 
-### `android_scroll_to_element`
+### `android_scroll_to_node`
 
-Scroll to make the specified element visible by scrolling its nearest scrollable ancestor.
+Scroll to make the specified node visible by scrolling its nearest scrollable ancestor.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "element_id": { "type": "string", "description": "Node ID from find_elements" }
+    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
   },
-  "required": ["element_id"]
+  "required": ["node_id"]
 }
 ```
 
-**Output**: `"Scrolled to element '<element_id>' (N scroll(s))"` or `"Element '<element_id>' is already visible"`
+**Output**: `"Scrolled to node '<node_id>' (N scroll(s))"` or `"Node '<node_id>' is already visible"`
 
 **Example**:
 ```bash
@@ -1263,21 +1263,21 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_scroll_to_element", "arguments": { "element_id": "node_abc123" } }
+    "params": { "name": "android_scroll_to_node", "arguments": { "node_id": "node_abc123" } }
   }'
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id`
+- **Invalid params**: Missing or empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found
-- **Action failed**: No scrollable container found, scroll failed, or element not visible after max attempts (5)
+- **Node not found**: Node not found
+- **Action failed**: No scrollable container found, scroll failed, or node not visible after max attempts (5)
 
 ---
 
 ## 6. Text Input Tools
 
-Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools require `element_id` (mandatory), click the element to focus it, and return the field content after the operation for verification.
+Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools require `node_id` (mandatory), click the node to focus it, and return the field content after the operation for verification.
 
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
@@ -1288,12 +1288,12 @@ Type text character by character at the end of a text field. Uses natural InputC
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `element_id` | string | Yes | - | Target element ID to type into |
+| `node_id` | string | Yes | - | Target node ID to type into |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
 | `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
 | `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
 
-**Output**: `"Typed N characters at end of element '<element_id>'.\nField content: <content>"`
+**Output**: `"Typed N characters at end of node '<node_id>'.\nField content: <content>"`
 
 **Request Example**:
 ```json
@@ -1304,7 +1304,7 @@ Type text character by character at the end of a text field. Uses natural InputC
   "params": {
     "name": "android_type_append_text",
     "arguments": {
-      "element_id": "node_abc123",
+      "node_id": "node_abc123",
       "text": "Hello World"
     }
   }
@@ -1320,7 +1320,7 @@ Type text character by character at the end of a text field. Uses natural InputC
     "content": [
       {
         "type": "text",
-        "text": "Typed 11 characters at end of element 'node_abc123'.\nField content: Hello World"
+        "text": "Typed 11 characters at end of node 'node_abc123'.\nField content: Hello World"
       }
     ]
   }
@@ -1328,10 +1328,10 @@ Type text character by character at the end of a text field. Uses natural InputC
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id` or `text`, text exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Missing or empty `node_id` or `text`, text exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree
-- **Action failed**: Click failed, input connection not ready (element may not be editable), cursor positioning failed, typing failed (input connection lost)
+- **Node not found**: Node not found in accessibility tree
+- **Action failed**: Click failed, input connection not ready (node may not be editable), cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1342,13 +1342,13 @@ Type text character by character at a specific position in a text field. Uses na
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `element_id` | string | Yes | - | Target element ID to type into |
+| `node_id` | string | Yes | - | Target node ID to type into |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
 | `offset` | integer | Yes | - | 0-based character offset for cursor position. Must be within [0, current text length] |
 | `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
 | `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
 
-**Output**: `"Typed N characters at offset M in element '<element_id>'.\nField content: <content>"`
+**Output**: `"Typed N characters at offset M in node '<node_id>'.\nField content: <content>"`
 
 **Request Example**:
 ```json
@@ -1359,7 +1359,7 @@ Type text character by character at a specific position in a text field. Uses na
   "params": {
     "name": "android_type_insert_text",
     "arguments": {
-      "element_id": "node_abc123",
+      "node_id": "node_abc123",
       "text": "inserted ",
       "offset": 5
     }
@@ -1376,7 +1376,7 @@ Type text character by character at a specific position in a text field. Uses na
     "content": [
       {
         "type": "text",
-        "text": "Typed 9 characters at offset 5 in element 'node_abc123'.\nField content: Helloinserted  World"
+        "text": "Typed 9 characters at offset 5 in node 'node_abc123'.\nField content: Helloinserted  World"
       }
     ]
   }
@@ -1384,9 +1384,9 @@ Type text character by character at a specific position in a text field. Uses na
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id` or `text`, text exceeds 2000 characters, missing `offset`, `offset` negative, `offset` exceeds current text length, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Missing or empty `node_id` or `text`, text exceeds 2000 characters, missing `offset`, `offset` negative, `offset` exceeds current text length, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree
 - **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
 
 ---
@@ -1398,13 +1398,13 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `element_id` | string | Yes | - | Target element ID |
+| `node_id` | string | Yes | - | Target node ID |
 | `search` | string | Yes | - | Text to find in the field (first occurrence, max 10000 characters) |
 | `new_text` | string | Yes | - | Replacement text to type (max 2000 characters). Can be empty to just delete the found text |
 | `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
 | `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
 
-**Output**: `"Replaced N characters with M characters in element '<element_id>'.\nField content: <content>"`
+**Output**: `"Replaced N characters with M characters in node '<node_id>'.\nField content: <content>"`
 
 **Request Example**:
 ```json
@@ -1415,7 +1415,7 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
   "params": {
     "name": "android_type_replace_text",
     "arguments": {
-      "element_id": "node_abc123",
+      "node_id": "node_abc123",
       "search": "World",
       "new_text": "Android"
     }
@@ -1432,7 +1432,7 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
     "content": [
       {
         "type": "text",
-        "text": "Replaced 5 characters with 7 characters in element 'node_abc123'.\nField content: Hello Android"
+        "text": "Replaced 5 characters with 7 characters in node 'node_abc123'.\nField content: Hello Android"
       }
     ]
   }
@@ -1440,9 +1440,9 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id` or `search`, `search` exceeds 10000 characters, `new_text` exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Missing or empty `node_id` or `search`, `search` exceeds 10000 characters, `new_text` exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree, or search text not found in the field
+- **Node not found**: Node not found in accessibility tree, or search text not found in the field
 - **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
 
 ---
@@ -1454,9 +1454,9 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `element_id` | string | Yes | - | Target element ID to clear |
+| `node_id` | string | Yes | - | Target node ID to clear |
 
-**Output**: `"Text cleared from element '<element_id>'.\nField content: <content>"`
+**Output**: `"Text cleared from node '<node_id>'.\nField content: <content>"`
 
 **Request Example**:
 ```json
@@ -1467,7 +1467,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
   "params": {
     "name": "android_type_clear_text",
     "arguments": {
-      "element_id": "node_abc123"
+      "node_id": "node_abc123"
     }
   }
 }
@@ -1482,7 +1482,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
     "content": [
       {
         "type": "text",
-        "text": "Text cleared from element 'node_abc123'.\nField content: "
+        "text": "Text cleared from node 'node_abc123'.\nField content: "
       }
     ]
   }
@@ -1490,9 +1490,9 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `element_id`
+- **Invalid params**: Missing or empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: Element not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree
 - **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
 
 ---
@@ -1538,7 +1538,7 @@ curl -X POST http://localhost:8080/mcp \
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `key` parameter or invalid key name
 - **Permission denied**: Accessibility service not enabled
-- **Element not found**: No focused element found (for ENTER, DEL, TAB, SPACE)
+- **Node not found**: No focused node found (for ENTER, DEL, TAB, SPACE)
 - **Action failed**: Key action failed
 
 ---
@@ -1616,9 +1616,9 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `android_wait_for_element`
+### `android_wait_for_node`
 
-Wait until an element matching the specified criteria appears in the accessibility tree, polling every 500ms.
+Wait until a node matching the specified criteria appears in the accessibility tree, polling every 500ms.
 
 **Input Schema**:
 ```json
@@ -1646,8 +1646,8 @@ Wait until an element matching the specified criteria appears in the accessibili
   "found": true,
   "elapsedMs": 1200,
   "attempts": 3,
-  "element": {
-    "element_id": "node_abc123",
+  "node": {
+    "node_id": "node_abc123",
     "text": "Result",
     "contentDescription": null,
     "resourceId": null,
@@ -1659,7 +1659,7 @@ Wait until an element matching the specified criteria appears in the accessibili
 }
 ```
 
-**Timeout behavior**: When the timeout expires without finding the element, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
+**Timeout behavior**: When the timeout expires without finding the node, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
 
 **Example**:
 ```bash
@@ -1668,7 +1668,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_wait_for_element", "arguments": { "by": "text", "value": "10", "timeout": 5000 } }
+    "params": { "name": "android_wait_for_node", "arguments": { "by": "text", "value": "10", "timeout": 5000 } }
   }'
 ```
 
@@ -1749,22 +1749,22 @@ curl -X POST http://localhost:8080/mcp \
 
 ---
 
-### `android_get_element_details`
+### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more elements by their element_ids. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "element_ids": {
+    "node_ids": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Array of element_ids to look up (from get_screen_state output)"
+      "description": "Array of node_ids to look up (from get_screen_state output)"
     }
   },
-  "required": ["element_ids"]
+  "required": ["node_ids"]
 }
 ```
 
@@ -1775,9 +1775,9 @@ Retrieves full untruncated text and contentDescription for one or more elements 
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "android_get_element_details",
+    "name": "android_get_node_details",
     "arguments": {
-      "element_ids": ["node_1", "node_2"]
+      "node_ids": ["node_1", "node_2"]
     }
   }
 }
@@ -1792,7 +1792,7 @@ Retrieves full untruncated text and contentDescription for one or more elements 
     "content": [
       {
         "type": "text",
-        "text": "element_id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this element"
+        "text": "node_id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this node"
       }
     ]
   }
@@ -1800,14 +1800,14 @@ Retrieves full untruncated text and contentDescription for one or more elements 
 ```
 
 **Output Format**: TSV with three columns:
-- `element_id`: The element ID
+- `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
 
-If an element ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
+If a node ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing `element_ids` parameter, `element_ids` is not an array, array is empty, or contains non-string values
+- **Invalid params**: Missing `node_ids` parameter, `node_ids` is not an array, array is empty, or contains non-string values
 - **Permission denied**: Accessibility service not enabled
 
 ---

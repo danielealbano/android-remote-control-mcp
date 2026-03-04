@@ -45,9 +45,9 @@ class E2ECalculatorTest {
 
     companion object {
         /**
-         * Maximum time to wait for element search before giving up.
+         * Maximum time to wait for node search before giving up.
          */
-        private const val ELEMENT_WAIT_TIMEOUT_MS = 20_000L
+        private const val NODE_WAIT_TIMEOUT_MS = 20_000L
 
         /**
          * Maximum time to wait for the calculator app to become visible
@@ -119,7 +119,7 @@ class E2ECalculatorTest {
             "Screen state should contain flags legend note line",
         )
         assertTrue(
-            treeStr.contains("note:offscreen items require scroll_to_element before interaction"),
+            treeStr.contains("note:offscreen items require scroll_to_node before interaction"),
             "Screen state should contain offscreen hint note line",
         )
         // Verify new comma-separated flag format (at least one element should be on-screen + clickable + enabled)
@@ -134,27 +134,27 @@ class E2ECalculatorTest {
         )
 
         // Step 4: Find and click "7" button
-        val button7 = findElementWithRetry("text", "7")
+        val button7 = findNodeWithRetry("text", "7")
         assertNotNull(button7, "Could not find '7' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_element", mapOf("element_id" to button7!!))
+        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button7!!))
         Thread.sleep(500)
 
         // Step 5: Find and click "+" button
-        val buttonPlus = findElementWithRetry("text", "+")
+        val buttonPlus = findNodeWithRetry("text", "+")
         assertNotNull(buttonPlus, "Could not find '+' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_element", mapOf("element_id" to buttonPlus!!))
+        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonPlus!!))
         Thread.sleep(500)
 
         // Step 6: Find and click "3" button
-        val button3 = findElementWithRetry("text", "3")
+        val button3 = findNodeWithRetry("text", "3")
         assertNotNull(button3, "Could not find '3' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_element", mapOf("element_id" to button3!!))
+        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button3!!))
         Thread.sleep(500)
 
         // Step 7: Find and click "=" button
-        val buttonEquals = findElementWithRetry("text", "=")
+        val buttonEquals = findNodeWithRetry("text", "=")
         assertNotNull(buttonEquals, "Could not find '=' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_element", mapOf("element_id" to buttonEquals!!))
+        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonEquals!!))
         Thread.sleep(1_000)
 
         // Step 8: Wait for UI to settle
@@ -250,23 +250,23 @@ class E2ECalculatorTest {
     }
 
     /**
-     * Find an element by criteria, retrying up to ELEMENT_WAIT_TIMEOUT_MS.
-     * Returns the element_id of the first match, or null if not found.
+     * Find a node by criteria, retrying up to NODE_WAIT_TIMEOUT_MS.
+     * Returns the node_id of the first match, or null if not found.
      *
-     * The find_elements tool returns a [CallToolResult] where the first content
+     * The find_nodes tool returns a [CallToolResult] where the first content
      * item is a [TextContent] containing a JSON-serialized string with the
-     * elements array:
+     * nodes array:
      * ```json
-     * {"elements":[...]}
+     * {"nodes":[...]}
      * ```
      */
-    private suspend fun findElementWithRetry(by: String, value: String): String? {
+    private suspend fun findNodeWithRetry(by: String, value: String): String? {
         val startTime = System.currentTimeMillis()
 
-        while (System.currentTimeMillis() - startTime < ELEMENT_WAIT_TIMEOUT_MS) {
+        while (System.currentTimeMillis() - startTime < NODE_WAIT_TIMEOUT_MS) {
             try {
                 val result = mcpClient.callTool(
-                    "${TOOL_PREFIX}find_elements",
+                    "${TOOL_PREFIX}find_nodes",
                     mapOf("by" to by, "value" to value, "exact_match" to true),
                 )
 
@@ -274,13 +274,13 @@ class E2ECalculatorTest {
                 if (textContent != null) {
                     // Parse the inner JSON string
                     val innerJson = Json.parseToJsonElement(textContent).jsonObject
-                    val elements = innerJson["elements"]?.jsonArray
-                    if (elements != null && elements.isNotEmpty()) {
-                        return elements[0].jsonObject["element_id"]?.jsonPrimitive?.contentOrNull
+                    val nodes = innerJson["nodes"]?.jsonArray
+                    if (nodes != null && nodes.isNotEmpty()) {
+                        return nodes[0].jsonObject["node_id"]?.jsonPrimitive?.contentOrNull
                     }
                 }
             } catch (_: Exception) {
-                // Element not found yet, retry
+                // Node not found yet, retry
             }
             Thread.sleep(500)
         }
