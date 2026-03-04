@@ -1081,9 +1081,9 @@ if (!environment.containsKey("DOCKER_HOST")) {
 ```
 
 **Definition of Done**:
-- [ ] `TESTCONTAINERS_RYUK_DISABLED` in env var forwarding list
-- [ ] Socket fallback checks podman socket first, then Docker
-- [ ] Comments updated
+- [x] `TESTCONTAINERS_RYUK_DISABLED` in env var forwarding list
+- [x] Socket fallback checks podman socket first, then Docker
+- [x] Comments updated
 
 ### Task R1.3: Update Makefile targets for podman
 
