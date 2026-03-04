@@ -163,6 +163,11 @@ jobs:
       - name: Build debug APK (required by E2E tests)
         run: ./gradlew assembleDebug
 
+      - name: Set up Android platform-tools (adb)
+        run: |
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          adb version
+
       - name: Set up redroid kernel modules
         run: |
           # Install kernel module package (binder_linux is in linux-modules-extra)
