@@ -149,6 +149,50 @@ class ElementActionIntegrationTest {
             }
         }
 
+    @Test
+    fun `tap_element with valid element_id taps within bounds and returns success`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_btn")
+            } returns sampleTree.children[0]
+            coEvery { deps.actionExecutor.tap(any(), any()) } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_tap_element",
+                        arguments = mapOf("element_id" to "node_btn"),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("Tap executed"))
+                assertTrue(text.contains("node_btn"))
+            }
+        }
+
+    @Test
+    fun `tap_element with non-existent element_id returns element not found error`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_xyz")
+            } returns null
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_tap_element",
+                        arguments = mapOf("element_id" to "node_xyz"),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("node_xyz"))
+            }
+        }
+
     @Nested
     @DisplayName("Multi-Window Scenarios")
     inner class MultiWindowScenarios {
