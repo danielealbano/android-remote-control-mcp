@@ -674,10 +674,10 @@ fun disconnectAdb() {
 **Why**: The initialization sequence must remove `setupPortForwarding()`, update call sites for methods that dropped the `container` parameter, and add adb cleanup on shutdown.
 
 **Acceptance criteria**:
-- [ ] `setupPortForwarding()` call removed from initialization sequence
-- [ ] All call sites updated to match new method signatures (no `container` param)
-- [ ] `disconnectAdb()` called in JVM shutdown hook before stopping the container
-- [ ] `ensureAccessibilityService()` call updated (no `container` param)
+- [x] `setupPortForwarding()` call removed from initialization sequence
+- [x] All call sites updated to match new method signatures (no `container` param)
+- [x] `disconnectAdb()` called in JVM shutdown hook before stopping the container
+- [x] `ensureAccessibilityService()` call updated (no `container` param)
 
 ### Task 3.1: Update SharedAndroidContainer initialization and shutdown
 
@@ -747,11 +747,11 @@ Runtime.getRuntime().addShutdownHook(Thread {
 ```
 
 **Definition of Done**:
-- [ ] `setupPortForwarding()` call removed
-- [ ] All method calls updated to new signatures (no container param)
-- [ ] `ensureAccessibilityService()` uses new no-arg signature
-- [ ] `disconnectAdb()` called before container stop in shutdown hook
-- [ ] Dead `container` public property removed
+- [x] `setupPortForwarding()` call removed
+- [x] All method calls updated to new signatures (no container param)
+- [x] `ensureAccessibilityService()` uses new no-arg signature
+- [x] `disconnectAdb()` called before container stop in shutdown hook
+- [x] Dead `container` public property removed
 
 ---
 

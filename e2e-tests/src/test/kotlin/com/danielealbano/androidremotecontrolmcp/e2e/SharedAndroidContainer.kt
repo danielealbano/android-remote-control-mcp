@@ -1,19 +1,17 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
 import kotlinx.coroutines.runBlocking
-import org.testcontainers.containers.GenericContainer
 
 /**
- * Singleton that manages a single shared Docker Android container
+ * Singleton that manages a single shared redroid Docker container
  * for all E2E test classes.
  *
  * The container is lazily initialized on first access and reused
  * across all test classes. A JVM shutdown hook stops the container
  * when the test JVM exits.
  *
- * This avoids booting a separate Android emulator container per
- * test class (~2-4 minutes each), reducing total E2E runtime from
- * ~10-15 minutes to ~5-7 minutes.
+ * This avoids booting a separate Android container per test class,
+ * reducing total E2E runtime significantly.
  */
 object SharedAndroidContainer {
 
@@ -35,7 +33,7 @@ object SharedAndroidContainer {
 
     // Cached values set during successful initialization
     @Volatile
-    private var _container: GenericContainer<*>? = null
+    private var _container: org.testcontainers.containers.GenericContainer<*>? = null
 
     @Volatile
     private var _mcpServerUrl: String? = null
@@ -68,39 +66,36 @@ object SharedAndroidContainer {
                 val c = AndroidContainerSetup.createContainer()
                 c.start()
 
-                // Wait for emulator boot
+                // Wait for redroid boot via host-side ADB
                 AndroidContainerSetup.waitForEmulatorBoot(c)
 
-                // Set up port forwarding from container to emulator
-                AndroidContainerSetup.setupPortForwarding(c)
-
                 // Install APK
-                AndroidContainerSetup.installApk(c, apkPath)
+                AndroidContainerSetup.installApk(apkPath)
 
                 // Install calculator APK for E2E interaction tests
-                AndroidContainerSetup.installCalculatorApk(c)
+                AndroidContainerSetup.installCalculatorApk()
 
                 // Grant camera and microphone permissions for camera E2E tests
-                AndroidContainerSetup.grantCameraPermissions(c)
+                AndroidContainerSetup.grantCameraPermissions()
 
                 // Configure server settings (binding 0.0.0.0, known bearer token)
                 // NOTE: This step force-stops the app to flush DataStore, which disconnects
                 // any accessibility service. Therefore, accessibility must be enabled AFTER
                 // this step and after the app process is running.
-                AndroidContainerSetup.configureServerSettings(c)
+                AndroidContainerSetup.configureServerSettings()
 
                 // Start MCP server (activity + explicit service start)
-                AndroidContainerSetup.startMcpServer(c)
+                AndroidContainerSetup.startMcpServer()
 
                 // Wait for server to be ready (polls HTTP POST to /mcp until responsive)
                 val url = AndroidContainerSetup.getMcpServerUrl(c)
-                AndroidContainerSetup.waitForServerReady(c, url)
+                AndroidContainerSetup.waitForServerReady(url)
 
                 // Enable accessibility service AFTER the app is running.
                 // The force-stop in configureServerSettings kills the process and
                 // disconnects any previously-bound accessibility service. By enabling
                 // after the server is running, the system can immediately bind.
-                AndroidContainerSetup.enableAccessibilityService(c)
+                AndroidContainerSetup.enableAccessibilityService()
 
                 // Create and connect the MCP client
                 val client = McpClient(url, AndroidContainerSetup.E2E_BEARER_TOKEN)
@@ -118,15 +113,6 @@ object SharedAndroidContainer {
             }
         }
     }
-
-    /**
-     * The shared Docker Android container instance.
-     */
-    val container: GenericContainer<*>
-        get() {
-            ensureInitialized()
-            return _container!!
-        }
 
     /**
      * The base URL of the MCP server, derived from the shared container.
@@ -154,7 +140,7 @@ object SharedAndroidContainer {
      */
     fun ensureAccessibilityService() {
         ensureInitialized()
-        AndroidContainerSetup.ensureAccessibilityService(_container!!)
+        AndroidContainerSetup.ensureAccessibilityService()
     }
 
     init {
@@ -162,6 +148,7 @@ object SharedAndroidContainer {
         Runtime.getRuntime().addShutdownHook(Thread {
             _container?.let { c ->
                 println("[SharedAndroidContainer] Stopping shared container...")
+                AndroidContainerSetup.disconnectAdb()
                 if (c.isRunning) {
                     c.stop()
                 }
