@@ -93,7 +93,15 @@ class CameraProviderImpl
         @androidx.camera.camera2.interop.ExperimentalCamera2Interop
         override suspend fun listCameras(): List<CameraInfo> {
             requireCameraPermission()
-            val provider = getCameraProvider()
+            val provider =
+                try {
+                    getCameraProvider()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Camera provider unavailable, returning empty camera list", e)
+                    return emptyList()
+                }
             return provider.availableCameraInfos.map { cameraInfo ->
                 val camera2Info = Camera2CameraInfo.from(cameraInfo)
                 val cameraId = camera2Info.cameraId
