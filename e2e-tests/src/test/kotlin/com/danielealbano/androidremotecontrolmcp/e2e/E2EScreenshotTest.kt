@@ -56,8 +56,9 @@ class E2EScreenshotTest {
     @Test
     @Order(1)
     fun `get_screen_state with screenshot returns valid JPEG data`() = runBlocking {
-        // Navigate to home screen first
-        mcpClient.callTool("${TOOL_PREFIX}press_home")
+        // Launch calculator so there is an active app context (the home screen
+        // launcher does not always produce an "app:" line in the compact TSV output).
+        AndroidContainerSetup.launchCalculator()
         Thread.sleep(1_000)
 
         // Retry screenshot capture — accessibility service screenshot can be transiently
@@ -98,7 +99,11 @@ class E2EScreenshotTest {
         assertTrue(textContent is TextContent, "First content item should be TextContent")
         val text = (textContent as TextContent).text
         assertTrue(text.contains("note:"), "Text should contain note line")
-        assertTrue(text.contains("app:"), "Text should contain app line")
+        assertTrue(text.contains("screen:"), "Text should contain screen info line")
+        assertTrue(
+            text.contains("--- window:") && text.contains("type:APPLICATION"),
+            "Text should contain an APPLICATION window header",
+        )
         assertTrue(
             text.contains("note:flags: on=onscreen off=offscreen"),
             "Text should contain flags legend note line",

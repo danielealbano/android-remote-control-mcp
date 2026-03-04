@@ -64,10 +64,7 @@ object SharedAndroidContainer {
                 println("[SharedAndroidContainer] Initializing shared container...")
 
                 val c = AndroidContainerSetup.createContainer()
-                c.start()
-
-                // Wait for redroid boot via host-side ADB
-                AndroidContainerSetup.waitForEmulatorBoot(c)
+                c.start() // ADB-based boot wait strategy runs inside start()
 
                 // Install APK
                 AndroidContainerSetup.installApk(apkPath)

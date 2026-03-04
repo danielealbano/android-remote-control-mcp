@@ -2,9 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 
 import com.github.dockerjava.api.model.Capability
 import com.github.dockerjava.api.model.Device
+import com.github.dockerjava.api.model.LogConfig
 import com.github.dockerjava.api.model.Volume
 import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy
 import org.testcontainers.utility.DockerImageName
 import java.io.File
 import java.time.Duration
@@ -67,7 +68,7 @@ object AndroidContainerSetup {
     private var _adbSerial: String? = null
 
     val adbSerial: String
-        get() = _adbSerial ?: error("Container not booted yet — call waitForEmulatorBoot first")
+        get() = _adbSerial ?: error("Container not booted yet — call container.start() first")
 
     /**
      * Create a configured redroid container.
@@ -103,10 +104,52 @@ object AndroidContainerSetup {
                 "ro.debuggable=1",
                 "ro.secure=0",
             )
-            .withStartupTimeout(Duration.ofSeconds(120))
+            .withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
             .waitingFor(
-                Wait.forLogMessage(".*sys\\.boot_completed=1.*\\n", 1)
-                    .withStartupTimeout(Duration.ofSeconds(120))
+                object : AbstractWaitStrategy() {
+                    override fun waitUntilReady() {
+                        // Redroid writes to Android logcat, not stdout/stderr — container
+                        // log-based strategies (LogMessageWaitStrategy) cannot work.
+                        // Instead, connect via host-side ADB and poll sys.boot_completed.
+                        val host = waitStrategyTarget.host
+                        val adbPort = waitStrategyTarget.getMappedPort(ADB_PORT)
+                        val serial = "$host:$adbPort"
+                        val timeoutMs = startupTimeout.toMillis()
+
+                        println("[E2E Setup] Waiting for redroid boot via ADB $serial (timeout: ${timeoutMs}ms)...")
+                        val startTime = System.currentTimeMillis()
+
+                        // Phase 1: wait for adb connect to succeed
+                        while (System.currentTimeMillis() - startTime < timeoutMs) {
+                            try {
+                                val output = runProcess("adb", "connect", serial, timeoutSeconds = 10L)
+                                if (output.contains("connected")) break
+                            } catch (_: Exception) { }
+                            Thread.sleep(POLL_INTERVAL_MS)
+                        }
+
+                        // Phase 2: poll sys.boot_completed
+                        while (System.currentTimeMillis() - startTime < timeoutMs) {
+                            try {
+                                val output = runProcess(
+                                    "adb", "-s", serial, "shell", "getprop", "sys.boot_completed",
+                                    timeoutSeconds = 10L,
+                                )
+                                if (output == "1") {
+                                    val elapsed = System.currentTimeMillis() - startTime
+                                    println("[E2E Setup] Redroid boot completed (${elapsed}ms)")
+                                    _adbSerial = serial
+                                    return
+                                }
+                            } catch (_: Exception) { }
+                            Thread.sleep(POLL_INTERVAL_MS)
+                        }
+
+                        throw IllegalStateException(
+                            "Redroid did not boot within ${timeoutMs}ms. ADB serial: $serial",
+                        )
+                    }
+                },
             )
             .withCreateContainerCmdModifier { cmd ->
                 cmd.withVolumes(Volume("/sys/fs/cgroup"))
@@ -132,53 +175,8 @@ object AndroidContainerSetup {
                             "c $fuseDevMajorMinor rwm",
                         )
                     )
+                    ?.withLogConfig(LogConfig(LogConfig.LoggingType.JSON_FILE))
             }
-    }
-
-    /**
-     * Wait for the redroid container to boot and establish host-side ADB connection.
-     *
-     * Redroid has no adb binary inside the container. We connect from the host
-     * via `adb connect` to the container's mapped ADB port, then poll
-     * `getprop sys.boot_completed`.
-     */
-    fun waitForEmulatorBoot(
-        container: GenericContainer<*>,
-        timeoutMs: Long = DEFAULT_EMULATOR_BOOT_TIMEOUT_MS,
-    ) {
-        val host = container.host
-        val adbPort = container.getMappedPort(ADB_PORT)
-        val serial = "$host:$adbPort"
-
-        println("[E2E Setup] Waiting for redroid boot via adb connect $serial (timeout: ${timeoutMs}ms)...")
-        val startTime = System.currentTimeMillis()
-
-        // Phase 1: wait for adb connect to succeed
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            try {
-                val output = runProcess("adb", "connect", serial, timeoutSeconds = 10L)
-                if (output.contains("connected")) break
-            } catch (_: Exception) { }
-            Thread.sleep(POLL_INTERVAL_MS)
-        }
-
-        // Phase 2: poll sys.boot_completed
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            try {
-                val output = runProcess(
-                    "adb", "-s", serial, "shell", "getprop", "sys.boot_completed",
-                    timeoutSeconds = 10L,
-                )
-                if (output == "1") {
-                    println("[E2E Setup] Redroid boot completed (${System.currentTimeMillis() - startTime}ms)")
-                    _adbSerial = serial
-                    return
-                }
-            } catch (_: Exception) { }
-            Thread.sleep(POLL_INTERVAL_MS)
-        }
-
-        throw IllegalStateException("Redroid did not boot within ${timeoutMs}ms. ADB serial: $serial")
     }
 
     /**
@@ -362,10 +360,17 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Launch the calculator app using monkey command.
+     * Launch the calculator app using am start.
+     *
+     * Uses `am start` with explicit component name instead of `monkey` because
+     * the `monkey` command is unavailable in redroid containers (exit 251).
      */
     fun launchCalculator() {
-        execAdb("shell", "monkey", "-p", CALCULATOR_PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
+        val result = execAdb(
+            "shell", "am", "start", "-W",
+            "-n", "$CALCULATOR_PACKAGE/.activities.MainActivity",
+        )
+        println("[E2E Setup] launchCalculator result: $result")
         Thread.sleep(2_000)
     }
 

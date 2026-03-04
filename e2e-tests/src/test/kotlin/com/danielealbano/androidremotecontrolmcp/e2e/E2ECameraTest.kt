@@ -190,6 +190,10 @@ class E2ECameraTest {
     @Test
     @Order(4)
     fun `list_camera_photo_resolutions with invalid camera_id returns error`() = runBlocking {
+        // On environments without camera HAL (redroid), the camera subsystem itself
+        // fails before reaching the "camera not found" validation.
+        requireCameraId()
+
         val result = mcpClient.callTool(
             "${TOOL_PREFIX}list_camera_photo_resolutions",
             mapOf("camera_id" to "nonexistent_camera_99"),
@@ -253,6 +257,10 @@ class E2ECameraTest {
     @Test
     @Order(6)
     fun `list_camera_video_resolutions with invalid camera_id returns error`() = runBlocking {
+        // On environments without camera HAL (redroid), the camera subsystem itself
+        // fails before reaching the "camera not found" validation.
+        requireCameraId()
+
         val result = mcpClient.callTool(
             "${TOOL_PREFIX}list_camera_video_resolutions",
             mapOf("camera_id" to "nonexistent_camera_99"),
