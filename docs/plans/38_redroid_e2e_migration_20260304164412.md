@@ -760,9 +760,9 @@ Runtime.getRuntime().addShutdownHook(Thread {
 **Why**: Redroid lacks QEMU camera emulation. Camera E2E tests (16 tests) will fail unless gracefully skipped. Non-camera test assertions must be verified for Android 13 compatibility.
 
 **Acceptance criteria**:
-- [ ] Camera tests gracefully skip (not fail) when no cameras available
+- [x] Camera tests gracefully skip (not fail) when no cameras available
 - [ ] All non-camera E2E tests pass on Android 13 redroid
-- [ ] Tool count assertion verified (app-defined, not OS-dependent)
+- [x] Tool count assertion verified (app-defined, not OS-dependent)
 
 ### Task 4.1: Add camera availability guard to E2ECameraTest
 
@@ -830,11 +830,11 @@ AndroidContainerSetup.launchCalculator()
 3. **Verify** tool count assertion (`result.tools.size >= 27`) — app-defined, not OS-dependent. Verify after implementation.
 
 **Definition of Done**:
-- [ ] Camera tests use `Assumptions.assumeTrue` — skip gracefully on redroid
-- [ ] `requireCameraId()` uses `Assumptions.assumeTrue` — skip gracefully on redroid
+- [x] Camera tests use `Assumptions.assumeTrue` — skip gracefully on redroid
+- [x] `requireCameraId()` uses `Assumptions.assumeTrue` — skip gracefully on redroid
 - [ ] Non-camera E2E tests pass on Android 13 redroid
-- [ ] `launchCalculator()` call updated to new signature
-- [ ] Unused `container` property removed from E2ECalculatorTest
+- [x] `launchCalculator()` call updated to new signature
+- [x] Unused `container` property removed from E2ECalculatorTest
 
 ---
 

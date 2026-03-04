@@ -40,7 +40,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2ECalculatorTest {
 
-    private val container = SharedAndroidContainer.container
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     companion object {
@@ -105,7 +104,7 @@ class E2ECalculatorTest {
         Thread.sleep(1_000)
 
         // Step 2: Launch Simple Calculator app via monkey command and poll for visibility
-        AndroidContainerSetup.launchCalculator(container)
+        AndroidContainerSetup.launchCalculator()
         val treeStrOrNull = waitForAppVisible(CALCULATOR_PACKAGE, "Calculator", APP_LAUNCH_TIMEOUT_MS)
         assertNotNull(
             treeStrOrNull,
