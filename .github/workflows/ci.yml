@@ -165,8 +165,19 @@ jobs:
 
       - name: Set up Android platform-tools (adb)
         run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "Checking for platform-tools..."
+          ls -la "$ANDROID_HOME/platform-tools/adb" 2>/dev/null || echo "adb not found at $ANDROID_HOME/platform-tools/"
+          ls "$ANDROID_HOME/" 2>/dev/null || echo "ANDROID_HOME directory not found"
+          # Install platform-tools if not present
+          if [ ! -f "$ANDROID_HOME/platform-tools/adb" ]; then
+            echo "Installing platform-tools via sdkmanager..."
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" 2>/dev/null || \
+              sudo apt-get install -y -qq android-sdk-platform-tools 2>/dev/null || \
+              { echo "ERROR: Could not install platform-tools"; exit 1; }
+          fi
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-          adb version
+          "$ANDROID_HOME/platform-tools/adb" version
 
       - name: Set up redroid kernel modules
         run: |
