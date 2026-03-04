@@ -86,13 +86,13 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
             ),
         ),
         ToolCategory(
-            "Element Actions",
+            "Node Actions",
             listOf(
-                ToolEntry("find_elements", "Find Elements"),
-                ToolEntry("click_element", "Click Element"),
-                ToolEntry("long_click_element", "Long Click Element"),
-                ToolEntry("tap_element", "Tap Element"),
-                ToolEntry("scroll_to_element", "Scroll to Element"),
+                ToolEntry("find_nodes", "Find Nodes"),
+                ToolEntry("click_node", "Click Node"),
+                ToolEntry("long_click_node", "Long Click Node"),
+                ToolEntry("tap_node", "Tap Node"),
+                ToolEntry("scroll_to_node", "Scroll to Node"),
             ),
         ),
         ToolCategory(
@@ -110,9 +110,9 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
             listOf(
                 ToolEntry("get_clipboard", "Get Clipboard"),
                 ToolEntry("set_clipboard", "Set Clipboard"),
-                ToolEntry("wait_for_element", "Wait for Element"),
+                ToolEntry("wait_for_node", "Wait for Node"),
                 ToolEntry("wait_for_idle", "Wait for Idle"),
-                ToolEntry("get_element_details", "Get Element Details"),
+                ToolEntry("get_node_details", "Get Node Details"),
             ),
         ),
         ToolCategory(

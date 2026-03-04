@@ -11,10 +11,10 @@ import javax.inject.Inject
  * - Line 2: `note:certain elements are custom and will not be properly reported, ...`
  * - Line 3: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable
  *   foc=focusable scr=scrollable edt=editable ena=enabled`
- * - Line 4: `note:offscreen items require scroll_to_element before interaction`
+ * - Line 4: `note:offscreen items require scroll_to_node before interaction`
  * - Line 5: `app:<package> activity:<activity>`
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
- * - Line 7: TSV header: `element_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
+ * - Line 7: TSV header: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
  * - Lines 8+: one TSV row per kept node (flat, no depth)
  *
  * Nodes are filtered: a node is KEPT if ANY of:
@@ -273,7 +273,7 @@ class CompactTreeFormatter
                 "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
                     "foc=focusable scr=scrollable edt=editable ena=enabled"
             const val NOTE_LINE_OFFSCREEN_HINT =
-                "note:offscreen items require scroll_to_element before interaction"
+                "note:offscreen items require scroll_to_node before interaction"
             const val FLAG_ONSCREEN = "on"
             const val FLAG_OFFSCREEN = "off"
             const val FLAG_CLICKABLE = "clk"
@@ -284,7 +284,7 @@ class CompactTreeFormatter
             const val FLAG_ENABLED = "ena"
             private const val FLAG_SEPARATOR = ","
             const val HEADER =
-                "element_id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
+                "node_id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +
                     "desc${COLUMN_SEPARATOR}res_id${COLUMN_SEPARATOR}bounds${COLUMN_SEPARATOR}flags"
         }
     }

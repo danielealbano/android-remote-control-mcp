@@ -8,7 +8,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerElementActionTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
@@ -159,7 +159,7 @@ object McpIntegrationTestHelper {
         )
         registerTouchActionTools(server, deps.actionExecutor, toolNamePrefix, perms)
         registerGestureTools(server, deps.actionExecutor, toolNamePrefix, perms)
-        registerElementActionTools(
+        registerNodeActionTools(
             server,
             deps.treeParser,
             deps.elementFinder,

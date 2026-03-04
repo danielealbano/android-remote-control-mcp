@@ -178,12 +178,12 @@ class SetClipboardTool
     }
 
 /**
- * MCP tool: wait_for_element
+ * MCP tool: wait_for_node
  *
- * Polls the accessibility tree every [POLL_INTERVAL_MS] until an element matching
+ * Polls the accessibility tree every [POLL_INTERVAL_MS] until a node matching
  * the criteria appears, or the timeout is reached.
  */
-class WaitForElementTool
+class WaitForNodeTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -235,14 +235,14 @@ class WaitForElementTool
                     if (elements.isNotEmpty()) {
                         val element = elements.first()
                         val elapsed = SystemClock.elapsedRealtime() - startTime
-                        Log.d(TAG, "wait_for_element: found after ${elapsed}ms ($attemptCount attempts)")
+                        Log.d(TAG, "wait_for_node: found after ${elapsed}ms ($attemptCount attempts)")
 
                         val resultJson =
                             buildJsonObject {
                                 put("found", true)
                                 put("elapsedMs", elapsed)
                                 put("attempts", attemptCount)
-                                put("element", McpToolUtils.buildElementJson(element))
+                                put("node", McpToolUtils.buildNodeJson(element))
                             }
                         return McpToolUtils.textResult(Json.encodeToString(resultJson))
                     }
@@ -250,7 +250,7 @@ class WaitForElementTool
                     // If accessibility service becomes unavailable during polling, propagate
                     if (e is McpToolException.PermissionDenied) throw e
                     // Other errors (e.g., stale tree) — retry on next poll
-                    Log.d(TAG, "wait_for_element: poll attempt $attemptCount failed: ${e.message}")
+                    Log.d(TAG, "wait_for_node: poll attempt $attemptCount failed: ${e.message}")
                 }
 
                 delay(POLL_INTERVAL_MS)
@@ -263,7 +263,7 @@ class WaitForElementTool
                     put("attempts", attemptCount)
                     put(
                         "message",
-                        "Operation timed out after ${timeout}ms waiting for element " +
+                        "Operation timed out after ${timeout}ms waiting for node " +
                             "(by=$byStr, value='$value'). Retry if the operation is long-running.",
                     )
                 }
@@ -276,7 +276,7 @@ class WaitForElementTool
         ) {
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Wait until an element matching criteria appears (with timeout)",
+                description = "Wait until a node matching criteria appears (with timeout)",
                 inputSchema =
                     ToolSchema(
                         properties =
@@ -309,8 +309,8 @@ class WaitForElementTool
         }
 
         companion object {
-            private const val TAG = "MCP:WaitForElementTool"
-            const val TOOL_NAME = "wait_for_element"
+            private const val TAG = "MCP:WaitForNodeTool"
+            const val TOOL_NAME = "wait_for_node"
             private const val POLL_INTERVAL_MS = 500L
             private const val MAX_TIMEOUT_MS = 30000L
         }
@@ -502,12 +502,12 @@ class WaitForIdleTool
     }
 
 /**
- * MCP tool: get_element_details
+ * MCP tool: get_node_details
  *
- * Retrieves full (untruncated) text and contentDescription for a list of element_ids.
+ * Retrieves full (untruncated) text and contentDescription for a list of node_ids.
  * Use after get_screen_state when text or desc columns were truncated.
  */
-class GetElementDetailsTool
+class GetNodeDetailsTool
     @Inject
     constructor(
         private val treeParser: AccessibilityTreeParser,
@@ -517,23 +517,23 @@ class GetElementDetailsTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            // 1. Parse "element_ids" parameter — required, JSON array of strings
+            // 1. Parse "node_ids" parameter — required, JSON array of strings
             val idsElement =
-                arguments?.get("element_ids")
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_ids'")
+                arguments?.get("node_ids")
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_ids'")
             val idsArray =
                 (idsElement as? JsonArray)
-                    ?: throw McpToolException.InvalidParams("Parameter 'element_ids' must be an array of strings")
+                    ?: throw McpToolException.InvalidParams("Parameter 'node_ids' must be an array of strings")
             if (idsArray.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'element_ids' must not be empty")
+                throw McpToolException.InvalidParams("Parameter 'node_ids' must not be empty")
             }
             val ids =
                 idsArray.map { element ->
                     val primitive =
                         (element as? JsonPrimitive)
-                            ?: throw McpToolException.InvalidParams("Each element in 'element_ids' must be a string")
+                            ?: throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
                     if (!primitive.isString) {
-                        throw McpToolException.InvalidParams("Each element in 'element_ids' must be a string")
+                        throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
                     }
                     primitive.content
                 }
@@ -543,7 +543,7 @@ class GetElementDetailsTool
 
             // 3. Build TSV output
             val sb = StringBuilder()
-            sb.append("element_id\ttext\tdesc\n")
+            sb.append("node_id\ttext\tdesc\n")
 
             for (id in ids) {
                 val node = elementFinder.findNodeById(multiWindowResult.windows, id)
@@ -556,7 +556,7 @@ class GetElementDetailsTool
                 }
             }
 
-            Log.d(TAG, "get_element_details: element_ids=${ids.size}")
+            Log.d(TAG, "get_node_details: node_ids=${ids.size}")
 
             return McpToolUtils.textResult(sb.toString().trimEnd('\n'))
         }
@@ -584,28 +584,28 @@ class GetElementDetailsTool
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Retrieve full untruncated text and description for elements by element_id. " +
+                    "Retrieve full untruncated text and description for nodes by node_id. " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("element_ids") {
+                                putJsonObject("node_ids") {
                                     put("type", "array")
                                     putJsonObject("items") {
                                         put("type", "string")
                                     }
-                                    put("description", "List of element_ids to retrieve details for")
+                                    put("description", "List of node_ids to retrieve details for")
                                 }
                             },
-                        required = listOf("element_ids"),
+                        required = listOf("node_ids"),
                     ),
             ) { request -> execute(request.arguments) }
         }
 
         companion object {
-            private const val TAG = "MCP:GetElementDetailsTool"
-            const val TOOL_NAME = "get_element_details"
+            private const val TAG = "MCP:GetNodeDetailsTool"
+            const val TOOL_NAME = "get_node_details"
         }
     }
 
@@ -628,16 +628,16 @@ fun registerUtilityTools(
     if (perms.isToolEnabled(SetClipboardTool.TOOL_NAME)) {
         SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(WaitForElementTool.TOOL_NAME)) {
-        WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(WaitForNodeTool.TOOL_NAME)) {
+        WaitForNodeTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
     if (perms.isToolEnabled(WaitForIdleTool.TOOL_NAME)) {
         WaitForIdleTool(accessibilityServiceProvider)
             .register(server, toolNamePrefix)
     }
-    if (perms.isToolEnabled(GetElementDetailsTool.TOOL_NAME)) {
-        GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+    if (perms.isToolEnabled(GetNodeDetailsTool.TOOL_NAME)) {
+        GetNodeDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
 }
