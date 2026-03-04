@@ -916,8 +916,8 @@ AndroidContainerSetup.launchCalculator()
 ## User Story 6: Quality Gates
 
 **Acceptance criteria**:
-- [ ] `make lint` passes with zero warnings/errors
-- [ ] `./gradlew :app:test` passes (unit + integration tests unaffected)
+- [x] `make lint` passes with zero warnings/errors
+- [x] `./gradlew :app:test` passes (unit + integration tests unaffected)
 - [ ] `./gradlew :e2e-tests:test` passes locally with redroid
 - [ ] CI pipeline passes end-to-end
 
@@ -944,6 +944,244 @@ Spawn `code-reviewer` subagent in plan compliance mode.
 **Definition of Done**:
 - [ ] All quality gates pass
 - [ ] Code reviewer reports no issues (or all issues addressed)
+
+---
+
+## Revision 1: Switch from Docker to Rootful Podman (cgroup v2 Compatibility)
+
+**Why**: Redroid exits immediately (code 129/SIGHUP) on Docker with cgroup v2 because Docker does not support `--security-opt unmask=/sys/fs/cgroup`. This option is required for redroid to access the cgroup filesystem on cgroup v2 hosts. Podman supports this option. Rootful podman is required because redroid needs root-level access to kernel binder devices.
+
+**Reference implementation**: User's working redroid setup at `tools/redroid/start-redroid.sh` (lines 338-364) uses rootful podman with `--security-opt unmask=/sys/fs/cgroup` and `-v /sys/fs/cgroup` (anonymous volume).
+
+**Testcontainers + Podman**: Testcontainers supports podman via `DOCKER_HOST=unix:///run/podman/podman.sock`. Ryuk (cleanup container) is incompatible with podman — set `TESTCONTAINERS_RYUK_DISABLED=true` (existing JVM shutdown hook handles cleanup).
+
+**Local dev prerequisites** (one-time setup):
+1. `sudo systemctl enable --now podman.socket`
+2. `sudo chmod 755 /run/podman && sudo chmod 666 /run/podman/podman.sock`
+
+**Security note**: `chmod 666` on the rootful podman socket allows any local user to run rootful containers. This is acceptable for developer workstations; for shared machines, use group-based access instead (`sudo usermod -aG podman $USER`). CI runners are ephemeral and single-tenant, so `chmod 666` is safe there.
+
+**Accepted exception — `sudo` on CI** (extends existing kernel module exception):
+Installing podman, enabling the rootful socket, and setting permissions require `sudo` on CI. Same accepted exception as kernel module loading.
+
+### Task R1.1: Update CI workflow for podman
+
+**File**: `.github/workflows/ci.yml`
+
+**Operation**: Modify the `test-e2e` job
+
+Add podman setup step (after kernel modules, before image pull). Update image pull to use `sudo podman pull`. Add `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED` env vars to the E2E test step.
+
+```yaml
+      - name: Set up rootful podman socket
+        run: |
+          sudo apt-get install -y -qq podman
+          sudo systemctl enable --now podman.socket
+          sudo chmod 755 /run/podman
+          sudo chmod 666 /run/podman/podman.sock
+          # Verify socket is accessible
+          curl -s --unix-socket /run/podman/podman.sock http://localhost/_ping
+
+      - name: Pre-pull redroid image
+        run: sudo podman pull redroid/redroid:13.0.0-latest
+
+      - name: Run E2E tests
+        env:
+          DOCKER_HOST: unix:///run/podman/podman.sock
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: ./gradlew :e2e-tests:test
+```
+
+**Definition of Done**:
+- [ ] CI installs podman and enables rootful socket
+- [ ] CI sets socket permissions for non-root access
+- [ ] Image pull uses `sudo podman pull`
+- [ ] E2E test step has `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED` env vars
+
+### Task R1.2: Add `unmask=/sys/fs/cgroup` and fix volume in AndroidContainerSetup
+
+**File**: `e2e-tests/src/test/kotlin/com/danielealbano/androidremotecontrolmcp/e2e/AndroidContainerSetup.kt`
+
+**Operation**: Modify `createContainer()`
+
+1. Add `"unmask=/sys/fs/cgroup"` to the `withSecurityOpts` list
+2. Replace `withBinds(Bind("/sys/fs/cgroup", Volume("/sys/fs/cgroup")))` with `cmd.withVolumes(Volume("/sys/fs/cgroup"))` (anonymous volume, not host bind mount — matches reference script's `-v /sys/fs/cgroup`)
+3. Remove unused `Bind` import (`com.github.dockerjava.api.model.Bind`) — no longer needed after removing the bind mount
+
+Updated `createContainer()` body inside `withCreateContainerCmdModifier`:
+
+```kotlin
+.withCreateContainerCmdModifier { cmd ->
+    cmd.withVolumes(Volume("/sys/fs/cgroup"))
+    cmd.hostConfig
+        ?.withMemory(MEMORY_BYTES)
+        ?.withMemorySwap(MEMORY_BYTES)
+        ?.withCapAdd(*Capability.values())
+        ?.withSecurityOpts(
+            listOf(
+                "seccomp=unconfined",
+                "apparmor=unconfined",
+                "unmask=/sys/fs/cgroup",
+            )
+        )
+        ?.withDevices(
+            listOf(
+                Device("rwm", "/dev/fuse", "/dev/fuse"),
+            )
+        )
+        ?.withDeviceCgroupRules(
+            listOf(
+                "c $binderDevMajor:* rwm",
+                "c $fuseDevMajorMinor rwm",
+            )
+        )
+}
+```
+
+**Definition of Done**:
+- [ ] `unmask=/sys/fs/cgroup` present in security opts
+- [ ] `/sys/fs/cgroup` is anonymous volume (not host bind mount)
+- [ ] Unused `Bind` import removed
+- [ ] No other container config changes (devices, cgroup rules unchanged)
+
+### Task R1.2b: Update build.gradle.kts env var forwarding for podman
+
+**File**: `e2e-tests/build.gradle.kts`
+
+**Operation**: Modify lines 54-64
+
+1. Add `TESTCONTAINERS_RYUK_DISABLED` to the env var forwarding list on line 56
+2. Update Docker socket fallback (lines 60-64) to also check podman socket
+3. Update comments from "Docker" to "Docker/Podman"
+
+```kotlin
+// Forward Docker/Podman-related environment variables to the forked test JVM
+// so Testcontainers can discover the container runtime environment.
+listOf(
+    "DOCKER_HOST",
+    "DOCKER_TLS_VERIFY",
+    "DOCKER_CERT_PATH",
+    "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE",
+    "TESTCONTAINERS_RYUK_DISABLED",
+).forEach { key ->
+    System.getenv(key)?.let { value -> environment(key, value) }
+}
+
+// Ensure DOCKER_HOST is set for the test JVM when running on Linux.
+// Testcontainers 1.20.x may fail to auto-detect the Unix socket without this.
+// Prefer podman rootful socket (required for redroid), fall back to Docker.
+if (!environment.containsKey("DOCKER_HOST")) {
+    val podmanSocket = File("/run/podman/podman.sock")
+    val dockerSocket = File("/var/run/docker.sock")
+    when {
+        podmanSocket.exists() -> environment("DOCKER_HOST", "unix:///run/podman/podman.sock")
+        dockerSocket.exists() -> environment("DOCKER_HOST", "unix:///var/run/docker.sock")
+    }
+}
+```
+
+**Definition of Done**:
+- [ ] `TESTCONTAINERS_RYUK_DISABLED` in env var forwarding list
+- [ ] Socket fallback checks podman socket first, then Docker
+- [ ] Comments updated
+
+### Task R1.3: Update Makefile targets for podman
+
+**File**: `Makefile`
+
+**Operation**: Modify `test-e2e` target and `check-deps` target
+
+1. `test-e2e`: Set `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED` env vars inline. Update comment.
+
+```makefile
+test-e2e: ## Run E2E tests (requires rootful podman socket)
+	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) DOCKER_HOST=unix:///run/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true $(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
+```
+
+2. `check-deps` (lines 71-78): Replace Docker check with podman check.
+
+```makefile
+	if command -v podman >/dev/null 2>&1; then \
+		PODMAN_VER=$$(podman --version); \
+		echo "  [OK] $$PODMAN_VER"; \
+	else \
+		echo "  [MISSING] Podman (required for E2E tests)"; \
+		echo "           Install: https://podman.io/getting-started/installation"; \
+		MISSING=1; \
+	fi; \
+```
+
+**Definition of Done**:
+- [ ] `test-e2e` sets `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED`
+- [ ] `test-e2e` comment updated to mention podman
+- [ ] `check-deps` checks for `podman` instead of `docker`
+
+### Task R1.4: Update all Docker→Podman references in E2E context
+
+**Operation**: Modify — update Docker references in E2E context to mention Podman across all files
+
+**`CLAUDE.md`**:
+- Line 510: `### E2E testing (Docker Android + Testcontainers)` → `### E2E testing (Redroid + Podman + Testcontainers)`
+- Line 512: already says redroid — add "via rootful podman" mention
+- Line 527: `starts Docker Android container` → `starts redroid container via podman`
+- Line 561: `**Docker**: Required for E2E tests` → `**Podman**: Required for E2E tests (rootful socket). Requires...`
+
+**`README.md`**:
+- Line 69: `**Docker** (for \`redroid/redroid\` Android container image)` → `**Podman** (rootful, for \`redroid/redroid\` Android container image)`
+- Line 209: `Requires Docker. Starts a full Android emulator inside Docker` → `Requires rootful Podman. Starts a redroid Android container via Podman`
+
+**`docs/PROJECT.md`**:
+- Line 154: `E2E tests (Docker Android, JVM-only module)` → `E2E tests (redroid/Podman, JVM-only module)`
+- Line 519: `Docker container` → `container`
+- Line 562: `Docker pre-installed on GitHub Actions runners` → `Podman installed on GitHub Actions runners via CI workflow`
+- Line 701: `requires Docker` → `requires rootful podman socket`
+- Line 740: `Docker` → `Podman` in `check-deps` description
+
+**`docs/TOOLS.md`**:
+- Line 483: `Docker-in-Docker: E2E tests using Testcontainers (Docker Android) require Docker-in-Docker support` → `Podman: E2E tests using Testcontainers require rootful podman socket, which may not be available in all \`act\` configurations`
+
+**E2E test source KDoc comments** (update "Docker container" → "container" or "redroid container"):
+- `SharedAndroidContainer.kt` line 6: `Docker container` → `redroid container`
+- `E2ECalculatorTest.kt` lines 26, 31, 37: update Docker references
+- `E2ECameraTest.kt` line 49: `Docker container` → `redroid container`
+- `E2EErrorHandlingTest.kt` line 24: `Docker container` → `redroid container`
+- `E2EScreenshotTest.kt` line 23: `Docker container` → `redroid container`
+- `AndroidContainerSetup.kt` lines 15, 437: `Docker container` → `redroid container`
+
+**Definition of Done**:
+- [ ] All E2E-related "Docker" references updated to "Podman" or "redroid" where appropriate
+- [ ] Kernel module + rootful podman socket requirements documented
+- [ ] E2E test KDoc comments updated
+- [ ] `docs/TOOLS.md` updated
+- [ ] `docs/PROJECT.md` line 154 and 740 updated
+
+### Task R1.5: Re-run quality gates
+
+Same as US6 Tasks 6.1–6.5 — re-run after Revision 1 changes.
+
+**Definition of Done**:
+- [ ] `make lint` passes
+- [ ] `./gradlew :app:test` passes
+- [ ] `make test-e2e` passes locally with podman
+- [ ] CI pipeline passes
+- [ ] Code reviewer reports no issues (or all issues addressed)
+
+### Revision 1 Review Findings
+
+Review performed after initial draft. All WARNINGs addressed by expanding tasks R1.2, R1.3, R1.4 and adding task R1.2b:
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| Q1 | WARNING | `build.gradle.kts` missing `TESTCONTAINERS_RYUK_DISABLED` forwarding | Added Task R1.2b |
+| Q2 | WARNING | `build.gradle.kts` Docker socket fallback needs podman update | Added Task R1.2b |
+| Q3 | WARNING | `docs/PROJECT.md` line 154 "Docker Android" not updated | Added to Task R1.4 |
+| Q4 | WARNING | `docs/PROJECT.md` line 740 `check-deps` says "Docker" | Added to Task R1.4 |
+| Q5 | WARNING | Makefile `check-deps` checks `docker` not `podman` | Added to Task R1.3 |
+| Q6 | WARNING | 6 E2E test source files have "Docker" in KDoc | Added to Task R1.4 |
+| Q7 | WARNING | `docs/TOOLS.md` line 483 has Docker references | Added to Task R1.4 |
+| Q8 | WARNING | `README.md` line 209 references "Docker" | Added to Task R1.4 |
+| A2 | WARNING | `Bind` import unused after R1.2 | Added to Task R1.2 |
+| SEC1 | WARNING | `chmod 666` security note missing | Added to Revision 1 context |
 
 ---
 
