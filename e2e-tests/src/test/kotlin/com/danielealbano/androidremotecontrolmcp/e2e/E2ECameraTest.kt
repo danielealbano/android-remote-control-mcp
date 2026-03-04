@@ -46,7 +46,7 @@ import org.junit.jupiter.api.TestMethodOrder
  * - save_camera_photo (needs location_id)
  * - save_camera_video (needs location_id)
  *
- * Uses [SharedAndroidContainer] singleton to share the Docker container
+ * Uses [SharedAndroidContainer] singleton to share the redroid container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
  *
  * CAMERA and RECORD_AUDIO permissions are granted during container setup

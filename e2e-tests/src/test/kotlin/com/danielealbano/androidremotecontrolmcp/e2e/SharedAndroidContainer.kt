@@ -3,7 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 import kotlinx.coroutines.runBlocking
 
 /**
- * Singleton that manages a single shared redroid Docker container
+ * Singleton that manages a single shared redroid container
  * for all E2E test classes.
  *
  * The container is lazily initialized on first access and reused

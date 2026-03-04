@@ -151,7 +151,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/debug/` — `AndroidManifest.xml` (debug overlay), `kotlin/.../debug/E2EConfigReceiver.kt`
 - `app/src/test/kotlin/` — Unit tests and JVM-based integration tests
 - `app/src/test/kotlin/.../integration/` — Integration tests (Ktor `testApplication`, no emulator)
-- `e2e-tests/` — E2E tests (Docker Android, JVM-only module)
+- `e2e-tests/` — E2E tests (redroid/Podman, JVM-only module)
 - `gradle/libs.versions.toml` — Gradle version catalog
 - `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`
 - `Makefile`, `CLAUDE.md`, `README.md`, `LICENSE`
@@ -516,7 +516,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Framework**: Testcontainers Kotlin (`redroid/redroid:13.0.0-latest`), JUnit 5, MCP Kotlin SDK Client
 - **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found)
-- **Infrastructure**: `SharedAndroidContainer` singleton shares one Docker container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` with trust-all TLS for self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
+- **Infrastructure**: `SharedAndroidContainer` singleton shares one container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` with trust-all TLS for self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
 
@@ -559,7 +559,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 - **Trigger**: Push to main, pull requests
 - **Pipeline**: lint → test-unit (includes JVM integration tests) → test-e2e → build-release (sequential)
-- **E2E tests**: Docker pre-installed on GitHub Actions runners, Testcontainers works out of the box
+- **E2E tests**: Podman installed on GitHub Actions runners via CI workflow, Testcontainers configured via rootful podman socket
 - **Artifacts**: Debug and release APKs uploaded on successful build
 
 ### Deployment
@@ -698,7 +698,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 |--------|-------------|-------------------|
 | `test-unit` | Run unit and JVM integration tests | `./gradlew test` |
 | `test-integration` | Run JVM integration tests only | `./gradlew :app:testDebugUnitTest --tests "...integration.*"` |
-| `test-e2e` | Run E2E tests (requires Docker) | `./gradlew :e2e-tests:test` |
+| `test-e2e` | Run E2E tests (requires rootful podman socket) | `./gradlew :e2e-tests:test` |
 | `test` | Run all tests sequentially | test-unit + test-e2e |
 | `coverage` | Generate Jacoco coverage report | `./gradlew jacocoTestReport` |
 
@@ -737,7 +737,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 | `version-bump-patch` | Increment patch version (1.0.0 → 1.0.1) |
 | `version-bump-minor` | Increment minor version (1.0.0 → 1.1.0) |
 | `version-bump-major` | Increment major version (1.0.0 → 2.0.0) |
-| `check-deps` | Check for required tools (Android SDK, Java 17+, Gradle, adb, Docker) |
+| `check-deps` | Check for required tools (Android SDK, Java 17+, Gradle, adb, Podman) |
 | `all` | Run full workflow: clean → build → lint → test-unit |
 | `ci` | Run CI workflow: check-deps → lint → test-unit (includes JVM integration) → test-e2e → build-release |
 

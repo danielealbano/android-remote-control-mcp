@@ -1149,11 +1149,11 @@ test-e2e: ## Run E2E tests (requires rootful podman socket)
 - `AndroidContainerSetup.kt` lines 15, 437: `Docker container` → `redroid container`
 
 **Definition of Done**:
-- [ ] All E2E-related "Docker" references updated to "Podman" or "redroid" where appropriate
-- [ ] Kernel module + rootful podman socket requirements documented
-- [ ] E2E test KDoc comments updated
-- [ ] `docs/TOOLS.md` updated
-- [ ] `docs/PROJECT.md` line 154 and 740 updated
+- [x] All E2E-related "Docker" references updated to "Podman" or "redroid" where appropriate
+- [x] Kernel module + rootful podman socket requirements documented
+- [x] E2E test KDoc comments updated
+- [x] `docs/TOOLS.md` updated
+- [x] `docs/PROJECT.md` line 154 and 740 updated
 
 ### Task R1.5: Re-run quality gates
 

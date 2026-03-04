@@ -11,7 +11,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
- * Manages the redroid Docker container lifecycle for E2E tests.
+ * Manages the redroid container lifecycle for E2E tests.
  *
  * Responsibilities:
  * - Create and configure the redroid container with kernel module setup
@@ -432,7 +432,7 @@ object AndroidContainerSetup {
     /**
      * Get the mapped MCP server URL from a running container.
      *
-     * @param container the running Docker container
+     * @param container the running redroid container
      * @return the base URL for the MCP server (e.g., "http://localhost:32768")
      */
     fun getMcpServerUrl(container: GenericContainer<*>): String {

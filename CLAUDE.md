@@ -507,9 +507,9 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 }
 ```
 
-### E2E testing (Docker Android + Testcontainers)
-- Use **Testcontainers Kotlin** for container orchestration.
-- Use **redroid/redroid:13.0.0-latest** Docker image (native Android in container via kernel modules).
+### E2E testing (Redroid + Podman + Testcontainers)
+- Use **Testcontainers Kotlin** for container orchestration via rootful podman.
+- Use **redroid/redroid:13.0.0-latest** container image (native Android in container via kernel modules).
 - Use **JUnit 5** for test framework.
 - Use **MCP Kotlin SDK client** with `StreamableHttpClientTransport` for MCP requests.
 - Organize tests in `e2e-tests/src/test/kotlin/` directory (separate Gradle module).
@@ -524,7 +524,7 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 **Test scenario: Calculator** (7 + 3 = 10, see Plan 10 for detailed E2E test steps).
 
 **Running E2E tests**:
-- `make test-e2e` (starts Docker Android container, installs APK, runs tests, tears down).
+- `make test-e2e` (starts redroid container via podman, installs APK, runs tests, tears down).
 - E2E tests are slow (container startup, emulator boot); run selectively.
 
 ### Environment variables for tests
@@ -558,7 +558,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 - **Java JDK**: Version 17 (standard for Android development).
 - **Gradle**: Version 8.x (wrapper included in project, use `./gradlew`).
 - **adb**: Android Debug Bridge (part of Android SDK platform-tools).
-- **Docker**: Required for E2E tests (redroid/redroid image). Requires `binder_linux` and `fuse` kernel modules.
+- **Podman**: Required for E2E tests (rootful socket for redroid/redroid image). Requires `binder_linux` and `fuse` kernel modules.
 - **Emulator or Device**: For E2E tests and manual testing.
 
 ### Environment setup

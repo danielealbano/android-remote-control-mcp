@@ -20,7 +20,7 @@ import org.junit.jupiter.api.TestMethodOrder
  * Verifies that the get_screen_state MCP tool with include_screenshot=true
  * returns both compact TSV text and valid JPEG screenshot data.
  *
- * Uses [SharedAndroidContainer] singleton to share the Docker container
+ * Uses [SharedAndroidContainer] singleton to share the redroid container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
