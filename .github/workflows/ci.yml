@@ -180,10 +180,22 @@ jobs:
           ls -la /dev/binderfs/
           lsmod | grep -E 'binder_linux|fuse'
 
+      - name: Set up rootful podman socket
+        run: |
+          sudo apt-get install -y -qq podman
+          sudo systemctl enable --now podman.socket
+          sudo chmod 755 /run/podman
+          sudo chmod 666 /run/podman/podman.sock
+          # Verify socket is accessible
+          curl -s --unix-socket /run/podman/podman.sock http://localhost/_ping
+
       - name: Pre-pull redroid image
-        run: docker pull redroid/redroid:13.0.0-latest
+        run: sudo podman pull redroid/redroid:13.0.0-latest
 
       - name: Run E2E tests
+        env:
+          DOCKER_HOST: unix:///run/podman/podman.sock
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: ./gradlew :e2e-tests:test
 
       - name: Upload E2E test results

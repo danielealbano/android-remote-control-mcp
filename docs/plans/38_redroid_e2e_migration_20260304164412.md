@@ -993,10 +993,10 @@ Add podman setup step (after kernel modules, before image pull). Update image pu
 ```
 
 **Definition of Done**:
-- [ ] CI installs podman and enables rootful socket
-- [ ] CI sets socket permissions for non-root access
-- [ ] Image pull uses `sudo podman pull`
-- [ ] E2E test step has `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED` env vars
+- [x] CI installs podman and enables rootful socket
+- [x] CI sets socket permissions for non-root access
+- [x] Image pull uses `sudo podman pull`
+- [x] E2E test step has `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED` env vars
 
 ### Task R1.2: Add `unmask=/sys/fs/cgroup` and fix volume in AndroidContainerSetup
 
