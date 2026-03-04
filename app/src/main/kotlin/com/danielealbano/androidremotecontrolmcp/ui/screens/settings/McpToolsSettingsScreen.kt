@@ -91,6 +91,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                 ToolEntry("find_elements", "Find Elements"),
                 ToolEntry("click_element", "Click Element"),
                 ToolEntry("long_click_element", "Long Click Element"),
+                ToolEntry("tap_element", "Tap Element"),
                 ToolEntry("scroll_to_element", "Scroll to Element"),
             ),
         ),
