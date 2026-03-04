@@ -84,63 +84,7 @@ class ToolPermissionsIntegrationTest {
     @Test
     fun `all tools disabled returns empty tool list`() =
         runTest {
-            val allToolNames =
-                setOf(
-                    "tap",
-                    "long_press",
-                    "double_tap",
-                    "swipe",
-                    "scroll",
-                    "press_back",
-                    "press_home",
-                    "press_recents",
-                    "open_notifications",
-                    "open_quick_settings",
-                    "get_device_logs",
-                    "pinch",
-                    "custom_gesture",
-                    "find_elements",
-                    "click_element",
-                    "long_click_element",
-                    "scroll_to_element",
-                    "type_append_text",
-                    "type_insert_text",
-                    "type_replace_text",
-                    "type_clear_text",
-                    "press_key",
-                    "get_clipboard",
-                    "set_clipboard",
-                    "wait_for_element",
-                    "wait_for_idle",
-                    "get_element_details",
-                    "list_storage_locations",
-                    "list_files",
-                    "read_file",
-                    "write_file",
-                    "append_file",
-                    "file_replace",
-                    "download_from_url",
-                    "delete_file",
-                    "open_app",
-                    "list_apps",
-                    "close_app",
-                    "list_cameras",
-                    "list_camera_photo_resolutions",
-                    "list_camera_video_resolutions",
-                    "take_camera_photo",
-                    "save_camera_photo",
-                    "save_camera_video",
-                    "send_intent",
-                    "open_uri",
-                    "notification_list",
-                    "notification_open",
-                    "notification_dismiss",
-                    "notification_snooze",
-                    "notification_action",
-                    "notification_reply",
-                    "get_screen_state",
-                )
-            val perms = ToolPermissionsConfig(disabledTools = allToolNames)
+            val perms = ToolPermissionsConfig(disabledTools = ALL_TOOL_NAMES)
 
             McpIntegrationTestHelper.withTestApplication(perms = perms) { client, _ ->
                 val result = client.listTools()
@@ -165,7 +109,7 @@ class ToolPermissionsIntegrationTest {
                 val tool = result.tools.find { it.name == "android_get_screen_state" }
                 assertTrue(tool != null, "get_screen_state tool should be registered")
 
-                val properties = tool!!.inputSchema?.properties
+                val properties = tool!!.inputSchema.properties
                 assertFalse(
                     properties?.containsKey("include_screenshot") == true,
                     "include_screenshot should be absent from schema when disabled",
@@ -186,7 +130,7 @@ class ToolPermissionsIntegrationTest {
                 val tool = result.tools.find { it.name == "android_save_camera_video" }
                 assertTrue(tool != null, "save_camera_video tool should be registered")
 
-                val properties = tool!!.inputSchema?.properties
+                val properties = tool!!.inputSchema.properties
                 assertFalse(
                     properties?.containsKey("audio") == true,
                     "audio should be absent from schema when disabled",
@@ -317,4 +261,63 @@ class ToolPermissionsIntegrationTest {
                 }
             }
         }
+
+    companion object {
+        private val ALL_TOOL_NAMES =
+            setOf(
+                "tap",
+                "long_press",
+                "double_tap",
+                "swipe",
+                "scroll",
+                "press_back",
+                "press_home",
+                "press_recents",
+                "open_notifications",
+                "open_quick_settings",
+                "get_device_logs",
+                "pinch",
+                "custom_gesture",
+                "find_elements",
+                "click_element",
+                "long_click_element",
+                "scroll_to_element",
+                "type_append_text",
+                "type_insert_text",
+                "type_replace_text",
+                "type_clear_text",
+                "press_key",
+                "get_clipboard",
+                "set_clipboard",
+                "wait_for_element",
+                "wait_for_idle",
+                "get_element_details",
+                "list_storage_locations",
+                "list_files",
+                "read_file",
+                "write_file",
+                "append_file",
+                "file_replace",
+                "download_from_url",
+                "delete_file",
+                "open_app",
+                "list_apps",
+                "close_app",
+                "list_cameras",
+                "list_camera_photo_resolutions",
+                "list_camera_video_resolutions",
+                "take_camera_photo",
+                "save_camera_photo",
+                "save_camera_video",
+                "send_intent",
+                "open_uri",
+                "notification_list",
+                "notification_open",
+                "notification_dismiss",
+                "notification_snooze",
+                "notification_action",
+                "notification_reply",
+                "get_screen_state",
+            )
+    }
 }

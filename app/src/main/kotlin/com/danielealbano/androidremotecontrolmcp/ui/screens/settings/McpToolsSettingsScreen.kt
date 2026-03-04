@@ -206,7 +206,7 @@ fun McpToolsSettingsScreen(
                         text = category.header,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, top = 16.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
                     )
                 }
                 items(category.tools, key = { it.toolName }) { tool ->

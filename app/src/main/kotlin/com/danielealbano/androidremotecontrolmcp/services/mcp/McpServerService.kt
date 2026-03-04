@@ -311,7 +311,15 @@ class McpServerService : Service() {
             toolNamePrefix,
             perms,
         )
-        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, nodeCache, toolNamePrefix, perms)
+        registerUtilityTools(
+            server,
+            treeParser,
+            elementFinder,
+            accessibilityServiceProvider,
+            nodeCache,
+            toolNamePrefix,
+            perms,
+        )
         registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix, perms)
         registerAppManagementTools(server, appManager, toolNamePrefix, perms)
         registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix, perms)

@@ -1100,10 +1100,15 @@ class MainViewModelTest {
         runTest {
             advanceUntilIdle()
 
+            val values = mutableListOf<ToolPermissionsConfig>()
+            val job = launch { viewModel.toolPermissionsConfig.collect { values.add(it) } }
+            advanceUntilIdle()
+
             val updatedPerms = ToolPermissionsConfig(disabledTools = setOf("tap"))
             configFlow.value = configFlow.value.copy(toolPermissionsConfig = updatedPerms)
             advanceUntilIdle()
 
-            assertEquals(updatedPerms, viewModel.toolPermissionsConfig.value)
+            assertEquals(updatedPerms, values.last())
+            job.cancel()
         }
 }
