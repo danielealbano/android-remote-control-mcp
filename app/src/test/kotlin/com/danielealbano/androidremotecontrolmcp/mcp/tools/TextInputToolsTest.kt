@@ -353,12 +353,12 @@ class TextInputToolsTest {
         }
 
         @Test
-        fun `appends text to element`() =
+        fun `appends text to node`() =
             runTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -374,7 +374,7 @@ class TextInputToolsTest {
         @Test
         fun `throws error when text is missing`() =
             runTest {
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
@@ -384,7 +384,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "")
                     }
 
@@ -393,7 +393,7 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is missing`() =
+        fun `throws error when node_id is missing`() =
             runTest {
                 val params = buildJsonObject { put("text", "Hello") }
 
@@ -401,11 +401,11 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is empty string`() =
+        fun `throws error when node_id is empty string`() =
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "")
+                        put("node_id", "")
                         put("text", "Hello")
                     }
 
@@ -418,7 +418,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "A".repeat(2001))
                     }
 
@@ -431,7 +431,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                         put("typing_speed", 5)
                     }
@@ -445,7 +445,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                         put("typing_speed", 6000)
                     }
@@ -462,7 +462,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -483,7 +483,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -497,7 +497,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "AB")
                     }
 
@@ -520,7 +520,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hi\uD83D\uDE00")
                     }
 
@@ -536,7 +536,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -559,7 +559,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -600,7 +600,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", " World")
                         put("offset", 3)
                     }
@@ -618,7 +618,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Pre")
                         put("offset", 0)
                     }
@@ -633,7 +633,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                     }
 
@@ -652,7 +652,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "X")
                         put("offset", 10)
                     }
@@ -666,7 +666,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "X")
                         put("offset", -1)
                     }
@@ -680,7 +680,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "")
                         put("offset", 0)
                     }
@@ -690,11 +690,11 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is empty string`() =
+        fun `throws error when node_id is empty string`() =
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "")
+                        put("node_id", "")
                         put("text", "Hello")
                         put("offset", 0)
                     }
@@ -716,7 +716,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "X")
                         put("offset", 3)
                     }
@@ -740,7 +740,7 @@ class TextInputToolsTest {
                 // offset 0 should succeed when textLength defaults to 0
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                         put("offset", 0)
                     }
@@ -755,7 +755,7 @@ class TextInputToolsTest {
 
                 val params2 =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", "Hello")
                         put("offset", 1)
                     }
@@ -770,7 +770,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("text", " World")
                         put("offset", 3)
                     }
@@ -812,7 +812,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "Goodbye")
                     }
@@ -840,12 +840,12 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "NotFound")
                         put("new_text", "X")
                     }
 
-                assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
+                assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
             }
 
         @Test
@@ -853,7 +853,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "")
                         put("new_text", "X")
                     }
@@ -867,7 +867,7 @@ class TextInputToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "A".repeat(10001))
                         put("new_text", "X")
                     }
@@ -887,7 +887,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "X")
                     }
@@ -897,11 +897,11 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is empty string`() =
+        fun `throws error when node_id is empty string`() =
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "")
+                        put("node_id", "")
                         put("search", "Hello")
                         put("new_text", "X")
                     }
@@ -923,7 +923,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "X")
                     }
@@ -947,7 +947,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "")
                     }
@@ -977,7 +977,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "abc")
                         put("new_text", "X")
                     }
@@ -1004,7 +1004,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "Hi")
                     }
@@ -1030,7 +1030,7 @@ class TextInputToolsTest {
 
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "World")
                         put("new_text", "Earth")
                     }
@@ -1051,7 +1051,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "Goodbye")
                     }
@@ -1066,7 +1066,7 @@ class TextInputToolsTest {
                 setupDefaultMocks()
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_edit")
+                        put("node_id", "node_edit")
                         put("search", "Hello")
                         put("new_text", "Goodbye")
                     }
@@ -1090,7 +1090,7 @@ class TextInputToolsTest {
             )
 
         @Test
-        fun `clears text from element`() =
+        fun `clears text from node`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
@@ -1102,7 +1102,7 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returnsMany listOf(beforeText, afterText)
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
@@ -1124,7 +1124,7 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns emptyText
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
@@ -1145,7 +1145,7 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns emptyText
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 // First call — early return for empty field
                 tool.execute(params)
@@ -1155,7 +1155,7 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is missing`() =
+        fun `throws error when node_id is missing`() =
             runTest {
                 val params = buildJsonObject {}
 
@@ -1163,9 +1163,9 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when element_id is empty string`() =
+        fun `throws error when node_id is empty string`() =
             runTest {
-                val params = buildJsonObject { put("element_id", "") }
+                val params = buildJsonObject { put("node_id", "") }
 
                 val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("non-empty"))
@@ -1177,7 +1177,7 @@ class TextInputToolsTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns false
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Input connection not available"))
@@ -1194,7 +1194,7 @@ class TextInputToolsTest {
                 } returns beforeText
                 every { mockTypeInputController.performContextMenuAction(any()) } returns false
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Failed to select all text"))
@@ -1212,7 +1212,7 @@ class TextInputToolsTest {
                 every { mockTypeInputController.performContextMenuAction(any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns false
 
-                val params = buildJsonObject { put("element_id", "node_edit") }
+                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Failed to send DELETE key"))

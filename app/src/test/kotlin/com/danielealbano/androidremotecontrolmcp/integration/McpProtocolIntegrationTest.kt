@@ -148,12 +148,12 @@ class McpProtocolIntegrationTest {
                 // Gestures
                 "android_pinch",
                 "android_custom_gesture",
-                // Element actions
-                "android_find_elements",
-                "android_click_element",
-                "android_long_click_element",
-                "android_tap_element",
-                "android_scroll_to_element",
+                // Node actions
+                "android_find_nodes",
+                "android_click_node",
+                "android_long_click_node",
+                "android_tap_node",
+                "android_scroll_to_node",
                 // Screen introspection
                 "android_get_screen_state",
                 // System actions
@@ -172,9 +172,9 @@ class McpProtocolIntegrationTest {
                 // Utility
                 "android_get_clipboard",
                 "android_set_clipboard",
-                "android_wait_for_element",
+                "android_wait_for_node",
                 "android_wait_for_idle",
-                "android_get_element_details",
+                "android_get_node_details",
                 // File tools
                 "android_list_storage_locations",
                 "android_list_files",

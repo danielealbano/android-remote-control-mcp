@@ -38,8 +38,8 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
-@DisplayName("ElementActionTools")
-class ElementActionToolsTest {
+@DisplayName("NodeActionTools")
+class NodeActionToolsTest {
     private val mockTreeParser = mockk<AccessibilityTreeParser>()
     private val mockElementFinder = mockk<ElementFinder>()
     private val mockActionExecutor = mockk<ActionExecutor>()
@@ -133,13 +133,13 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("FindElementsTool")
-    inner class FindElementsToolTests {
+    @DisplayName("FindNodesTool")
+    inner class FindNodesToolTests {
         private val tool =
-            FindElementsTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
+            FindNodesTool(mockTreeParser, mockElementFinder, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
-        fun `returns matching elements`() =
+        fun `returns matching nodes`() =
             runTest {
                 // Arrange
                 every {
@@ -157,9 +157,9 @@ class ElementActionToolsTest {
                 val parsed = Json.parseToJsonElement(text).jsonObject
 
                 // Assert
-                val elements = parsed["elements"]!!.jsonArray
+                val elements = parsed["nodes"]!!.jsonArray
                 assertEquals(1, elements.size)
-                assertEquals("node_abc", elements[0].jsonObject["element_id"]?.jsonPrimitive?.content)
+                assertEquals("node_abc", elements[0].jsonObject["node_id"]?.jsonPrimitive?.content)
             }
 
         @Test
@@ -181,7 +181,7 @@ class ElementActionToolsTest {
                 val parsed = Json.parseToJsonElement(text).jsonObject
 
                 // Assert
-                val elements = parsed["elements"]!!.jsonArray
+                val elements = parsed["nodes"]!!.jsonArray
                 assertTrue(elements.isEmpty())
             }
 
@@ -221,16 +221,16 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("ClickElementTool")
-    inner class ClickElementToolTests {
+    @DisplayName("ClickNodeTool")
+    inner class ClickNodeToolTests {
         private val tool =
-            ClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
+            ClickNodeTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
-        fun `clicks element successfully`() =
+        fun `clicks node successfully`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns Result.success(Unit)
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
@@ -238,27 +238,27 @@ class ElementActionToolsTest {
             }
 
         @Test
-        fun `throws error when element not found`() =
+        fun `throws error when node not found`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_xyz", sampleWindows) } returns
                     Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
-                val params = buildJsonObject { put("element_id", "node_xyz") }
+                val params = buildJsonObject { put("node_id", "node_xyz") }
 
-                assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
+                assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
             }
 
         @Test
-        fun `throws error when element not clickable`() =
+        fun `throws error when node not clickable`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns
                     Result.failure(IllegalStateException("Node 'node_abc' is not clickable"))
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
             }
 
         @Test
-        fun `throws error for missing element_id`() =
+        fun `throws error for missing node_id`() =
             runTest {
                 val params = buildJsonObject {}
 
@@ -267,16 +267,16 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("LongClickElementTool")
-    inner class LongClickElementToolTests {
+    @DisplayName("LongClickNodeTool")
+    inner class LongClickNodeToolTests {
         private val tool =
-            LongClickElementTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
+            LongClickNodeTool(mockTreeParser, mockActionExecutor, mockAccessibilityServiceProvider, mockNodeCache)
 
         @Test
-        fun `long-clicks element successfully`() =
+        fun `long-clicks node successfully`() =
             runTest {
                 coEvery { mockActionExecutor.longClickNode("node_abc", sampleWindows) } returns Result.success(Unit)
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
@@ -285,10 +285,10 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("TapElementTool")
-    inner class TapElementToolTests {
+    @DisplayName("TapNodeTool")
+    inner class TapNodeToolTests {
         private val tool =
-            TapElementTool(
+            TapNodeTool(
                 mockTreeParser,
                 mockElementFinder,
                 mockActionExecutor,
@@ -297,7 +297,7 @@ class ElementActionToolsTest {
             )
 
         @Test
-        fun `taps element successfully with default inset`() =
+        fun `taps node successfully with default inset`() =
             runTest {
                 // Arrange
                 val node = sampleTree.children[0] // bounds = BoundsData(50, 800, 250, 1000)
@@ -305,7 +305,7 @@ class ElementActionToolsTest {
                     mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
                 } returns node
                 coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 // Act
                 val result = tool.execute(params)
@@ -317,7 +317,7 @@ class ElementActionToolsTest {
             }
 
         @Test
-        fun `taps small element at top-left corner`() =
+        fun `taps small node at top-left corner`() =
             runTest {
                 // Arrange — small element: width=3, height=3 (both < 5)
                 val smallNode =
@@ -331,7 +331,7 @@ class ElementActionToolsTest {
                     mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_small"))
                 } returns smallNode
                 coEvery { mockActionExecutor.tap(100f, 200f) } returns Result.success(Unit)
-                val params = buildJsonObject { put("element_id", "node_small") }
+                val params = buildJsonObject { put("node_id", "node_small") }
 
                 // Act
                 val result = tool.execute(params)
@@ -355,7 +355,7 @@ class ElementActionToolsTest {
                 coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_abc")
+                        put("node_id", "node_abc")
                         put("inset_percentage", 20.0)
                     }
 
@@ -369,32 +369,32 @@ class ElementActionToolsTest {
             }
 
         @Test
-        fun `throws error for missing element_id`() =
+        fun `throws error for missing node_id`() =
             runTest {
                 val params = buildJsonObject {}
 
                 val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("Missing required parameter 'element_id'"))
+                assertTrue(exception.message!!.contains("Missing required parameter 'node_id'"))
             }
 
         @Test
-        fun `throws error for empty element_id`() =
+        fun `throws error for empty node_id`() =
             runTest {
-                val params = buildJsonObject { put("element_id", "") }
+                val params = buildJsonObject { put("node_id", "") }
 
                 val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("non-empty"))
             }
 
         @Test
-        fun `throws error when element not found`() =
+        fun `throws error when node not found`() =
             runTest {
                 every {
                     mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_xyz"))
                 } returns null
-                val params = buildJsonObject { put("element_id", "node_xyz") }
+                val params = buildJsonObject { put("node_id", "node_xyz") }
 
-                val exception = assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("node_xyz"))
             }
 
@@ -403,7 +403,7 @@ class ElementActionToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_abc")
+                        put("node_id", "node_abc")
                         put("inset_percentage", -1.0)
                     }
 
@@ -416,7 +416,7 @@ class ElementActionToolsTest {
             runTest {
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_abc")
+                        put("node_id", "node_abc")
                         put("inset_percentage", 50.0)
                     }
 
@@ -434,7 +434,7 @@ class ElementActionToolsTest {
                 } returns node
                 coEvery { mockActionExecutor.tap(any(), any()) } returns
                     Result.failure(RuntimeException("Gesture dispatch failed"))
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 // Act & Assert
                 assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
@@ -452,7 +452,7 @@ class ElementActionToolsTest {
         fun `throws error for null arguments`() =
             runTest {
                 val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(null) }
-                assertTrue(exception.message!!.contains("Missing required parameter 'element_id'"))
+                assertTrue(exception.message!!.contains("Missing required parameter 'node_id'"))
             }
 
         @Test
@@ -466,7 +466,7 @@ class ElementActionToolsTest {
                 coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_abc")
+                        put("node_id", "node_abc")
                         put("inset_percentage", 0.0)
                     }
 
@@ -488,7 +488,7 @@ class ElementActionToolsTest {
                 coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_abc")
+                        put("node_id", "node_abc")
                         put("inset_percentage", 45.0)
                     }
 
@@ -500,7 +500,7 @@ class ElementActionToolsTest {
             }
 
         @Test
-        fun `high inset on small-but-not-tiny element collapses bounds gracefully`() =
+        fun `high inset on small-but-not-tiny node collapses bounds gracefully`() =
             runTest {
                 // Arrange — element width=10, height=10 (above threshold of 5)
                 // inset_percentage=45.0 → insetFraction=0.45, inset=4.5px each side
@@ -520,7 +520,7 @@ class ElementActionToolsTest {
                 coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
                 val params =
                     buildJsonObject {
-                        put("element_id", "node_smallish")
+                        put("node_id", "node_smallish")
                         put("inset_percentage", 45.0)
                     }
 
@@ -534,10 +534,10 @@ class ElementActionToolsTest {
     }
 
     @Nested
-    @DisplayName("ScrollToElementTool")
-    inner class ScrollToElementToolTests {
+    @DisplayName("ScrollToNodeTool")
+    inner class ScrollToNodeToolTests {
         private val tool =
-            ScrollToElementTool(
+            ScrollToNodeTool(
                 mockTreeParser,
                 mockElementFinder,
                 mockActionExecutor,
@@ -546,11 +546,11 @@ class ElementActionToolsTest {
             )
 
         @Test
-        fun `returns immediately when element already visible`() =
+        fun `returns immediately when node already visible`() =
             runTest {
                 val visibleNode = sampleTree.children[0] // visible = true
                 every { mockElementFinder.findNodeById(sampleWindows, "node_abc") } returns visibleNode
-                val params = buildJsonObject { put("element_id", "node_abc") }
+                val params = buildJsonObject { put("node_id", "node_abc") }
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
@@ -558,17 +558,17 @@ class ElementActionToolsTest {
             }
 
         @Test
-        fun `throws error when element not found`() =
+        fun `throws error when node not found`() =
             runTest {
                 every { mockElementFinder.findNodeById(sampleWindows, "node_xyz") } returns null
-                val params = buildJsonObject { put("element_id", "node_xyz") }
+                val params = buildJsonObject { put("node_id", "node_xyz") }
 
-                assertThrows<McpToolException.ElementNotFound> { tool.execute(params) }
+                assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
             }
 
         @Suppress("LongMethod")
         @Test
-        fun `scrolls to element in non-primary window`() =
+        fun `scrolls to node in non-primary window`() =
             runTest {
                 val invisibleNode =
                     AccessibilityNodeData(
@@ -635,7 +635,7 @@ class ElementActionToolsTest {
                     mockActionExecutor.scrollNode(any(), any(), any())
                 } returns Result.success(Unit)
 
-                val params = buildJsonObject { put("element_id", "node_dialog_btn") }
+                val params = buildJsonObject { put("node_id", "node_dialog_btn") }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 assertTrue(

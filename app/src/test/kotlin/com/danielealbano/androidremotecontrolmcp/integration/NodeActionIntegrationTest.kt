@@ -28,8 +28,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@DisplayName("Element Action Integration Tests")
-class ElementActionIntegrationTest {
+@DisplayName("Node Action Integration Tests")
+class NodeActionIntegrationTest {
     private val sampleTree =
         AccessibilityNodeData(
             id = "node_root",
@@ -69,7 +69,7 @@ class ElementActionIntegrationTest {
         )
 
     @Test
-    fun `find_elements returns matching elements from mocked tree`() =
+    fun `find_nodes returns matching nodes from mocked tree`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -91,7 +91,7 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_find_elements",
+                        name = "android_find_nodes",
                         arguments = mapOf("by" to "text", "value" to "OK"),
                     )
                 assertNotEquals(true, result.isError)
@@ -99,17 +99,17 @@ class ElementActionIntegrationTest {
 
                 val textContent = (result.content[0] as TextContent).text
                 val parsed = Json.parseToJsonElement(textContent).jsonObject
-                val elements = parsed["elements"]!!.jsonArray
+                val elements = parsed["nodes"]!!.jsonArray
                 assertEquals(1, elements.size)
                 assertEquals(
                     "node_btn",
-                    elements[0].jsonObject["element_id"]?.jsonPrimitive?.content,
+                    elements[0].jsonObject["node_id"]?.jsonPrimitive?.content,
                 )
             }
         }
 
     @Test
-    fun `click_element with valid node_id calls actionExecutor and returns success`() =
+    fun `click_node with valid node_id calls actionExecutor and returns success`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -120,8 +120,8 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_element",
-                        arguments = mapOf("element_id" to "node_btn"),
+                        name = "android_click_node",
+                        arguments = mapOf("node_id" to "node_btn"),
                     )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
@@ -129,7 +129,7 @@ class ElementActionIntegrationTest {
         }
 
     @Test
-    fun `click_element with non-existent node_id returns element not found error`() =
+    fun `click_node with non-existent node_id returns node not found error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -140,8 +140,8 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_element",
-                        arguments = mapOf("element_id" to "node_xyz"),
+                        name = "android_click_node",
+                        arguments = mapOf("node_id" to "node_xyz"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -150,7 +150,7 @@ class ElementActionIntegrationTest {
         }
 
     @Test
-    fun `tap_element with valid element_id taps within bounds and returns success`() =
+    fun `tap_node with valid node_id taps within bounds and returns success`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -162,8 +162,8 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_tap_element",
-                        arguments = mapOf("element_id" to "node_btn"),
+                        name = "android_tap_node",
+                        arguments = mapOf("node_id" to "node_btn"),
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -173,7 +173,7 @@ class ElementActionIntegrationTest {
         }
 
     @Test
-    fun `tap_element with non-existent element_id returns element not found error`() =
+    fun `tap_node with non-existent node_id returns node not found error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -184,8 +184,8 @@ class ElementActionIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_tap_element",
-                        arguments = mapOf("element_id" to "node_xyz"),
+                        name = "android_tap_node",
+                        arguments = mapOf("node_id" to "node_xyz"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -260,7 +260,7 @@ class ElementActionIntegrationTest {
         }
 
         @Test
-        fun `find_elements finds element in system dialog window`() =
+        fun `find_nodes finds node in system dialog window`() =
             runTest {
                 val deps = McpIntegrationTestHelper.createMockDependencies()
                 deps.setupTwoWindowMock()
@@ -282,23 +282,23 @@ class ElementActionIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "android_find_elements",
+                            name = "android_find_nodes",
                             arguments = mapOf("by" to "text", "value" to "Allow"),
                         )
                     assertNotEquals(true, result.isError)
                     val textContent = (result.content[0] as TextContent).text
                     val parsed = Json.parseToJsonElement(textContent).jsonObject
-                    val elements = parsed["elements"]!!.jsonArray
+                    val elements = parsed["nodes"]!!.jsonArray
                     assertEquals(1, elements.size)
                     assertEquals(
                         "node_allow_w99",
-                        elements[0].jsonObject["element_id"]?.jsonPrimitive?.content,
+                        elements[0].jsonObject["node_id"]?.jsonPrimitive?.content,
                     )
                 }
             }
 
         @Test
-        fun `click_element clicks element in non-primary window`() =
+        fun `click_node clicks node in non-primary window`() =
             runTest {
                 val deps = McpIntegrationTestHelper.createMockDependencies()
                 deps.setupTwoWindowMock()
@@ -309,8 +309,8 @@ class ElementActionIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "android_click_element",
-                            arguments = mapOf("element_id" to "node_allow_w99"),
+                            name = "android_click_node",
+                            arguments = mapOf("node_id" to "node_allow_w99"),
                         )
                     assertNotEquals(true, result.isError)
                     assertTrue(result.content.isNotEmpty())

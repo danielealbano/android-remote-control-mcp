@@ -76,7 +76,7 @@ class ErrorHandlingIntegrationTest {
         }
 
     @Test
-    fun `element not found returns error result`() =
+    fun `node not found returns error result`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
@@ -90,8 +90,8 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_element",
-                        arguments = mapOf("element_id" to "nonexistent"),
+                        name = "android_click_node",
+                        arguments = mapOf("node_id" to "nonexistent"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -114,8 +114,8 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_element",
-                        arguments = mapOf("element_id" to "node_root"),
+                        name = "android_click_node",
+                        arguments = mapOf("node_id" to "node_root"),
                     )
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
@@ -160,7 +160,7 @@ class ErrorHandlingIntegrationTest {
         }
 
     @Test
-    fun `wait_for_element timeout returns informational non-error result`() =
+    fun `wait_for_node timeout returns informational non-error result`() =
         runTest {
             mockkStatic(SystemClock::class)
             try {
@@ -184,7 +184,7 @@ class ErrorHandlingIntegrationTest {
                 McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                     val result =
                         client.callTool(
-                            name = "android_wait_for_element",
+                            name = "android_wait_for_node",
                             arguments =
                                 mapOf(
                                     "by" to "text",
