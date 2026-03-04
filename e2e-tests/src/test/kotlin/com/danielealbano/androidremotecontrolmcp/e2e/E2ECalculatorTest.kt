@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -46,13 +47,13 @@ class E2ECalculatorTest {
         /**
          * Maximum time to wait for element search before giving up.
          */
-        private const val ELEMENT_WAIT_TIMEOUT_MS = 10_000L
+        private const val ELEMENT_WAIT_TIMEOUT_MS = 20_000L
 
         /**
          * Maximum time to wait for the calculator app to become visible
          * in the screen state after launching via monkey command.
          */
-        private const val APP_LAUNCH_TIMEOUT_MS = 15_000L
+        private const val APP_LAUNCH_TIMEOUT_MS = 30_000L
 
         /**
          * Simple Calculator package name (installed from test resources).
@@ -76,6 +77,11 @@ class E2ECalculatorTest {
          * Delay between retry attempts in milliseconds.
          */
         private const val RETRY_DELAY_MS = 3_000L
+    }
+
+    @BeforeEach
+    fun ensureAccessibility() {
+        SharedAndroidContainer.ensureAccessibilityService()
     }
 
     @Test

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -65,6 +66,11 @@ class E2ECameraTest {
      * and reused by subsequent tests.
      */
     private var backCameraId: String? = null
+
+    @BeforeEach
+    fun ensureAccessibility() {
+        SharedAndroidContainer.ensureAccessibilityService()
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // list_cameras

@@ -364,6 +364,42 @@ object AndroidContainerSetup {
     }
 
     /**
+     * Checks whether the accessibility service is currently connected.
+     *
+     * Runs `dumpsys accessibility` inside the container and checks for
+     * `McpAccessibilityService` in the output.
+     *
+     * @param container the running Docker container
+     * @return true if the accessibility service appears connected
+     */
+    fun isAccessibilityServiceConnected(container: GenericContainer<*>): Boolean =
+        try {
+            val dumpsys = container.execInContainer(
+                "sh", "-c",
+                "adb shell dumpsys accessibility | grep -i McpAccessibilityService"
+            )
+            dumpsys.stdout.contains("McpAccessibilityService") &&
+                dumpsys.stdout.contains("Service")
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Ensures the accessibility service is connected, re-enabling it if necessary.
+     *
+     * This is intended to be called before each test method to recover from
+     * transient accessibility service disconnections (e.g., after camera
+     * operations or app restarts on slow CI emulators).
+     *
+     * @param container the running Docker container
+     */
+    fun ensureAccessibilityService(container: GenericContainer<*>) {
+        if (isAccessibilityServiceConnected(container)) return
+        println("[E2E Setup] Accessibility service not connected, re-enabling...")
+        enableAccessibilityService(container)
+    }
+
+    /**
      * Configure the MCP server settings for E2E testing.
      *
      * Launches the app activity once to trigger initial DataStore creation,

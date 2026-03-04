@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.net.HttpURLConnection
@@ -47,6 +48,11 @@ class E2EErrorHandlingTest {
 
     private val mcpClient = SharedAndroidContainer.mcpClient
     private val baseUrl = SharedAndroidContainer.mcpServerUrl
+
+    @BeforeEach
+    fun ensureAccessibility() {
+        SharedAndroidContainer.ensureAccessibilityService()
+    }
 
     @Test
     fun `missing bearer token returns 401 Unauthorized`() {
