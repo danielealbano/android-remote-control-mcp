@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.intents.SendIntentRequest
@@ -300,7 +301,12 @@ fun registerIntentTools(
     server: Server,
     intentDispatcher: IntentDispatcher,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    SendIntentHandler(intentDispatcher).register(server, toolNamePrefix)
-    OpenUriHandler(intentDispatcher).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(SendIntentHandler.TOOL_NAME)) {
+        SendIntentHandler(intentDispatcher).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(OpenUriHandler.TOOL_NAME)) {
+        OpenUriHandler(intentDispatcher).register(server, toolNamePrefix)
+    }
 }

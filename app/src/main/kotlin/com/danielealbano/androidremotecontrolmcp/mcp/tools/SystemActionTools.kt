@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
@@ -623,11 +624,24 @@ fun registerSystemActionTools(
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    PressBackHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
-    GetDeviceLogsHandler().register(server, toolNamePrefix)
+    if (perms.isToolEnabled(PressBackHandler.TOOL_NAME)) {
+        PressBackHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(PressHomeHandler.TOOL_NAME)) {
+        PressHomeHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(PressRecentsHandler.TOOL_NAME)) {
+        PressRecentsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(OpenNotificationsHandler.TOOL_NAME)) {
+        OpenNotificationsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(OpenQuickSettingsHandler.TOOL_NAME)) {
+        OpenQuickSettingsHandler(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(GetDeviceLogsHandler.TOOL_NAME)) {
+        GetDeviceLogsHandler().register(server, toolNamePrefix)
+    }
 }

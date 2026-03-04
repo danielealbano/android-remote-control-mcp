@@ -11,6 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.McpApplication
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
@@ -200,7 +201,7 @@ class McpServerService : Service() {
                                 ),
                         ),
                 )
-            registerAllTools(sdkServer, toolNamePrefix)
+            registerAllTools(sdkServer, toolNamePrefix, config.toolPermissionsConfig)
 
             // Create and start the Ktor server
             mcpServer =
@@ -273,6 +274,7 @@ class McpServerService : Service() {
     private fun registerAllTools(
         server: Server,
         toolNamePrefix: String,
+        perms: ToolPermissionsConfig,
     ) {
         registerScreenIntrospectionTools(
             server,
@@ -284,10 +286,11 @@ class McpServerService : Service() {
             screenshotEncoder,
             nodeCache,
             toolNamePrefix,
+            perms,
         )
-        registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider, toolNamePrefix)
-        registerTouchActionTools(server, actionExecutor, toolNamePrefix)
-        registerGestureTools(server, actionExecutor, toolNamePrefix)
+        registerSystemActionTools(server, actionExecutor, accessibilityServiceProvider, toolNamePrefix, perms)
+        registerTouchActionTools(server, actionExecutor, toolNamePrefix, perms)
+        registerGestureTools(server, actionExecutor, toolNamePrefix, perms)
         registerElementActionTools(
             server,
             treeParser,
@@ -296,6 +299,7 @@ class McpServerService : Service() {
             accessibilityServiceProvider,
             nodeCache,
             toolNamePrefix,
+            perms,
         )
         registerTextInputTools(
             server,
@@ -305,13 +309,22 @@ class McpServerService : Service() {
             typeInputController,
             nodeCache,
             toolNamePrefix,
+            perms,
         )
-        registerUtilityTools(server, treeParser, elementFinder, accessibilityServiceProvider, nodeCache, toolNamePrefix)
-        registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix)
-        registerAppManagementTools(server, appManager, toolNamePrefix)
-        registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix)
-        registerIntentTools(server, intentDispatcher, toolNamePrefix)
-        registerNotificationTools(server, notificationProvider, toolNamePrefix)
+        registerUtilityTools(
+            server,
+            treeParser,
+            elementFinder,
+            accessibilityServiceProvider,
+            nodeCache,
+            toolNamePrefix,
+            perms,
+        )
+        registerFileTools(server, storageLocationProvider, fileOperationProvider, toolNamePrefix, perms)
+        registerAppManagementTools(server, appManager, toolNamePrefix, perms)
+        registerCameraTools(server, cameraProvider, fileOperationProvider, toolNamePrefix, perms)
+        registerIntentTools(server, intentDispatcher, toolNamePrefix, perms)
+        registerNotificationTools(server, notificationProvider, toolNamePrefix, perms)
     }
 
     override fun onDestroy() {

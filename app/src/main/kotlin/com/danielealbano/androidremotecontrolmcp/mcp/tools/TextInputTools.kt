@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -1005,16 +1006,27 @@ fun registerTextInputTools(
     typeInputController: TypeInputController,
     nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    TypeAppendTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
-        .register(server, toolNamePrefix)
-    TypeInsertTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
-        .register(server, toolNamePrefix)
-    TypeReplaceTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
-        .register(server, toolNamePrefix)
-    TypeClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
-        .register(server, toolNamePrefix)
-    PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(TypeAppendTextTool.TOOL_NAME)) {
+        TypeAppendTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(TypeInsertTextTool.TOOL_NAME)) {
+        TypeInsertTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(TypeReplaceTextTool.TOOL_NAME)) {
+        TypeReplaceTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(TypeClearTextTool.TOOL_NAME)) {
+        TypeClearTextTool(treeParser, actionExecutor, accessibilityServiceProvider, typeInputController, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(PressKeyTool.TOOL_NAME)) {
+        PressKeyTool(actionExecutor, accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

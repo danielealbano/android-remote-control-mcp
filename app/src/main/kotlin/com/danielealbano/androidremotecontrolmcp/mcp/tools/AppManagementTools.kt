@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.AppFilter
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -255,8 +256,9 @@ fun registerAppManagementTools(
     server: Server,
     appManager: AppManager,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    OpenAppHandler(appManager).register(server, toolNamePrefix)
-    ListAppsHandler(appManager).register(server, toolNamePrefix)
-    CloseAppHandler(appManager).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(OpenAppHandler.TOOL_NAME)) OpenAppHandler(appManager).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(ListAppsHandler.TOOL_NAME)) ListAppsHandler(appManager).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(CloseAppHandler.TOOL_NAME)) CloseAppHandler(appManager).register(server, toolNamePrefix)
 }

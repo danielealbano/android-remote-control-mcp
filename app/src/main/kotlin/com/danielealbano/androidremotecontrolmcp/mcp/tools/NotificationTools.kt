@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProviderImpl
@@ -436,11 +437,24 @@ fun registerNotificationTools(
     server: Server,
     notificationProvider: NotificationProvider,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    NotificationListHandler(notificationProvider).register(server, toolNamePrefix)
-    NotificationOpenHandler(notificationProvider).register(server, toolNamePrefix)
-    NotificationDismissHandler(notificationProvider).register(server, toolNamePrefix)
-    NotificationSnoozeHandler(notificationProvider).register(server, toolNamePrefix)
-    NotificationActionHandler(notificationProvider).register(server, toolNamePrefix)
-    NotificationReplyHandler(notificationProvider).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(NotificationListHandler.TOOL_NAME)) {
+        NotificationListHandler(notificationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(NotificationOpenHandler.TOOL_NAME)) {
+        NotificationOpenHandler(notificationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(NotificationDismissHandler.TOOL_NAME)) {
+        NotificationDismissHandler(notificationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(NotificationSnoozeHandler.TOOL_NAME)) {
+        NotificationSnoozeHandler(notificationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(NotificationActionHandler.TOOL_NAME)) {
+        NotificationActionHandler(notificationProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(NotificationReplyHandler.TOOL_NAME)) {
+        NotificationReplyHandler(notificationProvider).register(server, toolNamePrefix)
+    }
 }

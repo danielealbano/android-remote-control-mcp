@@ -3,6 +3,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollAmount
@@ -427,10 +428,11 @@ fun registerTouchActionTools(
     server: Server,
     actionExecutor: ActionExecutor,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    TapTool(actionExecutor).register(server, toolNamePrefix)
-    LongPressTool(actionExecutor).register(server, toolNamePrefix)
-    DoubleTapTool(actionExecutor).register(server, toolNamePrefix)
-    SwipeTool(actionExecutor).register(server, toolNamePrefix)
-    ScrollTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(TapTool.TOOL_NAME)) TapTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(LongPressTool.TOOL_NAME)) LongPressTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(DoubleTapTool.TOOL_NAME)) DoubleTapTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(SwipeTool.TOOL_NAME)) SwipeTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(ScrollTool.TOOL_NAME)) ScrollTool(actionExecutor).register(server, toolNamePrefix)
 }

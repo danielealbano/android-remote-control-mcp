@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 
@@ -54,6 +55,7 @@ class AdbConfigHandler(
         applyAllowUnverifiedHttpsCerts(intent)
         applyDownloadTimeout(intent)
         applyDeviceSlug(intent)
+        applyToolPermissions(intent)
 
         Log.i(TAG, "ADB configuration applied successfully")
     }
@@ -233,6 +235,21 @@ class AdbConfigHandler(
         )
     }
 
+    private suspend fun applyToolPermissions(intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_TOOL_PERMISSIONS) ?: return
+        val config = ToolPermissionsConfig.fromJson(value)
+        if (config == null) {
+            Log.w(TAG, "Ignoring invalid tool_permissions JSON")
+            return
+        }
+        settingsRepository.updateToolPermissionsConfig(config)
+        Log.i(
+            TAG,
+            "Tool permissions updated: ${config.disabledTools.size} tools disabled, " +
+                "${config.disabledParams.size} param overrides",
+        )
+    }
+
     private fun handleStartServer(context: Context) {
         Log.i(TAG, "Received ADB start server broadcast")
         val serviceIntent =
@@ -272,5 +289,6 @@ class AdbConfigHandler(
         internal const val EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS = "allow_unverified_https_certs"
         internal const val EXTRA_DOWNLOAD_TIMEOUT_SECONDS = "download_timeout_seconds"
         internal const val EXTRA_DEVICE_SLUG = "device_slug"
+        internal const val EXTRA_TOOL_PERMISSIONS = "tool_permissions"
     }
 }

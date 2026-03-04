@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.SystemClock
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -619,13 +620,24 @@ fun registerUtilityTools(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     nodeCache: AccessibilityNodeCache,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    GetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
-    SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
-    WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
-    WaitForIdleTool(accessibilityServiceProvider)
-        .register(server, toolNamePrefix)
-    GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
-        .register(server, toolNamePrefix)
+    if (perms.isToolEnabled(GetClipboardTool.TOOL_NAME)) {
+        GetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(SetClipboardTool.TOOL_NAME)) {
+        SetClipboardTool(accessibilityServiceProvider).register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(WaitForElementTool.TOOL_NAME)) {
+        WaitForElementTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(WaitForIdleTool.TOOL_NAME)) {
+        WaitForIdleTool(accessibilityServiceProvider)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(GetElementDetailsTool.TOOL_NAME)) {
+        GetElementDetailsTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
 }

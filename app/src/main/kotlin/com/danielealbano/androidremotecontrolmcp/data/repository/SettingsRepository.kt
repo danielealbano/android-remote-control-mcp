@@ -4,6 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import kotlinx.coroutines.flow.Flow
 
@@ -152,6 +153,22 @@ interface SettingsRepository {
      * @return [Result.success] with the validated slug, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateDeviceSlug(slug: String): Result<String>
+
+    /** Updates the full tool permissions configuration. */
+    suspend fun updateToolPermissionsConfig(config: ToolPermissionsConfig)
+
+    /** Enables or disables a specific tool. */
+    suspend fun updateToolEnabled(
+        toolName: String,
+        enabled: Boolean,
+    )
+
+    /** Enables or disables a specific parameter for a tool. */
+    suspend fun updateParamEnabled(
+        toolName: String,
+        paramName: String,
+        enabled: Boolean,
+    )
 
     /**
      * Data class representing a stored storage location record.

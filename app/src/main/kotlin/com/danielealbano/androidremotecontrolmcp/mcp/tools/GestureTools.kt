@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.GesturePoint
@@ -399,7 +400,10 @@ fun registerGestureTools(
     server: Server,
     actionExecutor: ActionExecutor,
     toolNamePrefix: String,
+    perms: ToolPermissionsConfig,
 ) {
-    PinchTool(actionExecutor).register(server, toolNamePrefix)
-    CustomGestureTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(PinchTool.TOOL_NAME)) PinchTool(actionExecutor).register(server, toolNamePrefix)
+    if (perms.isToolEnabled(CustomGestureTool.TOOL_NAME)) {
+        CustomGestureTool(actionExecutor).register(server, toolNamePrefix)
+    }
 }
