@@ -32,7 +32,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 53 tools via the JSON-RPC 2.0 protocol, organized into 12 categories:
+The MCP server exposes 54 tools via the JSON-RPC 2.0 protocol, organized into 12 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -40,7 +40,7 @@ The MCP server exposes 53 tools via the JSON-RPC 2.0 protocol, organized into 12
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | 7 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_scroll_to_element` | 9 |
+| Element Actions | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_tap_element`, `android_scroll_to_element` | 9, 35 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
@@ -1199,6 +1199,43 @@ curl -X POST http://localhost:8080/mcp \
 - **Permission denied**: Accessibility service not enabled
 - **Element not found**: Element not found
 - **Action failed**: Element is not long-clickable or action failed
+
+---
+
+### `android_tap_element`
+
+Performs a gesture-based tap at a random point within the bounds of the element identified by element_id. Unlike `click_element` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the element bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "element_id": { "type": "string", "description": "Node ID from find_elements" },
+    "inset_percentage": { "type": "number", "default": 5.0, "description": "Percentage to inset from each edge of the element bounds (0.0-45.0). Default 5.0" }
+  },
+  "required": ["element_id"]
+}
+```
+
+**Output**: `"Tap executed at (<x>, <y>) within element '<element_id>'"`
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "android_tap_element", "arguments": { "element_id": "node_abc123" } }
+  }'
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or empty `element_id`, `inset_percentage` out of range (0.0-45.0)
+- **Permission denied**: Accessibility service not enabled
+- **Element not found**: Element not found in accessibility tree
+- **Action failed**: Tap gesture failed
 
 ---
 
