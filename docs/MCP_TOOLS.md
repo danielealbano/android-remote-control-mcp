@@ -261,7 +261,7 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
    - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
    - **Hierarchy header**: `hierarchy:`
-   - **Hierarchy rows**: One line per kept node (element ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
+   - **Hierarchy rows**: One line per kept node (node ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
 
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 
