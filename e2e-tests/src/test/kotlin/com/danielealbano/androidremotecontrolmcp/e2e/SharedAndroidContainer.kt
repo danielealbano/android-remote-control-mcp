@@ -146,6 +146,17 @@ object SharedAndroidContainer {
             return _mcpClient!!
         }
 
+    /**
+     * Ensures the accessibility service is connected, re-enabling it if necessary.
+     *
+     * Intended to be called from `@BeforeEach` in E2E test classes to recover
+     * from transient accessibility service disconnections.
+     */
+    fun ensureAccessibilityService() {
+        ensureInitialized()
+        AndroidContainerSetup.ensureAccessibilityService(_container!!)
+    }
+
     init {
         // Register JVM shutdown hook to stop the container when all tests complete.
         Runtime.getRuntime().addShutdownHook(Thread {

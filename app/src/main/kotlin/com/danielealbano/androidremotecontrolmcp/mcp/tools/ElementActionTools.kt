@@ -32,6 +32,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
+import kotlin.random.Random
 
 /**
  * MCP tool: find_elements
@@ -256,6 +257,129 @@ class LongClickElementTool
         companion object {
             private const val TAG = "MCP:LongClickElementTool"
             const val TOOL_NAME = "long_click_element"
+        }
+    }
+
+/**
+ * MCP tool: tap_element
+ *
+ * Performs a gesture-based tap at a random point within the bounds of the
+ * element identified by element_id. Unlike click_element (which uses the
+ * accessibility ACTION_CLICK), this performs a coordinate-based touch gesture.
+ */
+class TapElementTool
+    @Inject
+    constructor(
+        private val treeParser: AccessibilityTreeParser,
+        private val elementFinder: ElementFinder,
+        private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
+    ) {
+        @Suppress("ThrowsCount")
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val elementId =
+                arguments?.get("element_id")?.jsonPrimitive?.contentOrNull
+                    ?: throw McpToolException.InvalidParams("Missing required parameter 'element_id'")
+
+            if (elementId.isEmpty()) {
+                throw McpToolException.InvalidParams("Parameter 'element_id' must be non-empty")
+            }
+
+            val insetPercentage =
+                McpToolUtils.optionalFloat(arguments, "inset_percentage", DEFAULT_INSET_PERCENTAGE)
+
+            if (insetPercentage < MIN_INSET_PERCENTAGE || insetPercentage > MAX_INSET_PERCENTAGE) {
+                throw McpToolException.InvalidParams(
+                    "Parameter 'inset_percentage' must be between $MIN_INSET_PERCENTAGE and $MAX_INSET_PERCENTAGE",
+                )
+            }
+
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+
+            val node =
+                elementFinder.findNodeById(multiWindowResult.windows, elementId)
+                    ?: throw McpToolException.ElementNotFound("Element '$elementId' not found")
+
+            val bounds = node.bounds
+            val width = bounds.right - bounds.left
+            val height = bounds.bottom - bounds.top
+
+            val (tapX, tapY) =
+                if (width < SMALL_ELEMENT_THRESHOLD && height < SMALL_ELEMENT_THRESHOLD) {
+                    Pair(bounds.left.toFloat(), bounds.top.toFloat())
+                } else {
+                    val insetFraction = insetPercentage / PERCENTAGE_DIVISOR
+                    val insetLeft = bounds.left + width * insetFraction
+                    val insetRight = bounds.right - width * insetFraction
+                    val insetTop = bounds.top + height * insetFraction
+                    val insetBottom = bounds.bottom - height * insetFraction
+                    Pair(
+                        randomFloatInRange(insetLeft, insetRight),
+                        randomFloatInRange(insetTop, insetBottom),
+                    )
+                }
+
+            Log.d(TAG, "tap_element: elementId=$elementId, tapAt=($tapX, $tapY)")
+
+            val result = actionExecutor.tap(tapX, tapY)
+            return McpToolUtils.handleActionResult(
+                result,
+                "Tap executed at (${tapX.toInt()}, ${tapY.toInt()}) within element '$elementId'",
+            )
+        }
+
+        internal fun randomFloatInRange(
+            min: Float,
+            max: Float,
+        ): Float {
+            if (min >= max) return min
+            return min + Random.nextFloat() * (max - min)
+        }
+
+        fun register(
+            server: Server,
+            toolNamePrefix: String,
+        ) {
+            server.addTool(
+                name = "$toolNamePrefix$TOOL_NAME",
+                description =
+                    "Performs a gesture-based tap at a random point within the bounds of the " +
+                        "element identified by element_id. Unlike click_element (which uses the " +
+                        "accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. " +
+                        "The tap point is randomized within the element bounds, inset by a configurable " +
+                        "percentage (default 5%) from each edge to avoid hitting borders.",
+                inputSchema =
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putJsonObject("element_id") {
+                                    put("type", "string")
+                                    put("description", "Node ID from ${toolNamePrefix}find_elements")
+                                }
+                                putJsonObject("inset_percentage") {
+                                    put("type", "number")
+                                    put("default", DEFAULT_INSET_PERCENTAGE.toDouble())
+                                    put(
+                                        "description",
+                                        "Percentage to inset from each edge of the element bounds " +
+                                            "(0.0-45.0). Default 5.0",
+                                    )
+                                }
+                            },
+                        required = listOf("element_id"),
+                    ),
+            ) { request -> execute(request.arguments) }
+        }
+
+        companion object {
+            private const val TAG = "MCP:TapElementTool"
+            const val TOOL_NAME = "tap_element"
+            private const val DEFAULT_INSET_PERCENTAGE = 5.0f
+            private const val MIN_INSET_PERCENTAGE = 0.0f
+            private const val MAX_INSET_PERCENTAGE = 45.0f
+            private const val SMALL_ELEMENT_THRESHOLD = 5
+            private const val PERCENTAGE_DIVISOR = 100.0f
         }
     }
 
@@ -654,6 +778,10 @@ fun registerElementActionTools(
     }
     if (perms.isToolEnabled(LongClickElementTool.TOOL_NAME)) {
         LongClickElementTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+            .register(server, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(TapElementTool.TOOL_NAME)) {
+        TapElementTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
             .register(server, toolNamePrefix)
     }
     if (perms.isToolEnabled(ScrollToElementTool.TOOL_NAME)) {

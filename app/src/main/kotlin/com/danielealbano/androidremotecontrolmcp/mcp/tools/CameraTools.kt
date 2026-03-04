@@ -16,6 +16,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import java.util.concurrent.CancellationException
 import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,13 +249,22 @@ class TakeCameraPhotoHandler
             )
 
             val result =
-                cameraProvider.takePhoto(
-                    cameraId = cameraId,
-                    width = resolution?.first,
-                    height = resolution?.second,
-                    quality = quality,
-                    flashMode = flashMode,
-                )
+                try {
+                    cameraProvider.takePhoto(
+                        cameraId = cameraId,
+                        width = resolution?.first,
+                        height = resolution?.second,
+                        quality = quality,
+                        flashMode = flashMode,
+                    )
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (e: CancellationException) {
+                    throw McpToolException.Timeout(
+                        "Camera photo capture timed out: ${e.message}",
+                        e,
+                    )
+                }
 
             return McpToolUtils.imageResult(result.data, "image/jpeg")
         }
@@ -351,14 +361,23 @@ class SaveCameraPhotoHandler
 
             val outputUri = fileOperationProvider.createFileUri(locationId, path, "image/jpeg")
             val fileSizeBytes =
-                cameraProvider.savePhoto(
-                    cameraId = cameraId,
-                    outputUri = outputUri,
-                    width = resolution?.first,
-                    height = resolution?.second,
-                    quality = quality,
-                    flashMode = flashMode,
-                )
+                try {
+                    cameraProvider.savePhoto(
+                        cameraId = cameraId,
+                        outputUri = outputUri,
+                        width = resolution?.first,
+                        height = resolution?.second,
+                        quality = quality,
+                        flashMode = flashMode,
+                    )
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (e: CancellationException) {
+                    throw McpToolException.Timeout(
+                        "Camera photo save timed out: ${e.message}",
+                        e,
+                    )
+                }
 
             return McpToolUtils.textResult("Photo saved successfully: $path ($fileSizeBytes bytes)")
         }
@@ -470,15 +489,24 @@ class SaveCameraVideoHandler
 
             val outputUri = fileOperationProvider.createFileUri(locationId, path, "video/mp4")
             val result =
-                cameraProvider.saveVideo(
-                    cameraId = cameraId,
-                    outputUri = outputUri,
-                    durationSeconds = duration,
-                    width = resolution?.first,
-                    height = resolution?.second,
-                    audio = audio,
-                    flashMode = flashMode,
-                )
+                try {
+                    cameraProvider.saveVideo(
+                        cameraId = cameraId,
+                        outputUri = outputUri,
+                        durationSeconds = duration,
+                        width = resolution?.first,
+                        height = resolution?.second,
+                        audio = audio,
+                        flashMode = flashMode,
+                    )
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (e: CancellationException) {
+                    throw McpToolException.Timeout(
+                        "Camera video recording timed out: ${e.message}",
+                        e,
+                    )
+                }
 
             val text =
                 "Video saved successfully: $path " +
