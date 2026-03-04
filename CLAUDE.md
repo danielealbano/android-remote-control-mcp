@@ -509,7 +509,7 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 
 ### E2E testing (Docker Android + Testcontainers)
 - Use **Testcontainers Kotlin** for container orchestration.
-- Use **budtmo/docker-android-x86** Docker image (Android emulator in container).
+- Use **redroid/redroid:13.0.0-latest** Docker image (native Android in container via kernel modules).
 - Use **JUnit 5** for test framework.
 - Use **MCP Kotlin SDK client** with `StreamableHttpClientTransport` for MCP requests.
 - Organize tests in `e2e-tests/src/test/kotlin/` directory (separate Gradle module).
@@ -558,7 +558,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 - **Java JDK**: Version 17 (standard for Android development).
 - **Gradle**: Version 8.x (wrapper included in project, use `./gradlew`).
 - **adb**: Android Debug Bridge (part of Android SDK platform-tools).
-- **Docker**: Required for E2E tests (budtmo/docker-android-x86 image).
+- **Docker**: Required for E2E tests (redroid/redroid image). Requires `binder_linux` and `fuse` kernel modules.
 - **Emulator or Device**: For E2E tests and manual testing.
 
 ### Environment setup

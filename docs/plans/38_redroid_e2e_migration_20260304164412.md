@@ -843,9 +843,9 @@ AndroidContainerSetup.launchCalculator()
 **Why**: Multiple project documentation files reference `budtmo/docker-android`. After migration, these become stale and misleading. The `plan-reviewer.md` agent config specifically mandates `budtmo/docker-android-x86` — it will incorrectly flag future plans.
 
 **Acceptance criteria**:
-- [ ] All `budtmo/docker-android` references updated to `redroid/redroid:13.0.0-latest`
-- [ ] Documentation accurately describes kernel module requirements
-- [ ] Agent config (`plan-reviewer.md`) updated to reference redroid
+- [x] All `budtmo/docker-android` references updated to `redroid/redroid:13.0.0-latest`
+- [x] Documentation accurately describes kernel module requirements
+- [x] Agent config (`plan-reviewer.md`) updated to reference redroid
 
 ### Task 5.1: Update docs/PROJECT.md
 
@@ -906,10 +906,10 @@ AndroidContainerSetup.launchCalculator()
 ```
 
 **Definition of Done**:
-- [ ] `docs/PROJECT.md` references redroid
-- [ ] `CLAUDE.md` references redroid with kernel module note
-- [ ] `README.md` references redroid
-- [ ] `.claude/agents/plan-reviewer.md` references redroid
+- [x] `docs/PROJECT.md` references redroid
+- [x] `CLAUDE.md` references redroid with kernel module note
+- [x] `README.md` references redroid
+- [x] `.claude/agents/plan-reviewer.md` references redroid
 
 ---
 

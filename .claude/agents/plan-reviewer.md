@@ -80,7 +80,7 @@ Review the ENTIRE plan across five dimensions: **Structure & Ordering**, **QA Ad
 - Shared test infrastructure (e.g., `McpIntegrationTestHelper`, common mock setup utilities) introducing foundational patterns reused across test files MUST be present IN FULL. You MUST flag if missing as WARNING.
 - You MUST verify: unit tests use JUnit 5 + MockK.
 - You MUST verify: integration tests use Ktor `testApplication` with MockK for Android service interfaces.
-- You MUST verify: E2E tests use Testcontainers Kotlin with `budtmo/docker-android-x86` — NOT pre-running emulators or Docker Compose services.
+- You MUST verify: E2E tests use Testcontainers Kotlin with `redroid/redroid` — NOT pre-running emulators or Docker Compose services.
 
 ### Linting Suppression — CRITICAL
 

@@ -66,7 +66,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - **adb** (Android Debug Bridge) for device/emulator management
 
 ### For E2E Tests
-- **Docker** (for `budtmo/docker-android-x86` emulator image)
+- **Docker** (for `redroid/redroid` Android container image)
 
 Check all dependencies:
 ```bash
