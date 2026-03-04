@@ -16,6 +16,8 @@ import javax.inject.Inject
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
  * - Line 7: TSV header: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
  * - Lines 8+: one TSV row per kept node (flat, no depth)
+ * - Line N: `hierarchy:`
+ * - Lines N+1+: one line per kept node, indented by 2 spaces per nesting depth
  *
  * Nodes are filtered: a node is KEPT if ANY of:
  * - has non-null, non-empty text
@@ -68,34 +70,57 @@ class CompactTreeFormatter
             sb.appendLine(HEADER)
 
             // Lines 8+: walk tree and append kept nodes
-            walkNode(sb, tree)
+            val hierarchySb = StringBuilder()
+            walkTree(
+                tree,
+                visitors =
+                    listOf(
+                        { node, _ -> appendElementRow(sb, node) },
+                        { node, depth ->
+                            repeat(depth) { hierarchySb.append(HIERARCHY_INDENT) }
+                            hierarchySb.appendLine(node.id)
+                        },
+                    ),
+            )
+            sb.appendLine(HIERARCHY_HEADER)
+            sb.append(hierarchySb)
 
             return sb.toString().trimEnd('\n')
         }
 
-        private fun walkNode(
+        private fun walkTree(
+            node: AccessibilityNodeData,
+            depth: Int = 0,
+            visitors: List<(node: AccessibilityNodeData, depth: Int) -> Unit>,
+        ) {
+            val isKept = shouldKeepNode(node)
+            if (isKept) {
+                for (visitor in visitors) {
+                    visitor(node, depth)
+                }
+            }
+            val childDepth = if (isKept) depth + 1 else depth
+            for (child in node.children) {
+                walkTree(child, childDepth, visitors)
+            }
+        }
+
+        private fun appendElementRow(
             sb: StringBuilder,
             node: AccessibilityNodeData,
         ) {
-            if (shouldKeepNode(node)) {
-                val id = node.id
-                val className = simplifyClassName(node.className)
-                val text = sanitizeText(node.text)
-                val desc = sanitizeText(node.contentDescription)
-                val resId = sanitizeResourceId(node.resourceId)
-                val bounds =
-                    "${node.bounds.left},${node.bounds.top}," +
-                        "${node.bounds.right},${node.bounds.bottom}"
-                val flags = buildFlags(node)
-
-                sb.appendLine(
-                    "$id$SEP$className$SEP$text$SEP$desc$SEP$resId$SEP$bounds$SEP$flags",
-                )
-            }
-
-            for (child in node.children) {
-                walkNode(sb, child)
-            }
+            val id = node.id
+            val className = simplifyClassName(node.className)
+            val text = sanitizeText(node.text)
+            val desc = sanitizeText(node.contentDescription)
+            val resId = sanitizeResourceId(node.resourceId)
+            val bounds =
+                "${node.bounds.left},${node.bounds.top}," +
+                    "${node.bounds.right},${node.bounds.bottom}"
+            val flags = buildFlags(node)
+            sb.appendLine(
+                "$id$SEP$className$SEP$text$SEP$desc$SEP$resId$SEP$bounds$SEP$flags",
+            )
         }
 
         /**
@@ -131,7 +156,20 @@ class CompactTreeFormatter
             for (windowData in result.windows) {
                 sb.appendLine(buildWindowHeader(windowData))
                 sb.appendLine(HEADER)
-                walkNode(sb, windowData.tree)
+                val hierarchySb = StringBuilder()
+                walkTree(
+                    windowData.tree,
+                    visitors =
+                        listOf(
+                            { node, _ -> appendElementRow(sb, node) },
+                            { node, depth ->
+                                repeat(depth) { hierarchySb.append(HIERARCHY_INDENT) }
+                                hierarchySb.appendLine(node.id)
+                            },
+                        ),
+                )
+                sb.appendLine(HIERARCHY_HEADER)
+                sb.append(hierarchySb)
             }
 
             return sb.toString().trimEnd('\n')
@@ -282,6 +320,8 @@ class CompactTreeFormatter
             const val FLAG_SCROLLABLE = "scr"
             const val FLAG_EDITABLE = "edt"
             const val FLAG_ENABLED = "ena"
+            const val HIERARCHY_HEADER = "hierarchy:"
+            private const val HIERARCHY_INDENT = "  "
             private const val FLAG_SEPARATOR = ","
             const val HEADER =
                 "node_id${COLUMN_SEPARATOR}class${COLUMN_SEPARATOR}text${COLUMN_SEPARATOR}" +

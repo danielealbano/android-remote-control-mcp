@@ -217,7 +217,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena\nhierarchy:\nnode_a1b2\nnode_c3d4"
       }
     ]
   }
@@ -260,6 +260,8 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
    - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
+   - **Hierarchy header**: `hierarchy:`
+   - **Hierarchy rows**: One line per kept node (element ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
 
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 

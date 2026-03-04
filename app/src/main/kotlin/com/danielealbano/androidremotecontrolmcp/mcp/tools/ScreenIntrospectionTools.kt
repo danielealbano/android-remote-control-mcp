@@ -180,7 +180,8 @@ class GetScreenStateHandler
                         "and a compact UI node list (text/desc truncated to 100 chars, use " +
                         "${toolNamePrefix}get_node_details to retrieve full values). Optionally includes a " +
                         "low-resolution screenshot (only request the screenshot when the node " +
-                        "list alone is not sufficient to understand the screen layout).",
+                        "list alone is not sufficient to understand the screen layout). " +
+                        "Includes a hierarchy section showing node nesting via indentation.",
                 inputSchema =
                     ToolSchema(
                         properties =
