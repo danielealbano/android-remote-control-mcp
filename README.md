@@ -20,19 +20,19 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-start on boot
 - Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 53 MCP Tools across 12 Categories
+### 54 MCP Tools across 12 Categories
 
 All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full naming convention.
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Screen Introspection** (1) | `android_get_screen_state` | Consolidated screen state: app info, screen dimensions, filtered UI element list (TSV), optional annotated low-res screenshot with bounding boxes and element ID labels |
+| **Screen Introspection** (1) | `android_get_screen_state` | Consolidated screen state: app info, screen dimensions, filtered UI node list (TSV), hierarchy section, optional annotated low-res screenshot with bounding boxes and node ID labels |
 | **System Actions** (6) | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_get_device_logs` | Global device actions and log retrieval |
 | **Touch Actions** (5) | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | Coordinate-based touch interactions |
 | **Gestures** (2) | `android_pinch`, `android_custom_gesture` | Multi-touch and complex gestures |
-| **Element Actions** (4) | `android_find_elements`, `android_click_element`, `android_long_click_element`, `android_scroll_to_element` | Accessibility node-based interactions |
+| **Node Actions** (5) | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node` | Accessibility node-based interactions |
 | **Text Input** (5) | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | Natural text input via InputConnection and key events |
-| **Utilities** (5) | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_element`, `android_wait_for_idle`, `android_get_element_details` | Helper tools for automation and element inspection |
+| **Utilities** (5) | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | Helper tools for automation and node inspection |
 | **File Operations** (8) | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | File system access via Storage Access Framework (SAF) |
 | **App Management** (3) | `android_open_app`, `android_list_apps`, `android_close_app` | Launch, list, and close applications |
 | **Camera** (6) | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | Camera photo/video capture via CameraX, list capabilities and resolutions |
@@ -42,9 +42,10 @@ All tool names use the `android_` prefix by default (e.g., `android_tap`). When 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with input/output schemas and examples.
 
 ### Android App
-- Material Design 3 configuration UI with dark mode
-- Server status monitoring (running/stopped)
+- Material Design 3 UI with tabbed layout (Server / Settings / About) and dark mode
+- Server status monitoring (running/stopped) with permission warning banner
 - Connection info display (IP, port, token, tunnel URL)
+- Per-tool and per-parameter permissions (enable/disable individual MCP tools)
 - Permission management (Accessibility, Notifications, Camera, Microphone)
 - Remote access tunnel configuration (Cloudflare / ngrok)
 - Storage location management (SAF authorization for file tools)
@@ -130,7 +131,7 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
-# Get the current screen state (UI elements + optional screenshot)
+# Get the current screen state (UI nodes + optional screenshot)
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
@@ -187,7 +188,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, element finding, screenshot encoding, settings repository, network utilities, and all 53 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, node finding, screenshot encoding, settings repository, network utilities, and all 54 MCP tool handlers.
 
 ### Integration Tests
 
@@ -243,7 +244,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"53 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"54 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end
@@ -302,6 +303,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docum
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
 | Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
 | Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (Cloudflare Quick Tunnels or ngrok) |
+| Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
 | Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
@@ -354,7 +356,8 @@ adb shell am broadcast \
   --ez allow_http_downloads false \
   --ez allow_unverified_https_certs false \
   --ei download_timeout_seconds 60 \
-  --es device_slug "pixel8"
+  --es device_slug "pixel8" \
+  --es tool_permissions '{"disabled_tools":["tap"],"disabled_params":{"swipe":["duration_ms"]}}'
 ```
 
 | Extra | Type | Description |
@@ -375,6 +378,7 @@ adb shell am broadcast \
 | `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |
 | `download_timeout_seconds` | int | Download timeout (10-300) |
 | `device_slug` | string | Device identifier for tool name prefix |
+| `tool_permissions` | string (JSON) | Per-tool and per-parameter permissions: `{"disabled_tools":["tool_name"],"disabled_params":{"tool_name":["param"]}}` |
 
 #### Start the MCP Server
 
