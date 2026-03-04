@@ -87,16 +87,16 @@ Replace the "Pre-pull Docker Android image" step with two new steps:
 **Why**: Container config, boot detection, port forwarding, APK install, and all adb interactions must change — redroid has no nested emulator and no adb binary inside the container.
 
 **Acceptance criteria**:
-- [ ] Container uses `redroid/redroid:13.0.0-latest` image
-- [ ] Container starts with `--cap-add=ALL` (no `--privileged`)
-- [ ] Container has correct security-opt, device-cgroup-rule, and device mounts
-- [ ] Boot detection polls via host-side `adb connect` + `getprop sys.boot_completed`
-- [ ] Port forwarding bridge (socat) removed — MCP port directly exposed
-- [ ] APK installation via host-side `adb install` (no container file copy)
-- [ ] All setup methods work: install APKs, grant permissions, configure server, enable accessibility
-- [ ] Local dev: kernel module auto-loading via `sudo modprobe` with clear error on failure
-- [ ] Vestigial `container` parameter removed from methods that no longer use it
-- [ ] All `ProcessBuilder.waitFor()` calls use timeouts to prevent indefinite hangs
+- [x] Container uses `redroid/redroid:13.0.0-latest` image
+- [x] Container starts with `--cap-add=ALL` (no `--privileged`)
+- [x] Container has correct security-opt, device-cgroup-rule, and device mounts
+- [x] Boot detection polls via host-side `adb connect` + `getprop sys.boot_completed`
+- [x] Port forwarding bridge (socat) removed — MCP port directly exposed
+- [x] APK installation via host-side `adb install` (no container file copy)
+- [x] All setup methods work: install APKs, grant permissions, configure server, enable accessibility
+- [x] Local dev: kernel module auto-loading via `sudo modprobe` with clear error on failure
+- [x] Vestigial `container` parameter removed from methods that no longer use it
+- [x] All `ProcessBuilder.waitFor()` calls use timeouts to prevent indefinite hangs
 
 ### Task 2.1: Rewrite constants and createContainer()
 
@@ -657,15 +657,15 @@ fun disconnectAdb() {
 ```
 
 **Definition of Done (Task 2.1–2.9)**:
-- [ ] `createContainer()` uses `redroid/redroid:13.0.0-latest` with `--cap-add=ALL` and proper security-opts
-- [ ] Kernel module loading + binderfs mount works on local dev and CI
-- [ ] Boot detection uses host-side `adb connect` + `getprop` polling with timeouts
-- [ ] `setupPortForwarding()` and `execInContainer()` deleted
-- [ ] All adb commands execute from the host via `execAdb()` → `runProcess()` with timeouts
-- [ ] APK installation uses direct `adb install` (no container file copy)
-- [ ] `disconnectAdb()` cleans up adb connection on shutdown
-- [ ] Vestigial `container` parameter removed from methods that don't use it
-- [ ] `ensureAccessibilityService()` updated with new signature (no container param)
+- [x] `createContainer()` uses `redroid/redroid:13.0.0-latest` with `--cap-add=ALL` and proper security-opts
+- [x] Kernel module loading + binderfs mount works on local dev and CI
+- [x] Boot detection uses host-side `adb connect` + `getprop` polling with timeouts
+- [x] `setupPortForwarding()` and `execInContainer()` deleted
+- [x] All adb commands execute from the host via `execAdb()` → `runProcess()` with timeouts
+- [x] APK installation uses direct `adb install` (no container file copy)
+- [x] `disconnectAdb()` cleans up adb connection on shutdown
+- [x] Vestigial `container` parameter removed from methods that don't use it
+- [x] `ensureAccessibilityService()` updated with new signature (no container param)
 
 ---
 
