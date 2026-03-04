@@ -1112,9 +1112,9 @@ test-e2e: ## Run E2E tests (requires rootful podman socket)
 ```
 
 **Definition of Done**:
-- [ ] `test-e2e` sets `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED`
-- [ ] `test-e2e` comment updated to mention podman
-- [ ] `check-deps` checks for `podman` instead of `docker`
+- [x] `test-e2e` sets `DOCKER_HOST` and `TESTCONTAINERS_RYUK_DISABLED`
+- [x] `test-e2e` comment updated to mention podman
+- [x] `check-deps` checks for `podman` instead of `docker`
 
 ### Task R1.4: Update all Docker→Podman references in E2E context
 
