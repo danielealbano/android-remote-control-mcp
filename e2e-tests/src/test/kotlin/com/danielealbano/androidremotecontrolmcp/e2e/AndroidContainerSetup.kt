@@ -113,7 +113,7 @@ object AndroidContainerSetup {
                 cmd.hostConfig
                     ?.withMemory(MEMORY_BYTES)
                     ?.withMemorySwap(MEMORY_BYTES)
-                    ?.withCapAdd(Capability.values().toList())
+                    ?.withCapAdd(*Capability.values())
                     ?.withSecurityOpts(
                         listOf(
                             "seccomp=unconfined",
