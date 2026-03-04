@@ -8,10 +8,10 @@ import com.danielealbano.androidremotecontrolmcp.mcp.mcpStreamableHttp
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNotificationTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
