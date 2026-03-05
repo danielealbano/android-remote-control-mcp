@@ -1292,8 +1292,8 @@ Type text character by character at the end of a text field. Uses natural InputC
 |-----------|------|----------|---------|-------------|
 | `node_id` | string | Yes | - | Target node ID to type into |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
-| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
-| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+| `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 50 | Random variance in ms, clamped to [0, typing_speed] |
 
 **Output**: `"Typed N characters at end of node '<node_id>'.\nField content: <content>"`
 
@@ -1347,8 +1347,8 @@ Type text character by character at a specific position in a text field. Uses na
 | `node_id` | string | Yes | - | Target node ID to type into |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
 | `offset` | integer | Yes | - | 0-based character offset for cursor position. Must be within [0, current text length] |
-| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
-| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+| `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 50 | Random variance in ms, clamped to [0, typing_speed] |
 
 **Output**: `"Typed N characters at offset M in node '<node_id>'.\nField content: <content>"`
 
@@ -1403,8 +1403,8 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 | `node_id` | string | Yes | - | Target node ID |
 | `search` | string | Yes | - | Text to find in the field (first occurrence, max 10000 characters) |
 | `new_text` | string | Yes | - | Replacement text to type (max 2000 characters). Can be empty to just delete the found text |
-| `typing_speed` | integer | No | 70 | Base delay between characters in ms (min: 10, max: 5000) |
-| `typing_speed_variance` | integer | No | 15 | Random variance in ms, clamped to [0, typing_speed] |
+| `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
+| `typing_speed_variance` | integer | No | 50 | Random variance in ms, clamped to [0, typing_speed] |
 
 **Output**: `"Replaced N characters with M characters in node '<node_id>'.\nField content: <content>"`
 

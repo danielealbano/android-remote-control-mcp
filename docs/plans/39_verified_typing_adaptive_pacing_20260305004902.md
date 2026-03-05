@@ -21,17 +21,17 @@ The text typing tools (`type_append_text`, `type_insert_text`, `type_replace_tex
 **Why**: The core typing loop currently has no feedback mechanism — characters are dispatched via one-way IPC with no confirmation. This user story adds a verify-retry loop and AIMD-style delay adjustment to make typing reliable across all target apps.
 
 **Acceptance Criteria**:
-- [ ] After each `commitText()`, `getSurroundingText(charCount, 0, 0)` is called to verify
-- [ ] Verification checks that text before cursor matches the committed code point string
-- [ ] On miss: 50ms wait, then retry same character (up to 3 retries)
-- [ ] On exhausted retries: throw `ActionFailed` with position info
-- [ ] On `getSurroundingText()` returning null during verification: throw `ActionFailed` immediately (IC lost, no retry)
-- [ ] Each miss: `effectiveDelay += 50`
-- [ ] Each success: `effectiveDelay = max(minDelay, effectiveDelay - 25)` where `minDelay` = caller's `typingSpeed`
-- [ ] Inter-character delay uses `effectiveDelay ± variance`
-- [ ] `DEFAULT_TYPING_SPEED_MS` = 250, `DEFAULT_TYPING_VARIANCE_MS` = 50
-- [ ] Pre-retry length check: before re-committing, verify field length didn't grow (avoids double-commit)
-- [ ] `effectiveDelay` capped at `ADAPTIVE_DELAY_MAX_MS` (2000ms)
+- [x] After each `commitText()`, `getSurroundingText(charCount, 0, 0)` is called to verify
+- [x] Verification checks that text before cursor matches the committed code point string
+- [x] On miss: 50ms wait, then retry same character (up to 3 retries)
+- [x] On exhausted retries: throw `ActionFailed` with position info
+- [x] On `getSurroundingText()` returning null during verification: throw `ActionFailed` immediately (IC lost, no retry)
+- [x] Each miss: `effectiveDelay += 50`
+- [x] Each success: `effectiveDelay = max(minDelay, effectiveDelay - 25)` where `minDelay` = caller's `typingSpeed`
+- [x] Inter-character delay uses `effectiveDelay ± variance`
+- [x] `DEFAULT_TYPING_SPEED_MS` = 250, `DEFAULT_TYPING_VARIANCE_MS` = 50
+- [x] Pre-retry length check: before re-committing, verify field length didn't grow (avoids double-commit)
+- [x] `effectiveDelay` capped at `ADAPTIVE_DELAY_MAX_MS` (2000ms)
 
 ### Task 1.1: Modify `typeCharByChar()` — add verification, retry, and adaptive pacing
 
@@ -164,13 +164,13 @@ internal suspend fun typeCharByChar(
 - **Known limitation (T-2)**: `endsWith` check assumes cursor stays immediately after the committed character. Apps with auto-formatting that moves the cursor post-commit may cause spurious verification failures (mitigated by pre-retry length check).
 
 **Definition of Done**:
-- [ ] `typeCharByChar()` verifies each character after commit
-- [ ] Retries up to 3 times on miss with 50ms wait
-- [ ] Pre-retry length check prevents double-commit
-- [ ] Adaptive delay: +50 on miss (capped at 2000ms), -25 on success, floor at `typingSpeed`
-- [ ] IC loss (commitText false or getSurroundingText null) throws immediately
-- [ ] Constants updated: `DEFAULT_TYPING_SPEED_MS=250`, `DEFAULT_TYPING_VARIANCE_MS=50`
-- [ ] Mutex hold-time comment updated from "70ms" to "250ms"
+- [x] `typeCharByChar()` verifies each character after commit
+- [x] Retries up to 3 times on miss with 50ms wait
+- [x] Pre-retry length check prevents double-commit
+- [x] Adaptive delay: +50 on miss (capped at 2000ms), -25 on success, floor at `typingSpeed`
+- [x] IC loss (commitText false or getSurroundingText null) throws immediately
+- [x] Constants updated: `DEFAULT_TYPING_SPEED_MS=250`, `DEFAULT_TYPING_VARIANCE_MS=50`
+- [x] Mutex hold-time comment updated from "70ms" to "250ms"
 
 ### Task 1.2: Update KDoc for `typeCharByChar()`
 
@@ -179,7 +179,7 @@ internal suspend fun typeCharByChar(
 Replace the KDoc block above `typeCharByChar()` (lines 53-79) with updated documentation reflecting the new verification, retry, and adaptive pacing behavior.
 
 **Definition of Done**:
-- [ ] KDoc accurately describes verification, retry, adaptive pacing, and error conditions
+- [x] KDoc accurately describes verification, retry, adaptive pacing, and error conditions
 
 ### Task 1.3: Update unit tests for `typeCharByChar()`
 
@@ -242,9 +242,9 @@ This `answers {}` approach (Q-3 fix) dynamically tracks what was committed and r
 | `typeCharByChar cancellation during retry delay` | Coroutine is cancelled during the 50ms retry delay. Verify CancellationException propagates. (Q-2 fix) |
 
 **Definition of Done**:
-- [ ] Shared `setupVerificationMock()` helper added
-- [ ] All existing `typeCharByChar` and tool-level tests updated with verification mocks
-- [ ] 9 new tests for retry, exhaustion, IC loss, adaptive increase/decrease, endsWith, pre-retry length check, delay cap, and retry cancellation
+- [x] Shared `setupVerificationMock()` helper added
+- [x] All existing `typeCharByChar` and tool-level tests updated with verification mocks
+- [x] 9 new tests for retry, exhaustion, IC loss, adaptive increase/decrease, endsWith, pre-retry length check, delay cap, and retry cancellation
 - [ ] All tests pass
 
 ### Task 1.4: Update tool-level unit tests for new defaults and verification mocks
@@ -262,8 +262,8 @@ All `TypeAppendTextTool`, `TypeInsertTextTool`, `TypeReplaceTextTool` tests that
 - `uses default typing speed and variance` in TypeAppendTextToolTests — update comment from "70/15" to "250/50"
 
 **Definition of Done**:
-- [ ] All tool-level tests pass with the new verification behavior
-- [ ] Default speed/variance references updated
+- [x] All tool-level tests pass with the new verification behavior
+- [x] Default speed/variance references updated
 
 ### Task 1.5: Update integration tests for verification mocks
 
@@ -274,7 +274,7 @@ Integration tests use `McpIntegrationTestHelper.createMockDependencies()` which 
 **Setup changes** (Q-3 fix): In each integration test that exercises typing tools, configure the `typeInputController` mock with an `answers {}` block (same pattern as `setupVerificationMock()`) to dynamically return matching verification responses. Existing `returnsMany` patterns for field-content reads must be replaced with argument-matcher-based mocking to separate verification calls (`afterLength=0`) from field-content reads (`afterLength=10000`).
 
 **Definition of Done**:
-- [ ] All integration tests pass with the new verification behavior
+- [x] All integration tests pass with the new verification behavior
 
 ---
 
@@ -283,8 +283,8 @@ Integration tests use `McpIntegrationTestHelper.createMockDependencies()` which 
 **Why**: The MCP tools documentation in `PROJECT.md` and `MCP_TOOLS.md` references the old default values (70ms/15ms). These must match the implementation.
 
 **Acceptance Criteria**:
-- [ ] `docs/PROJECT.md` shows `typing_speed` default = 250, `typing_speed_variance` default = 50
-- [ ] `docs/MCP_TOOLS.md` shows `typing_speed` default = 250, `typing_speed_variance` default = 50
+- [x] `docs/PROJECT.md` shows `typing_speed` default = 250, `typing_speed_variance` default = 50
+- [x] `docs/MCP_TOOLS.md` shows `typing_speed` default = 250, `typing_speed_variance` default = 50
 
 ### Task 2.1: Update PROJECT.md
 
@@ -293,7 +293,7 @@ Integration tests use `McpIntegrationTestHelper.createMockDependencies()` which 
 Update all occurrences of `default 70` → `default 250` and `default 15` → `default 50` in the text input tools table.
 
 **Definition of Done**:
-- [ ] All three typing tools show updated defaults in PROJECT.md
+- [x] All three typing tools show updated defaults in PROJECT.md
 
 ### Task 2.2: Update MCP_TOOLS.md
 
@@ -304,7 +304,7 @@ Update the parameter tables for `android_type_append_text`, `android_type_insert
 - `typing_speed_variance` default: 15 → 50
 
 **Definition of Done**:
-- [ ] All three tool parameter tables show updated defaults in MCP_TOOLS.md
+- [x] All three tool parameter tables show updated defaults in MCP_TOOLS.md
 
 ---
 
