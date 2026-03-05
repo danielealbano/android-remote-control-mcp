@@ -86,14 +86,26 @@ class TextInputIntegrationTest {
 
             // Explicitly configure TypeInputController mock returns
             every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.commitText(any(), any()) } returns true
             every { deps.typeInputController.setSelection(any(), any()) } returns true
 
+            // General getSurroundingText: field-content reads (registered first, lower priority)
             val beforeText = createMockSurroundingText("existing")
             val afterText = createMockSurroundingText("existingHello")
             every {
                 deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+
+            // Verification mocks: dynamic answers for per-character verification (registered after, higher priority)
+            var lastCommittedText = ""
+            every { deps.typeInputController.commitText(any(), any()) } answers {
+                lastCommittedText = firstArg<String>()
+                true
+            }
+            every {
+                deps.typeInputController.getSurroundingText(any(), eq(0), eq(0))
+            } answers {
+                createMockSurroundingText(lastCommittedText)
+            }
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -136,14 +148,26 @@ class TextInputIntegrationTest {
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.commitText(any(), any()) } returns true
             every { deps.typeInputController.setSelection(any(), any()) } returns true
 
+            // General getSurroundingText: field-content reads (registered first, lower priority)
             val beforeText = createMockSurroundingText("Hello")
             val afterText = createMockSurroundingText("Hel Worldlo")
             every {
                 deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+
+            // Verification mocks (registered after, higher priority)
+            var lastCommittedText = ""
+            every { deps.typeInputController.commitText(any(), any()) } answers {
+                lastCommittedText = firstArg<String>()
+                true
+            }
+            every {
+                deps.typeInputController.getSurroundingText(any(), eq(0), eq(0))
+            } answers {
+                createMockSurroundingText(lastCommittedText)
+            }
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -175,15 +199,27 @@ class TextInputIntegrationTest {
             } returns Result.success(Unit)
 
             every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.commitText(any(), any()) } returns true
             every { deps.typeInputController.setSelection(any(), any()) } returns true
             every { deps.typeInputController.sendKeyEvent(any()) } returns true
 
+            // General getSurroundingText: field-content reads (registered first, lower priority)
             val beforeText = createMockSurroundingText("Hello World")
             val afterText = createMockSurroundingText("Goodbye World")
             every {
                 deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+
+            // Verification mocks (registered after, higher priority)
+            var lastCommittedText = ""
+            every { deps.typeInputController.commitText(any(), any()) } answers {
+                lastCommittedText = firstArg<String>()
+                true
+            }
+            every {
+                deps.typeInputController.getSurroundingText(any(), eq(0), eq(0))
+            } answers {
+                createMockSurroundingText(lastCommittedText)
+            }
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
