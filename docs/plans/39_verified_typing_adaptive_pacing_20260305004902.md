@@ -245,7 +245,7 @@ This `answers {}` approach (Q-3 fix) dynamically tracks what was committed and r
 - [x] Shared `setupVerificationMock()` helper added
 - [x] All existing `typeCharByChar` and tool-level tests updated with verification mocks
 - [x] 9 new tests for retry, exhaustion, IC loss, adaptive increase/decrease, endsWith, pre-retry length check, delay cap, and retry cancellation
-- [ ] All tests pass
+- [x] All tests pass
 
 ### Task 1.4: Update tool-level unit tests for new defaults and verification mocks
 
