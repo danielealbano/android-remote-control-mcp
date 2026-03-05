@@ -31,20 +31,25 @@ import javax.inject.Inject
 
 // Shared constants for type tools
 private const val MAX_TEXT_LENGTH = 2000
-private const val DEFAULT_TYPING_SPEED_MS = 70
-private const val DEFAULT_TYPING_VARIANCE_MS = 15
+private const val DEFAULT_TYPING_SPEED_MS = 250
+private const val DEFAULT_TYPING_VARIANCE_MS = 50
 private const val MIN_TYPING_SPEED_MS = 10
 private const val MAX_TYPING_SPEED_MS = 5000
 private const val MAX_SURROUNDING_TEXT_LENGTH = 10000
 private const val FOCUS_POLL_INTERVAL_MS = 50L
 private const val FOCUS_POLL_MAX_MS = 500L
+private const val COMMIT_VERIFY_RETRY_DELAY_MS = 50L
+private const val COMMIT_MAX_RETRIES = 3
+private const val ADAPTIVE_DELAY_INCREASE_MS = 50
+private const val ADAPTIVE_DELAY_DECREASE_MS = 25
+private const val ADAPTIVE_DELAY_MAX_MS = 2000
 
 /**
  * Mutex serializing all type tool operations.
  * Prevents concurrent MCP requests from interleaving character commits.
  *
  * **Hold time**: The Mutex is held for the entire duration of a typing operation.
- * For 2000 chars at default 70ms: ~140 seconds. At max 5000ms: ~2.8 hours.
+ * For 2000 chars at default 250ms: ~500 seconds. At max 5000ms: ~2.8 hours.
  * During this time, other type tool MCP requests are suspended (queued).
  * Non-type tools (tap, swipe, screenshot, etc.) are NOT blocked.
  */
@@ -52,30 +57,43 @@ internal val typeOperationMutex = Mutex()
 
 /**
  * Types text code point by code point using the given [TypeInputController],
- * with configurable speed and variance to simulate natural human typing.
+ * with per-character verification, retry logic, and adaptive pacing.
  *
  * Iterates by **Unicode code points** (not Char), so supplementary characters
  * (emoji, CJK extensions) are committed as a single unit instead of being
  * split into surrogate pairs.
  *
- * Each code point is committed via [TypeInputController.commitText] with a delay of:
- *   typingSpeed + random(-effectiveVariance, +effectiveVariance)
- * where effectiveVariance = clamp(variance, 0, typingSpeed).
+ * **Verification**: After each [TypeInputController.commitText], reads back via
+ * [TypeInputController.getSurroundingText] (synchronous two-way IPC) to confirm
+ * the character landed. On miss, waits [COMMIT_VERIFY_RETRY_DELAY_MS] and retries
+ * (up to [COMMIT_MAX_RETRIES] retries). Before re-committing, a pre-retry length
+ * check prevents double-commit when autocomplete/formatters alter text around
+ * the cursor.
+ *
+ * **Adaptive pacing (AIMD-style)**: Each miss increases the effective inter-character
+ * delay by [ADAPTIVE_DELAY_INCREASE_MS]. Each success decreases it by
+ * [ADAPTIVE_DELAY_DECREASE_MS]. The delay is floored at [typingSpeed] and capped at
+ * [ADAPTIVE_DELAY_MAX_MS]. Variance is applied on top of the effective delay.
+ *
+ * **IPC overhead**: Each character incurs at least one additional `getSurroundingText`
+ * round-trip (verification). On retries, up to two additional calls per attempt
+ * (verification + pre-retry length check). This is the accepted tradeoff for
+ * reliable character delivery.
  *
  * Supports cancellation via structured concurrency — if the parent coroutine
- * is cancelled, the typing loop stops immediately at the next `delay()`.
+ * is cancelled, the typing loop stops at the next `delay()` or retry wait.
  *
- * **Input connection loss detection**: Instead of checking `isReady()` before
- * every character (which can cause false negatives during brief framework state
- * transitions), this function relies solely on the `commitText()` return value.
- * If `commitText` returns `false`, the input connection has been lost and typing
- * stops immediately with an error.
+ * **Known limitation**: The `endsWith` verification check assumes the cursor stays
+ * immediately after the committed character. Apps with auto-formatting that move the
+ * cursor post-commit may cause spurious verification failures (mitigated by the
+ * pre-retry length check).
  *
  * @param text The text to type.
- * @param typingSpeed Base delay between characters in ms.
+ * @param typingSpeed Base delay between characters in ms (also the adaptive floor).
  * @param typingSpeedVariance Variance in ms.
  * @param typeInputController The input controller to commit characters through.
- * @throws McpToolException.ActionFailed if commitText fails (input connection lost mid-typing).
+ * @throws McpToolException.ActionFailed if commitText fails, verification IC is lost,
+ *   or a character is dropped after max retries.
  */
 internal suspend fun typeCharByChar(
     text: String,
@@ -87,36 +105,152 @@ internal suspend fun typeCharByChar(
     val codePointCount = text.codePointCount(0, text.length)
     var codePointIndex = 0
     var offset = 0
+    var effectiveDelay = typingSpeed
+
+    // Read initial field length once for pre-retry length validation
+    val initialFieldLength =
+        typeInputController
+            .getSurroundingText(
+                MAX_SURROUNDING_TEXT_LENGTH,
+                MAX_SURROUNDING_TEXT_LENGTH,
+                0,
+            )?.let { it.offset + it.text.length } ?: 0
+    val ctx =
+        TypingVerifyContext(
+            typeInputController,
+            codePointCount,
+            typingSpeed,
+            initialFieldLength,
+        )
 
     while (offset < text.length) {
-        val codePoint = text.codePointAt(offset)
-        val charCount = Character.charCount(codePoint)
+        val charCount = Character.charCount(text.codePointAt(offset))
         val codePointStr = text.substring(offset, offset + charCount)
 
-        val committed = typeInputController.commitText(codePointStr, 1)
-        if (!committed) {
-            throw McpToolException.ActionFailed(
-                "Input connection lost during typing at position $codePointIndex of $codePointCount. " +
-                    "commitText returned false.",
+        effectiveDelay =
+            commitAndVerifyCodePoint(
+                ctx,
+                codePointStr,
+                charCount,
+                codePointIndex,
+                effectiveDelay,
             )
-        }
 
+        ctx.committedCodeUnits += charCount
         offset += charCount
         codePointIndex++
 
-        // Skip delay after the last character to avoid unnecessary wait
+        // Skip delay after the last character
         if (offset < text.length) {
-            val delay =
-                if (effectiveVariance > 0) {
-                    val variance = kotlin.random.Random.nextInt(-effectiveVariance, effectiveVariance + 1)
-                    (typingSpeed + variance).coerceAtLeast(1).toLong()
-                } else {
-                    typingSpeed.toLong()
-                }
-            delay(delay)
+            delay(computeInterCharDelay(effectiveDelay, effectiveVariance))
         }
     }
 }
+
+/**
+ * Bundles immutable context for the commit-verify-retry loop, reducing parameter count.
+ */
+private class TypingVerifyContext(
+    val controller: TypeInputController,
+    val codePointCount: Int,
+    val minDelay: Int,
+    val initialFieldLength: Int,
+    var committedCodeUnits: Int = 0,
+)
+
+/**
+ * Commits a single code point and verifies it landed. Retries up to [COMMIT_MAX_RETRIES]
+ * times on verification miss. Adjusts effective delay via AIMD pacing.
+ *
+ * @return The updated effectiveDelay after this code point.
+ */
+private suspend fun commitAndVerifyCodePoint(
+    ctx: TypingVerifyContext,
+    codePointStr: String,
+    charCount: Int,
+    codePointIndex: Int,
+    effectiveDelay: Int,
+): Int {
+    var currentDelay = effectiveDelay
+    for (attempt in 0..COMMIT_MAX_RETRIES) {
+        if (attempt == 0) {
+            dispatchCommitText(ctx, codePointStr, codePointIndex)
+        }
+
+        val verified = verifyCommittedChar(ctx, charCount, codePointStr, codePointIndex)
+        if (verified) {
+            return (currentDelay - ADAPTIVE_DELAY_DECREASE_MS).coerceAtLeast(ctx.minDelay)
+        }
+
+        // Miss — increase pacing (capped)
+        currentDelay = (currentDelay + ADAPTIVE_DELAY_INCREASE_MS).coerceAtMost(ADAPTIVE_DELAY_MAX_MS)
+        if (attempt < COMMIT_MAX_RETRIES) {
+            delay(COMMIT_VERIFY_RETRY_DELAY_MS)
+
+            if (preRetryLengthCheckPassed(ctx, charCount)) {
+                return (currentDelay - ADAPTIVE_DELAY_DECREASE_MS).coerceAtLeast(ctx.minDelay)
+            }
+            // Length didn't increase — char genuinely dropped, retry commit
+            dispatchCommitText(ctx, codePointStr, codePointIndex)
+        }
+    }
+    throw McpToolException.ActionFailed(
+        "Character dropped after $COMMIT_MAX_RETRIES retries " +
+            "at position $codePointIndex of ${ctx.codePointCount}.",
+    )
+}
+
+private fun dispatchCommitText(
+    ctx: TypingVerifyContext,
+    codePointStr: String,
+    codePointIndex: Int,
+) {
+    if (!ctx.controller.commitText(codePointStr, 1)) {
+        throw McpToolException.ActionFailed(
+            "Input connection lost during typing at position $codePointIndex of ${ctx.codePointCount}. " +
+                "commitText returned false.",
+        )
+    }
+}
+
+private fun verifyCommittedChar(
+    ctx: TypingVerifyContext,
+    charCount: Int,
+    codePointStr: String,
+    codePointIndex: Int,
+): Boolean {
+    val surrounding =
+        ctx.controller.getSurroundingText(charCount, 0, 0)
+            ?: throw McpToolException.ActionFailed(
+                "Input connection lost during verification at position $codePointIndex of ${ctx.codePointCount}.",
+            )
+    return surrounding.text.toString().endsWith(codePointStr)
+}
+
+private fun preRetryLengthCheckPassed(
+    ctx: TypingVerifyContext,
+    charCount: Int,
+): Boolean {
+    val currentLength =
+        ctx.controller
+            .getSurroundingText(
+                MAX_SURROUNDING_TEXT_LENGTH,
+                MAX_SURROUNDING_TEXT_LENGTH,
+                0,
+            )?.let { it.offset + it.text.length } ?: 0
+    return currentLength >= ctx.initialFieldLength + ctx.committedCodeUnits + charCount
+}
+
+private fun computeInterCharDelay(
+    effectiveDelay: Int,
+    effectiveVariance: Int,
+): Long =
+    if (effectiveVariance > 0) {
+        val variance = kotlin.random.Random.nextInt(-effectiveVariance, effectiveVariance + 1)
+        (effectiveDelay + variance).coerceAtLeast(1).toLong()
+    } else {
+        effectiveDelay.toLong()
+    }
 
 /**
  * Validates and extracts typing speed parameters from tool arguments.
