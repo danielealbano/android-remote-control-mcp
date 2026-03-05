@@ -88,6 +88,23 @@ class TextInputToolsTest {
         return mock
     }
 
+    /**
+     * Sets up mockTypeInputController to handle per-character verification.
+     * Uses answers {} to dynamically return whatever was last committed via commitText.
+     * Verification calls use afterLength=0; field-content reads use afterLength=10000.
+     * The initial field length mock must be set up separately per test or in setupDefaultMocks.
+     */
+    private fun setupVerificationMock() {
+        var lastCommittedText = ""
+        every { mockTypeInputController.commitText(any(), any()) } answers {
+            lastCommittedText = firstArg<String>()
+            true
+        }
+        every { mockTypeInputController.getSurroundingText(any(), eq(0), eq(0)) } answers {
+            createMockSurroundingText(lastCommittedText)
+        }
+    }
+
     @Suppress("LongMethod")
     @BeforeEach
     fun setUp() {
@@ -121,7 +138,10 @@ class TextInputToolsTest {
             runTest {
                 // "A😀B" is 3 code points but 4 chars (emoji is a surrogate pair)
                 val text = "A\uD83D\uDE00B"
-                every { mockTypeInputController.commitText(any(), any()) } returns true
+                setupVerificationMock()
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
 
                 typeCharByChar(text, 10, 0, mockTypeInputController)
 
@@ -131,6 +151,13 @@ class TextInputToolsTest {
         @Test
         fun `typeCharByChar stops when commitText returns false`() =
             runTest {
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+                // Verification mock for char "A" (first char succeeds)
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns createMockSurroundingText("A")
                 every { mockTypeInputController.commitText("A", 1) } returns true
                 every { mockTypeInputController.commitText("B", 1) } returns false
 
@@ -145,7 +172,10 @@ class TextInputToolsTest {
         @Test
         fun `typeCharByChar respects coroutine cancellation`() =
             runTest {
-                every { mockTypeInputController.commitText(any(), any()) } returns true
+                setupVerificationMock()
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
 
                 val job =
                     launch {
@@ -164,6 +194,10 @@ class TextInputToolsTest {
         @Test
         fun `typeCharByChar handles empty string without calling commitText`() =
             runTest {
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
                 typeCharByChar("", 10, 0, mockTypeInputController)
 
                 verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
@@ -173,7 +207,10 @@ class TextInputToolsTest {
         @Test
         fun `typeCharByChar skips delay after last character`() =
             runTest {
-                every { mockTypeInputController.commitText(any(), any()) } returns true
+                setupVerificationMock()
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
 
                 val startTime = testScheduler.currentTime
                 typeCharByChar("ABC", 100, 0, mockTypeInputController)
@@ -188,8 +225,8 @@ class TextInputToolsTest {
         fun `extractTypingParams uses defaults when not provided`() {
             val params = buildJsonObject {}
             val (speed, variance) = extractTypingParams(params)
-            assertEquals(70, speed)
-            assertEquals(15, variance)
+            assertEquals(250, speed)
+            assertEquals(50, variance)
         }
 
         @Test
@@ -239,7 +276,10 @@ class TextInputToolsTest {
         @Test
         fun `typeCharByChar clamps large variance to typing_speed`() =
             runTest {
-                every { mockTypeInputController.commitText(any(), any()) } returns true
+                setupVerificationMock()
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
 
                 // variance=9999 but speed=100, variance will be clamped to 100
                 typeCharByChar("AB", 100, 9999, mockTypeInputController)
@@ -326,6 +366,308 @@ class TextInputToolsTest {
             val result = readFieldContent(mockTypeInputController)
             assertEquals("partial text", result)
         }
+
+        @Test
+        fun `typeCharByChar retries on verification miss and succeeds`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                var commitCount = 0
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    commitCount++
+                    true
+                }
+
+                // Verification: first call returns mismatch, second returns match
+                var verifyCallCount = 0
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } answers {
+                    verifyCallCount++
+                    if (verifyCallCount == 1) {
+                        // First verify: miss (text doesn't match)
+                        createMockSurroundingText("wrong")
+                    } else {
+                        // Second verify: success
+                        createMockSurroundingText("A")
+                    }
+                }
+
+                typeCharByChar("A", 100, 0, mockTypeInputController)
+
+                // commitText called twice: initial + retry (pre-retry length check shows no growth)
+                assertEquals(2, commitCount)
+            }
+
+        @Test
+        fun `typeCharByChar throws after max retries exhausted`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                every { mockTypeInputController.commitText(any(), any()) } returns true
+
+                // All verification calls return mismatch
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns createMockSurroundingText("wrong")
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        typeCharByChar("A", 100, 0, mockTypeInputController)
+                    }
+                assertTrue(exception.message!!.contains("retries"))
+            }
+
+        @Test
+        fun `typeCharByChar throws immediately when getSurroundingText returns null`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                every { mockTypeInputController.commitText(any(), any()) } returns true
+
+                // Verification returns null (IC lost)
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns null
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        typeCharByChar("A", 100, 0, mockTypeInputController)
+                    }
+                assertTrue(exception.message!!.contains("verification"))
+
+                // Should only have committed once (no retry when IC lost)
+                verify(exactly = 1) { mockTypeInputController.commitText(any(), 1) }
+            }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        @Test
+        fun `typeCharByChar adaptive delay increases on miss`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                var lastCommitted = ""
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    lastCommitted = firstArg<String>()
+                    true
+                }
+
+                // For 3-char text "ABC":
+                // Char B (second) misses once then succeeds on retry
+                var verifyCallCount = 0
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } answers {
+                    verifyCallCount++
+                    // Call 1: verify A -> success
+                    // Call 2: verify B -> miss
+                    // Call 3: verify B retry -> success
+                    // Call 4: verify C -> success
+                    if (verifyCallCount == 2) {
+                        createMockSurroundingText("wrong")
+                    } else {
+                        createMockSurroundingText(lastCommitted)
+                    }
+                }
+
+                val startTime = testScheduler.currentTime
+                typeCharByChar("ABC", 100, 0, mockTypeInputController)
+                val elapsed = testScheduler.currentTime - startTime
+
+                // Without miss: 2 * 100ms = 200ms inter-char delay
+                // With miss on B: +50ms retry delay + increased effectiveDelay (150) for B->C delay
+                // Total > 200ms
+                assertTrue(elapsed > 200L)
+            }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        @Test
+        fun `typeCharByChar adaptive delay decreases on success back to floor`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                var lastCommitted = ""
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    lastCommitted = firstArg<String>()
+                    true
+                }
+
+                // 10+ chars: first char misses once (raises effectiveDelay to 150),
+                // then all subsequent succeed (each decreasing by 25 back to floor of 100)
+                var verifyCallCount = 0
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } answers {
+                    verifyCallCount++
+                    if (verifyCallCount == 1) {
+                        // First verify of first char: miss
+                        createMockSurroundingText("wrong")
+                    } else {
+                        createMockSurroundingText(lastCommitted)
+                    }
+                }
+
+                val text = "ABCDEFGHIJ" // 10 chars
+                val startTime = testScheduler.currentTime
+                typeCharByChar(text, 100, 0, mockTypeInputController)
+                val elapsed = testScheduler.currentTime - startTime
+
+                // After first char miss: effectiveDelay = 150
+                // After first char retry success: effectiveDelay = 125
+                // After B success: effectiveDelay = 100 (floor)
+                // Remaining chars at 100ms each
+                // If delay never recovered, total would be 9 * 150 = 1350ms + retry delay
+                // With recovery, total should be less than 1350ms
+                // 9 inter-char delays: 125 + 100*8 = 925ms + 50ms retry delay = 975ms
+                assertTrue(elapsed < 1200L)
+                assertTrue(elapsed >= 975L)
+            }
+
+        @Test
+        fun `typeCharByChar verification uses endsWith for robustness`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                every { mockTypeInputController.commitText(any(), any()) } returns true
+
+                // Verification returns extra text before the committed char
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns createMockSurroundingText("xyzD")
+
+                // Should succeed because "xyzD".endsWith("D") is true
+                typeCharByChar("D", 100, 0, mockTypeInputController)
+
+                verify(exactly = 1) { mockTypeInputController.commitText("D", 1) }
+            }
+
+        @Test
+        fun `typeCharByChar pre-retry length check detects char landed despite endsWith mismatch`() =
+            runTest {
+                // Initial field length = 5
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("Hello", offset = 0)
+
+                var commitCount = 0
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    commitCount++
+                    true
+                }
+
+                // Verification endsWith always fails (autocomplete changed text around cursor)
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns createMockSurroundingText("reformatted")
+
+                // But pre-retry length check shows field grew by charCount (5 + 1 = 6)
+                // Override initial field length mock for pre-retry check: return length 6
+                // The pre-retry check calls getSurroundingText(10000, 10000, 0) again
+                // We need to differentiate: first call returns length 5, subsequent returns 6
+                var fieldLengthCallCount = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } answers {
+                    fieldLengthCallCount++
+                    if (fieldLengthCallCount == 1) {
+                        // Initial field length read
+                        createMockSurroundingText("Hello", offset = 0)
+                    } else {
+                        // Pre-retry length check: field grew
+                        createMockSurroundingText("Hello!", offset = 0)
+                    }
+                }
+
+                typeCharByChar("!", 100, 0, mockTypeInputController)
+
+                // Only one commit (no re-commit because pre-retry length check detected growth)
+                assertEquals(1, commitCount)
+            }
+
+        @Test
+        fun `typeCharByChar effectiveDelay capped at 2000ms`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                var lastCommitted = ""
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    lastCommitted = firstArg<String>()
+                    true
+                }
+
+                // Set up so many chars fail verification once each, driving effectiveDelay up
+                // Each miss adds +50. Starting at 100, to reach 2000 we need 38 misses.
+                // Use a long string and make every first verify miss.
+                val longText = "A".repeat(50)
+                var verifyCallCount = 0
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } answers {
+                    verifyCallCount++
+                    // Odd calls (first verify per char) miss, even calls (retry verify) succeed
+                    if (verifyCallCount % 2 == 1) {
+                        createMockSurroundingText("wrong")
+                    } else {
+                        createMockSurroundingText(lastCommitted)
+                    }
+                }
+
+                // Should not throw — delay capped at 2000ms, doesn't grow unbounded
+                typeCharByChar(longText, 100, 0, mockTypeInputController)
+
+                // Each char misses once and is re-committed: 2 commits per char
+                verify(exactly = 100) { mockTypeInputController.commitText("A", 1) }
+            }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        @Test
+        fun `typeCharByChar cancellation during retry delay`() =
+            runTest {
+                // Initial field length = 0
+                every {
+                    mockTypeInputController.getSurroundingText(eq(10000), eq(10000), eq(0))
+                } returns createMockSurroundingText("")
+
+                every { mockTypeInputController.commitText(any(), any()) } returns true
+
+                // All verification calls return mismatch to force retry delays
+                every {
+                    mockTypeInputController.getSurroundingText(any(), eq(0), eq(0))
+                } returns createMockSurroundingText("wrong")
+
+                val job =
+                    launch {
+                        typeCharByChar("A", 100, 0, mockTypeInputController)
+                    }
+
+                // Advance past the first commit but into the 50ms retry delay
+                testScheduler.advanceTimeBy(25)
+                job.cancelAndJoin()
+
+                // Verify CancellationException was the cause (job is cancelled)
+                assertTrue(job.isCancelled)
+            }
     }
 
     @Nested
@@ -343,13 +685,16 @@ class TextInputToolsTest {
         private fun setupDefaultMocks(existingText: String = "existing") {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
-            every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
+            // General getSurroundingText: field-content reads
+            // (beforeText for cursor positioning, afterText for final read)
             val beforeText = createMockSurroundingText(existingText)
             val afterText = createMockSurroundingText("${existingText}Hello")
             every {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+            // Verification mocks (more specific matchers, registered after general)
+            setupVerificationMock()
         }
 
         @Test
@@ -501,7 +846,7 @@ class TextInputToolsTest {
                         put("text", "AB")
                     }
 
-                // Should not throw — uses defaults 70/15
+                // Should not throw — uses defaults 250/50
                 tool.execute(params)
             }
 
@@ -510,13 +855,13 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 val beforeText = createMockSurroundingText("")
                 val afterText = createMockSurroundingText("Hi\uD83D\uDE00")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
+                } returnsMany listOf(beforeText, beforeText, afterText)
+                setupVerificationMock()
 
                 val params =
                     buildJsonObject {
@@ -550,12 +895,12 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 val afterText = createMockSurroundingText("Hello")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, afterText)
+                } returnsMany listOf(null, null, afterText)
+                setupVerificationMock()
 
                 val params =
                     buildJsonObject {
@@ -585,13 +930,15 @@ class TextInputToolsTest {
         private fun setupDefaultMocks(existingText: String = "Hello") {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
-            every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
+            // General getSurroundingText: field-content reads
             val beforeText = createMockSurroundingText(existingText)
             val afterText = createMockSurroundingText("Hel Worldlo")
             every {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+            // Verification mocks (more specific matchers, registered after general)
+            setupVerificationMock()
         }
 
         @Test
@@ -730,12 +1077,12 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 val afterText = createMockSurroundingText("Hello")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, afterText)
+                } returnsMany listOf(null, null, afterText)
+                setupVerificationMock()
 
                 // offset 0 should succeed when textLength defaults to 0
                 val params =
@@ -751,7 +1098,8 @@ class TextInputToolsTest {
                 // offset > 0 should fail when textLength defaults to 0
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, afterText)
+                } returnsMany listOf(null, null, afterText)
+                setupVerificationMock()
 
                 val params2 =
                     buildJsonObject {
@@ -796,14 +1144,16 @@ class TextInputToolsTest {
         private fun setupDefaultMocks(existingText: String = "Hello World") {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
             every { mockTypeInputController.isReady() } returns true
-            every { mockTypeInputController.commitText(any(), any()) } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
             every { mockTypeInputController.sendKeyEvent(any()) } returns true
+            // General getSurroundingText: field-content reads
             val beforeText = createMockSurroundingText(existingText)
             val afterText = createMockSurroundingText("Goodbye World")
             every {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            } returnsMany listOf(beforeText, beforeText, afterText)
+            // Verification mocks (more specific matchers, registered after general)
+            setupVerificationMock()
         }
 
         @Test
@@ -966,14 +1316,14 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
                 val beforeText = createMockSurroundingText("abcabcabc")
                 val afterText = createMockSurroundingText("Xabcabc")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
+                } returnsMany listOf(beforeText, beforeText, afterText)
+                setupVerificationMock()
 
                 val params =
                     buildJsonObject {
@@ -993,14 +1343,14 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
                 val beforeText = createMockSurroundingText("Hello World")
                 val afterText = createMockSurroundingText("Hi World")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
+                } returnsMany listOf(beforeText, beforeText, afterText)
+                setupVerificationMock()
 
                 val params =
                     buildJsonObject {
@@ -1019,14 +1369,14 @@ class TextInputToolsTest {
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.commitText(any(), any()) } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
                 val beforeText = createMockSurroundingText("Hello World")
                 val afterText = createMockSurroundingText("Hello Earth")
                 every {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
+                } returnsMany listOf(beforeText, beforeText, afterText)
+                setupVerificationMock()
 
                 val params =
                     buildJsonObject {
