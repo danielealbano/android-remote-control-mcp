@@ -1,27 +1,32 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import com.github.dockerjava.api.model.Capability
+import com.github.dockerjava.api.model.Device
+import com.github.dockerjava.api.model.LogConfig
+import com.github.dockerjava.api.model.Volume
 import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy
 import org.testcontainers.utility.DockerImageName
 import java.io.File
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 /**
- * Manages the Docker Android container lifecycle for E2E tests.
+ * Manages the redroid container lifecycle for E2E tests.
  *
  * Responsibilities:
- * - Create and configure the Docker Android container
- * - Wait for emulator boot completion
- * - Install APK and configure permissions
+ * - Create and configure the redroid container with kernel module setup
+ * - Wait for boot completion via host-side ADB connection
+ * - Install APK and configure permissions via host-side adb commands
  * - Start the MCP server and wait for it to be ready
  */
 object AndroidContainerSetup {
 
-    private const val DOCKER_IMAGE = "budtmo/docker-android:emulator_14.0"
+    private const val DOCKER_IMAGE = "redroid/redroid:13.0.0-latest"
     private const val ADB_PORT = 5555
-    private const val NOVNC_PORT = 6080
     private const val MCP_DEFAULT_PORT = 8080
-    private const val ADB_FORWARD_PORT = 18080
+    private const val PROCESS_TIMEOUT_SECONDS = 30L
+    private const val MEMORY_BYTES = 4L * 1024 * 1024 * 1024 // 4 GB
 
     private const val APP_PACKAGE = "com.danielealbano.androidremotecontrolmcp.debug"
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
@@ -59,158 +64,144 @@ object AndroidContainerSetup {
      */
     const val TOOL_NAME_PREFIX = "android_"
 
+    @Volatile
+    private var _adbSerial: String? = null
+
+    val adbSerial: String
+        get() = _adbSerial ?: error("Container not booted yet — call container.start() first")
+
     /**
-     * Create a configured Docker Android container.
+     * Create a configured redroid container.
      *
-     * The container runs a full Android emulator (API 34, x86) with:
+     * The container runs native Android via kernel modules (binder_linux, fuse) with:
      * - adb accessible on port 5555
-     * - noVNC accessible on port 6080 (for visual debugging)
-     * - MCP server port exposed and forwarded from the emulator to the container
+     * - MCP server port directly exposed on container network
      *
-     * Port forwarding chain:
-     *   Test host -> (Testcontainers mapped port) -> Docker container:MCP_DEFAULT_PORT
-     *     -> (adb forward inside container) -> Android emulator:MCP_DEFAULT_PORT
+     * No nested emulator — ADB connects from host via `adb connect` to the
+     * container's mapped port.
      *
      * @return configured [GenericContainer] (not yet started)
      */
     fun createContainer(): GenericContainer<*> {
-        println("[E2E Setup] Creating Docker Android container ($DOCKER_IMAGE)")
+        println("[E2E Setup] Creating redroid container ($DOCKER_IMAGE)")
 
-        val isCI = System.getenv("CI") == "true"
-        val emulatorArgs = buildString {
-            append("-no-boot-anim -no-audio -no-snapshot")
-            append(" -camera-back emulated -camera-front emulated")
-            if (isCI) append(" -no-window")
-        }
-        val memoryBytes = if (isCI) 5632L * 1024 * 1024 else 6L * 1024 * 1024 * 1024 // 5.5 GB CI, 6 GB local
+        ensureKernelModules()
+
+        val binderDevMajor = detectBinderDevMajor()
+        val fuseDevMajorMinor = detectFuseDevMajorMinor()
 
         return GenericContainer(DockerImageName.parse(DOCKER_IMAGE))
-            .withExposedPorts(ADB_PORT, NOVNC_PORT, MCP_DEFAULT_PORT)
-            .withEnv("EMULATOR_DEVICE", "Nexus 5")
-            .withEnv("WEB_VNC", if (isCI) "false" else "true")
-            .withEnv("EMULATOR_HEADLESS", if (isCI) "true" else "false")
-            .withEnv("EMULATOR_ADDITIONAL_ARGS", emulatorArgs)
-            .withEnv("USER_BEHAVIOR_ANALYTICS", "false")
-            .withEnv("EMULATOR_DATA_PARTITION", "2048m")
-            .withPrivilegedMode(true)
-            .withStartupTimeout(Duration.ofSeconds(300))
-            .waitingFor(
-                Wait.forLogMessage(".*device entered RUNNING state.*\\n", 1)
-                    .withStartupTimeout(Duration.ofSeconds(300))
+            .withExposedPorts(ADB_PORT, MCP_DEFAULT_PORT)
+            .withCommand(
+                "androidboot.redroid_width=1080",
+                "androidboot.redroid_height=2400",
+                "androidboot.redroid_gpu_mode=guest",
+                "androidboot.redroid_dpi=420",
+                "androidboot.use_memfd=true",
+                "ro.product.model=Pixel_6",
+                "ro.product.brand=google",
+                "ro.product.manufacturer=Google",
+                "ro.debuggable=1",
+                "ro.secure=0",
             )
+            .waitingFor(
+                object : AbstractWaitStrategy() {
+                    override fun waitUntilReady() {
+                        // Redroid writes to Android logcat, not stdout/stderr — container
+                        // log-based strategies (LogMessageWaitStrategy) cannot work.
+                        // Instead, connect via host-side ADB and poll sys.boot_completed.
+                        val host = waitStrategyTarget.host
+                        val adbPort = waitStrategyTarget.getMappedPort(ADB_PORT)
+                        val serial = "$host:$adbPort"
+                        val timeoutMs = startupTimeout.toMillis()
+
+                        println("[E2E Setup] Waiting for redroid boot via ADB $serial (timeout: ${timeoutMs}ms)...")
+                        val startTime = System.currentTimeMillis()
+
+                        // Phase 1: wait for adb connect to succeed
+                        while (System.currentTimeMillis() - startTime < timeoutMs) {
+                            try {
+                                val output = runProcess("adb", "connect", serial, timeoutSeconds = 10L)
+                                if (output.contains("connected")) {
+                                    println("[E2E Setup] ADB connected to $serial")
+                                    break
+                                }
+                                println("[E2E Setup] ADB connect output: $output")
+                            } catch (e: Exception) {
+                                println("[E2E Setup] ADB connect failed: ${e::class.simpleName}: ${e.message}")
+                            }
+                            Thread.sleep(POLL_INTERVAL_MS)
+                        }
+
+                        // Phase 2: poll sys.boot_completed
+                        while (System.currentTimeMillis() - startTime < timeoutMs) {
+                            try {
+                                val output = runProcess(
+                                    "adb", "-s", serial, "shell", "getprop", "sys.boot_completed",
+                                    timeoutSeconds = 10L,
+                                )
+                                if (output == "1") {
+                                    val elapsed = System.currentTimeMillis() - startTime
+                                    println("[E2E Setup] Redroid boot completed (${elapsed}ms)")
+                                    _adbSerial = serial
+                                    return
+                                }
+                                println("[E2E Setup] boot_completed=$output")
+                            } catch (e: Exception) {
+                                println("[E2E Setup] getprop failed: ${e::class.simpleName}: ${e.message}")
+                            }
+                            Thread.sleep(POLL_INTERVAL_MS)
+                        }
+
+                        throw IllegalStateException(
+                            "Redroid did not boot within ${timeoutMs}ms. ADB serial: $serial",
+                        )
+                    }
+                },
+            )
+            .withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
             .withCreateContainerCmdModifier { cmd ->
-                cmd.hostConfig?.withMemory(memoryBytes)
-                cmd.hostConfig?.withMemorySwap(memoryBytes)
+                cmd.withVolumes(Volume("/sys/fs/cgroup"))
+                cmd.hostConfig
+                    ?.withMemory(MEMORY_BYTES)
+                    ?.withMemorySwap(MEMORY_BYTES)
+                    ?.withCapAdd(*Capability.values())
+                    ?.withSecurityOpts(
+                        listOf(
+                            "seccomp=unconfined",
+                            "apparmor=unconfined",
+                            "unmask=/sys/fs/cgroup",
+                        )
+                    )
+                    ?.withDevices(
+                        listOf(
+                            Device("rwm", "/dev/fuse", "/dev/fuse"),
+                        )
+                    )
+                    ?.withDeviceCgroupRules(
+                        listOf(
+                            "c $binderDevMajor:* rwm",
+                            "c $fuseDevMajorMinor rwm",
+                        )
+                    )
+                    ?.withLogConfig(LogConfig(LogConfig.LoggingType.JSON_FILE))
             }
     }
 
     /**
-     * Set up port forwarding inside the Docker container.
+     * Install the APK on the redroid container via host-side adb.
      *
-     * The MCP server runs inside the Android emulator, which has its own
-     * network stack. Testcontainers maps the Docker container's port to the
-     * test host, but we need to bridge from the container's `0.0.0.0:8080`
-     * (which Docker port mapping connects to) to the emulator's port.
-     *
-     * `adb forward` only binds to `127.0.0.1`, which Docker port mapping
-     * cannot reach. Instead, we use `socat` to listen on all interfaces and
-     * forward to the emulator via the adb forward.
-     *
-     * Forward chain:
-     *   test host:randomPort <-> container:0.0.0.0:MCP_DEFAULT_PORT <-> (socat)
-     *     <-> container:127.0.0.1:adb_forward_port <-> emulator:MCP_DEFAULT_PORT
-     *
-     * @param container the running Docker container
-     */
-    fun setupPortForwarding(container: GenericContainer<*>) {
-        println("[E2E Setup] Setting up port forwarding (container:$MCP_DEFAULT_PORT -> emulator:$MCP_DEFAULT_PORT)...")
-
-        // Step 1: Install socat (not included in the Docker image by default).
-        container.execInContainer(
-            "sh", "-c",
-            "apt-get update -qq && apt-get install -y -qq socat > /dev/null 2>&1"
-        )
-
-        // Step 2: Set up adb forward from container's localhost to the emulator.
-        // This binds to 127.0.0.1:ADB_FORWARD_PORT inside the container.
-        execInContainer(
-            container,
-            "adb", "forward", "tcp:$ADB_FORWARD_PORT", "tcp:$MCP_DEFAULT_PORT"
-        )
-
-        // Step 3: Use socat to bridge from 0.0.0.0:MCP_DEFAULT_PORT (Docker port mapping)
-        // to 127.0.0.1:ADB_FORWARD_PORT (adb forward). Run in background.
-        container.execInContainer(
-            "sh", "-c",
-            "nohup socat TCP-LISTEN:$MCP_DEFAULT_PORT,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:$ADB_FORWARD_PORT &"
-        )
-        Thread.sleep(1_000)
-
-        println("[E2E Setup] Port forwarding established")
-    }
-
-    /**
-     * Wait for the Android emulator inside the container to fully boot.
-     *
-     * Polls `adb shell getprop sys.boot_completed` until it returns "1"
-     * or the timeout is exceeded.
-     *
-     * @param container the running Docker container
-     * @param timeoutMs maximum time to wait for boot (default 180 seconds)
-     * @throws IllegalStateException if emulator does not boot within timeout
-     */
-    fun waitForEmulatorBoot(
-        container: GenericContainer<*>,
-        timeoutMs: Long = DEFAULT_EMULATOR_BOOT_TIMEOUT_MS,
-    ) {
-        println("[E2E Setup] Waiting for emulator boot (timeout: ${timeoutMs}ms)...")
-
-        val startTime = System.currentTimeMillis()
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            try {
-                val result = execInContainer(container, "adb", "shell", "getprop", "sys.boot_completed")
-                if (result.trim() == "1") {
-                    println("[E2E Setup] Emulator boot completed (${System.currentTimeMillis() - startTime}ms)")
-                    return
-                }
-            } catch (_: Exception) {
-                // adb may not be ready yet, continue polling
-            }
-            Thread.sleep(POLL_INTERVAL_MS)
-        }
-
-        throw IllegalStateException(
-            "Emulator did not boot within ${timeoutMs}ms. Check container logs for details."
-        )
-    }
-
-    /**
-     * Install the APK on the emulator inside the container.
-     *
-     * Copies the APK file into the container and installs it via adb.
-     *
-     * @param container the running Docker container
      * @param apkPath path to the APK file on the host machine
      * @throws IllegalStateException if APK installation fails
      */
-    fun installApk(container: GenericContainer<*>, apkPath: String) {
+    fun installApk(apkPath: String) {
         val apkFile = File(apkPath)
         require(apkFile.exists()) { "APK file not found: $apkPath" }
-
         println("[E2E Setup] Installing APK: $apkPath")
-
-        // Copy APK into container
-        container.copyFileToContainer(
-            org.testcontainers.utility.MountableFile.forHostPath(apkPath),
-            "/tmp/app.apk"
-        )
-
-        // Install via adb
-        val result = execInContainer(container, "adb", "install", "-r", "/tmp/app.apk")
+        val result = execAdb("install", "-r", apkPath)
         if (!result.contains("Success")) {
             throw IllegalStateException("APK installation failed: $result")
         }
-
         println("[E2E Setup] APK installed successfully")
     }
 
@@ -219,37 +210,18 @@ object AndroidContainerSetup {
      *
      * The calculator APK is bundled as a test resource and is used for
      * interaction tests (e.g., calculate 7 + 3 = 10).
-     *
-     * @param container the running Docker container
      */
-    fun installCalculatorApk(container: GenericContainer<*>) {
+    fun installCalculatorApk() {
         println("[E2E Setup] Installing calculator APK for testing...")
-
-        // Load calculator APK from test resources
         val resourceStream = AndroidContainerSetup::class.java.getResourceAsStream(CALCULATOR_APK_RESOURCE)
             ?: throw IllegalStateException("Calculator APK not found in test resources: $CALCULATOR_APK_RESOURCE")
-
-        // Write to a temp file
         val tempFile = File.createTempFile("calculator", ".apk")
         tempFile.deleteOnExit()
-        resourceStream.use { input ->
-            tempFile.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        // Copy APK into container
-        container.copyFileToContainer(
-            org.testcontainers.utility.MountableFile.forHostPath(tempFile.absolutePath),
-            "/tmp/calculator.apk"
-        )
-
-        // Install via adb
-        val result = execInContainer(container, "adb", "install", "-r", "/tmp/calculator.apk")
+        resourceStream.use { input -> tempFile.outputStream().use { output -> input.copyTo(output) } }
+        val result = execAdb("install", "-r", tempFile.absolutePath)
         if (!result.contains("Success")) {
             throw IllegalStateException("Calculator APK installation failed: $result")
         }
-
         println("[E2E Setup] Calculator APK installed successfully")
     }
 
@@ -261,41 +233,12 @@ object AndroidContainerSetup {
      * need for interactive permission dialogs in E2E tests.
      *
      * Must be called after APK installation.
-     *
-     * @param container the running Docker container
      */
-    fun grantCameraPermissions(container: GenericContainer<*>) {
+    fun grantCameraPermissions() {
         println("[E2E Setup] Granting camera and microphone permissions...")
-
-        execInContainer(
-            container,
-            "adb", "shell", "pm", "grant", APP_PACKAGE,
-            "android.permission.CAMERA"
-        )
-
-        execInContainer(
-            container,
-            "adb", "shell", "pm", "grant", APP_PACKAGE,
-            "android.permission.RECORD_AUDIO"
-        )
-
+        execAdb("shell", "pm", "grant", APP_PACKAGE, "android.permission.CAMERA")
+        execAdb("shell", "pm", "grant", APP_PACKAGE, "android.permission.RECORD_AUDIO")
         println("[E2E Setup] Camera and microphone permissions granted")
-    }
-
-    /**
-     * Launch the calculator app using monkey command.
-     *
-     * @param container the running Docker container
-     */
-    fun launchCalculator(container: GenericContainer<*>) {
-        execInContainer(
-            container,
-            "adb", "shell", "monkey",
-            "-p", CALCULATOR_PACKAGE,
-            "-c", "android.intent.category.LAUNCHER",
-            "1"
-        )
-        Thread.sleep(2_000)
     }
 
     /**
@@ -312,74 +255,46 @@ object AndroidContainerSetup {
      * After writing the settings, this method polls `dumpsys accessibility` to verify
      * the service is actually connected before returning.
      *
-     * @param container the running Docker container
      * @param timeoutMs maximum time to wait for the service to connect (default 30 seconds)
      * @throws IllegalStateException if the service does not connect within timeout
      */
-    fun enableAccessibilityService(
-        container: GenericContainer<*>,
-        timeoutMs: Long = 30_000L,
-    ) {
+    fun enableAccessibilityService(timeoutMs: Long = 30_000L) {
         println("[E2E Setup] Enabling accessibility service...")
-
         val serviceComponent = "$APP_PACKAGE/$ACCESSIBILITY_SERVICE_CLASS"
 
-        execInContainer(
-            container,
-            "adb", "shell", "settings", "put", "secure",
-            "enabled_accessibility_services", serviceComponent
-        )
+        execAdb("shell", "settings", "put", "secure", "enabled_accessibility_services", serviceComponent)
+        execAdb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
 
-        execInContainer(
-            container,
-            "adb", "shell", "settings", "put", "secure",
-            "accessibility_enabled", "1"
-        )
-
-        // Poll dumpsys accessibility to verify the service is actually connected.
         println("[E2E Setup] Waiting for accessibility service to connect (timeout: ${timeoutMs}ms)...")
         val startTime = System.currentTimeMillis()
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             try {
-                val dumpsys = container.execInContainer(
-                    "sh", "-c",
-                    "adb shell dumpsys accessibility | grep -i McpAccessibilityService"
-                )
-                if (dumpsys.stdout.contains("McpAccessibilityService") &&
-                    dumpsys.stdout.contains("Service")
-                ) {
+                val dumpsys = execAdb("shell", "dumpsys", "accessibility")
+                if (dumpsys.contains("McpAccessibilityService") && dumpsys.contains("Service")) {
                     println("[E2E Setup] Accessibility service connected (${System.currentTimeMillis() - startTime}ms)")
                     return
                 }
-            } catch (_: Exception) {
-                // dumpsys might fail or return empty, keep polling
-            }
+            } catch (_: Exception) { }
             Thread.sleep(POLL_INTERVAL_MS)
         }
 
         throw IllegalStateException(
-            "Accessibility service did not connect within ${timeoutMs}ms. " +
-                "Component: $serviceComponent"
+            "Accessibility service did not connect within ${timeoutMs}ms. Component: $serviceComponent"
         )
     }
 
     /**
      * Checks whether the accessibility service is currently connected.
      *
-     * Runs `dumpsys accessibility` inside the container and checks for
+     * Runs `dumpsys accessibility` via host-side adb and checks for
      * `McpAccessibilityService` in the output.
      *
-     * @param container the running Docker container
      * @return true if the accessibility service appears connected
      */
-    fun isAccessibilityServiceConnected(container: GenericContainer<*>): Boolean =
+    fun isAccessibilityServiceConnected(): Boolean =
         try {
-            val dumpsys = container.execInContainer(
-                "sh", "-c",
-                "adb shell dumpsys accessibility | grep -i McpAccessibilityService"
-            )
-            dumpsys.stdout.contains("McpAccessibilityService") &&
-                dumpsys.stdout.contains("Service")
+            val dumpsys = execAdb("shell", "dumpsys", "accessibility")
+            dumpsys.contains("McpAccessibilityService") && dumpsys.contains("Service")
         } catch (_: Exception) {
             false
         }
@@ -389,14 +304,12 @@ object AndroidContainerSetup {
      *
      * This is intended to be called before each test method to recover from
      * transient accessibility service disconnections (e.g., after camera
-     * operations or app restarts on slow CI emulators).
-     *
-     * @param container the running Docker container
+     * operations or app restarts on slow CI).
      */
-    fun ensureAccessibilityService(container: GenericContainer<*>) {
-        if (isAccessibilityServiceConnected(container)) return
+    fun ensureAccessibilityService() {
+        if (isAccessibilityServiceConnected()) return
         println("[E2E Setup] Accessibility service not connected, re-enabling...")
-        enableAccessibilityService(container)
+        enableAccessibilityService()
     }
 
     /**
@@ -405,40 +318,25 @@ object AndroidContainerSetup {
      * Launches the app activity once to trigger initial DataStore creation,
      * then uses the debug-only BroadcastReceiver to inject test settings
      * (bearer token, binding address, port) via adb broadcast.
-     *
-     * @param container the running Docker container
      */
-    fun configureServerSettings(container: GenericContainer<*>) {
+    fun configureServerSettings() {
         println("[E2E Setup] Configuring MCP server settings...")
 
-        // Step 1: Launch the app briefly to trigger initial DataStore creation
-        execInContainer(
-            container,
-            "adb", "shell", "am", "start",
-            "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
-        )
+        execAdb("shell", "am", "start", "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS")
         Thread.sleep(5_000)
 
-        // Step 2: Force-stop the app so DataStore files are flushed to disk
-        execInContainer(
-            container,
-            "adb", "shell", "am", "force-stop", APP_PACKAGE
-        )
+        execAdb("shell", "am", "force-stop", APP_PACKAGE)
         Thread.sleep(1_000)
 
-        // Step 3: Write settings via adb broadcast to the debug-only E2EConfigReceiver.
-        // Use --include-stopped-packages since the app was just force-stopped.
-        // Use explicit FQCN for the component to avoid any resolution ambiguity.
         val configAction = "$APP_PACKAGE.E2E_CONFIGURE"
-        execInContainer(
-            container,
-            "adb", "shell", "am", "broadcast",
+        execAdb(
+            "shell", "am", "broadcast",
             "--include-stopped-packages",
             "-a", configAction,
             "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
             "--es", "bearer_token", E2E_BEARER_TOKEN,
             "--es", "binding_address", "0.0.0.0",
-            "--ei", "port", MCP_DEFAULT_PORT.toString()
+            "--ei", "port", MCP_DEFAULT_PORT.toString(),
         )
         Thread.sleep(3_000)
 
@@ -452,32 +350,37 @@ object AndroidContainerSetup {
      * The service is `exported=false` in the manifest, so it cannot be started
      * directly via `adb shell am startservice`. Instead, the E2EConfigReceiver
      * runs inside the app process and calls `context.startForegroundService()`.
-     *
-     * @param container the running Docker container
      */
-    fun startMcpServer(container: GenericContainer<*>) {
+    fun startMcpServer() {
         println("[E2E Setup] Starting MCP server...")
 
-        // Launch MainActivity to initialize the app
-        execInContainer(
-            container,
-            "adb", "shell", "am", "start",
-            "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
-        )
+        execAdb("shell", "am", "start", "-n", "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS")
         Thread.sleep(5_000)
 
-        // Start the McpServerService via broadcast to the debug-only E2EConfigReceiver.
-        // This runs inside the app process, bypassing the exported=false restriction.
         val startServerAction = "$APP_PACKAGE.E2E_START_SERVER"
-        execInContainer(
-            container,
-            "adb", "shell", "am", "broadcast",
+        execAdb(
+            "shell", "am", "broadcast",
             "-a", startServerAction,
-            "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS"
+            "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
         )
         Thread.sleep(5_000)
 
         println("[E2E Setup] MCP server start commands sent")
+    }
+
+    /**
+     * Launch the calculator app using am start.
+     *
+     * Uses `am start` with explicit component name instead of `monkey` because
+     * the `monkey` command is unavailable in redroid containers (exit 251).
+     */
+    fun launchCalculator() {
+        val result = execAdb(
+            "shell", "am", "start", "-W",
+            "-n", "$CALCULATOR_PACKAGE/.activities.MainActivity",
+        )
+        println("[E2E Setup] launchCalculator result: $result")
+        Thread.sleep(2_000)
     }
 
     /**
@@ -486,13 +389,11 @@ object AndroidContainerSetup {
      * Sends an HTTP POST to `/mcp` with a minimal JSON-RPC body. Any HTTP
      * response (even an error) proves the Ktor server is running and processing.
      *
-     * @param container the running Docker container (used for diagnostics on timeout)
      * @param baseUrl the base URL of the MCP server (e.g., "http://localhost:8080")
      * @param timeoutMs maximum time to wait for server ready (default 60 seconds)
      * @throws IllegalStateException if server does not become ready within timeout
      */
     fun waitForServerReady(
-        container: GenericContainer<*>,
         baseUrl: String,
         timeoutMs: Long = DEFAULT_SERVER_READY_TIMEOUT_MS,
     ) {
@@ -516,7 +417,6 @@ object AndroidContainerSetup {
                     it.write("""{"jsonrpc":"2.0","method":"ping","id":1}""".toByteArray())
                 }
                 val responseCode = conn.responseCode
-                // Any HTTP response means the server is up and processing requests
                 if (responseCode > 0) {
                     println(
                         "[E2E Setup] MCP server is ready " +
@@ -536,8 +436,7 @@ object AndroidContainerSetup {
             Thread.sleep(SERVER_READY_POLL_INTERVAL_MS)
         }
 
-        // Dump diagnostics before failing
-        dumpDiagnostics(container)
+        dumpDiagnostics()
 
         throw IllegalStateException(
             "MCP server did not become ready within ${timeoutMs}ms at $baseUrl"
@@ -547,7 +446,7 @@ object AndroidContainerSetup {
     /**
      * Get the mapped MCP server URL from a running container.
      *
-     * @param container the running Docker container
+     * @param container the running redroid container
      * @return the base URL for the MCP server (e.g., "http://localhost:32768")
      */
     fun getMcpServerUrl(container: GenericContainer<*>): String {
@@ -557,35 +456,142 @@ object AndroidContainerSetup {
     }
 
     /**
+     * Disconnect ADB from the redroid container.
+     * Best-effort cleanup — errors are silently ignored.
+     */
+    fun disconnectAdb() {
+        val serial = _adbSerial ?: return
+        try {
+            runProcess("adb", "disconnect", serial, timeoutSeconds = 10L)
+            println("[E2E Setup] Disconnected adb from $serial")
+        } catch (_: Exception) {
+            // Best-effort cleanup
+        }
+        _adbSerial = null
+    }
+
+    /**
+     * Ensures binder_linux and fuse kernel modules are loaded.
+     *
+     * On CI, modules are pre-loaded by the workflow. On local dev, attempts
+     * `sudo modprobe` and provides a clear error on failure.
+     *
+     * NOTE: Uses `sudo` — accepted exception to CLAUDE.md no-sudo rule.
+     * Kernel module loading is a host-OS operation required by redroid.
+     */
+    private fun ensureKernelModules() {
+        if (isModuleLoaded("binder_linux") && isModuleLoaded("fuse")) {
+            println("[E2E Setup] Kernel modules already loaded")
+            return
+        }
+
+        println("[E2E Setup] Loading kernel modules via sudo modprobe...")
+        try {
+            runProcess("sudo", "modprobe", "binder_linux", "devices=binder,hwbinder,vndbinder",
+                timeoutSeconds = 60L)
+            runProcess("sudo", "modprobe", "fuse", timeoutSeconds = 60L)
+            ensureBinderfs()
+            println("[E2E Setup] Kernel modules loaded successfully")
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Failed to load kernel modules required by redroid. " +
+                    "On Linux, ensure 'binder_linux' and 'fuse' modules are available. " +
+                    "Install with: sudo apt-get install linux-modules-extra-\$(uname -r) && " +
+                    "sudo modprobe binder_linux devices=\"binder,hwbinder,vndbinder\" && " +
+                    "sudo modprobe fuse. Error: ${e.message}",
+                e,
+            )
+        }
+    }
+
+    /**
+     * Mounts binderfs at /dev/binderfs/ if not already mounted.
+     * NOTE: Uses `sudo` — same accepted exception as ensureKernelModules.
+     */
+    private fun ensureBinderfs() {
+        try {
+            runProcess("mountpoint", "-q", "/dev/binderfs")
+            return // Already mounted
+        } catch (_: Exception) {
+            // Not mounted, proceed
+        }
+
+        println("[E2E Setup] Mounting binderfs at /dev/binderfs/...")
+        runProcess("sudo", "mkdir", "-p", "/dev/binderfs")
+        runProcess("sudo", "mount", "-t", "binder", "binder", "/dev/binderfs")
+    }
+
+    private fun isModuleLoaded(moduleName: String): Boolean =
+        try {
+            File("/proc/modules").readText().contains(moduleName)
+        } catch (_: Exception) {
+            false
+        }
+
+    private fun detectBinderDevMajor(): String =
+        try {
+            val output = runProcess("stat", "-c", "%Hr", "/dev/binderfs/binder-control")
+            if (output.isNotEmpty()) {
+                println("[E2E Setup] Binder device major: $output")
+                output
+            } else {
+                println("[E2E Setup] Could not detect binder device major, using default 10")
+                "10"
+            }
+        } catch (e: Exception) {
+            println("[E2E Setup] Binder device major detection failed: ${e.message}, using default 10")
+            "10"
+        }
+
+    private fun detectFuseDevMajorMinor(): String =
+        try {
+            val content = File("/sys/class/misc/fuse/dev").readText().trim()
+            if (content.isNotEmpty()) {
+                println("[E2E Setup] Fuse device major:minor: $content")
+                content
+            } else {
+                println("[E2E Setup] Could not detect fuse device, using default 10:229")
+                "10:229"
+            }
+        } catch (e: Exception) {
+            println("[E2E Setup] Fuse device detection failed: ${e.message}, using default 10:229")
+            "10:229"
+        }
+
+    /**
+     * Execute an adb command on the host targeting the redroid container.
+     * Returns stdout on success. Uses [PROCESS_TIMEOUT_SECONDS] timeout.
+     */
+    private fun execAdb(vararg args: String): String {
+        val command = arrayOf("adb", "-s", adbSerial) + args
+        return runProcess(*command)
+    }
+
+    /**
      * Dump diagnostic information to help debug server readiness issues.
      * Only called when the health check times out.
      */
-    private fun dumpDiagnostics(container: GenericContainer<*>) {
+    private fun dumpDiagnostics() {
         System.err.println("[E2E Diagnostics] === Server readiness timeout — dumping diagnostics ===")
 
         try {
-            val adbForwardList = container.execInContainer("adb", "forward", "--list")
-            System.err.println("[E2E Diagnostics] adb forward list: ${adbForwardList.stdout.trim()}")
+            val ss = execAdb("shell", "ss", "-tlnp")
+            System.err.println("[E2E Diagnostics] LISTEN ports: $ss")
         } catch (e: Exception) {
-            System.err.println("[E2E Diagnostics] adb forward --list failed: ${e.message}")
+            System.err.println("[E2E Diagnostics] ss failed: ${e.message}")
         }
 
         try {
-            val ss = container.execInContainer(
-                "sh", "-c",
-                "adb shell ss -tlnp 2>/dev/null | grep LISTEN"
-            )
-            System.err.println("[E2E Diagnostics] emulator LISTEN ports: ${ss.stdout.trim()}")
-        } catch (e: Exception) {
-            System.err.println("[E2E Diagnostics] emulator ss failed: ${e.message}")
-        }
-
-        try {
-            val logcat = container.execInContainer(
-                "sh", "-c",
-                "adb shell logcat -d -t 50 | grep -iE '(MCP|E2E|McpServer|FATAL)' | tail -20"
-            )
-            System.err.println("[E2E Diagnostics] logcat (MCP/E2E): ${logcat.stdout.trim()}")
+            val logcat = execAdb("shell", "logcat", "-d", "-t", "50")
+            val filtered = logcat.lines()
+                .filter {
+                    it.contains("MCP", ignoreCase = true) ||
+                        it.contains("E2E", ignoreCase = true) ||
+                        it.contains("FATAL", ignoreCase = true)
+                }
+                .takeLast(20)
+                .joinToString("\n")
+            System.err.println("[E2E Diagnostics] logcat (MCP/E2E): $filtered")
         } catch (e: Exception) {
             System.err.println("[E2E Diagnostics] logcat failed: ${e.message}")
         }
@@ -594,16 +600,41 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Execute a command inside the Docker container and return stdout.
+     * Runs a process with a timeout. Returns trimmed stdout on success.
+     * Destroys the process forcibly on timeout.
+     *
+     * Stdout is read in a separate thread to avoid deadlock: if the process
+     * hangs without closing stdout (e.g., `sudo` waiting for password),
+     * `readText()` would block forever, preventing `waitFor()` from firing.
+     * By reading in a thread, `waitFor()` can time out and `destroyForcibly()`.
      */
-    private fun execInContainer(container: GenericContainer<*>, vararg command: String): String {
-        val result = container.execInContainer(*command)
-        if (result.exitCode != 0) {
+    private fun runProcess(
+        vararg command: String,
+        timeoutSeconds: Long = PROCESS_TIMEOUT_SECONDS,
+    ): String {
+        val process = ProcessBuilder(*command).redirectErrorStream(true).start()
+        val outputBuilder = StringBuilder()
+        val readerThread = Thread {
+            try {
+                outputBuilder.append(process.inputStream.bufferedReader().readText())
+            } catch (_: Exception) { }
+        }.apply { isDaemon = true; start() }
+
+        if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            readerThread.join(1_000)
             throw IllegalStateException(
-                "[E2E Setup] Command '${command.joinToString(" ")}' failed with exit code " +
-                    "${result.exitCode}. stdout: ${result.stdout} stderr: ${result.stderr}"
+                "Process timed out after ${timeoutSeconds}s: ${command.joinToString(" ")}"
             )
         }
-        return result.stdout
+        readerThread.join(5_000)
+        val output = outputBuilder.toString().trim()
+
+        if (process.exitValue() != 0) {
+            throw IllegalStateException(
+                "Process '${command.joinToString(" ")}' failed (exit ${process.exitValue()}): $output"
+            )
+        }
+        return output
     }
 }

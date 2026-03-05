@@ -480,7 +480,7 @@ gh act --secret-file .secrets
 
 - **Android SDK**: CI containers may not have Android SDK pre-installed. Jobs requiring Android SDK (build, test) may need custom platform images (`-P`) or may only work fully on GitHub-hosted runners.
 - **Android Emulator**: Integration tests requiring an emulator are unlikely to work locally via `act` due to KVM/hardware acceleration requirements inside Docker. These jobs should be validated on GitHub.
-- **Docker-in-Docker**: E2E tests using Testcontainers (Docker Android) require Docker-in-Docker support, which may not work in all `act` configurations.
+- **Podman**: E2E tests using Testcontainers require rootful podman socket, which may not be available in all `act` configurations.
 - **Recommended local usage**: Use `gh act` primarily for validating workflow syntax, running lint jobs, and testing non-Android-specific jobs. Rely on GitHub-hosted runners for full Android CI.
 
 ### Workflow During Plan Implementation

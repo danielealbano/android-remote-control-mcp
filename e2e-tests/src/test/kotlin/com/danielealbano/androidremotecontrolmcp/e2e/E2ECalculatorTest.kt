@@ -23,24 +23,23 @@ import org.junit.jupiter.api.TestMethodOrder
  * E2E test: Calculator App (7 + 3 = 10)
  *
  * This test verifies the entire MCP stack by:
- * 1. Using the shared Docker Android emulator (via [SharedAndroidContainer])
+ * 1. Using the shared redroid container (via [SharedAndroidContainer])
  * 2. Using MCP tools to interact with the Simple Calculator app
  * 3. Verifying the calculation result via get_screen_state compact TSV output
  * 4. Verifying get_screen_state with include_screenshot returns valid image data
  *
- * Uses [SharedAndroidContainer] singleton to share the Docker container
+ * Uses [SharedAndroidContainer] singleton to share the redroid container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
  *
  * The Simple Calculator app (com.simplemobiletools.calculator) is installed
  * during container setup from test resources.
  *
- * Requires Docker to be available on the host machine.
+ * Requires rootful Podman to be available on the host machine.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2ECalculatorTest {
 
-    private val container = SharedAndroidContainer.container
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     companion object {
@@ -105,7 +104,7 @@ class E2ECalculatorTest {
         Thread.sleep(1_000)
 
         // Step 2: Launch Simple Calculator app via monkey command and poll for visibility
-        AndroidContainerSetup.launchCalculator(container)
+        AndroidContainerSetup.launchCalculator()
         val treeStrOrNull = waitForAppVisible(CALCULATOR_PACKAGE, "Calculator", APP_LAUNCH_TIMEOUT_MS)
         assertNotNull(
             treeStrOrNull,

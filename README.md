@@ -66,7 +66,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - **adb** (Android Debug Bridge) for device/emulator management
 
 ### For E2E Tests
-- **Docker** (for `budtmo/docker-android-x86` emulator image)
+- **Podman** (rootful, for `redroid/redroid` Android container image)
 
 Check all dependencies:
 ```bash
@@ -206,7 +206,7 @@ Runs JVM-based integration tests using Ktor `testApplication` (no device or emul
 make test-e2e
 ```
 
-Requires Docker. Starts a full Android emulator inside Docker, installs the app, and performs real MCP tool calls. Includes:
+Requires rootful Podman. Starts a redroid Android container via Podman, installs the app, and performs real MCP tool calls. Includes:
 - **Calculator test**: 7 + 3 = 10 via MCP tools (verifies full stack)
 - **Screenshot test**: Capture with different quality settings
 - **Error handling test**: Authentication, unknown tools, invalid params

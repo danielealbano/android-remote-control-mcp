@@ -51,16 +51,28 @@ tasks.withType<Test> {
         events("passed", "skipped", "failed")
     }
 
-    // Forward Docker-related environment variables to the forked test JVM
-    // so Testcontainers can discover the Docker environment.
-    listOf("DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE").forEach { key ->
+    // Forward Docker/Podman-related environment variables to the forked test JVM
+    // so Testcontainers can discover the container runtime environment.
+    listOf(
+        "DOCKER_HOST",
+        "DOCKER_TLS_VERIFY",
+        "DOCKER_CERT_PATH",
+        "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE",
+        "TESTCONTAINERS_RYUK_DISABLED",
+    ).forEach { key ->
         System.getenv(key)?.let { value -> environment(key, value) }
     }
 
-    // Ensure DOCKER_HOST is set for the test JVM when running on Linux with Docker CE.
+    // Ensure DOCKER_HOST is set for the test JVM when running on Linux.
     // Testcontainers 1.20.x may fail to auto-detect the Unix socket without this.
-    if (!environment.containsKey("DOCKER_HOST") && File("/var/run/docker.sock").exists()) {
-        environment("DOCKER_HOST", "unix:///var/run/docker.sock")
+    // Prefer podman rootful socket (required for redroid), fall back to Docker.
+    if (!environment.containsKey("DOCKER_HOST")) {
+        val podmanSocket = File("/run/podman/podman.sock")
+        val dockerSocket = File("/var/run/docker.sock")
+        when {
+            podmanSocket.exists() -> environment("DOCKER_HOST", "unix:///run/podman/podman.sock")
+            dockerSocket.exists() -> environment("DOCKER_HOST", "unix:///var/run/docker.sock")
+        }
     }
 
     // Pass the root project directory so tests can resolve paths relative to the project root.

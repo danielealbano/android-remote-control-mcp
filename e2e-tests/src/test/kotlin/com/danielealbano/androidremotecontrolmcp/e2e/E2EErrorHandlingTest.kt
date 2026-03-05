@@ -21,7 +21,7 @@ import java.net.URI
  * - Invalid tool parameters
  * - Node not found errors
  *
- * Uses [SharedAndroidContainer] singleton to share the Docker container
+ * Uses [SharedAndroidContainer] singleton to share the redroid container
  * across all E2E test classes, avoiding ~2-4 minute container boot per class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

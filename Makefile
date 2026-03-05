@@ -68,12 +68,12 @@ check-deps: ## Check for required development tools
 		echo "           Install Android SDK platform-tools"; \
 		MISSING=1; \
 	fi; \
-	if command -v docker >/dev/null 2>&1; then \
-		DOCKER_VER=$$(docker --version); \
-		echo "  [OK] $$DOCKER_VER"; \
+	if command -v podman >/dev/null 2>&1; then \
+		PODMAN_VER=$$(podman --version); \
+		echo "  [OK] $$PODMAN_VER"; \
 	else \
-		echo "  [MISSING] Docker (required for E2E tests)"; \
-		echo "           Install: https://docs.docker.com/get-docker/"; \
+		echo "  [MISSING] Podman (required for E2E tests)"; \
+		echo "           Install: https://podman.io/getting-started/installation"; \
 		MISSING=1; \
 	fi; \
 	if command -v go >/dev/null 2>&1; then \
@@ -137,8 +137,8 @@ test-unit: ## Run unit tests (includes integration tests since both are JVM-base
 test-integration: ## Run integration tests (JVM-based, no emulator required)
 	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) $(GRADLE) :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.*"
 
-test-e2e: ## Run E2E tests (requires Docker)
-	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) $(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
+test-e2e: ## Run E2E tests (requires rootful podman socket)
+	$(if $(wildcard .env),set -a && . ./.env && set +a &&,) DOCKER_HOST=unix:///run/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true $(GRADLE) :e2e-tests:cleanTest :e2e-tests:test
 
 test: test-unit test-e2e ## Run all tests
 
