@@ -13,7 +13,62 @@ plugins {
     jacoco
 }
 
-val versionNameProp = project.findProperty("VERSION_NAME") as String? ?: "1.0.0"
+/**
+ * Derives the version name from `git describe` output.
+ *
+ * Output formats handled:
+ * - "v1.2.3"              → exact tag    → "1.2.3"
+ * - "v1.2.3-7-gabc1234"   → after tag    → "1.2.3-dev.7+abc1234"
+ * - "v1.2.3-beta-7-g..."  → pre-release  → "1.2.3-beta-dev.7+abc1234"
+ * - "abc1234"              → no tags      → "0.0.0-dev+abc1234"
+ *
+ * Returns null when git is unavailable or the command fails.
+ */
+fun getGitDescribeVersion(): String? {
+    return try {
+        val process =
+            ProcessBuilder("git", "describe", "--tags", "--match", "v*", "--always")
+                .directory(rootDir)
+                .redirectErrorStream(true)
+                .start()
+        val output =
+            process
+                .inputStream
+                .bufferedReader()
+                .readText()
+                .trim()
+        val exitCode = process.waitFor()
+        if (exitCode != 0 || output.isEmpty()) return null
+
+        // Describe pattern checked first: the -N-gHASH suffix is unambiguous.
+        // Using (.+) for the version part lets the regex engine backtrack correctly
+        // even when pre-release segments contain hyphens (e.g. v1.0.0-rc1-3-g1234567).
+        val describePattern = Regex("""^v(.+)-(\d+)-g([0-9a-f]+)$""")
+        val tagPattern = Regex("""^v(\d+\.\d+\.\d+(?:-.+)?)$""")
+
+        when {
+            describePattern.matches(output) -> {
+                val match = describePattern.find(output)!!
+                val baseVersion = match.groupValues[1]
+                val commitCount = match.groupValues[2]
+                val hash = match.groupValues[3]
+                "$baseVersion-dev.$commitCount+$hash"
+            }
+            tagPattern.matches(output) -> tagPattern.find(output)!!.groupValues[1]
+            else -> "0.0.0-dev+$output"
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+val isExplicitVersion =
+    project.gradle.startParameter
+        .projectProperties
+        .containsKey("VERSION_NAME")
+val fallbackVersion = project.findProperty("VERSION_NAME") as String? ?: "1.0.0"
+val versionNameProp =
+    if (isExplicitVersion) fallbackVersion else (getGitDescribeVersion() ?: fallbackVersion)
 val versionCodeProp = (project.findProperty("VERSION_CODE") as String?)?.toInt() ?: 1
 
 android {
