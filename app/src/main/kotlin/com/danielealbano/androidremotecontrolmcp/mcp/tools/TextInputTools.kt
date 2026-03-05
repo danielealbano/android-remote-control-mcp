@@ -148,7 +148,7 @@ internal suspend fun typeCharByChar(
 }
 
 /**
- * Bundles immutable context for the commit-verify-retry loop, reducing parameter count.
+ * Bundles context for the commit-verify-retry loop, reducing parameter count.
  */
 private class TypingVerifyContext(
     val controller: TypeInputController,

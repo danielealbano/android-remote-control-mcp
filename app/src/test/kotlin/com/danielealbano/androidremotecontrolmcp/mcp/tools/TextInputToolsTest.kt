@@ -392,7 +392,7 @@ class TextInputToolsTest {
                         createMockSurroundingText("wrong")
                     } else {
                         // Second verify: success
-                        createMockSurroundingText(firstArg<Int>().let { "A" })
+                        createMockSurroundingText("A")
                     }
                 }
 
@@ -533,9 +533,9 @@ class TextInputToolsTest {
                 // Remaining chars at 100ms each
                 // If delay never recovered, total would be 9 * 150 = 1350ms + retry delay
                 // With recovery, total should be less than 1350ms
-                // 9 inter-char delays: 125 + 100 + 100 + ... = 125 + 8*100 = 925ms + 50ms retry
+                // 9 inter-char delays: 125 + 100*8 = 925ms + 50ms retry delay = 975ms
                 assertTrue(elapsed < 1200L)
-                assertTrue(elapsed >= 925L)
+                assertTrue(elapsed >= 975L)
             }
 
         @Test
