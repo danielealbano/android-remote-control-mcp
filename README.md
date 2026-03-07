@@ -54,6 +54,32 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for full tool documentation with inpu
 - Server log viewer (MCP tool calls, tunnel events)
 - Headless setup via ADB (configure, grant permissions, start/stop server without UI)
 
+### Comparison with Alternatives
+
+| Feature | This project | [mobile-mcp] | [Android-MCP] | [android-mcp-server] | [adb-mcp] | [droidrun-mcp] |
+|---------|:-:|:-:|:-:|:-:|:-:|:-:|
+| MCP tools | 54 | 21 | 11 | 5 | 10 | 11 |
+| Runs on the phone (no ADB) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Action latency | 10-100 ms | 1-4 s | 1-4 s | 1-4 s | 1-4 s | 1-4 s |
+| Works over the internet | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Token-efficient screen state | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Annotated screenshots | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Configurable screenshot resolution/quality | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Per-tool enable/disable | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Multi-device support | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Camera, clipboard, files, downloads | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| iOS support | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+[mobile-mcp]: https://github.com/mobile-next/mobile-mcp
+[Android-MCP]: https://github.com/CursorTouch/Android-MCP
+[android-mcp-server]: https://github.com/minhalvp/android-mcp-server
+[adb-mcp]: https://github.com/srmorete/adb-mcp
+[droidrun-mcp]: https://github.com/chukfinley/droidrun-mcp-server
+
+Most alternatives rely on ADB running on a host machine, which means a USB cable or local network connection and a computer sitting next to the phone. This project runs entirely on the device itself, so you can expose the MCP endpoint through a tunnel and control your phone from anywhere.
+
+On the token efficiency side, ADB-based tools typically return raw `uiautomator` XML dumps which can easily be 10-50x more verbose than the compact representation used here. Combined with numbered screenshot annotations, configurable image quality, and the ability to disable tools you don't need (every tool definition costs tokens on every turn), this significantly reduces the per-interaction cost in agentic loops.
+
 ---
 
 ## Requirements
