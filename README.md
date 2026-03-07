@@ -7,6 +7,8 @@ An Android application that runs as an **MCP (Model Context Protocol) server**, 
 
 The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device — reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
 
+> **⚠️ Disclaimer:** This software is provided "as-is" without warranty of any kind, for **research and educational purposes only**. The authors do not condone the use of this tool for any illegal, unauthorized, or unethical activities. Users are solely responsible for ensuring their use complies with all applicable laws and regulations. By using this software, you agree to use it responsibly and at your own risk.
+
 ---
 
 ## Features
