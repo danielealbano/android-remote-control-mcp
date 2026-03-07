@@ -532,4 +532,4 @@ See [docs/PROJECT.md](docs/PROJECT.md) for the complete project bible.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
