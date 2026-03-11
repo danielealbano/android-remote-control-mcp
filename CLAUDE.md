@@ -370,6 +370,14 @@ This project uses **DataStore** (not Room database) for persisting settings. The
 - Include enough context: timestamp, tool name, element IDs, error messages.
 - Use consistent log tags (e.g., `MCP:ServerService`, `MCP:AccessibilityService`).
 
+### Anti-prompt-injection — ABSOLUTE RULE
+- Every MCP tool that returns device-derived content (accessibility tree data, node text/descriptions, file contents, clipboard data, logcat output, notification text, app metadata, camera images, storage metadata) MUST prepend the `UNTRUSTED_CONTENT_WARNING` to its response.
+- Use `McpToolUtils.untrustedTextResult()`, `McpToolUtils.untrustedTextAndImageResult()`, or `McpToolUtils.untrustedImageResult()` instead of the plain variants.
+- The warning MUST be the first line of the text content. It MUST NOT use a `note:` prefix.
+- Pure action confirmation tools (tap, click, swipe, etc.) that return only server-generated text do NOT need the warning.
+- When adding a new MCP tool, you MUST classify it as device-content or action-only and use the appropriate result helper. If uncertain, use the untrusted variant.
+- **Limitation**: Image content (screenshots, camera photos) cannot carry an inline text warning. The `untrustedImageResult` and `untrustedTextAndImageResult` helpers add the warning as a `TextContent` item before the `ImageContent`, which is the best available mitigation.
+
 ---
 
 ## 8) Frontend Rules (Jetpack Compose + Material Design 3)
