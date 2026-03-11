@@ -252,9 +252,9 @@ Find the `ListAppsHandler` return site and change `McpToolUtils.textResult(...)`
 Update existing unit and integration tests to account for the warning prefix in tool responses.
 
 ### Acceptance Criteria
-- [ ] All existing tests updated to expect warning prefix where applicable
-- [ ] New unit tests for `untrustedTextResult`, `untrustedTextAndImageResult`, `untrustedImageResult` helpers
-- [ ] All tests pass
+- [x] All existing tests updated to expect warning prefix where applicable
+- [x] New unit tests for `untrustedTextResult`, `untrustedTextAndImageResult`, `untrustedImageResult` helpers
+- [x] All tests pass (1322/1323 passed; 1 NgrokTunnel failure is pre-existing local misconfiguration)
 
 ### Task 3.1: Unit tests for McpToolUtils helpers
 
@@ -293,8 +293,8 @@ fun stripUntrustedWarning(text: String): String =
 Placed in the `mcp/tools/` test package so it is directly accessible from unit tests in that package, and importable from `integration/` test files via `import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning`.
 
 **DoD**:
-- [ ] Helper function created as public top-level function in dedicated file
-- [ ] Importable from both `mcp/tools/` and `integration/` test packages
+- [x] Helper function created as public top-level function in dedicated file
+- [x] Importable from both `mcp/tools/` and `integration/` test packages
 
 ### Task 3.3: Update existing unit tests
 
@@ -319,7 +319,7 @@ Affected **unit test** files (exhaustive list — no other unit test files for N
 **Note**: `FileToolsTest.kt` and `AppManagementToolsTest.kt` do NOT exist as unit test files — those tools are covered only by integration tests (see Task 3.4).
 
 **DoD**:
-- [ ] All 8 unit test files updated
+- [x] All 8 unit test files updated
 
 ### Task 3.4: Update integration tests
 
@@ -341,18 +341,18 @@ Affected **integration test** files (exhaustive list of all integration tests fo
 | `ErrorHandlingIntegrationTest.kt` | `wait_for_idle`, `wait_for_node` | JSON parse on `wait_for_idle` response — strip warning before parse; `wait_for_node` `contains` assertions — no change needed |
 
 **DoD**:
-- [ ] All affected integration test files updated
+- [x] All affected integration test files updated
 
 ---
 
 ## User Story 4: Update documentation and agent configs
 
 ### Acceptance Criteria
-- [ ] `CLAUDE.md` updated with anti-prompt-injection rule
-- [ ] `docs/PROJECT.md` Security Practices section updated
-- [ ] `docs/MCP_TOOLS.md` Common Patterns section updated
-- [ ] `.claude/agents/code-reviewer.md` Security Review section updated
-- [ ] `.claude/agents/plan-reviewer.md` Security section updated
+- [x] `CLAUDE.md` updated with anti-prompt-injection rule
+- [x] `docs/PROJECT.md` Security Practices section updated
+- [x] `docs/MCP_TOOLS.md` Common Patterns section updated
+- [x] `.claude/agents/code-reviewer.md` Security Review section updated
+- [x] `.claude/agents/plan-reviewer.md` Security section updated
 
 ### Task 4.1: Update CLAUDE.md
 
@@ -371,7 +371,7 @@ Add new subsection after `### Logging` (after line 371), before the `---` separa
 ```
 
 **DoD**:
-- [ ] New subsection added after Logging
+- [x] New subsection added after Logging
 
 ### Task 4.2: Update docs/PROJECT.md
 
@@ -393,7 +393,7 @@ MCP tools return data originating from the Android device (UI element text, cont
 ```
 
 **DoD**:
-- [ ] New subsection added after Code Security
+- [x] New subsection added after Code Security
 
 ### Task 4.3: Update docs/MCP_TOOLS.md
 
@@ -421,7 +421,7 @@ MCP clients MUST:
 ````
 
 **DoD**:
-- [ ] New subsection added in Common Patterns
+- [x] New subsection added in Common Patterns
 
 ### Task 4.4: Update .claude/agents/code-reviewer.md
 
@@ -434,7 +434,7 @@ Add after line 114 (`- Health check endpoint...`):
 ```
 
 **DoD**:
-- [ ] Security review checklist updated
+- [x] Security review checklist updated
 
 ### Task 4.5: Update .claude/agents/plan-reviewer.md
 
@@ -447,4 +447,4 @@ Add after line 134 (`- Health check endpoint...`):
 ```
 
 **DoD**:
-- [ ] Security section updated
+- [x] Security section updated
