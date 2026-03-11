@@ -102,7 +102,7 @@ class CameraToolsTest {
                 val result = handler.execute(null)
                 val text = extractTextContent(result)
 
-                assertEquals("[]", text)
+                assertEquals("[]", stripUntrustedWarning(text))
             }
 
         @Test
@@ -269,8 +269,8 @@ class CameraToolsTest {
                 val params = buildJsonObject { put("camera_id", "0") }
                 val result = handler.execute(params)
 
-                assertEquals(1, result.content.size)
-                val imageContent = result.content[0] as ImageContent
+                assertEquals(2, result.content.size)
+                val imageContent = result.content[1] as ImageContent
                 assertEquals("base64data", imageContent.data)
                 assertEquals("image/jpeg", imageContent.mimeType)
             }
@@ -402,7 +402,7 @@ class CameraToolsTest {
                         put("quality", 1)
                     }
                 val result = handler.execute(params)
-                assertEquals(1, result.content.size)
+                assertEquals(2, result.content.size)
             }
 
         @Test
@@ -425,7 +425,7 @@ class CameraToolsTest {
                         put("quality", 100)
                     }
                 val result = handler.execute(params)
-                assertEquals(1, result.content.size)
+                assertEquals(2, result.content.size)
             }
 
         @Test

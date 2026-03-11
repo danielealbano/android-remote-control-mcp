@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementI
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -103,7 +104,7 @@ class UtilityIntegrationTest {
                 assertTrue(result.content.isNotEmpty())
 
                 val textContent = (result.content[0] as TextContent).text
-                val parsed = Json.parseToJsonElement(textContent).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(textContent)).jsonObject
                 assertEquals(
                     "clipboard text",
                     parsed["text"]?.jsonPrimitive?.content,
@@ -158,7 +159,7 @@ class UtilityIntegrationTest {
                 assertTrue(result.content.isNotEmpty())
 
                 val textContent = (result.content[0] as TextContent).text
-                val lines = textContent.split("\n")
+                val lines = stripUntrustedWarning(textContent).split("\n")
                 assertEquals("node_id\ttext\tdesc", lines[0])
                 assertEquals("node_a\tHello World\tA button", lines[1])
                 assertEquals("node_b\t-\t-", lines[2])
@@ -211,7 +212,7 @@ class UtilityIntegrationTest {
                     assertTrue(result.content.isNotEmpty())
 
                     val textContent = (result.content[0] as TextContent).text
-                    val parsed = Json.parseToJsonElement(textContent).jsonObject
+                    val parsed = Json.parseToJsonElement(stripUntrustedWarning(textContent)).jsonObject
                     assertEquals(
                         true,
                         parsed["found"]?.jsonPrimitive?.content?.toBoolean(),

@@ -155,7 +155,7 @@ class NodeActionToolsTest {
                 // Act
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
 
                 // Assert
                 val elements = parsed["nodes"]!!.jsonArray
@@ -179,7 +179,7 @@ class NodeActionToolsTest {
                 // Act
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
 
                 // Assert
                 val elements = parsed["nodes"]!!.jsonArray

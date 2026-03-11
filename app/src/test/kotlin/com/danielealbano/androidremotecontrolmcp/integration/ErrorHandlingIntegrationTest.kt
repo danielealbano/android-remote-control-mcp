@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -250,7 +251,7 @@ class ErrorHandlingIntegrationTest {
                         )
                     assertNotEquals(true, result.isError)
                     val text = (result.content[0] as TextContent).text
-                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                     assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("timed out") == true)
                     assertTrue(parsed.containsKey("similarity"))
                     assertTrue(parsed.containsKey("elapsedMs"))

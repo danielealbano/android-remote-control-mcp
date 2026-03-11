@@ -560,6 +560,93 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // untrustedTextResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("untrustedTextResult")
+    inner class UntrustedTextResultTests {
+        @Test
+        @DisplayName("prepends warning before content")
+        fun prependsWarningBeforeContent() {
+            val result = McpToolUtils.untrustedTextResult("some content")
+            assertEquals(1, result.content.size)
+            val text = (result.content[0] as TextContent).text
+            assertTrue(text.startsWith(McpToolUtils.UNTRUSTED_CONTENT_WARNING))
+            assertTrue(text.endsWith("some content"))
+        }
+
+        @Test
+        @DisplayName("text starts with warning then newline")
+        fun textStartsWithWarningThenNewline() {
+            val result = McpToolUtils.untrustedTextResult("data")
+            val text = (result.content[0] as TextContent).text
+            assertEquals("${McpToolUtils.UNTRUSTED_CONTENT_WARNING}\ndata", text)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // untrustedTextAndImageResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("untrustedTextAndImageResult")
+    inner class UntrustedTextAndImageResultTests {
+        @Test
+        @DisplayName("prepends warning to text and includes image")
+        fun prependsWarningToTextAndIncludesImage() {
+            val result = McpToolUtils.untrustedTextAndImageResult("info", "imgdata", "image/png")
+            assertEquals(2, result.content.size)
+            val text = result.content[0] as TextContent
+            val image = result.content[1] as ImageContent
+            assertTrue(text.text.startsWith(McpToolUtils.UNTRUSTED_CONTENT_WARNING))
+            assertTrue(text.text.endsWith("info"))
+            assertEquals("imgdata", image.data)
+            assertEquals("image/png", image.mimeType)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // untrustedImageResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("untrustedImageResult")
+    inner class UntrustedImageResultTests {
+        @Test
+        @DisplayName("adds warning as separate text content before image")
+        fun addsWarningAsSeparateTextBeforeImage() {
+            val result = McpToolUtils.untrustedImageResult("imgdata", "image/jpeg")
+            assertEquals(2, result.content.size)
+            val text = result.content[0] as TextContent
+            val image = result.content[1] as ImageContent
+            assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.text)
+            assertEquals("imgdata", image.data)
+            assertEquals("image/jpeg", image.mimeType)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // UNTRUSTED_CONTENT_WARNING constant
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("UNTRUSTED_CONTENT_WARNING")
+    inner class UntrustedContentWarningTests {
+        @Test
+        @DisplayName("is not empty")
+        fun isNotEmpty() {
+            assertTrue(McpToolUtils.UNTRUSTED_CONTENT_WARNING.isNotBlank())
+        }
+
+        @Test
+        @DisplayName("does not use note prefix")
+        fun doesNotUseNotePrefix() {
+            assertTrue(!McpToolUtils.UNTRUSTED_CONTENT_WARNING.lowercase().startsWith("note:"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // buildServerName
     // ─────────────────────────────────────────────────────────────────────
 

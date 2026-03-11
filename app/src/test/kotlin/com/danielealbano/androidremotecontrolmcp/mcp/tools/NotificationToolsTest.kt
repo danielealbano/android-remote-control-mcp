@@ -87,7 +87,7 @@ class NotificationToolsTest {
 
                 val result = handler.execute(null)
                 val text = (result.content[0] as TextContent).text
-                val json = Json.parseToJsonElement(text).jsonObject
+                val json = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals(1, json["count"]?.jsonPrimitive?.content?.toInt())
                 val notifications = json["notifications"]?.jsonArray
                 assertEquals(1, notifications?.size)
@@ -145,7 +145,7 @@ class NotificationToolsTest {
 
                 val result = handler.execute(null)
                 val text = (result.content[0] as TextContent).text
-                val json = Json.parseToJsonElement(text).jsonObject
+                val json = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals(0, json["count"]?.jsonPrimitive?.content?.toInt())
                 assertEquals(0, json["notifications"]?.jsonArray?.size)
             }

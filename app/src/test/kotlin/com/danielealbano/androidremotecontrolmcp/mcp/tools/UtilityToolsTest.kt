@@ -141,7 +141,7 @@ class UtilityToolsTest {
 
                 val result = tool.execute(null)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals("copied text", parsed["text"]?.jsonPrimitive?.content)
             }
 
@@ -152,7 +152,7 @@ class UtilityToolsTest {
 
                 val result = tool.execute(null)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertTrue(
                     parsed["text"]?.jsonPrimitive?.content == null ||
                         parsed["text"]?.jsonPrimitive?.content == "null",
@@ -207,7 +207,7 @@ class UtilityToolsTest {
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
                 assertEquals(
                     "node_abc",
@@ -289,7 +289,7 @@ class UtilityToolsTest {
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals(true, parsed["found"]?.jsonPrimitive?.content?.toBoolean())
                 assertTrue(parsed["attempts"]?.jsonPrimitive?.content?.toInt()!! >= 3)
             }
@@ -366,7 +366,7 @@ class UtilityToolsTest {
                 val params = buildJsonObject { put("timeout", 5000) }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
                 assertEquals(100, parsed["similarity"]?.jsonPrimitive?.int)
             }
@@ -381,7 +381,7 @@ class UtilityToolsTest {
                 val params = buildJsonObject { put("timeout", 5000) }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertEquals(100, parsed["similarity"]?.jsonPrimitive?.int)
             }
 
@@ -423,7 +423,7 @@ class UtilityToolsTest {
                         }
                     val result = tool.execute(params)
                     val text = extractTextContent(result)
-                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                     assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
                     val similarity = parsed["similarity"]?.jsonPrimitive?.int ?: 0
                     assertTrue(similarity in 80..100, "Expected similarity between 80 and 100, got $similarity")
@@ -475,7 +475,7 @@ class UtilityToolsTest {
                     val params = buildJsonObject { put("timeout", 1000) }
                     val result = tool.execute(params)
                     val text = extractTextContent(result)
-                    val parsed = Json.parseToJsonElement(text).jsonObject
+                    val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                     assertTrue(parsed.containsKey("similarity"))
                     assertTrue(parsed.containsKey("elapsedMs"))
                     assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("timed out") == true)
@@ -521,7 +521,7 @@ class UtilityToolsTest {
                 val params = buildJsonObject { put("timeout", 5000) }
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
-                val parsed = Json.parseToJsonElement(text).jsonObject
+                val parsed = Json.parseToJsonElement(stripUntrustedWarning(text)).jsonObject
                 assertTrue(parsed["message"]?.jsonPrimitive?.content?.contains("idle") == true)
             }
 
