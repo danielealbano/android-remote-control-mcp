@@ -229,6 +229,17 @@ class AccessibilityTreeParser
             for (i in 0 until childCount) {
                 val childNode = node.getChild(i)
                 if (childNode != null) {
+                    // Refresh nodes that are likely virtual (Compose, WebView, custom
+                    // AccessibilityNodeProvider implementations). Virtual nodes can
+                    // return stale cached data after recomposition/DOM changes.
+                    // - No viewIdResourceName: virtual nodes typically lack resource IDs
+                    // - Compose extra data key: definitive marker for Compose virtual nodes
+                    // Nodes with a resource ID are real Views and don't need refresh.
+                    if (childNode.viewIdResourceName == null ||
+                        childNode.availableExtraData.contains(COMPOSE_SEMANTICS_ID_KEY)
+                    ) {
+                        childNode.refresh()
+                    }
                     children.add(
                         parseNode(
                             node = childNode,
@@ -307,6 +318,12 @@ class AccessibilityTreeParser
             private const val ROOT_PARENT_ID = "root"
             private const val HASH_RADIX = 16
             internal const val MAX_TREE_DEPTH = 100
+
+            /**
+             * Extra data key added by Compose's AccessibilityNodeProvider to every
+             * virtual accessibility node. Present in [AccessibilityNodeInfo.getAvailableExtraData].
+             */
+            private const val COMPOSE_SEMANTICS_ID_KEY = "androidx.compose.ui.semantics.id"
 
             /** Maps [AccessibilityWindowInfo] type constants to human-readable labels. */
             fun mapWindowType(type: Int): String =

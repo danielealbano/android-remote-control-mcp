@@ -26,10 +26,11 @@ object AndroidContainerSetup {
     private const val ADB_PORT = 5555
     private const val MCP_DEFAULT_PORT = 8080
     private const val PROCESS_TIMEOUT_SECONDS = 30L
-    private const val MEMORY_BYTES = 4L * 1024 * 1024 * 1024 // 4 GB
+    private const val MEMORY_BYTES = 8L * 1024 * 1024 * 1024 // 8 GB
 
     private const val APP_PACKAGE = "com.danielealbano.androidremotecontrolmcp.debug"
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
+    private const val COMPOSE_TEST_PACKAGE = "com.danielealbano.composetestapp"
     private const val CALCULATOR_APK_RESOURCE = "/simple-calculator.apk"
     private const val E2E_CONFIG_RECEIVER_CLASS =
         "com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver"
@@ -170,12 +171,17 @@ object AndroidContainerSetup {
                         listOf(
                             "seccomp=unconfined",
                             "apparmor=unconfined",
-                            "unmask=/sys/fs/cgroup",
                         )
                     )
                     ?.withDevices(
-                        listOf(
+                        listOfNotNull(
                             Device("rwm", "/dev/fuse", "/dev/fuse"),
+                            if (java.io.File("/dev/dma_heap/system").exists())
+                                Device("rwm", "/dev/dma_heap/system", "/dev/dma_heap/system")
+                            else null,
+                            if (java.io.File("/dev/hwrng").exists())
+                                Device("rwm", "/dev/hw_random", "/dev/hwrng")
+                            else null,
                         )
                     )
                     ?.withDeviceCgroupRules(
@@ -382,6 +388,84 @@ object AndroidContainerSetup {
         println("[E2E Setup] launchCalculator result: $result")
         Thread.sleep(2_000)
     }
+
+    /**
+     * Launch the compose test app using am start.
+     */
+    fun launchComposeTestApp() {
+        val result = execAdb(
+            "shell", "am", "start", "-W",
+            "-n", "$COMPOSE_TEST_PACKAGE/.MainActivity",
+        )
+        println("[E2E Setup] launchComposeTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Send a broadcast to the compose test app to update the displayed number.
+     *
+     * @param number the number to display
+     */
+    fun sendComposeTestNumber(number: Int) {
+        val result = execAdb(
+            "shell", "am", "start",
+            "--activity-single-top",
+            "-n", "$COMPOSE_TEST_PACKAGE/.MainActivity",
+            "--ei", "number", number.toString(),
+        )
+        println("[E2E Setup] sendComposeTestNumber($number) result: $result")
+    }
+
+    /**
+     * Launch the WebView test activity using am start.
+     */
+    fun launchWebViewTestApp() {
+        val result = execAdb(
+            "shell", "am", "start", "-W",
+            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
+        )
+        println("[E2E Setup] launchWebViewTestApp result: $result")
+        Thread.sleep(3_000)
+    }
+
+    /**
+     * Send an intent to the WebView test activity to update the displayed number.
+     *
+     * @param number the number to display
+     */
+    fun sendWebViewTestNumber(number: Int) {
+        val result = execAdb(
+            "shell", "am", "start",
+            "--activity-single-top",
+            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
+            "--ei", "number", number.toString(),
+        )
+        println("[E2E Setup] sendWebViewTestNumber($number) result: $result")
+    }
+
+    /**
+     * Dump logcat lines from the compose test app for diagnostics.
+     *
+     * @return recent logcat lines matching the ComposeTestApp tag
+     */
+    fun dumpComposeTestAppLogs(): String =
+        try {
+            execAdb("shell", "logcat", "-d", "-s", "ComposeTestApp:I")
+        } catch (e: Exception) {
+            "Failed to dump logcat: ${e.message}"
+        }
+
+    /**
+     * Dump logcat lines from the WebView test activity for diagnostics.
+     *
+     * @return recent logcat lines matching the WebViewTestApp tag
+     */
+    fun dumpWebViewTestAppLogs(): String =
+        try {
+            execAdb("shell", "logcat", "-d", "-s", "WebViewTestApp:I")
+        } catch (e: Exception) {
+            "Failed to dump logcat: ${e.message}"
+        }
 
     /**
      * Poll the MCP endpoint until the server is ready to accept requests.

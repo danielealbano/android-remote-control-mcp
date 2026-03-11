@@ -646,6 +646,13 @@ internal fun getFreshWindows(
             for (window in accessibilityWindows) {
                 val rootNode = window.root ?: continue
 
+                // Force the accessibility framework to re-query the underlying
+                // AccessibilityNodeProvider (e.g., Compose's virtual node provider).
+                // Without this, window.root can return stale cached snapshots —
+                // particularly problematic for Jetpack Compose apps where
+                // TYPE_WINDOW_CONTENT_CHANGED events may be throttled or missed.
+                rootNode.refresh()
+
                 // Extract metadata BEFORE parsing
                 val wId = window.id
                 val windowPackage = rootNode.packageName?.toString()
@@ -711,6 +718,9 @@ internal fun getFreshWindows(
                 "No windows available and no active window root node. " +
                     "The screen may be transitioning.",
             )
+
+    // Force fresh data from the accessibility framework (see multi-window path comment).
+    rootNode.refresh()
 
     // Extract metadata from the root node before recycling.
     // Use rootNode.window (available API 21+) to detect the actual window type
