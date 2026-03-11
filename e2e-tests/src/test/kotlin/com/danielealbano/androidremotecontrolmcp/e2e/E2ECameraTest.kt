@@ -88,7 +88,7 @@ class E2ECameraTest {
         assertTrue(result.content.isNotEmpty(), "Result should have content")
 
         val textContent = result.content[0] as TextContent
-        val cameras = Json.parseToJsonElement(textContent.text).jsonArray
+        val cameras = Json.parseToJsonElement(stripUntrustedWarning(textContent.text)).jsonArray
 
         Assumptions.assumeTrue(
             cameras.isNotEmpty(),
@@ -131,7 +131,7 @@ class E2ECameraTest {
         val result = mcpClient.callTool("${TOOL_PREFIX}list_cameras")
 
         assertNotEquals(true, result.isError)
-        val cameras = Json.parseToJsonElement((result.content[0] as TextContent).text).jsonArray
+        val cameras = Json.parseToJsonElement(stripUntrustedWarning((result.content[0] as TextContent).text)).jsonArray
 
         Assumptions.assumeTrue(
             cameras.isNotEmpty(),
@@ -162,7 +162,7 @@ class E2ECameraTest {
 
         assertNotEquals(true, result.isError, "Should not return error for valid camera_id")
 
-        val resolutions = Json.parseToJsonElement((result.content[0] as TextContent).text).jsonArray
+        val resolutions = Json.parseToJsonElement(stripUntrustedWarning((result.content[0] as TextContent).text)).jsonArray
         assertTrue(resolutions.isNotEmpty(), "Camera should support at least one photo resolution")
 
         // Verify structure of first resolution
@@ -224,7 +224,7 @@ class E2ECameraTest {
 
         assertNotEquals(true, result.isError, "Should not return error for valid camera_id")
 
-        val resolutions = Json.parseToJsonElement((result.content[0] as TextContent).text).jsonArray
+        val resolutions = Json.parseToJsonElement(stripUntrustedWarning((result.content[0] as TextContent).text)).jsonArray
         assertTrue(resolutions.isNotEmpty(), "Camera should support at least one video resolution")
 
         // Verify structure
@@ -527,7 +527,7 @@ class E2ECameraTest {
         val result = mcpClient.callTool("${TOOL_PREFIX}list_cameras")
         assertNotEquals(true, result.isError, "list_cameras should succeed")
 
-        val cameras = Json.parseToJsonElement((result.content[0] as TextContent).text).jsonArray
+        val cameras = Json.parseToJsonElement(stripUntrustedWarning((result.content[0] as TextContent).text)).jsonArray
         Assumptions.assumeTrue(
             cameras.isNotEmpty(),
             "Skipping: no cameras available in redroid container",
