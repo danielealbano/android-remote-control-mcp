@@ -22,4 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "AndroidRemoteControlMcp"
 include(":app")
+include(":compose-test-app")
 include(":e2e-tests")
