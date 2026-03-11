@@ -417,6 +417,33 @@ object AndroidContainerSetup {
     }
 
     /**
+     * Launch the WebView test activity using am start.
+     */
+    fun launchWebViewTestApp() {
+        val result = execAdb(
+            "shell", "am", "start", "-W",
+            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
+        )
+        println("[E2E Setup] launchWebViewTestApp result: $result")
+        Thread.sleep(3_000)
+    }
+
+    /**
+     * Send an intent to the WebView test activity to update the displayed number.
+     *
+     * @param number the number to display
+     */
+    fun sendWebViewTestNumber(number: Int) {
+        val result = execAdb(
+            "shell", "am", "start",
+            "--activity-single-top",
+            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
+            "--ei", "number", number.toString(),
+        )
+        println("[E2E Setup] sendWebViewTestNumber($number) result: $result")
+    }
+
+    /**
      * Dump logcat lines from the compose test app for diagnostics.
      *
      * @return recent logcat lines matching the ComposeTestApp tag
@@ -424,6 +451,18 @@ object AndroidContainerSetup {
     fun dumpComposeTestAppLogs(): String =
         try {
             execAdb("shell", "logcat", "-d", "-s", "ComposeTestApp:I")
+        } catch (e: Exception) {
+            "Failed to dump logcat: ${e.message}"
+        }
+
+    /**
+     * Dump logcat lines from the WebView test activity for diagnostics.
+     *
+     * @return recent logcat lines matching the WebViewTestApp tag
+     */
+    fun dumpWebViewTestAppLogs(): String =
+        try {
+            execAdb("shell", "logcat", "-d", "-s", "WebViewTestApp:I")
         } catch (e: Exception) {
             "Failed to dump logcat: ${e.message}"
         }

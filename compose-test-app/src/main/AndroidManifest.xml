@@ -17,5 +17,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".WebViewActivity"
+            android:exported="true"
+            android:launchMode="singleTop" />
+
     </application>
 </manifest>
