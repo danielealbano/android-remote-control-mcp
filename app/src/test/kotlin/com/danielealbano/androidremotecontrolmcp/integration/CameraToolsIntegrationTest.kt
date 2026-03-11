@@ -6,8 +6,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.PhotoResolution
 import com.danielealbano.androidremotecontrolmcp.data.model.ScreenshotData
 import com.danielealbano.androidremotecontrolmcp.data.model.VideoResolution
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import com.danielealbano.androidremotecontrolmcp.services.camera.VideoRecordingResult
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
+import com.danielealbano.androidremotecontrolmcp.services.camera.VideoRecordingResult
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent

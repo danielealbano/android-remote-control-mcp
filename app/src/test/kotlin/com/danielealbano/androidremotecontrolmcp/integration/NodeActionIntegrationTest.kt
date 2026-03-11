@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.integration
 
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
@@ -13,7 +14,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowDa
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
