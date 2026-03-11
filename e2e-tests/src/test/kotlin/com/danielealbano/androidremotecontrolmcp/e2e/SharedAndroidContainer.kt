@@ -22,6 +22,13 @@ object SharedAndroidContainer {
     private const val APK_RELATIVE_PATH = "app/build/outputs/apk/debug/app-debug.apk"
 
     /**
+     * Path to the compose test app APK, relative to the project root.
+     * Built alongside the main APK via `./gradlew :compose-test-app:assembleDebug`.
+     */
+    private const val COMPOSE_TEST_APK_RELATIVE_PATH =
+        "compose-test-app/build/outputs/apk/debug/compose-test-app-debug.apk"
+
+    /**
      * Resolved absolute path to the APK, using the project root directory
      * passed as a system property from build.gradle.kts.
      */
@@ -29,6 +36,15 @@ object SharedAndroidContainer {
         val rootDir = System.getProperty("project.rootDir")
             ?: error("System property 'project.rootDir' not set. Run via Gradle.")
         "$rootDir/$APK_RELATIVE_PATH"
+    }
+
+    /**
+     * Resolved absolute path to the compose test app APK.
+     */
+    private val composeTestApkPath: String by lazy {
+        val rootDir = System.getProperty("project.rootDir")
+            ?: error("System property 'project.rootDir' not set. Run via Gradle.")
+        "$rootDir/$COMPOSE_TEST_APK_RELATIVE_PATH"
     }
 
     // Cached values set during successful initialization
@@ -71,6 +87,9 @@ object SharedAndroidContainer {
 
                 // Install calculator APK for E2E interaction tests
                 AndroidContainerSetup.installCalculatorApk()
+
+                // Install compose test app for accessibility tree refresh tests
+                AndroidContainerSetup.installApk(composeTestApkPath)
 
                 // Grant camera and microphone permissions for camera E2E tests
                 AndroidContainerSetup.grantCameraPermissions()
