@@ -96,6 +96,7 @@ object McpIntegrationTestHelper {
         every { mockWindowInfo.title } returns "Test"
         every { mockWindowInfo.layer } returns 0
         every { mockWindowInfo.isFocused } returns true
+        every { mockRootNode.refresh() } returns true
         every { mockRootNode.packageName } returns packageName
         every {
             deps.accessibilityServiceProvider.getAccessibilityWindows()

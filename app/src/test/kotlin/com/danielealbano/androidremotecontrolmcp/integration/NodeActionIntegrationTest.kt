@@ -238,6 +238,7 @@ class NodeActionIntegrationTest {
             every { mockWindowApp.title } returns "MyApp"
             every { mockWindowApp.layer } returns 0
             every { mockWindowApp.isFocused } returns false
+            every { mockRootApp.refresh() } returns true
             every { mockRootApp.packageName } returns "com.example.myapp"
 
             every { mockWindowDialog.id } returns 99
@@ -246,6 +247,7 @@ class NodeActionIntegrationTest {
             every { mockWindowDialog.title } returns "Permission"
             every { mockWindowDialog.layer } returns 1
             every { mockWindowDialog.isFocused } returns true
+            every { mockRootDialog.refresh() } returns true
             every { mockRootDialog.packageName } returns "com.android.permissioncontroller"
 
             every {
