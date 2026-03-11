@@ -99,7 +99,7 @@ class NotificationListHandler
                     }
                     put("count", notifications.size)
                 }
-            return McpToolUtils.textResult(json.toString())
+            return McpToolUtils.untrustedTextResult(json.toString())
         }
 
         fun register(

@@ -132,7 +132,7 @@ class ListAppsHandler
                     }
                 }
 
-            return McpToolUtils.textResult(Json.encodeToString(jsonResult))
+            return McpToolUtils.untrustedTextResult(Json.encodeToString(jsonResult))
         }
 
         fun register(

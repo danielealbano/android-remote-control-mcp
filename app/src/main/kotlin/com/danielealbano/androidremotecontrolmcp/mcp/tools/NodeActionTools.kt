@@ -91,7 +91,7 @@ class FindNodesTool
                     )
                 }
 
-            return McpToolUtils.textResult(Json.encodeToString(resultJson))
+            return McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
         }
 
         fun register(

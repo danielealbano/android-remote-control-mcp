@@ -121,7 +121,7 @@ class GetScreenStateHandler
                             ScreenCaptureProvider.DEFAULT_QUALITY,
                         )
 
-                    return McpToolUtils.textAndImageResult(
+                    return McpToolUtils.untrustedTextAndImageResult(
                         compactOutput,
                         screenshotData.data,
                         "image/jpeg",
@@ -140,7 +140,7 @@ class GetScreenStateHandler
             }
 
             // 6. Return text-only result
-            return McpToolUtils.textResult(compactOutput)
+            return McpToolUtils.untrustedTextResult(compactOutput)
         }
 
         /**

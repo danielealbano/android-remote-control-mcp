@@ -66,8 +66,8 @@ This plan adds a mandatory anti-prompt-injection warning as the **first line** o
 Add the warning constant and a helper function to prepend it to tool responses.
 
 ### Acceptance Criteria
-- [ ] Warning constant defined in `McpToolUtils`
-- [ ] Helper functions available for text, JSON, and image-only responses
+- [x] Warning constant defined in `McpToolUtils`
+- [x] Helper functions available for text, JSON, and image-only responses
 
 ### Task 1.1: Add constant and helpers to McpToolUtils
 
@@ -121,8 +121,8 @@ fun untrustedImageResult(
 ```
 
 **DoD**:
-- [ ] Constant and 3 helper functions added
-- [ ] No existing callers broken
+- [x] Constant and 3 helper functions added
+- [x] No existing callers broken
 
 ---
 
@@ -131,8 +131,8 @@ fun untrustedImageResult(
 Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResult`/`imageResult` to the `untrusted*` variants.
 
 ### Acceptance Criteria
-- [ ] All 21 tools in NEEDS_WARNING list use `untrusted*` helpers
-- [ ] Warning appears as first line in every device-content response
+- [x] All 21 tools in NEEDS_WARNING list use `untrusted*` helpers
+- [x] Warning appears as first line in every device-content response
 
 ### Task 2.1: ScreenIntrospectionTools.kt — `get_screen_state`
 
@@ -144,7 +144,7 @@ Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResu
 | Line ~143 | `McpToolUtils.textResult(compactOutput)` → `McpToolUtils.untrustedTextResult(compactOutput)` |
 
 **DoD**:
-- [ ] Both return paths use untrusted variants
+- [x] Both return paths use untrusted variants
 
 ### Task 2.2: NodeActionTools.kt — `find_nodes`
 
@@ -155,7 +155,7 @@ Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResu
 | Line ~94 | `McpToolUtils.textResult(Json.encodeToString(resultJson))` → `McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))` |
 
 **DoD**:
-- [ ] `find_nodes` uses untrusted variant
+- [x] `find_nodes` uses untrusted variant
 
 ### Task 2.3: UtilityTools.kt — `get_clipboard`, `wait_for_node`, `wait_for_idle`, `get_node_details`
 
@@ -173,7 +173,7 @@ Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResu
 **Note**: The `wait_for_node` timeout (line ~270) and `wait_for_idle` timeout (line ~420) paths return purely server-generated JSON (no device-derived content). The warning is applied uniformly to ALL return paths of a tool handler for consistency — splitting return paths within a single tool would add complexity for marginal benefit.
 
 **DoD**:
-- [ ] All 6 call sites switched to untrusted variants
+- [x] All 6 call sites switched to untrusted variants
 
 ### Task 2.4: TextInputTools.kt — `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`
 
@@ -188,7 +188,7 @@ Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResu
 | `type_clear_text` | Line ~927 | `McpToolUtils.textResult(...)` → `McpToolUtils.untrustedTextResult(...)` |
 
 **DoD**:
-- [ ] All 5 call sites switched to untrusted variants
+- [x] All 5 call sites switched to untrusted variants
 
 ### Task 2.5: SystemActionTools.kt — `get_device_logs`
 
@@ -197,7 +197,7 @@ Switch all tools classified as NEEDS_WARNING from `textResult`/`textAndImageResu
 Find the `GetDeviceLogsHandler` return site and change `McpToolUtils.textResult(...)` → `McpToolUtils.untrustedTextResult(...)`.
 
 **DoD**:
-- [ ] `get_device_logs` uses untrusted variant
+- [x] `get_device_logs` uses untrusted variant
 
 ### Task 2.6: NotificationTools.kt — `notification_list`
 
@@ -206,7 +206,7 @@ Find the `GetDeviceLogsHandler` return site and change `McpToolUtils.textResult(
 Find the `NotificationListHandler` return site and change `McpToolUtils.textResult(...)` → `McpToolUtils.untrustedTextResult(...)`.
 
 **DoD**:
-- [ ] `notification_list` uses untrusted variant
+- [x] `notification_list` uses untrusted variant
 
 ### Task 2.7: AppManagementTools.kt — `list_apps`
 
@@ -215,7 +215,7 @@ Find the `NotificationListHandler` return site and change `McpToolUtils.textResu
 Find the `ListAppsHandler` return site and change `McpToolUtils.textResult(...)` → `McpToolUtils.untrustedTextResult(...)`.
 
 **DoD**:
-- [ ] `list_apps` uses untrusted variant
+- [x] `list_apps` uses untrusted variant
 
 ### Task 2.8: CameraTools.kt — `list_cameras`, `list_camera_photo_resolutions`, `list_camera_video_resolutions`, `take_camera_photo`, `save_camera_video`
 
@@ -230,7 +230,7 @@ Find the `ListAppsHandler` return site and change `McpToolUtils.textResult(...)`
 | `save_camera_video` | `textAndImageResult(...)` → `untrustedTextAndImageResult(...)` |
 
 **DoD**:
-- [ ] All 5 camera tools switched to untrusted variants
+- [x] All 5 camera tools switched to untrusted variants
 
 ### Task 2.9: FileTools.kt — `list_storage_locations`, `list_files`, `read_file`
 
@@ -243,7 +243,7 @@ Find the `ListAppsHandler` return site and change `McpToolUtils.textResult(...)`
 | `read_file` | `textResult(...)` → `untrustedTextResult(...)` |
 
 **DoD**:
-- [ ] All 3 file read tools switched to untrusted variants
+- [x] All 3 file read tools switched to untrusted variants
 
 ---
 

@@ -53,7 +53,7 @@ class ListCamerasHandler
                     }
                 }
 
-            return McpToolUtils.textResult(jsonResult.toString())
+            return McpToolUtils.untrustedTextResult(jsonResult.toString())
         }
 
         fun register(
@@ -109,7 +109,7 @@ class ListCameraPhotoResolutionsHandler
                     }
                 }
 
-            return McpToolUtils.textResult(jsonResult.toString())
+            return McpToolUtils.untrustedTextResult(jsonResult.toString())
         }
 
         fun register(
@@ -175,7 +175,7 @@ class ListCameraVideoResolutionsHandler
                     }
                 }
 
-            return McpToolUtils.textResult(jsonResult.toString())
+            return McpToolUtils.untrustedTextResult(jsonResult.toString())
         }
 
         fun register(
@@ -266,7 +266,7 @@ class TakeCameraPhotoHandler
                     )
                 }
 
-            return McpToolUtils.imageResult(result.data, "image/jpeg")
+            return McpToolUtils.untrustedImageResult(result.data, "image/jpeg")
         }
 
         fun register(
@@ -512,7 +512,7 @@ class SaveCameraVideoHandler
                 "Video saved successfully: $path " +
                     "(${result.fileSizeBytes} bytes, ${result.durationMs}ms)"
 
-            return McpToolUtils.textAndImageResult(text, result.thumbnailData, "image/jpeg")
+            return McpToolUtils.untrustedTextAndImageResult(text, result.thumbnailData, "image/jpeg")
         }
 
         @Suppress("LongMethod")

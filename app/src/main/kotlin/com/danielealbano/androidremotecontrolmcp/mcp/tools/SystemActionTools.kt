@@ -398,7 +398,7 @@ class GetDeviceLogsHandler
                         put("truncated", truncated)
                     }
 
-                McpToolUtils.textResult(Json.encodeToString(resultJson))
+                McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
