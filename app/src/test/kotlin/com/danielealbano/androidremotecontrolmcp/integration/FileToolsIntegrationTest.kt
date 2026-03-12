@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageBackend
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileListResult
@@ -773,6 +774,149 @@ class FileToolsIntegrationTest {
                 assertEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
                 assertTrue(text.contains("Delete not allowed"))
+            }
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Builtin location tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `list_storage_locations includes builtin locations`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.storageLocationProvider.getAllLocations() } returns
+                listOf(
+                    StorageLocation(
+                        id = "builtin:downloads",
+                        name = "Downloads",
+                        path = "/Download",
+                        description = "",
+                        treeUri = "",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                        backend = StorageBackend.MEDIA_STORE,
+                        isBuiltin = true,
+                    ),
+                )
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(name = "android_list_storage_locations", arguments = emptyMap())
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("builtin:downloads"))
+                assertTrue(text.contains("Downloads"))
+            }
+        }
+
+    @Test
+    fun `list_files with builtin location ID succeeds`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.listFiles("builtin:downloads", "", 0, 200) } returns
+                FileListResult(files = emptyList(), totalCount = 0, hasMore = false)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_list_files",
+                        arguments = mapOf("location_id" to "builtin:downloads"),
+                    )
+                assertNotEquals(true, result.isError)
+            }
+        }
+
+    @Test
+    fun `read_file with builtin location ID succeeds`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.readFile("builtin:downloads", "test.txt", 1, 200) } returns
+                FileReadResult(content = "hello", totalLines = 1, hasMore = false, startLine = 1, endLine = 1)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_read_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "builtin:downloads",
+                                "path" to "test.txt",
+                            ),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("hello"))
+            }
+        }
+
+    @Test
+    fun `write_file with builtin location ID succeeds`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.writeFile("builtin:downloads", "test.txt", "content") } returns Unit
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_write_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "builtin:downloads",
+                                "path" to "test.txt",
+                                "content" to "content",
+                            ),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("written successfully"))
+            }
+        }
+
+    @Test
+    fun `download_from_url with builtin location ID succeeds`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery {
+                deps.fileOperationProvider.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+            } returns 5678L
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_download_from_url",
+                        arguments =
+                            mapOf(
+                                "location_id" to "builtin:downloads",
+                                "path" to "file.txt",
+                                "url" to "https://example.com/f",
+                            ),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("5678 bytes"))
+            }
+        }
+
+    @Test
+    fun `delete_file with builtin location ID succeeds`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            coEvery { deps.fileOperationProvider.deleteFile("builtin:downloads", "test.txt") } returns Unit
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_delete_file",
+                        arguments =
+                            mapOf(
+                                "location_id" to "builtin:downloads",
+                                "path" to "test.txt",
+                            ),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("deleted successfully"))
             }
         }
 }

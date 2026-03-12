@@ -9,6 +9,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.Test
 @DisplayName("AdbConfigHandler")
 class AdbConfigHandlerTest {
     private lateinit var settingsRepository: SettingsRepository
+    private lateinit var storageLocationProvider: StorageLocationProvider
     private lateinit var handler: AdbConfigHandler
     private lateinit var context: Context
 
@@ -82,8 +85,11 @@ class AdbConfigHandlerTest {
             }
         }
 
+        storageLocationProvider = mockk(relaxUnitFun = true)
+        coEvery { storageLocationProvider.isLocationAuthorized(any()) } returns false
+
         context = mockk(relaxed = true)
-        handler = AdbConfigHandler(settingsRepository)
+        handler = AdbConfigHandler(settingsRepository, storageLocationProvider)
     }
 
     @AfterEach
@@ -734,6 +740,83 @@ class AdbConfigHandlerTest {
                 coVerify(exactly = 0) { settingsRepository.updateBearerToken(any()) }
                 verify(exactly = 0) { context.startForegroundService(any()) }
                 verify(exactly = 0) { context.startService(any()) }
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Storage Location Permissions
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Storage Location Permissions")
+    inner class StorageLocationPermissionsTests {
+        @Test
+        @DisplayName("configure with storage_location_id and storage_allow_write updates")
+        fun storageAllowWriteUpdates() =
+            runTest {
+                coEvery { storageLocationProvider.isLocationAuthorized("loc1") } returns true
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_STORAGE_LOCATION_ID, "loc1")
+                        boolean(AdbConfigHandler.EXTRA_STORAGE_ALLOW_WRITE, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { storageLocationProvider.updateLocationAllowWrite("loc1", true) }
+            }
+
+        @Test
+        @DisplayName("configure with storage_location_id and storage_allow_delete updates")
+        fun storageAllowDeleteUpdates() =
+            runTest {
+                coEvery { storageLocationProvider.isLocationAuthorized("loc1") } returns true
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_STORAGE_LOCATION_ID, "loc1")
+                        boolean(AdbConfigHandler.EXTRA_STORAGE_ALLOW_DELETE, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { storageLocationProvider.updateLocationAllowDelete("loc1", true) }
+            }
+
+        @Test
+        @DisplayName("configure with unknown storage_location_id logs and skips")
+        fun unknownStorageLocationSkips() =
+            runTest {
+                coEvery { storageLocationProvider.isLocationAuthorized("unknown-loc") } returns false
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_STORAGE_LOCATION_ID, "unknown-loc")
+                        boolean(AdbConfigHandler.EXTRA_STORAGE_ALLOW_WRITE, true)
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { storageLocationProvider.updateLocationAllowWrite(any(), any()) }
+                coVerify(exactly = 0) { storageLocationProvider.updateLocationAllowDelete(any(), any()) }
+            }
+
+        @Test
+        @DisplayName("configure without storage_location_id skips")
+        fun noStorageLocationIdSkips() =
+            runTest {
+                val intent = createIntent(AdbConfigReceiver.ACTION_CONFIGURE)
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { storageLocationProvider.updateLocationAllowWrite(any(), any()) }
+                coVerify(exactly = 0) { storageLocationProvider.updateLocationAllowDelete(any(), any()) }
+            }
+
+        @Test
+        @DisplayName("configure with builtin location ID works")
+        fun builtinLocationIdWorks() =
+            runTest {
+                coEvery { storageLocationProvider.isLocationAuthorized("builtin:downloads") } returns true
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_STORAGE_LOCATION_ID, "builtin:downloads")
+                        boolean(AdbConfigHandler.EXTRA_STORAGE_ALLOW_WRITE, true)
+                        boolean(AdbConfigHandler.EXTRA_STORAGE_ALLOW_DELETE, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { storageLocationProvider.updateLocationAllowWrite("builtin:downloads", true) }
+                coVerify { storageLocationProvider.updateLocationAllowDelete("builtin:downloads", true) }
             }
     }
 

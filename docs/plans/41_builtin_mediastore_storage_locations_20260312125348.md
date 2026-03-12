@@ -1739,17 +1739,17 @@ Update class KDoc from `Lists user-added storage locations` to `Lists all availa
 ## User Story 8: Tests
 
 ### Acceptance Criteria
-- [ ] Unit tests for `BuiltinStorageLocation` enum helpers + path validation
-- [ ] Unit tests for `BuiltinPermissions` JSON serialization in `SettingsRepositoryImpl`
-- [ ] Unit tests for `PermissionChecker` impl
-- [ ] Unit tests for `StorageLocationProviderImpl` built-in integration
-- [ ] Unit tests for `MediaStoreFileOperationsImpl` (all methods + edge cases)
-- [ ] Unit tests for `FileOperationProviderImpl` routing
-- [ ] Unit tests for `MimeTypeUtils`
-- [ ] Unit tests for `AdbConfigHandler` storage permission extras
-- [ ] Unit tests for `E2EConfigReceiver` storage permission extras
-- [ ] Unit tests for `MainViewModel` refresh behavior
-- [ ] Integration tests for file tools with built-in locations (mock at `FileOperationProvider` level)
+- [x] Unit tests for `BuiltinStorageLocation` enum helpers + path validation
+- [x] Unit tests for `BuiltinPermissions` JSON serialization in `SettingsRepositoryImpl`
+- [x] Unit tests for `PermissionChecker` impl
+- [x] Unit tests for `StorageLocationProviderImpl` built-in integration
+- [x] Unit tests for `MediaStoreFileOperationsImpl` (all methods + edge cases)
+- [x] Unit tests for `FileOperationProviderImpl` routing
+- [x] Unit tests for `MimeTypeUtils`
+- [x] Unit tests for `AdbConfigHandler` storage permission extras
+- [x] Unit tests for `E2EConfigReceiver` storage permission extras
+- [x] Unit tests for `MainViewModel` refresh behavior
+- [x] Integration tests for file tools with built-in locations (mock at `FileOperationProvider` level)
 - [ ] All existing tests pass
 - **Note**: Compose UI tests are not included — the project does not have Compose UI tests in its test strategy. UI behavior (rendering, button visibility) is verified manually. ViewModel and provider logic IS tested.
 
@@ -1957,7 +1957,7 @@ Update class KDoc from `Lists user-added storage locations` to `Lists all availa
 | `delete_file with builtin location ID succeeds` | E2E routing |
 
 **Definition of Done**:
-- [ ] All test files created/modified
+- [x] All test files created/modified
 - [ ] All tests pass
 - [ ] No existing tests broken
 

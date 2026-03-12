@@ -11,6 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -51,6 +52,9 @@ class FileOperationProviderTest {
     @MockK
     private lateinit var mockSettingsRepository: SettingsRepository
 
+    @MockK
+    private lateinit var mockMediaStoreFileOperations: MediaStoreFileOperations
+
     private lateinit var provider: FileOperationProviderImpl
 
     private val mockTreeUri = mockk<Uri>()
@@ -74,6 +78,7 @@ class FileOperationProviderTest {
                 mockContext,
                 mockStorageLocationProvider,
                 mockSettingsRepository,
+                mockMediaStoreFileOperations,
             )
     }
 
@@ -1265,6 +1270,136 @@ class FileOperationProviderTest {
 
                 // Assert
                 assertEquals(mockFileUri, result)
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // MediaStore Routing
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("MediaStore Routing")
+    inner class MediaStoreRouting {
+        @Test
+        fun `listFiles routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.listFiles("builtin:downloads", "", 0, 200)
+                } returns FileListResult(files = emptyList(), totalCount = 0, hasMore = false)
+
+                val result = provider.listFiles("builtin:downloads", "", 0, 200)
+
+                assertEquals(0, result.totalCount)
+                coVerify { mockMediaStoreFileOperations.listFiles("builtin:downloads", "", 0, 200) }
+            }
+
+        @Test
+        fun `listFiles routes to SAF for non-builtin ID`() =
+            runTest {
+                setupAuthorizedLocation("loc1")
+                val mockDir = mockk<DocumentFile>()
+                setupRootDocument(mockDir)
+                every { mockDir.isDirectory } returns true
+                every { mockDir.listFiles() } returns emptyArray()
+
+                provider.listFiles("loc1", "", 0, 10)
+
+                coVerify(exactly = 0) { mockMediaStoreFileOperations.listFiles(any(), any(), any(), any()) }
+            }
+
+        @Test
+        fun `readFile routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.readFile("builtin:downloads", "test.txt", 1, 200)
+                } returns FileReadResult(content = "hello", totalLines = 1, hasMore = false, startLine = 1, endLine = 1)
+
+                val result = provider.readFile("builtin:downloads", "test.txt", 1, 200)
+
+                assertEquals("hello", result.content)
+                coVerify { mockMediaStoreFileOperations.readFile("builtin:downloads", "test.txt", 1, 200) }
+            }
+
+        @Test
+        fun `writeFile routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.writeFile("builtin:downloads", "test.txt", "content")
+                } returns Unit
+
+                provider.writeFile("builtin:downloads", "test.txt", "content")
+
+                coVerify { mockMediaStoreFileOperations.writeFile("builtin:downloads", "test.txt", "content") }
+            }
+
+        @Test
+        fun `appendFile routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.appendFile("builtin:downloads", "test.txt", "more")
+                } returns Unit
+
+                provider.appendFile("builtin:downloads", "test.txt", "more")
+
+                coVerify { mockMediaStoreFileOperations.appendFile("builtin:downloads", "test.txt", "more") }
+            }
+
+        @Test
+        fun `replaceInFile routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.replaceInFile("builtin:downloads", "test.txt", "old", "new", false)
+                } returns FileReplaceResult(1)
+
+                val result = provider.replaceInFile("builtin:downloads", "test.txt", "old", "new", false)
+
+                assertEquals(1, result.replacementCount)
+                coVerify {
+                    mockMediaStoreFileOperations.replaceInFile("builtin:downloads", "test.txt", "old", "new", false)
+                }
+            }
+
+        @Test
+        fun `downloadFromUrl routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+                } returns 1234L
+
+                val result = provider.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+
+                assertEquals(1234L, result)
+                coVerify {
+                    mockMediaStoreFileOperations.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+                }
+            }
+
+        @Test
+        fun `deleteFile routes to MediaStore for builtin ID`() =
+            runTest {
+                coEvery {
+                    mockMediaStoreFileOperations.deleteFile("builtin:downloads", "test.txt")
+                } returns Unit
+
+                provider.deleteFile("builtin:downloads", "test.txt")
+
+                coVerify { mockMediaStoreFileOperations.deleteFile("builtin:downloads", "test.txt") }
+            }
+
+        @Test
+        fun `createFileUri routes to MediaStore for builtin ID`() =
+            runTest {
+                val mockUri = mockk<Uri>()
+                coEvery {
+                    mockMediaStoreFileOperations.createFileUri("builtin:downloads", "test.jpg", "image/jpeg")
+                } returns mockUri
+
+                val result = provider.createFileUri("builtin:downloads", "test.jpg", "image/jpeg")
+
+                assertEquals(mockUri, result)
+                coVerify {
+                    mockMediaStoreFileOperations.createFileUri("builtin:downloads", "test.jpg", "image/jpeg")
+                }
             }
     }
 
