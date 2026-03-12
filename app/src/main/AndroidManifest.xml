@@ -101,6 +101,12 @@
             android:exported="true">
         </receiver>
 
+        <!-- E2E Configuration Receiver (test configuration injection via adb shell) -->
+        <receiver
+            android:name=".debug.E2EConfigReceiver"
+            android:exported="true">
+        </receiver>
+
         <!-- ADB Service Trampoline (headless start/stop via adb shell am start) -->
         <activity
             android:name=".services.mcp.AdbServiceTrampolineActivity"

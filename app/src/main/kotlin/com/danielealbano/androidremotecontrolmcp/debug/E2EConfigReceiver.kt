@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
@@ -57,6 +58,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
         // Log immediately to verify receiver is being called
         Log.i(TAG, "!!! onReceive called with action: ${intent.action}")
 
+        @Suppress("TooGenericExceptionCaught")
         try {
             when (intent.action) {
                 ACTION_E2E_CONFIGURE -> handleConfigure(intent)
@@ -92,7 +94,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 settingsRepository.updateBindingAddress(address)
                 Log.i(TAG, "Binding address updated to $address")
             }
-            if (port in 1..65535) {
+            if (port in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
                 settingsRepository.updatePort(port)
                 Log.i(TAG, "Port updated to $port")
             }
