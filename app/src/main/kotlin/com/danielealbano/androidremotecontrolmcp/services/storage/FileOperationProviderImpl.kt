@@ -258,6 +258,7 @@ class FileOperationProviderImpl
         // replaceInFile
         // ─────────────────────────────────────────────────────────────────────
 
+        @Suppress("ReturnCount")
         override suspend fun replaceInFile(
             locationId: String,
             path: String,

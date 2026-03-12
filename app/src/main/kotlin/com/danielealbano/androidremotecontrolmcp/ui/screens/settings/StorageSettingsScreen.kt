@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,11 +55,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
@@ -165,10 +165,11 @@ fun StorageSettingsScreen(
 
                 builtinLocations.forEach { location ->
                     val builtin = BuiltinStorageLocation.fromLocationId(location.id)
-                    val hasAllFiles = builtin?.readMediaPermission?.let {
-                        ContextCompat.checkSelfPermission(context, it) ==
-                            PackageManager.PERMISSION_GRANTED
-                    } ?: false
+                    val hasAllFiles =
+                        builtin?.readMediaPermission?.let {
+                            ContextCompat.checkSelfPermission(context, it) ==
+                                PackageManager.PERMISSION_GRANTED
+                        } ?: false
                     BuiltinStorageLocationRow(
                         location = location,
                         hasAllFilesPermission = hasAllFiles,
@@ -601,6 +602,7 @@ private fun StorageLocationRow(
     }
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun BuiltinStorageLocationRow(
     location: StorageLocation,

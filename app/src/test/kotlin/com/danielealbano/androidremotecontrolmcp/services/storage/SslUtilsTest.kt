@@ -2,10 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import io.mockk.mockk
 import io.mockk.verify
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLSocketFactory
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLSocketFactory
 
 @DisplayName("SslUtils")
 class SslUtilsTest {

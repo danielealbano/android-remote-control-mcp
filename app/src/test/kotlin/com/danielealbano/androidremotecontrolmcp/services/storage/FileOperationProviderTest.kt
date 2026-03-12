@@ -1363,14 +1363,27 @@ class FileOperationProviderTest {
         fun `downloadFromUrl routes to MediaStore for builtin ID`() =
             runTest {
                 coEvery {
-                    mockMediaStoreFileOperations.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+                    mockMediaStoreFileOperations.downloadFromUrl(
+                        "builtin:downloads",
+                        "file.txt",
+                        "https://example.com/f",
+                    )
                 } returns 1234L
 
-                val result = provider.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+                val result =
+                    provider.downloadFromUrl(
+                        "builtin:downloads",
+                        "file.txt",
+                        "https://example.com/f",
+                    )
 
                 assertEquals(1234L, result)
                 coVerify {
-                    mockMediaStoreFileOperations.downloadFromUrl("builtin:downloads", "file.txt", "https://example.com/f")
+                    mockMediaStoreFileOperations.downloadFromUrl(
+                        "builtin:downloads",
+                        "file.txt",
+                        "https://example.com/f",
+                    )
                 }
             }
 

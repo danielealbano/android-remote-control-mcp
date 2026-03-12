@@ -33,18 +33,19 @@ class StorageLocationProviderImpl
         override suspend fun getAllLocations(): List<StorageLocation> {
             val builtins = buildBuiltinLocations()
             val stored = settingsRepository.getStoredLocations()
-            val safLocations = stored.map { loc ->
-                StorageLocation(
-                    id = loc.id,
-                    name = loc.name,
-                    path = loc.path,
-                    description = loc.description,
-                    treeUri = loc.treeUri,
-                    availableBytes = queryAvailableBytes(loc.treeUri),
-                    allowWrite = loc.allowWrite,
-                    allowDelete = loc.allowDelete,
-                )
-            }
+            val safLocations =
+                stored.map { loc ->
+                    StorageLocation(
+                        id = loc.id,
+                        name = loc.name,
+                        path = loc.path,
+                        description = loc.description,
+                        treeUri = loc.treeUri,
+                        availableBytes = queryAvailableBytes(loc.treeUri),
+                        allowWrite = loc.allowWrite,
+                        allowDelete = loc.allowDelete,
+                    )
+                }
             return builtins + safLocations
         }
 
@@ -155,6 +156,7 @@ class StorageLocationProviderImpl
             return location?.let { Uri.parse(it.treeUri) }
         }
 
+        @Suppress("ReturnCount")
         override suspend fun getLocationById(locationId: String): StorageLocation? {
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return buildBuiltinLocations().find { it.id == locationId }
@@ -219,6 +221,7 @@ class StorageLocationProviderImpl
             return settingsRepository.getStoredLocations().any { it.treeUri == treeUriString }
         }
 
+        @Suppress("ReturnCount")
         override suspend fun isAllFilesMode(locationId: String): Boolean {
             val builtin = BuiltinStorageLocation.fromLocationId(locationId) ?: return false
             val permission = builtin.readMediaPermission ?: return false
@@ -234,8 +237,9 @@ class StorageLocationProviderImpl
             val availableBytes = querySharedStorageAvailableBytes()
             return BuiltinStorageLocation.entries.map { entry ->
                 val perms = permOverrides[entry.locationId] ?: BuiltinPermissions()
-                val allFilesMode = entry.readMediaPermission != null &&
-                    permissionChecker.hasPermission(entry.readMediaPermission)
+                val allFilesMode =
+                    entry.readMediaPermission != null &&
+                        permissionChecker.hasPermission(entry.readMediaPermission)
                 val displayName = if (allFilesMode) entry.displayNameAll else entry.displayNameOwned
                 StorageLocation(
                     id = entry.locationId,

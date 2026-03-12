@@ -22,10 +22,16 @@ object SslUtils {
             @Suppress("CustomX509TrustManager")
             object : X509TrustManager {
                 @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) { }
+                override fun checkClientTrusted(
+                    chain: Array<X509Certificate>,
+                    authType: String,
+                ) { }
 
                 @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) { }
+                override fun checkServerTrusted(
+                    chain: Array<X509Certificate>,
+                    authType: String,
+                ) { }
 
                 override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
             }

@@ -246,8 +246,14 @@ interface SettingsRepository {
     suspend fun getBuiltinLocationPermissions(): Map<String, BuiltinPermissions>
 
     /** Updates the allowWrite flag for a built-in location. */
-    suspend fun updateBuiltinLocationAllowWrite(locationId: String, allowWrite: Boolean)
+    suspend fun updateBuiltinLocationAllowWrite(
+        locationId: String,
+        allowWrite: Boolean,
+    )
 
     /** Updates the allowDelete flag for a built-in location. */
-    suspend fun updateBuiltinLocationAllowDelete(locationId: String, allowDelete: Boolean)
+    suspend fun updateBuiltinLocationAllowDelete(
+        locationId: String,
+        allowDelete: Boolean,
+    )
 }

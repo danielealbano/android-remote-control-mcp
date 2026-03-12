@@ -316,7 +316,10 @@ class SettingsRepositoryImpl
             return parseBuiltinPermissionsJson(json)
         }
 
-        override suspend fun updateBuiltinLocationAllowWrite(locationId: String, allowWrite: Boolean) {
+        override suspend fun updateBuiltinLocationAllowWrite(
+            locationId: String,
+            allowWrite: Boolean,
+        ) {
             dataStore.edit { prefs ->
                 val current = getBuiltinLocationPermissionsInternal(prefs)
                 val existing = current[locationId] ?: BuiltinPermissions()
@@ -325,7 +328,10 @@ class SettingsRepositoryImpl
             }
         }
 
-        override suspend fun updateBuiltinLocationAllowDelete(locationId: String, allowDelete: Boolean) {
+        override suspend fun updateBuiltinLocationAllowDelete(
+            locationId: String,
+            allowDelete: Boolean,
+        ) {
             dataStore.edit { prefs ->
                 val current = getBuiltinLocationPermissionsInternal(prefs)
                 val existing = current[locationId] ?: BuiltinPermissions()
@@ -340,10 +346,11 @@ class SettingsRepositoryImpl
                 val root = Json.parseToJsonElement(json).jsonObject
                 root.entries.associate { (key, value) ->
                     val obj = value.jsonObject
-                    key to BuiltinPermissions(
-                        allowWrite = obj["allowWrite"]?.jsonPrimitive?.booleanOrNull ?: false,
-                        allowDelete = obj["allowDelete"]?.jsonPrimitive?.booleanOrNull ?: false,
-                    )
+                    key to
+                        BuiltinPermissions(
+                            allowWrite = obj["allowWrite"]?.jsonPrimitive?.booleanOrNull ?: false,
+                            allowDelete = obj["allowDelete"]?.jsonPrimitive?.booleanOrNull ?: false,
+                        )
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to parse builtin location permissions JSON", e)
