@@ -1593,11 +1593,11 @@ Add strings:
 ## User Story 6: ADB Intent Configuration for Storage Permissions
 
 ### Acceptance Criteria
-- [ ] `AdbConfigHandler` supports `storage_location_id`, `storage_allow_write`, `storage_allow_delete` extras
-- [ ] Works for both built-in and SAF location IDs
-- [ ] `E2EConfigReceiver` supports the same extras
-- [ ] Missing extras silently ignored
-- [ ] Invalid location IDs logged and ignored
+- [x] `AdbConfigHandler` supports `storage_location_id`, `storage_allow_write`, `storage_allow_delete` extras
+- [x] Works for both built-in and SAF location IDs
+- [x] `E2EConfigReceiver` supports the same extras
+- [x] Missing extras silently ignored
+- [x] Invalid location IDs logged and ignored
 
 ### Task 6.1: Update AdbConfigHandler and AdbConfigReceiver
 
@@ -1653,10 +1653,10 @@ val handler = AdbConfigHandler(settingsRepository, storageLocationProvider)
 ```
 
 **Definition of Done**:
-- [ ] 3 new extras defined
-- [ ] `applyStorageLocationPermissions` validates and applies
-- [ ] `AdbConfigReceiver` injects and passes `StorageLocationProvider`
-- [ ] Works for `builtin:` and SAF IDs
+- [x] 3 new extras defined
+- [x] `applyStorageLocationPermissions` validates and applies
+- [x] `AdbConfigReceiver` injects and passes `StorageLocationProvider`
+- [x] Works for `builtin:` and SAF IDs
 
 ### Task 6.2: Update E2EConfigReceiver
 
@@ -1698,9 +1698,9 @@ val handler = AdbConfigHandler(settingsRepository, storageLocationProvider)
    ```
 
 **Definition of Done**:
-- [ ] E2E receiver handles storage permission extras
-- [ ] `StorageLocationProvider` injected
-- [ ] Same behavior as AdbConfigHandler
+- [x] E2E receiver handles storage permission extras
+- [x] `StorageLocationProvider` injected
+- [x] Same behavior as AdbConfigHandler
 
 ---
 

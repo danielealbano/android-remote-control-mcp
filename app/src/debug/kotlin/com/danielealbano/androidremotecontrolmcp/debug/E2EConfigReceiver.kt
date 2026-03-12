@@ -7,6 +7,7 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,9 @@ import javax.inject.Inject
 class E2EConfigReceiver : BroadcastReceiver() {
     @Inject
     lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var storageLocationProvider: StorageLocationProvider
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -96,6 +100,23 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 settingsRepository.updateAutoStartOnBoot(autoStart)
                 Log.i(TAG, "Auto-start on boot updated to $autoStart")
             }
+            val storageLocationId = intent.getStringExtra(EXTRA_STORAGE_LOCATION_ID)
+            if (!storageLocationId.isNullOrEmpty()) {
+                if (storageLocationProvider.isLocationAuthorized(storageLocationId)) {
+                    if (intent.hasExtra(EXTRA_STORAGE_ALLOW_WRITE)) {
+                        val allowWrite = intent.getBooleanExtra(EXTRA_STORAGE_ALLOW_WRITE, false)
+                        storageLocationProvider.updateLocationAllowWrite(storageLocationId, allowWrite)
+                        Log.i(TAG, "Storage location allowWrite=$allowWrite")
+                    }
+                    if (intent.hasExtra(EXTRA_STORAGE_ALLOW_DELETE)) {
+                        val allowDelete = intent.getBooleanExtra(EXTRA_STORAGE_ALLOW_DELETE, false)
+                        storageLocationProvider.updateLocationAllowDelete(storageLocationId, allowDelete)
+                        Log.i(TAG, "Storage location allowDelete=$allowDelete")
+                    }
+                } else {
+                    Log.w(TAG, "Unknown storage location: $storageLocationId")
+                }
+            }
             Log.i(TAG, "E2E configuration applied successfully")
         }
     }
@@ -118,5 +139,8 @@ class E2EConfigReceiver : BroadcastReceiver() {
         private const val EXTRA_BINDING_ADDRESS = "binding_address"
         private const val EXTRA_PORT = "port"
         private const val EXTRA_AUTO_START_ON_BOOT = "auto_start_on_boot"
+        private const val EXTRA_STORAGE_LOCATION_ID = "storage_location_id"
+        private const val EXTRA_STORAGE_ALLOW_WRITE = "storage_allow_write"
+        private const val EXTRA_STORAGE_ALLOW_DELETE = "storage_allow_delete"
     }
 }
