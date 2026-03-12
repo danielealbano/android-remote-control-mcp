@@ -1410,9 +1410,9 @@ abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): M
 ## User Story 4: Android Permissions & Manifest
 
 ### Acceptance Criteria
-- [ ] Manifest declares READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO
-- [ ] `make grant-permissions` grants the 3 media permissions
-- [ ] Permissions are optional — app works without them
+- [x] Manifest declares READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO
+- [x] `make grant-permissions` grants the 3 media permissions
+- [x] Permissions are optional — app works without them
 
 ### Task 4.1: Add READ_MEDIA_* permissions to manifest
 
@@ -1427,7 +1427,7 @@ Add after the Camera/Audio block (after line 25):
 ```
 
 **Definition of Done**:
-- [ ] 3 permissions added
+- [x] 3 permissions added
 
 ### Task 4.2: Update Makefile grant-permissions
 
@@ -1456,8 +1456,8 @@ Add 3 steps after step 5 (Notification Listener):
 ```
 
 **Definition of Done**:
-- [ ] 3 media permission grants added
-- [ ] Target comment updated
+- [x] 3 media permission grants added
+- [x] Target comment updated
 
 ---
 

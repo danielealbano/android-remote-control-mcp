@@ -170,7 +170,7 @@ uninstall: ## Uninstall app from connected device/emulator
 	$(ADB) uninstall $(APP_ID) 2>/dev/null || true
 	$(ADB) uninstall $(APP_ID_DEBUG) 2>/dev/null || true
 
-grant-permissions: ## Grant permissions via adb (accessibility + notifications + camera + microphone + notification listener)
+grant-permissions: ## Grant permissions via adb (accessibility + notifications + camera + microphone + notification listener + media)
 	@echo "=== Granting permissions via adb ==="
 	@echo ""
 	@echo "1. Enabling Accessibility Service..."
@@ -193,6 +193,18 @@ grant-permissions: ## Grant permissions via adb (accessibility + notifications +
 	@echo "5. Enabling Notification Listener Service..."
 	$(ADB) shell cmd notification allow_listener \
 		$(APP_ID_DEBUG)/com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
+	@echo "   Done."
+	@echo ""
+	@echo "6. Granting READ_MEDIA_IMAGES permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.READ_MEDIA_IMAGES
+	@echo "   Done."
+	@echo ""
+	@echo "7. Granting READ_MEDIA_VIDEO permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.READ_MEDIA_VIDEO
+	@echo "   Done."
+	@echo ""
+	@echo "8. Granting READ_MEDIA_AUDIO permission..."
+	$(ADB) shell pm grant $(APP_ID_DEBUG) android.permission.READ_MEDIA_AUDIO
 	@echo "   Done."
 	@echo ""
 
