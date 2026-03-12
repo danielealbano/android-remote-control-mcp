@@ -272,7 +272,7 @@ class E2ECalculatorTest {
                 val textContent = (result.content[0] as? TextContent)?.text
                 if (textContent != null) {
                     // Parse the inner JSON string
-                    val innerJson = Json.parseToJsonElement(textContent).jsonObject
+                    val innerJson = Json.parseToJsonElement(stripUntrustedWarning(textContent)).jsonObject
                     val nodes = innerJson["nodes"]?.jsonArray
                     if (nodes != null && nodes.isNotEmpty()) {
                         return nodes[0].jsonObject["node_id"]?.jsonPrimitive?.contentOrNull

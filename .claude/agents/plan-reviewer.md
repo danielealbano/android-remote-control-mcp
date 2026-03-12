@@ -132,6 +132,7 @@ You MUST verify ALL of the following for EVERY action's planned code:
 - Network binding defaults to localhost. Security warning for 0.0.0.0.
 - HTTPS certificate handling is secure.
 - Health check endpoint does not expose sensitive data.
+- New MCP tools returning device-derived content MUST use `McpToolUtils.untrustedTextResult()`/`untrustedTextAndImageResult()`/`untrustedImageResult()`. Verify the plan uses the correct variant. Flag as CRITICAL if plain `textResult()`/`imageResult()` is used for device-content tools.
 
 ---
 

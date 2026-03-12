@@ -67,7 +67,7 @@ class GetClipboardTool
                     buildJsonObject {
                         put("text", text)
                     }
-                McpToolUtils.textResult(Json.encodeToString(resultJson))
+                McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
             } catch (e: McpToolException) {
                 throw e
             } catch (
@@ -244,7 +244,7 @@ class WaitForNodeTool
                                 put("attempts", attemptCount)
                                 put("node", McpToolUtils.buildNodeJson(element))
                             }
-                        return McpToolUtils.textResult(Json.encodeToString(resultJson))
+                        return McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
                     }
                 } catch (e: McpToolException) {
                     // If accessibility service becomes unavailable during polling, propagate
@@ -267,7 +267,7 @@ class WaitForNodeTool
                             "(by=$byStr, value='$value'). Retry if the operation is long-running.",
                     )
                 }
-            return McpToolUtils.textResult(Json.encodeToString(timeoutJson))
+            return McpToolUtils.untrustedTextResult(Json.encodeToString(timeoutJson))
         }
 
         fun register(
@@ -388,7 +388,7 @@ class WaitForIdleTool
                                         put("elapsedMs", elapsed)
                                         put("similarity", similarity)
                                     }
-                                return McpToolUtils.textResult(Json.encodeToString(resultJson))
+                                return McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
                             }
                         } else {
                             consecutiveIdleChecks = 0
@@ -417,7 +417,7 @@ class WaitForIdleTool
                     put("elapsedMs", elapsed)
                     put("similarity", lastSimilarity)
                 }
-            return McpToolUtils.textResult(Json.encodeToString(resultJson))
+            return McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
         }
 
         @Suppress("ThrowsCount")
@@ -558,7 +558,7 @@ class GetNodeDetailsTool
 
             Log.d(TAG, "get_node_details: node_ids=${ids.size}")
 
-            return McpToolUtils.textResult(sb.toString().trimEnd('\n'))
+            return McpToolUtils.untrustedTextResult(sb.toString().trimEnd('\n'))
         }
 
         /**

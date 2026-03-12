@@ -112,6 +112,7 @@ You MUST verify ALL of the following in changed code:
 - Network binding defaults to localhost (127.0.0.1). Security warning shown for 0.0.0.0 binding.
 - HTTPS certificate handling is secure (app-private directory, proper key generation).
 - Health check endpoint (`/health`) is unauthenticated — verify no sensitive data is exposed.
+- MCP tools returning device-derived content use `untrustedTextResult()`/`untrustedTextAndImageResult()`/`untrustedImageResult()` — NOT the plain `textResult()`/`imageResult()` variants. Flag as CRITICAL if a device-content tool uses plain variants.
 
 ---
 
