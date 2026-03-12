@@ -1707,7 +1707,7 @@ val handler = AdbConfigHandler(settingsRepository, storageLocationProvider)
 ## User Story 7: Update list_storage_locations Tool Description
 
 ### Acceptance Criteria
-- [ ] Tool description reflects built-in and user-added locations
+- [x] Tool description reflects built-in and user-added locations
 
 ### Task 7.1: Update ListStorageLocationsHandler
 
@@ -1731,8 +1731,8 @@ with:
 Update class KDoc from `Lists user-added storage locations` to `Lists all available storage locations (built-in and user-added)`.
 
 **Definition of Done**:
-- [ ] Description updated
-- [ ] KDoc updated
+- [x] Description updated
+- [x] KDoc updated
 
 ---
 
