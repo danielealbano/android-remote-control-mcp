@@ -8,6 +8,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 
 /**
  * Handles ADB configuration broadcast intents by parsing extras and
@@ -19,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 @Suppress("TooManyFunctions")
 class AdbConfigHandler(
     private val settingsRepository: SettingsRepository,
+    private val storageLocationProvider: StorageLocationProvider,
 ) {
     /**
      * Dispatches the intent to the appropriate handler based on its action.
@@ -56,6 +58,7 @@ class AdbConfigHandler(
         applyDownloadTimeout(intent)
         applyDeviceSlug(intent)
         applyToolPermissions(intent)
+        applyStorageLocationPermissions(intent)
 
         Log.i(TAG, "ADB configuration applied successfully")
     }
@@ -250,6 +253,24 @@ class AdbConfigHandler(
         )
     }
 
+    private suspend fun applyStorageLocationPermissions(intent: Intent) {
+        val locationId = intent.getStringExtra(EXTRA_STORAGE_LOCATION_ID) ?: return
+        if (!storageLocationProvider.isLocationAuthorized(locationId)) {
+            Log.w(TAG, "Ignoring storage permissions for unknown location")
+            return
+        }
+        if (intent.hasExtra(EXTRA_STORAGE_ALLOW_WRITE)) {
+            val allowWrite = intent.getBooleanExtra(EXTRA_STORAGE_ALLOW_WRITE, false)
+            storageLocationProvider.updateLocationAllowWrite(locationId, allowWrite)
+            Log.i(TAG, "Storage location allowWrite updated to $allowWrite")
+        }
+        if (intent.hasExtra(EXTRA_STORAGE_ALLOW_DELETE)) {
+            val allowDelete = intent.getBooleanExtra(EXTRA_STORAGE_ALLOW_DELETE, false)
+            storageLocationProvider.updateLocationAllowDelete(locationId, allowDelete)
+            Log.i(TAG, "Storage location allowDelete updated to $allowDelete")
+        }
+    }
+
     private fun handleStartServer(context: Context) {
         Log.i(TAG, "Received ADB start server broadcast")
         val serviceIntent =
@@ -290,5 +311,8 @@ class AdbConfigHandler(
         internal const val EXTRA_DOWNLOAD_TIMEOUT_SECONDS = "download_timeout_seconds"
         internal const val EXTRA_DEVICE_SLUG = "device_slug"
         internal const val EXTRA_TOOL_PERMISSIONS = "tool_permissions"
+        internal const val EXTRA_STORAGE_LOCATION_ID = "storage_location_id"
+        internal const val EXTRA_STORAGE_ALLOW_WRITE = "storage_allow_write"
+        internal const val EXTRA_STORAGE_ALLOW_DELETE = "storage_allow_delete"
     }
 }

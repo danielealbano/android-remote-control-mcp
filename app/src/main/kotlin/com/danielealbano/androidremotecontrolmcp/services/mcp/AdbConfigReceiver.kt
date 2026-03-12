@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +72,9 @@ class AdbConfigReceiver : BroadcastReceiver() {
     @Inject
     lateinit var settingsRepository: SettingsRepository
 
+    @Inject
+    lateinit var storageLocationProvider: StorageLocationProvider
+
     // No sender UID check: the receiver is exported=true so ADB (shell UID 2000) can reach it,
     // and getSentFromUid() unreliably returns -1 for `am broadcast` on API 34+. The real
     // security boundary is having ADB access to the device itself.
@@ -81,7 +85,7 @@ class AdbConfigReceiver : BroadcastReceiver() {
     ) {
         Log.i(TAG, "onReceive called with action: ${intent.action}")
 
-        val handler = AdbConfigHandler(settingsRepository)
+        val handler = AdbConfigHandler(settingsRepository, storageLocationProvider)
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {

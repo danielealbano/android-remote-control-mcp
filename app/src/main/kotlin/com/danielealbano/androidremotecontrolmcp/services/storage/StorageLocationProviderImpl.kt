@@ -3,20 +3,24 @@ package com.danielealbano.androidremotecontrolmcp.services.storage
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinPermissions
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
+import com.danielealbano.androidremotecontrolmcp.data.model.StorageBackend
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 /**
- * User-managed implementation of [StorageLocationProvider].
+ * Implementation of [StorageLocationProvider] that manages both built-in MediaStore
+ * locations and user-added SAF locations.
  *
- * Users add storage locations via the SAF picker. This class manages
- * persistent URI permissions and metadata enrichment. No SAF discovery
- * is performed — the location list is entirely user-driven.
+ * Built-in locations are synthesized at runtime from [BuiltinStorageLocation] entries.
+ * SAF locations are persisted in DataStore via [SettingsRepository].
  */
 @Suppress("TooManyFunctions")
 class StorageLocationProviderImpl
@@ -24,21 +28,25 @@ class StorageLocationProviderImpl
     constructor(
         @param:ApplicationContext private val context: Context,
         private val settingsRepository: SettingsRepository,
+        private val permissionChecker: PermissionChecker,
     ) : StorageLocationProvider {
         override suspend fun getAllLocations(): List<StorageLocation> {
+            val builtins = buildBuiltinLocations()
             val stored = settingsRepository.getStoredLocations()
-            return stored.map { loc ->
-                StorageLocation(
-                    id = loc.id,
-                    name = loc.name,
-                    path = loc.path,
-                    description = loc.description,
-                    treeUri = loc.treeUri,
-                    availableBytes = queryAvailableBytes(loc.treeUri),
-                    allowWrite = loc.allowWrite,
-                    allowDelete = loc.allowDelete,
-                )
-            }
+            val safLocations =
+                stored.map { loc ->
+                    StorageLocation(
+                        id = loc.id,
+                        name = loc.name,
+                        path = loc.path,
+                        description = loc.description,
+                        treeUri = loc.treeUri,
+                        availableBytes = queryAvailableBytes(loc.treeUri),
+                        allowWrite = loc.allowWrite,
+                        allowDelete = loc.allowDelete,
+                    )
+                }
+            return builtins + safLocations
         }
 
         @Suppress("TooGenericExceptionCaught")
@@ -134,16 +142,25 @@ class StorageLocationProviderImpl
             Log.i(TAG, "Updated description for location: $locationId")
         }
 
-        override suspend fun isLocationAuthorized(locationId: String): Boolean =
-            settingsRepository.getStoredLocations().any { it.id == locationId }
+        override suspend fun isLocationAuthorized(locationId: String): Boolean {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return BuiltinStorageLocation.fromLocationId(locationId) != null
+            }
+            return settingsRepository.getStoredLocations().any { it.id == locationId }
+        }
 
         override suspend fun getTreeUriForLocation(locationId: String): Uri? {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) return null
             val stored = settingsRepository.getStoredLocations()
             val location = stored.find { it.id == locationId }
             return location?.let { Uri.parse(it.treeUri) }
         }
 
+        @Suppress("ReturnCount")
         override suspend fun getLocationById(locationId: String): StorageLocation? {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return buildBuiltinLocations().find { it.id == locationId }
+            }
             val stored =
                 settingsRepository.getStoredLocations().find { it.id == locationId }
                     ?: return null
@@ -159,16 +176,29 @@ class StorageLocationProviderImpl
             )
         }
 
-        override suspend fun isWriteAllowed(locationId: String): Boolean =
-            settingsRepository.getStoredLocations().find { it.id == locationId }?.allowWrite ?: false
+        override suspend fun isWriteAllowed(locationId: String): Boolean {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return settingsRepository.getBuiltinLocationPermissions()[locationId]?.allowWrite ?: false
+            }
+            return settingsRepository.getStoredLocations().find { it.id == locationId }?.allowWrite ?: false
+        }
 
-        override suspend fun isDeleteAllowed(locationId: String): Boolean =
-            settingsRepository.getStoredLocations().find { it.id == locationId }?.allowDelete ?: false
+        override suspend fun isDeleteAllowed(locationId: String): Boolean {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return settingsRepository.getBuiltinLocationPermissions()[locationId]?.allowDelete ?: false
+            }
+            return settingsRepository.getStoredLocations().find { it.id == locationId }?.allowDelete ?: false
+        }
 
         override suspend fun updateLocationAllowWrite(
             locationId: String,
             allowWrite: Boolean,
         ) {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                settingsRepository.updateBuiltinLocationAllowWrite(locationId, allowWrite)
+                Log.i(TAG, "Updated allowWrite=$allowWrite for builtin: ${sanitizeLocationId(locationId)}")
+                return
+            }
             settingsRepository.updateLocationAllowWrite(locationId, allowWrite)
             Log.i(TAG, "Updated allowWrite=$allowWrite for location: ${sanitizeLocationId(locationId)}")
         }
@@ -177,6 +207,11 @@ class StorageLocationProviderImpl
             locationId: String,
             allowDelete: Boolean,
         ) {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                settingsRepository.updateBuiltinLocationAllowDelete(locationId, allowDelete)
+                Log.i(TAG, "Updated allowDelete=$allowDelete for builtin: ${sanitizeLocationId(locationId)}")
+                return
+            }
             settingsRepository.updateLocationAllowDelete(locationId, allowDelete)
             Log.i(TAG, "Updated allowDelete=$allowDelete for location: ${sanitizeLocationId(locationId)}")
         }
@@ -185,6 +220,55 @@ class StorageLocationProviderImpl
             val treeUriString = treeUri.toString()
             return settingsRepository.getStoredLocations().any { it.treeUri == treeUriString }
         }
+
+        @Suppress("ReturnCount")
+        override suspend fun isAllFilesMode(locationId: String): Boolean {
+            val builtin = BuiltinStorageLocation.fromLocationId(locationId) ?: return false
+            val permission = builtin.readMediaPermission ?: return false
+            return permissionChecker.hasPermission(permission)
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Private helpers — built-in locations
+        // ─────────────────────────────────────────────────────────────────────
+
+        private suspend fun buildBuiltinLocations(): List<StorageLocation> {
+            val permOverrides = settingsRepository.getBuiltinLocationPermissions()
+            val availableBytes = querySharedStorageAvailableBytes()
+            return BuiltinStorageLocation.entries.map { entry ->
+                val perms = permOverrides[entry.locationId] ?: BuiltinPermissions()
+                val allFilesMode =
+                    entry.readMediaPermission != null &&
+                        permissionChecker.hasPermission(entry.readMediaPermission)
+                val displayName = if (allFilesMode) entry.displayNameAll else entry.displayNameOwned
+                StorageLocation(
+                    id = entry.locationId,
+                    name = displayName,
+                    path = "/${entry.baseRelativePath.trimEnd('/')}",
+                    description = "",
+                    treeUri = "",
+                    availableBytes = availableBytes,
+                    allowWrite = perms.allowWrite,
+                    allowDelete = perms.allowDelete,
+                    backend = StorageBackend.MEDIA_STORE,
+                    isBuiltin = true,
+                )
+            }
+        }
+
+        @Suppress("TooGenericExceptionCaught")
+        private fun querySharedStorageAvailableBytes(): Long? =
+            try {
+                val stat = android.os.StatFs(Environment.getExternalStorageDirectory().path)
+                stat.availableBytes
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query shared storage available bytes", e)
+                null
+            }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Private helpers — SAF
+        // ─────────────────────────────────────────────────────────────────────
 
         /**
          * Derives a human-readable path from a SAF document ID.

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinPermissions
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
@@ -16,6 +17,7 @@ import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -1258,6 +1260,80 @@ class SettingsRepositoryImplTest {
                 assertFalse(
                     result.toolPermissionsConfig.disabledParams.containsKey("get_screen_state"),
                 )
+            }
+    }
+
+    @Nested
+    @DisplayName("Builtin Location Permissions")
+    inner class BuiltinLocationPermissionsTests {
+        @Test
+        fun `getBuiltinLocationPermissions returns empty map when no data`() =
+            testScope.runTest {
+                val result = repository.getBuiltinLocationPermissions()
+                assertTrue(result.isEmpty())
+            }
+
+        @Test
+        fun `updateBuiltinLocationAllowWrite persists and reads back`() =
+            testScope.runTest {
+                repository.updateBuiltinLocationAllowWrite("builtin:downloads", true)
+
+                val result = repository.getBuiltinLocationPermissions()
+                assertEquals(true, result["builtin:downloads"]?.allowWrite)
+                assertEquals(false, result["builtin:downloads"]?.allowDelete)
+            }
+
+        @Test
+        fun `updateBuiltinLocationAllowDelete persists and reads back`() =
+            testScope.runTest {
+                repository.updateBuiltinLocationAllowDelete("builtin:pictures", true)
+
+                val result = repository.getBuiltinLocationPermissions()
+                assertEquals(false, result["builtin:pictures"]?.allowWrite)
+                assertEquals(true, result["builtin:pictures"]?.allowDelete)
+            }
+
+        @Test
+        fun `multiple builtin permissions stored independently`() =
+            testScope.runTest {
+                repository.updateBuiltinLocationAllowWrite("builtin:downloads", true)
+                repository.updateBuiltinLocationAllowDelete("builtin:pictures", true)
+                repository.updateBuiltinLocationAllowWrite("builtin:music", true)
+                repository.updateBuiltinLocationAllowDelete("builtin:music", true)
+
+                val result = repository.getBuiltinLocationPermissions()
+                assertEquals(3, result.size)
+                assertEquals(BuiltinPermissions(allowWrite = true, allowDelete = false), result["builtin:downloads"])
+                assertEquals(BuiltinPermissions(allowWrite = false, allowDelete = true), result["builtin:pictures"])
+                assertEquals(BuiltinPermissions(allowWrite = true, allowDelete = true), result["builtin:music"])
+            }
+
+        @Test
+        fun `malformed JSON returns empty map`() =
+            testScope.runTest {
+                // Write malformed JSON directly to the DataStore key
+                dataStore.edit { prefs ->
+                    prefs[stringPreferencesKey("builtin_location_permissions")] = "not valid json{{"
+                }
+
+                val result = repository.getBuiltinLocationPermissions()
+                assertTrue(result.isEmpty())
+            }
+
+        @Test
+        fun `serialized JSON matches expected format`() =
+            testScope.runTest {
+                repository.updateBuiltinLocationAllowWrite("builtin:downloads", true)
+
+                // Read raw JSON from DataStore
+                val prefs = dataStore.data.first()
+                val json = prefs[stringPreferencesKey("builtin_location_permissions")]
+
+                // Verify the JSON structure matches expected format
+                assertTrue(json != null)
+                assertTrue(json!!.contains("\"builtin:downloads\""))
+                assertTrue(json.contains("\"allowWrite\":true"))
+                assertTrue(json.contains("\"allowDelete\":false"))
             }
     }
 }

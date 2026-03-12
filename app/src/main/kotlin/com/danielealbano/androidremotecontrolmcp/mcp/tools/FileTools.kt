@@ -26,7 +26,7 @@ import javax.inject.Inject
 /**
  * MCP tool handler for `list_storage_locations`.
  *
- * Lists user-added storage locations with their metadata.
+ * Lists all available storage locations (built-in and user-added) with their metadata.
  *
  * **Input**: `{}` (no parameters)
  * **Output**: `{ "content": [{ "type": "text", "text": "[{\"id\":\"...\", ...}]" }] }`
@@ -82,8 +82,8 @@ class ListStorageLocationsHandler
             server.addTool(
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Lists storage locations that the user has added in the app. " +
-                        "Each location represents a directory the user granted access to. " +
+                    "Lists available storage locations. Includes built-in locations " +
+                        "(always available, no setup required) and user-added locations. " +
                         "Use the location ID from this list for all file operations.",
                 inputSchema =
                     ToolSchema(
