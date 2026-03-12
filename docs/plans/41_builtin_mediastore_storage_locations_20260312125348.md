@@ -388,13 +388,13 @@ private fun serializeBuiltinPermissions(perms: Map<String, BuiltinPermissions>):
 ## User Story 2: StorageLocationProvider Built-in Integration
 
 ### Acceptance Criteria
-- [ ] `getAllLocations()` returns built-in locations (first) followed by SAF locations
-- [ ] `isLocationAuthorized()` returns true for valid `builtin:` IDs
-- [ ] `isWriteAllowed()` / `isDeleteAllowed()` check built-in permission overrides
-- [ ] `updateLocationAllowWrite()` / `updateLocationAllowDelete()` route to built-in persistence for `builtin:` IDs
-- [ ] `getLocationById()` returns built-in locations
-- [ ] Built-in name is dynamic: "Only owned files" / "All files" based on runtime permission
-- [ ] `isAllFilesMode()` added to interface and implemented
+- [x] `getAllLocations()` returns built-in locations (first) followed by SAF locations
+- [x] `isLocationAuthorized()` returns true for valid `builtin:` IDs
+- [x] `isWriteAllowed()` / `isDeleteAllowed()` check built-in permission overrides
+- [x] `updateLocationAllowWrite()` / `updateLocationAllowDelete()` route to built-in persistence for `builtin:` IDs
+- [x] `getLocationById()` returns built-in locations
+- [x] Built-in name is dynamic: "Only owned files" / "All files" based on runtime permission
+- [x] `isAllFilesMode()` added to interface and implemented
 
 ### Task 2.1: Update StorageLocationProvider interface
 
@@ -411,7 +411,7 @@ suspend fun isAllFilesMode(locationId: String): Boolean
 ```
 
 **Definition of Done**:
-- [ ] Method added to interface
+- [x] Method added to interface
 
 ### Task 2.2: Update StorageLocationProviderImpl
 
@@ -554,11 +554,11 @@ suspend fun isAllFilesMode(locationId: String): Boolean
    ```
 
 **Definition of Done**:
-- [ ] `PermissionChecker` injected (no direct `ContextCompat` calls)
-- [ ] `getAllLocations()` returns built-ins + SAF
-- [ ] All routing methods handle `builtin:` IDs
-- [ ] `isAllFilesMode()` implemented
-- [ ] No changes to SAF behavior
+- [x] `PermissionChecker` injected (no direct `ContextCompat` calls)
+- [x] `getAllLocations()` returns built-ins + SAF
+- [x] All routing methods handle `builtin:` IDs
+- [x] `isAllFilesMode()` implemented
+- [x] No changes to SAF behavior
 
 ---
 

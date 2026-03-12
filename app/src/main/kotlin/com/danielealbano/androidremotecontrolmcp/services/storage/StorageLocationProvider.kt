@@ -110,6 +110,13 @@ interface StorageLocationProvider {
      */
     suspend fun isDuplicateTreeUri(treeUri: Uri): Boolean
 
+    /**
+     * Checks whether the given location is in "all files" mode (has READ_MEDIA_* permission).
+     * Only applicable to built-in MediaStore locations that have an optional read permission.
+     * Returns false for SAF locations and for built-in locations without "all files" support.
+     */
+    suspend fun isAllFilesMode(locationId: String): Boolean
+
     companion object {
         /** Maximum allowed length for location descriptions. */
         const val MAX_DESCRIPTION_LENGTH = 500
