@@ -28,6 +28,8 @@ import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCa
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderImpl
+import com.danielealbano.androidremotecontrolmcp.services.storage.MediaStoreFileOperations
+import com.danielealbano.androidremotecontrolmcp.services.storage.MediaStoreFileOperationsImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.PermissionChecker
 import com.danielealbano.androidremotecontrolmcp.services.storage.PermissionCheckerImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
@@ -124,6 +126,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindFileOperationProvider(impl: FileOperationProviderImpl): FileOperationProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): MediaStoreFileOperations
 
     @Binds
     @Singleton

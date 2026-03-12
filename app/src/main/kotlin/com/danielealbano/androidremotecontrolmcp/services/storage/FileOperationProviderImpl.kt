@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -17,11 +18,7 @@ import java.net.MalformedURLException
 import java.net.URL
 import java.nio.channels.FileChannel
 import javax.inject.Inject
-import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 /**
  * Default implementation of [FileOperationProvider] using the Storage Access Framework.
@@ -36,6 +33,7 @@ class FileOperationProviderImpl
         @param:ApplicationContext private val context: Context,
         private val storageLocationProvider: StorageLocationProvider,
         private val settingsRepository: SettingsRepository,
+        private val mediaStoreFileOperations: MediaStoreFileOperations,
     ) : FileOperationProvider {
         // ─────────────────────────────────────────────────────────────────────
         // listFiles
@@ -47,6 +45,9 @@ class FileOperationProviderImpl
             offset: Int,
             limit: Int,
         ): FileListResult {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.listFiles(locationId, path, offset, limit)
+            }
             val directory =
                 resolveDocumentFile(locationId, path)
                     ?: throw McpToolException.ActionFailed(
@@ -98,6 +99,9 @@ class FileOperationProviderImpl
             offset: Int,
             limit: Int,
         ): FileReadResult {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.readFile(locationId, path, offset, limit)
+            }
             require(offset >= 1) { "offset must be >= 1, got $offset" }
             val documentFile =
                 resolveDocumentFile(locationId, path)
@@ -158,6 +162,9 @@ class FileOperationProviderImpl
             path: String,
             content: String,
         ) {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.writeFile(locationId, path, content)
+            }
             val config = settingsRepository.getServerConfig()
             val contentBytes = content.toByteArray(Charsets.UTF_8)
             val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
@@ -190,6 +197,9 @@ class FileOperationProviderImpl
             path: String,
             content: String,
         ) {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.appendFile(locationId, path, content)
+            }
             checkAuthorization(locationId)
             checkWritePermission(locationId)
             val config = settingsRepository.getServerConfig()
@@ -255,6 +265,9 @@ class FileOperationProviderImpl
             newString: String,
             replaceAll: Boolean,
         ): FileReplaceResult {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.replaceInFile(locationId, path, oldString, newString, replaceAll)
+            }
             checkAuthorization(locationId)
             checkWritePermission(locationId)
             val documentFile =
@@ -311,6 +324,9 @@ class FileOperationProviderImpl
             path: String,
             url: String,
         ): Long {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.downloadFromUrl(locationId, path, url)
+            }
             checkAuthorization(locationId)
             checkWritePermission(locationId)
             val config = settingsRepository.getServerConfig()
@@ -344,7 +360,7 @@ class FileOperationProviderImpl
 
                 // Configure permissive SSL if setting is enabled
                 if (config.allowUnverifiedHttpsCerts && connection is HttpsURLConnection) {
-                    configurePermissiveSsl(connection)
+                    SslUtils.configurePermissiveSsl(connection)
                 }
 
                 connection.connect()
@@ -424,6 +440,9 @@ class FileOperationProviderImpl
             locationId: String,
             path: String,
         ) {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.deleteFile(locationId, path)
+            }
             checkAuthorization(locationId)
             checkDeletePermission(locationId)
             val documentFile =
@@ -458,6 +477,9 @@ class FileOperationProviderImpl
             path: String,
             mimeType: String,
         ): Uri {
+            if (BuiltinStorageLocation.isBuiltinId(locationId)) {
+                return mediaStoreFileOperations.createFileUri(locationId, path, mimeType)
+            }
             checkAuthorization(locationId)
             checkWritePermission(locationId)
             val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path, mimeType)
@@ -598,7 +620,7 @@ class FileOperationProviderImpl
             }
 
             // Use explicit MIME type if provided, otherwise infer from extension
-            val resolvedMimeType = explicitMimeType ?: guessMimeType(fileName)
+            val resolvedMimeType = explicitMimeType ?: MimeTypeUtils.guessMimeType(fileName)
             return current.createFile(resolvedMimeType, fileName)
                 ?: throw McpToolException.ActionFailed(
                     "Failed to create file '$fileName' in path '$path'",
@@ -703,44 +725,6 @@ class FileOperationProviderImpl
             return parsedUrl to (parsedUrl.openConnection() as HttpURLConnection)
         }
 
-        /**
-         * Configures permissive SSL settings on an HTTPS connection
-         * (accepts all certificates and hostnames).
-         */
-        private fun configurePermissiveSsl(connection: HttpsURLConnection) {
-            val trustAllManager =
-                @Suppress("CustomX509TrustManager")
-                object : X509TrustManager {
-                    @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
-                    override fun checkClientTrusted(
-                        chain: Array<java.security.cert.X509Certificate>,
-                        authType: String,
-                    ) { }
-
-                    @Suppress("TrustAllX509TrustManager", "EmptyFunctionBlock")
-                    override fun checkServerTrusted(
-                        chain: Array<java.security.cert.X509Certificate>,
-                        authType: String,
-                    ) { }
-
-                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
-                }
-
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, arrayOf<TrustManager>(trustAllManager), java.security.SecureRandom())
-            connection.sslSocketFactory = sslContext.socketFactory
-            connection.hostnameVerifier = HostnameVerifier { _, _ -> true }
-        }
-
-        /**
-         * Guesses a MIME type from a file name extension.
-         * Falls back to "application/octet-stream" if the type cannot be determined.
-         */
-        private fun guessMimeType(fileName: String): String {
-            val extension = fileName.substringAfterLast('.', "").lowercase()
-            return EXTENSION_TO_MIME[extension] ?: "application/octet-stream"
-        }
-
         companion object {
             private const val TAG = "MCP:FileOpsProvider"
             private const val MAX_LOCATION_ID_LOG_LENGTH = 200
@@ -753,48 +737,5 @@ class FileOperationProviderImpl
             private const val MILLIS_PER_SECOND = 1000
             private const val DOWNLOAD_BUFFER_SIZE = 8192
             private val HTTP_SUCCESS_RANGE = 200..299
-
-            /**
-             * Common file extension to MIME type mapping.
-             */
-            private val EXTENSION_TO_MIME =
-                mapOf(
-                    "txt" to "text/plain",
-                    "html" to "text/html",
-                    "htm" to "text/html",
-                    "css" to "text/css",
-                    "csv" to "text/csv",
-                    "xml" to "text/xml",
-                    "json" to "application/json",
-                    "js" to "application/javascript",
-                    "pdf" to "application/pdf",
-                    "zip" to "application/zip",
-                    "gz" to "application/gzip",
-                    "tar" to "application/x-tar",
-                    "jpg" to "image/jpeg",
-                    "jpeg" to "image/jpeg",
-                    "png" to "image/png",
-                    "gif" to "image/gif",
-                    "webp" to "image/webp",
-                    "svg" to "image/svg+xml",
-                    "mp3" to "audio/mpeg",
-                    "wav" to "audio/wav",
-                    "mp4" to "video/mp4",
-                    "webm" to "video/webm",
-                    "apk" to "application/vnd.android.package-archive",
-                    "md" to "text/markdown",
-                    "kt" to "text/x-kotlin",
-                    "java" to "text/x-java",
-                    "py" to "text/x-python",
-                    "sh" to "application/x-sh",
-                    "yaml" to "text/yaml",
-                    "yml" to "text/yaml",
-                    "toml" to "text/toml",
-                    "ini" to "text/plain",
-                    "cfg" to "text/plain",
-                    "conf" to "text/plain",
-                    "log" to "text/plain",
-                    "properties" to "text/plain",
-                )
         }
     }

@@ -565,14 +565,14 @@ suspend fun isAllFilesMode(locationId: String): Boolean
 ## User Story 3: MediaStore File Operations
 
 ### Acceptance Criteria
-- [ ] `MediaStoreFileOperations` interface and implementation created
-- [ ] `FileOperationProviderImpl` routes to MediaStore for `builtin:` locations
-- [ ] Path traversal protection on all operations (`..`, `.`, absolute paths, control chars)
-- [ ] All operations use `withContext(Dispatchers.IO)` for ContentResolver I/O
-- [ ] `listFiles` synthesizes directory structure from `RELATIVE_PATH`
-- [ ] `listFiles` respects "owned only" vs "all files" mode
-- [ ] `downloadFromUrl` uses `IS_PENDING` pattern
-- [ ] Subdirectory paths supported (e.g., `subdir/file.txt` → `RELATIVE_PATH = "Download/subdir/"`)
+- [x] `MediaStoreFileOperations` interface and implementation created
+- [x] `FileOperationProviderImpl` routes to MediaStore for `builtin:` locations
+- [x] Path traversal protection on all operations (`..`, `.`, absolute paths, control chars)
+- [x] All operations use `withContext(Dispatchers.IO)` for ContentResolver I/O
+- [x] `listFiles` synthesizes directory structure from `RELATIVE_PATH`
+- [x] `listFiles` respects "owned only" vs "all files" mode
+- [x] `downloadFromUrl` uses `IS_PENDING` pattern
+- [x] Subdirectory paths supported (e.g., `subdir/file.txt` → `RELATIVE_PATH = "Download/subdir/"`)
 
 ### Task 3.1: Create MediaStoreFileOperations interface
 
@@ -608,7 +608,7 @@ interface MediaStoreFileOperations {
 ```
 
 **Definition of Done**:
-- [ ] Interface created with all 8 methods
+- [x] Interface created with all 8 methods
 
 ### Task 3.2: Create MediaStoreFileOperationsImpl
 
@@ -1251,12 +1251,12 @@ class MediaStoreFileOperationsImpl
 ```
 
 **Definition of Done**:
-- [ ] Implementation created with all 8 methods
-- [ ] `BuiltinStorageLocation.validatePath()` called on every operation
-- [ ] All ContentResolver I/O wrapped in `withContext(Dispatchers.IO)`
-- [ ] `IS_PENDING` pattern for downloads with cleanup on failure
-- [ ] Directory synthesis in `listFiles`
-- [ ] Owned vs all-files filtering
+- [x] Implementation created with all 8 methods
+- [x] `BuiltinStorageLocation.validatePath()` called on every operation
+- [x] All ContentResolver I/O wrapped in `withContext(Dispatchers.IO)`
+- [x] `IS_PENDING` pattern for downloads with cleanup on failure
+- [x] Directory synthesis in `listFiles`
+- [x] Owned vs all-files filtering
 - **Note**: Private helpers like `findOwnedFile()`/`findAnyFile()` are non-suspend functions that call `contentResolver.query()`. This is safe because they are always called from within `withContext(Dispatchers.IO)` blocks in the public methods.
 
 ### Task 3.3: Extract shared utilities (MimeTypeUtils + SslUtils)
@@ -1359,11 +1359,11 @@ object SslUtils {
 - Remove now-unused SSL imports
 
 **Definition of Done**:
-- [ ] `MimeTypeUtils` object created with shared map and function
-- [ ] `SslUtils` object created with shared SSL helper
-- [ ] `FileOperationProviderImpl` delegates to both utilities
-- [ ] `MediaStoreFileOperationsImpl` uses both utilities
-- [ ] No behavior change
+- [x] `MimeTypeUtils` object created with shared map and function
+- [x] `SslUtils` object created with shared SSL helper
+- [x] `FileOperationProviderImpl` delegates to both utilities
+- [x] `MediaStoreFileOperationsImpl` uses both utilities
+- [x] No behavior change
 
 ### Task 3.4: Integrate MediaStore routing in FileOperationProviderImpl
 
@@ -1401,9 +1401,9 @@ abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): M
 ```
 
 **Definition of Done**:
-- [ ] All 8 methods route to MediaStore for `builtin:` IDs
-- [ ] SAF code paths unchanged
-- [ ] DI binding added for interface → impl
+- [x] All 8 methods route to MediaStore for `builtin:` IDs
+- [x] SAF code paths unchanged
+- [x] DI binding added for interface → impl
 
 ---
 
