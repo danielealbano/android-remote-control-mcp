@@ -1063,6 +1063,76 @@ class MainViewModelTest {
     // --- Tool Permissions Tests ---
 
     @Test
+    fun `updateLocationAllowWrite updates builtin location in state`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "builtin:downloads",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://media/external/downloads",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowWrite("builtin:downloads", true) } just Runs
+
+            viewModel.updateLocationAllowWrite("builtin:downloads", true)
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.updateLocationAllowWrite("builtin:downloads", true) }
+            assertEquals(true, viewModel.storageLocations.value[0].allowWrite)
+            assertEquals(false, viewModel.storageLocations.value[0].allowDelete)
+            coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
+        }
+
+    @Test
+    fun `updateLocationAllowDelete updates builtin location in state`() =
+        runTest {
+            advanceUntilIdle()
+
+            val locations =
+                listOf(
+                    StorageLocation(
+                        id = "builtin:downloads",
+                        name = "Downloads",
+                        path = "/",
+                        description = "",
+                        treeUri = "content://media/external/downloads",
+                        availableBytes = null,
+                        allowWrite = false,
+                        allowDelete = false,
+                    ),
+                )
+            coEvery { storageLocationProvider.getAllLocations() } returns locations
+
+            viewModel.refreshStorageLocations()
+            advanceUntilIdle()
+
+            clearMocks(storageLocationProvider, answers = false, recordedCalls = true)
+            coEvery { storageLocationProvider.updateLocationAllowDelete("builtin:downloads", true) } just Runs
+
+            viewModel.updateLocationAllowDelete("builtin:downloads", true)
+            advanceUntilIdle()
+
+            coVerify { storageLocationProvider.updateLocationAllowDelete("builtin:downloads", true) }
+            assertEquals(true, viewModel.storageLocations.value[0].allowDelete)
+            assertEquals(false, viewModel.storageLocations.value[0].allowWrite)
+            coVerify(exactly = 0) { storageLocationProvider.getAllLocations() }
+        }
+
+    @Test
     fun `updateToolEnabled false delegates to repository`() =
         runTest {
             advanceUntilIdle()
