@@ -28,6 +28,8 @@ import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCa
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderImpl
+import com.danielealbano.androidremotecontrolmcp.services.storage.PermissionChecker
+import com.danielealbano.androidremotecontrolmcp.services.storage.PermissionCheckerImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.AndroidCloudflareBinaryResolver
@@ -138,4 +140,8 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindNotificationProvider(impl: NotificationProviderImpl): NotificationProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindPermissionChecker(impl: PermissionCheckerImpl): PermissionChecker
 }

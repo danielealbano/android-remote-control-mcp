@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinPermissions
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
@@ -309,6 +310,66 @@ class SettingsRepositoryImpl
             }
         }
 
+        override suspend fun getBuiltinLocationPermissions(): Map<String, BuiltinPermissions> {
+            val prefs = dataStore.data.first()
+            val json = prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] ?: return emptyMap()
+            return parseBuiltinPermissionsJson(json)
+        }
+
+        override suspend fun updateBuiltinLocationAllowWrite(locationId: String, allowWrite: Boolean) {
+            dataStore.edit { prefs ->
+                val current = getBuiltinLocationPermissionsInternal(prefs)
+                val existing = current[locationId] ?: BuiltinPermissions()
+                val updated = current + (locationId to existing.copy(allowWrite = allowWrite))
+                prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] = serializeBuiltinPermissions(updated)
+            }
+        }
+
+        override suspend fun updateBuiltinLocationAllowDelete(locationId: String, allowDelete: Boolean) {
+            dataStore.edit { prefs ->
+                val current = getBuiltinLocationPermissionsInternal(prefs)
+                val existing = current[locationId] ?: BuiltinPermissions()
+                val updated = current + (locationId to existing.copy(allowDelete = allowDelete))
+                prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] = serializeBuiltinPermissions(updated)
+            }
+        }
+
+        @Suppress("TooGenericExceptionCaught")
+        private fun parseBuiltinPermissionsJson(json: String): Map<String, BuiltinPermissions> =
+            try {
+                val root = Json.parseToJsonElement(json).jsonObject
+                root.entries.associate { (key, value) ->
+                    val obj = value.jsonObject
+                    key to BuiltinPermissions(
+                        allowWrite = obj["allowWrite"]?.jsonPrimitive?.booleanOrNull ?: false,
+                        allowDelete = obj["allowDelete"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse builtin location permissions JSON", e)
+                emptyMap()
+            }
+
+        private fun getBuiltinLocationPermissionsInternal(prefs: Preferences): Map<String, BuiltinPermissions> {
+            val json = prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] ?: return emptyMap()
+            return parseBuiltinPermissionsJson(json)
+        }
+
+        private fun serializeBuiltinPermissions(perms: Map<String, BuiltinPermissions>): String =
+            Json.encodeToString(
+                buildJsonObject {
+                    for ((key, value) in perms) {
+                        put(
+                            key,
+                            buildJsonObject {
+                                put("allowWrite", value.allowWrite)
+                                put("allowDelete", value.allowDelete)
+                            },
+                        )
+                    }
+                },
+            )
+
         override fun validatePort(port: Int): Result<Int> =
             if (port in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
                 Result.success(port)
@@ -503,6 +564,7 @@ class SettingsRepositoryImpl
             private val DEVICE_SLUG_KEY = stringPreferencesKey("device_slug")
             private val TOOL_PERMISSIONS_KEY = stringPreferencesKey("tool_permissions")
             private val AUTHORIZED_LOCATIONS_KEY = stringPreferencesKey("authorized_storage_locations")
+            private val BUILTIN_LOCATION_PERMISSIONS_KEY = stringPreferencesKey("builtin_location_permissions")
 
             /**
              * Regex pattern for valid hostnames.

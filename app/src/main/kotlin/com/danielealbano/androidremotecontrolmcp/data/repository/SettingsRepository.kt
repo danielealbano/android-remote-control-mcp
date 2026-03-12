@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.data.repository
 
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinPermissions
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
@@ -240,4 +241,13 @@ interface SettingsRepository {
         locationId: String,
         allowDelete: Boolean,
     )
+
+    /** Returns permission overrides for all built-in locations. */
+    suspend fun getBuiltinLocationPermissions(): Map<String, BuiltinPermissions>
+
+    /** Updates the allowWrite flag for a built-in location. */
+    suspend fun updateBuiltinLocationAllowWrite(locationId: String, allowWrite: Boolean)
+
+    /** Updates the allowDelete flag for a built-in location. */
+    suspend fun updateBuiltinLocationAllowDelete(locationId: String, allowDelete: Boolean)
 }

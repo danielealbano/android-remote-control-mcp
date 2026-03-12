@@ -33,13 +33,13 @@ Add 4 built-in storage locations backed by Android MediaStore (no SAF picker nee
 ## User Story 1: Data Model & Enum Foundation
 
 ### Acceptance Criteria
-- [ ] `StorageBackend` enum exists with `SAF` and `MEDIA_STORE` values
-- [ ] `BuiltinStorageLocation` enum defines all 4 built-in locations with metadata
-- [ ] `BuiltinStorageLocation` companion includes path validation helper (rejects `..` segments, absolute paths)
-- [ ] `StorageLocation` has `backend` and `isBuiltin` fields
-- [ ] `BuiltinPermissions` data class exists in `data/model/`
-- [ ] `PermissionChecker` interface exists for abstracting runtime permission checks
-- [ ] Existing SAF code is unaffected (default values preserve current behavior)
+- [x] `StorageBackend` enum exists with `SAF` and `MEDIA_STORE` values
+- [x] `BuiltinStorageLocation` enum defines all 4 built-in locations with metadata
+- [x] `BuiltinStorageLocation` companion includes path validation helper (rejects `..` segments, absolute paths)
+- [x] `StorageLocation` has `backend` and `isBuiltin` fields
+- [x] `BuiltinPermissions` data class exists in `data/model/`
+- [x] `PermissionChecker` interface exists for abstracting runtime permission checks
+- [x] Existing SAF code is unaffected (default values preserve current behavior)
 
 ### Task 1.1: Create StorageBackend enum
 
@@ -62,7 +62,7 @@ enum class StorageBackend {
 ```
 
 **Definition of Done**:
-- [ ] File created with enum
+- [x] File created with enum
 
 ### Task 1.2: Create BuiltinStorageLocation enum
 
@@ -181,8 +181,8 @@ enum class BuiltinStorageLocation(
 ```
 
 **Definition of Done**:
-- [ ] File created with all 4 entries and companion helpers
-- [ ] `validatePath()` rejects `..`, `.`, absolute paths, control characters
+- [x] File created with all 4 entries and companion helpers
+- [x] `validatePath()` rejects `..`, `.`, absolute paths, control characters
 
 ### Task 1.3: Create BuiltinPermissions data class
 
@@ -202,7 +202,7 @@ data class BuiltinPermissions(
 ```
 
 **Definition of Done**:
-- [ ] File created in `data/model/`
+- [x] File created in `data/model/`
 
 ### Task 1.4: Create PermissionChecker interface
 
@@ -252,8 +252,8 @@ abstract fun bindPermissionChecker(impl: PermissionCheckerImpl): PermissionCheck
 ```
 
 **Definition of Done**:
-- [ ] Interface and impl created
-- [ ] DI binding added
+- [x] Interface and impl created
+- [x] DI binding added
 
 ### Task 1.5: Add backend and isBuiltin fields to StorageLocation
 
@@ -277,8 +277,8 @@ data class StorageLocation(
 Update KDoc to document `backend` and `isBuiltin`.
 
 **Definition of Done**:
-- [ ] Fields added with defaults preserving SAF behavior
-- [ ] KDoc updated
+- [x] Fields added with defaults preserving SAF behavior
+- [x] KDoc updated
 
 ### Task 1.6: Add built-in permission persistence to SettingsRepository
 
@@ -378,10 +378,10 @@ private fun serializeBuiltinPermissions(perms: Map<String, BuiltinPermissions>):
 ```
 
 **Definition of Done**:
-- [ ] 3 new methods on interface and impl
-- [ ] `BUILTIN_LOCATION_PERMISSIONS_KEY` added
-- [ ] Uses `buildJsonObject`/`Json.parseToJsonElement` (matches existing serialization pattern)
-- [ ] Graceful handling of missing/malformed JSON
+- [x] 3 new methods on interface and impl
+- [x] `BUILTIN_LOCATION_PERMISSIONS_KEY` added
+- [x] Uses `buildJsonObject`/`Json.parseToJsonElement` (matches existing serialization pattern)
+- [x] Graceful handling of missing/malformed JSON
 
 ---
 
