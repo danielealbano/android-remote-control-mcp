@@ -57,7 +57,10 @@ import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
@@ -104,6 +107,11 @@ fun StorageSettingsScreen(
 
     val scope = rememberCoroutineScope()
 
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { _ -> viewModel.refreshStorageLocations() }
+
     val documentTreeLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree(),
@@ -139,8 +147,51 @@ fun StorageSettingsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
             ) {
+                val builtinLocations = storageLocations.filter { it.isBuiltin }
+                val userLocations = storageLocations.filter { !it.isBuiltin }
+
+                // ── Built-in Locations Section ──────────────────────────────
                 Text(
-                    text = stringResource(R.string.storage_locations_title),
+                    text = stringResource(R.string.storage_builtin_locations_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = stringResource(R.string.storage_builtin_locations_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                builtinLocations.forEach { location ->
+                    val builtin = BuiltinStorageLocation.fromLocationId(location.id)
+                    val hasAllFiles = builtin?.readMediaPermission?.let {
+                        ContextCompat.checkSelfPermission(context, it) ==
+                            PackageManager.PERMISSION_GRANTED
+                    } ?: false
+                    BuiltinStorageLocationRow(
+                        location = location,
+                        hasAllFilesPermission = hasAllFiles,
+                        readMediaPermission = builtin?.readMediaPermission,
+                        onAllowWriteChange = { enabled ->
+                            viewModel.updateLocationAllowWrite(location.id, enabled)
+                        },
+                        onAllowDeleteChange = { enabled ->
+                            viewModel.updateLocationAllowDelete(location.id, enabled)
+                        },
+                        onRequestPermission = { permission ->
+                            permissionLauncher.launch(permission)
+                        },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── User Locations Section ──────────────────────────────────
+                Text(
+                    text = stringResource(R.string.storage_user_locations_title),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
@@ -166,14 +217,14 @@ fun StorageSettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                if (storageLocations.isEmpty()) {
+                if (userLocations.isEmpty()) {
                     Text(
                         text = stringResource(R.string.storage_location_no_locations),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    storageLocations.forEach { location ->
+                    userLocations.forEach { location ->
                         StorageLocationRow(
                             location = location,
                             onEdit = {
@@ -544,6 +595,100 @@ private fun StorageLocationRow(
                 Switch(
                     checked = location.allowDelete,
                     onCheckedChange = null,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BuiltinStorageLocationRow(
+    location: StorageLocation,
+    hasAllFilesPermission: Boolean,
+    readMediaPermission: String?,
+    onAllowWriteChange: (Boolean) -> Unit,
+    onAllowDeleteChange: (Boolean) -> Unit,
+    onRequestPermission: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = location.name,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = location.path,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowWrite,
+                        role = Role.Switch,
+                        onValueChange = onAllowWriteChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_write_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowWrite,
+                    onCheckedChange = null,
+                )
+            }
+            Row(
+                modifier =
+                    Modifier.toggleable(
+                        value = location.allowDelete,
+                        role = Role.Switch,
+                        onValueChange = onAllowDeleteChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.storage_location_allow_delete_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = location.allowDelete,
+                    onCheckedChange = null,
+                )
+            }
+        }
+        if (readMediaPermission != null) {
+            OutlinedButton(
+                onClick = { onRequestPermission(readMediaPermission) },
+                enabled = !hasAllFilesPermission,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    stringResource(
+                        if (hasAllFilesPermission) {
+                            R.string.storage_builtin_all_files_granted
+                        } else {
+                            R.string.storage_builtin_grant_all_files
+                        },
+                    ),
                 )
             }
         }

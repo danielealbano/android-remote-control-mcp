@@ -1464,13 +1464,13 @@ Add 3 steps after step 5 (Notification Listener):
 ## User Story 5: UI — Built-in Locations & "All Files" Toggle
 
 ### Acceptance Criteria
-- [ ] Built-in locations appear first, before SAF locations
-- [ ] Built-in locations have no edit or delete buttons
-- [ ] Built-in locations have allowWrite and allowDelete toggles
-- [ ] Pictures, Movies, Music have "Access all files" button triggering runtime permission request
-- [ ] Downloads does NOT have the "all files" button
-- [ ] Button state reflects permission status (granted = disabled)
-- [ ] Location name updates dynamically after permission change
+- [x] Built-in locations appear first, before SAF locations
+- [x] Built-in locations have no edit or delete buttons
+- [x] Built-in locations have allowWrite and allowDelete toggles
+- [x] Pictures, Movies, Music have "Access all files" button triggering runtime permission request
+- [x] Downloads does NOT have the "all files" button
+- [x] Button state reflects permission status (granted = disabled)
+- [x] Location name updates dynamically after permission change
 
 ### Task 5.1: Update StorageSettingsScreen
 
@@ -1581,12 +1581,12 @@ Add strings:
 - `storage_builtin_all_files_granted` → `"All files access granted"`
 
 **Definition of Done**:
-- [ ] Built-in section renders correctly
-- [ ] No edit/delete on built-ins
-- [ ] Write/delete toggles work
-- [ ] "Access all files" button on Pictures/Movies/Music only
-- [ ] Runtime permission request works
-- [ ] Name updates after permission change
+- [x] Built-in section renders correctly
+- [x] No edit/delete on built-ins
+- [x] Write/delete toggles work
+- [x] "Access all files" button on Pictures/Movies/Music only
+- [x] Runtime permission request works
+- [x] Name updates after permission change
 
 ---
 

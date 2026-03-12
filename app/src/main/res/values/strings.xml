@@ -154,6 +154,11 @@
     <string name="storage_location_delete_dialog_cancel">Cancel</string>
     <string name="storage_location_allow_write_label">Allow Write</string>
     <string name="storage_location_allow_delete_label">Allow Delete</string>
+    <string name="storage_builtin_locations_title">Built-in Locations</string>
+    <string name="storage_builtin_locations_description">Always available. Use MediaStore to read and write files without additional setup.</string>
+    <string name="storage_user_locations_title">User Locations</string>
+    <string name="storage_builtin_grant_all_files">Grant access to all files</string>
+    <string name="storage_builtin_all_files_granted">All files access granted</string>
     <string name="storage_file_size_limit_label">File Size Limit (MB)</string>
     <string name="storage_file_size_limit_error">Must be between %1$d and %2$d MB</string>
     <string name="storage_download_timeout_label">Download Timeout (seconds)</string>
