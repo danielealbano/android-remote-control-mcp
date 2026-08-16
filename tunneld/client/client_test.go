@@ -146,7 +146,9 @@ func TestClientEnrollReturnsUsableCert(t *testing.T) {
 
 	sctx, scancel := context.WithCancel(context.Background())
 	defer scancel()
-	go func() { _ = cl.Serve(sctx, "ws://"+cfg.Listen+"/connect", name+".example.test", cert, key, ok200("pong")) }()
+	go func() {
+		_ = cl.Serve(sctx, "ws://"+cfg.Listen+"/connect", name+".example.test", cert, key, ok200("pong"))
+	}()
 
 	code, body := postMCP(t, cfg.Listen, name)
 	if code != 200 || body != "pong" {

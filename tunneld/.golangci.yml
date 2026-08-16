@@ -40,3 +40,7 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+
+formatters:
+  enable:
+    - gofmt

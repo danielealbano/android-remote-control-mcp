@@ -32,12 +32,12 @@ type Nop struct{}
 
 var _ Recorder = Nop{}
 
-func (Nop) Reject(reason, tunnelName, clientIP string)               {}
+func (Nop) Reject(reason, tunnelName, clientIP string)                  {}
 func (Nop) Request(tunnelName, class string, code int, d time.Duration) {}
-func (Nop) Bytes(tunnelName, direction string, n int64)             {}
-func (Nop) WSConnect()                                              {}
-func (Nop) WSDisconnect(reason string)                             {}
-func (Nop) Enrollment()                                            {}
-func (Nop) InflightAdd(delta int)                                   {}
-func (Nop) Timeout()                                                {}
-func (Nop) PublishError()                                          {}
+func (Nop) Bytes(tunnelName, direction string, n int64)                 {}
+func (Nop) WSConnect()                                                  {}
+func (Nop) WSDisconnect(reason string)                                  {}
+func (Nop) Enrollment()                                                 {}
+func (Nop) InflightAdd(delta int)                                       {}
+func (Nop) Timeout()                                                    {}
+func (Nop) PublishError()                                               {}

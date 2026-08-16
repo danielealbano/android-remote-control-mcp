@@ -15,15 +15,15 @@ import (
 type FrameType byte
 
 const (
-	CHALLENGE FrameType = iota + 1 // server→phone {nonce}, no body
-	AUTH                           // phone→server {cert, signature}, no body
-	REQUEST_HEAD                   // {reqid, method, path, rawquery, host, header}, no body
-	REQUEST_BODY_CHUNK             // {reqid} + ≤ChunkSize body
-	REQUEST_END                    // {reqid}, no body — dispatch trigger
-	RESPONSE_HEAD                  // {reqid, status, header}, no body
-	RESPONSE_BODY_CHUNK            // {reqid} + ≤ChunkSize body
-	RESPONSE_END                   // {reqid}, no body
-	ERROR                          // {reqid, message}, no body
+	CHALLENGE           FrameType = iota + 1 // server→phone {nonce}, no body
+	AUTH                                     // phone→server {cert, signature}, no body
+	REQUEST_HEAD                             // {reqid, method, path, rawquery, host, header}, no body
+	REQUEST_BODY_CHUNK                       // {reqid} + ≤ChunkSize body
+	REQUEST_END                              // {reqid}, no body — dispatch trigger
+	RESPONSE_HEAD                            // {reqid, status, header}, no body
+	RESPONSE_BODY_CHUNK                      // {reqid} + ≤ChunkSize body
+	RESPONSE_END                             // {reqid}, no body
+	ERROR                                    // {reqid, message}, no body
 )
 
 // ChunkSize is the max body bytes per REQUEST_BODY_CHUNK/RESPONSE_BODY_CHUNK frame (bandwidth pacing

@@ -30,9 +30,9 @@ import (
 const tunneldImage = "tunneld:e2e"
 
 type cluster struct {
-	net       *testcontainers.DockerNetwork
-	traefik   testcontainers.Container
-	replicas  []testcontainers.Container
+	net        *testcontainers.DockerNetwork
+	traefik    testcontainers.Container
+	replicas   []testcontainers.Container
 	traefikURL string   // http://host:port (Traefik web entrypoint)
 	replicaURL []string // direct http://host:port per replica (mapped 8080)
 	caDir      string
@@ -113,16 +113,16 @@ func startCluster(t *testing.T) *cluster {
 			NetworkAliases: map[string][]string{net.Name: {alias}},
 			ExposedPorts:   []string{"8080/tcp", "9090/tcp"},
 			Env: map[string]string{
-				"TUNNELD_LISTEN":            ":8080",
-				"TUNNELD_INTERNAL_LISTEN":   ":9090",
-				"TUNNELD_REDIS_URL":         "redis://redis:6379",
-				"TUNNELD_TUNNEL_DOMAIN":     "example.test",
-				"TUNNELD_ENROLL_HOST":       "enroll.example.test",
-				"TUNNELD_CLIENT_IP_HEADER":  "X-Real-Ip",
-				"TUNNELD_CA_CERT":           "/ca/ca.pem",
-				"TUNNELD_CA_KEY":            "/ca/ca-key.pem",
-				"TUNNELD_BAN_FILE":          "/banfiles/bans.txt",
-				"TUNNELD_BAN_POLL":          "1s",
+				"TUNNELD_LISTEN":           ":8080",
+				"TUNNELD_INTERNAL_LISTEN":  ":9090",
+				"TUNNELD_REDIS_URL":        "redis://redis:6379",
+				"TUNNELD_TUNNEL_DOMAIN":    "example.test",
+				"TUNNELD_ENROLL_HOST":      "enroll.example.test",
+				"TUNNELD_CLIENT_IP_HEADER": "X-Real-Ip",
+				"TUNNELD_CA_CERT":          "/ca/ca.pem",
+				"TUNNELD_CA_KEY":           "/ca/ca-key.pem",
+				"TUNNELD_BAN_FILE":         "/banfiles/bans.txt",
+				"TUNNELD_BAN_POLL":         "1s",
 			},
 			// Bind-mount CA + banfiles (read-only in the container) so host-side ban-file updates
 			// propagate with REAL mtimes — the ban watcher is mtime-based, and CopyToContainer would

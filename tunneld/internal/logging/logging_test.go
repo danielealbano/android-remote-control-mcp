@@ -75,12 +75,12 @@ func TestLogDefaultWhenEmpty(t *testing.T) {
 
 func TestParseSpecsRejectsBad(t *testing.T) {
 	for _, spec := range []string{
-		"level=info",                 // missing output
-		"output=std;level=bogus",     // bad level
-		"output=std;format=yaml",     // bad format
-		"output=/x;maxsize=abc",      // bad maxsize
-		"output=std;unknown=1",       // unknown field
-		"badfield",                   // not key=value
+		"level=info",             // missing output
+		"output=std;level=bogus", // bad level
+		"output=std;format=yaml", // bad format
+		"output=/x;maxsize=abc",  // bad maxsize
+		"output=std;unknown=1",   // unknown field
+		"badfield",               // not key=value
 	} {
 		if err := ParseSpecs([]string{spec}); err == nil {
 			t.Errorf("ParseSpecs(%q) expected error", spec)
