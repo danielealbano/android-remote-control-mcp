@@ -1479,11 +1479,11 @@ Prometheus metrics + `/healthz` + `/admin/tunnels` on the internal listener, and
 cap-hit event logger wired into all rejection points.
 
 ### Acceptance Criteria
-- [ ] Internal listener serves `GET /metrics` (Prometheus), `GET /healthz` (200 if Redis PING ok else 503), `GET /admin/tunnels` (JSON top-N by bytes/requests from Redis).
-- [ ] Metric families exactly as listed below; NO per-tunnel labels.
-- [ ] A `PromRecorder` implements the `observ.Recorder` interface (US1 Task 1.5) by combining the metric registry + the cap-hit deduping logger; the US6/US7/US8 handlers were built against that interface, so this story provides the concrete implementation (no forward dependency).
-- [ ] Rejection sites (via `Recorder.Reject`) increment `tunneld_rejections_total{reason=...}` and emit a cap-hit log via the deduping logger (first per `(tunnel,reason)` immediately, then ≤1 summary/min).
-- [ ] Per-tunnel live counters (bytes in/out, requests) stored in Redis with TTL, feeding `/admin/tunnels`.
+- [x] Internal listener serves `GET /metrics` (Prometheus), `GET /healthz` (200 if Redis PING ok else 503), `GET /admin/tunnels` (JSON top-N by bytes/requests from Redis).
+- [x] Metric families exactly as listed below; NO per-tunnel labels.
+- [x] A `PromRecorder` implements the `observ.Recorder` interface (US1 Task 1.5) by combining the metric registry + the cap-hit deduping logger; the US6/US7/US8 handlers were built against that interface, so this story provides the concrete implementation (no forward dependency).
+- [x] Rejection sites (via `Recorder.Reject`) increment `tunneld_rejections_total{reason=...}` and emit a cap-hit log via the deduping logger (first per `(tunnel,reason)` immediately, then ≤1 summary/min).
+- [x] Per-tunnel live counters (bytes in/out, requests) stored in Redis with TTL, feeding `/admin/tunnels`.
 
 ### Task 9.1: Metric registry
 **File**: `tunneld/internal/metrics/metrics.go` — register:
@@ -1581,8 +1581,8 @@ DERIVED from connect/disconnect — no separate writer); `Enrollment()` → `tun
 | `PromRecorder flushes tcnt via Request/Bytes` | `Request(name,…)`/`Bytes(name,"in"/"out",…)` accumulate in-process; after one flusher cycle, `tcnt:{name}` `requests`/`bytes_in`/`bytes_out` reflect the totals (real async write path, NOT seeded) |
 
 ### Definition of Done
-- [ ] US9 test tables authored and committed (execution in US16).
-- [ ] No per-tunnel labels on any Prometheus metric (asserted in the test tables).
+- [x] US9 test tables authored and committed (execution in US16).
+- [x] No per-tunnel labels on any Prometheus metric (asserted in the test tables).
 
 ---
 
