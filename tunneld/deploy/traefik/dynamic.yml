@@ -1,0 +1,69 @@
+http:
+  middlewares:
+    ops-auth:
+      basicAuth:
+        users: ['{{ env "OPS_BASIC_AUTH" }}']
+    cf-only:
+      # Orange-cloud reference: only Cloudflare edges may reach the tunnel/enroll routers.
+      # Grey-cloud: remove this middleware from the two routers below.
+      ipAllowList:
+        sourceRange: {{ env "CLOUDFLARE_IP_RANGES" | splitList "," | toJson }}
+
+  routers:
+    enroll:
+      rule: Host(`{{ env "ENROLL_HOST" }}`)
+      # The tunnels HostRegexp below ALSO matches the enroll host; both routers point at the same
+      # service+middleware (tunneld re-dispatches by Host), but the explicit priority makes the
+      # overlap deterministic.
+      priority: 100
+      entryPoints: [websecure]
+      middlewares: [cf-only]
+      service: tunneld
+      tls: &wildcard-tls
+        certResolver: cloudflare
+        domains:
+          - main: '{{ env "TUNNEL_DOMAIN" }}'
+            sans: ['*.{{ env "TUNNEL_DOMAIN" }}']
+    tunnels:
+      # The regex is DERIVED from TUNNEL_DOMAIN (dots escaped via sprig `replace`) — single source
+      # of truth, no separate hand-escaped variable to drift.
+      rule: HostRegexp(`^[a-z0-9-]+\.{{ env "TUNNEL_DOMAIN" | replace "." "\\." }}$`)
+      entryPoints: [websecure]
+      middlewares: [cf-only]
+      service: tunneld
+      tls: *wildcard-tls
+    grafana:
+      rule: Host(`grafana.{{ env "OPS_DOMAIN" }}`)
+      entryPoints: [websecure]
+      middlewares: [ops-auth]
+      service: grafana
+      tls: &ops-tls
+        certResolver: cloudflare
+        domains:
+          - main: '{{ env "OPS_DOMAIN" }}'
+            sans: ['*.{{ env "OPS_DOMAIN" }}']
+    prometheus:
+      rule: Host(`prometheus.{{ env "OPS_DOMAIN" }}`)
+      entryPoints: [websecure]
+      middlewares: [ops-auth]
+      service: prometheus
+      tls: *ops-tls
+    alertmanager:
+      rule: Host(`alertmanager.{{ env "OPS_DOMAIN" }}`)
+      entryPoints: [websecure]
+      middlewares: [ops-auth]
+      service: alertmanager
+      tls: *ops-tls
+    ntfy:
+      # ntfy uses its OWN auth (deny-all + tokens) so the phone app can subscribe — NO basicAuth.
+      rule: Host(`ntfy.{{ env "OPS_DOMAIN" }}`)
+      entryPoints: [websecure]
+      service: ntfy
+      tls: *ops-tls
+
+  services:
+    tunneld:      { loadBalancer: { servers: [{ url: "http://tunneld-1:8080" }, { url: "http://tunneld-2:8080" }] } }
+    grafana:      { loadBalancer: { servers: [{ url: "http://grafana:3000" }] } }
+    prometheus:   { loadBalancer: { servers: [{ url: "http://prometheus:9090" }] } }
+    alertmanager: { loadBalancer: { servers: [{ url: "http://alertmanager:9093" }] } }
+    ntfy:         { loadBalancer: { servers: [{ url: "http://ntfy:80" }] } }

@@ -1,0 +1,22 @@
+groups:
+  - name: tunneld
+    rules:
+      - alert: HighRejectionRate
+        expr: sum by (reason) (rate(tunneld_rejections_total[5m])) > 10
+        for: 10m
+        labels: { severity: warning }
+      - alert: TunnelOfflineSpike
+        expr: sum(rate(tunneld_rejections_total{reason="tunnel_offline"}[5m])) > 1
+        for: 5m
+        labels: { severity: warning }
+      - alert: EnrollmentBurst
+        expr: sum(increase(tunneld_enrollments_total[10m])) > 50
+        labels: { severity: warning }
+      - alert: SustainedRateLimiting
+        expr: sum(rate(tunneld_rejections_total{reason=~"rate_rps|rate_rpm"}[15m])) > 5
+        for: 15m
+        labels: { severity: warning }
+      - alert: NodeDown
+        expr: up{job="tunneld"} == 0
+        for: 2m
+        labels: { severity: critical }

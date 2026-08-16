@@ -1,0 +1,9 @@
+route:
+  receiver: ntfy
+  group_by: [alertname]
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: http://ntfy-alertmanager:8080

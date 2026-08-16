@@ -1764,13 +1764,13 @@ The multi-stage `tunneld` image and the full `docker-compose.yml` with proxy, Re
 ntfy, and the fetcher service.
 
 ### Acceptance Criteria
-- [ ] Multi-stage `Dockerfile` builds a static `tunneld` into a distroless/minimal runtime image; `--version` injected via ldflags.
-- [ ] `docker-compose.yml` defines: `traefik`, `tunneld-1`/`tunneld-2` (two explicit replicas via a shared YAML anchor — deterministic Traefik LB URLs + Prometheus scrape names; scale by copying the block; internal-only ports), `redis`, `prometheus`, `grafana`, `alertmanager`, `ntfy`, `ntfy-alertmanager`, `fetcher`.
-- [ ] Traefik does plain TLS termination + host/path routing ONLY — NO `clientAuth`/`passTLSClientCert` (auth is app-layer over `/connect`). Routers: `<enroll-host>`, and the wildcard `*.<tunnel-domain>` (per-tunnel hosts). Ops routers under `*.<ops-domain>` use basic-auth middleware; ntfy exposed with its own auth.
-- [ ] **Orange-cloud reference**: an `IPAllowList` middleware restricts ingress to Cloudflare's published IP ranges (and/or Authenticated Origin Pulls) so `Cf-Connecting-Ip` is trustworthy; Traefik passes `Cf-Connecting-Ip` through to tunneld (`--client-ip-header=Cf-Connecting-Ip`). Documented in `dynamic.yml` with the edge-cert (ACM) and `.env` notes. Grey-cloud alternative documented (`--client-ip-header=X-Real-Ip`, no Cloudflare in path, no IPAllowList).
-- [ ] `fetcher`: stock image + `command:` that `apk add`s deps, writes the crontab (droplist daily, DB-IP daily), runs both scripts once, then `crond -f`; scripts mounted read-only; ban-file dir shared with `tunneld`.
-- [ ] Prometheus scrapes `tunneld` internal listeners; Alertmanager routes to the ntfy bridge; Grafana provisioned with a datasource + dashboard; starter alert rules present.
-- [ ] All real hostnames/tokens are placeholders in-repo; `.env.example` (compose interpolation + non-tunneld secrets) and `tunneld.env.example` (ONLY `TUNNELD_*` twins, `env_file:`-injected) document required values — tunneld NEVER receives the shared `.env` (least privilege: `CF_DNS_API_TOKEN`/ops credentials stay out of the public-facing process).
+- [x] Multi-stage `Dockerfile` builds a static `tunneld` into a distroless/minimal runtime image; `--version` injected via ldflags.
+- [x] `docker-compose.yml` defines: `traefik`, `tunneld-1`/`tunneld-2` (two explicit replicas via a shared YAML anchor — deterministic Traefik LB URLs + Prometheus scrape names; scale by copying the block; internal-only ports), `redis`, `prometheus`, `grafana`, `alertmanager`, `ntfy`, `ntfy-alertmanager`, `fetcher`.
+- [x] Traefik does plain TLS termination + host/path routing ONLY — NO `clientAuth`/`passTLSClientCert` (auth is app-layer over `/connect`). Routers: `<enroll-host>`, and the wildcard `*.<tunnel-domain>` (per-tunnel hosts). Ops routers under `*.<ops-domain>` use basic-auth middleware; ntfy exposed with its own auth.
+- [x] **Orange-cloud reference**: an `IPAllowList` middleware restricts ingress to Cloudflare's published IP ranges (and/or Authenticated Origin Pulls) so `Cf-Connecting-Ip` is trustworthy; Traefik passes `Cf-Connecting-Ip` through to tunneld (`--client-ip-header=Cf-Connecting-Ip`). Documented in `dynamic.yml` with the edge-cert (ACM) and `.env` notes. Grey-cloud alternative documented (`--client-ip-header=X-Real-Ip`, no Cloudflare in path, no IPAllowList).
+- [x] `fetcher`: stock image + `command:` that `apk add`s deps, writes the crontab (droplist daily, DB-IP daily), runs both scripts once, then `crond -f`; scripts mounted read-only; ban-file dir shared with `tunneld`.
+- [x] Prometheus scrapes `tunneld` internal listeners; Alertmanager routes to the ntfy bridge; Grafana provisioned with a datasource + dashboard; starter alert rules present.
+- [x] All real hostnames/tokens are placeholders in-repo; `.env.example` (compose interpolation + non-tunneld secrets) and `tunneld.env.example` (ONLY `TUNNELD_*` twins, `env_file:`-injected) document required values — tunneld NEVER receives the shared `.env` (least privilege: `CF_DNS_API_TOKEN`/ops credentials stay out of the public-facing process).
 
 ### Task 13.1: Dockerfile
 **File**: `tunneld/Dockerfile` — create:
@@ -2187,9 +2187,9 @@ file provides placeholder values; `tunneld.env` is `required: false` in the comp
 same reason).
 
 ### Definition of Done
-- [ ] Dockerfile, `docker-compose.yml`, Traefik/observability configs, and `.env.example` authored (build + `docker compose config -q` executed in US16).
-- [ ] Traefik has NO client-cert/mTLS config; ops behind basic auth; ntfy self-authed; the orange-cloud `IPAllowList` (Cloudflare ranges) restricts the tunnel/enroll routers; grey-cloud alternative documented.
-- [ ] No real secrets/hostnames committed; `.env.example` AND `tunneld.env.example` complete.
+- [x] Dockerfile, `docker-compose.yml`, Traefik/observability configs, and `.env.example` authored (build + `docker compose config -q` executed in US16).
+- [x] Traefik has NO client-cert/mTLS config; ops behind basic auth; ntfy self-authed; the orange-cloud `IPAllowList` (Cloudflare ranges) restricts the tunnel/enroll routers; grey-cloud alternative documented.
+- [x] No real secrets/hostnames committed; `.env.example` AND `tunneld.env.example` complete.
 
 ---
 

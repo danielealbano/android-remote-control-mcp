@@ -1,0 +1,5 @@
+base-url http://ntfy
+ntfy {
+    topic alerts
+    access-token changeme-write-token
+}
