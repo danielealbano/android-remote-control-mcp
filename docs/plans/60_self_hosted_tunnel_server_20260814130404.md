@@ -2313,21 +2313,21 @@ Re-verify the ENTIRE implementation from scratch against this plan and the app's
 surface — the final gate before the work is considered done.
 
 ### Acceptance Criteria
-- [ ] `tunneld/`: `go build ./...`, `go vet ./...`, `golangci-lint run`, `go test ./...` all clean; `make test-e2e` passes; `make test-scripts` (the US12 droplist/DB-IP harness) passes; `shellcheck` + `docker compose config -q` pass.
-- [ ] The ingress allowlist is re-diffed against the CURRENT app code (McpServer.kt, McpStreamableHttpExtension.kt, OAuthRoutes.kt, Cors.kt, CapabilityToken.kt, EphemeralFileLinkService.kt — the last confirms `PATH_PREFIX` is still `/s/`) — every allowlisted method+path still matches; no app route added/removed since planning is unaccounted for.
-- [ ] Every default in the Config table matches this plan; every `--limit-*` flag has a working env twin.
-- [ ] No permanent Redis state anywhere: every key set has a TTL (grep + review).
-- [ ] Ban check is provably FIRST among HANDLER-level checks on all three ingress edges (public, `/enroll`, `/connect`), keyed on the trusted `--client-ip-header` IP (checked BEFORE the WS upgrade on `/connect`). (Exactly TWO refusals necessarily precede it: Go's `MaxHeaderBytes` `431` emitted during header parsing before ANY handler runs — US7 step 6 — and the mandatory client-IP extraction's fail-closed `400 missing_client_ip`, since an IP must exist before it can be ban-checked. NO other logic precedes the ban check.)
-- [ ] Source IP comes ONLY from the configured `--client-ip-header` via the single `clientip.TrustedIP` helper (single value, or right-most token for `X-Forwarded-For`; never the left-most); grep confirms no other code path derives the ban/rate/quota IP; absent header → `400` `missing_client_ip`.
-- [ ] There is NO TLS-mTLS anywhere (no `clientAuth`/`passTLSClientCert` in Traefik, no client-cert header parsing in tunneld). `/connect` auth is the app-layer challenge-response; possession verification rejects wrong-key/wrong-nonce (no replay); CN == Host `<name>` enforced.
-- [ ] Revocation is enforced at ALL THREE points: `ban.MatchTunnel(name, fingerprint)` at `/connect` (after auth, before `Bind`), `MatchTunnel` on the resolved route at public ingress (US7 step 3), AND `EvictBanned` as the ban-reload hook (US10) dropping live banned tunnels mid-session; grep confirms all three are actually invoked (not just defined). `/connect` has a per-IP attempt limit + a bounded pre-auth semaphore before the WS upgrade.
-- [ ] Header sanitization strips client `X-Forwarded-*`/hop-by-hop; public side rejects the fixed client-cert/mTLS-indicating header set (`400 public_mtls_header`).
-- [ ] The edge performs NO authentication on forwarded requests (user decision): a token-less `POST /mcp` is forwarded and the app's `401` + RFC 9728 `WWW-Authenticate` header passes back unmodified; grep confirms the ingress never inspects the `Authorization` header.
-- [ ] Orange-cloud origin-trust documented: `Cf-Connecting-Ip` is used only with the Cloudflare IPAllowList / Authenticated Origin Pulls restriction; `--ping-interval < 100s` and `--limit-request-timeout < 100s` (Cloudflare limits) enforced by `Validate()`.
-- [ ] Every Redis counter's TTL is set atomically with its INCR/HINCRBY (single Lua), not in a separate call.
-- [ ] No AI attribution anywhere (commits, comments, docs).
-- [ ] No real country names/codes in ANY module artifact; DB-IP attribution present.
-- [ ] `/health` is NOT reachable through the tunnel; `/healthz` exists only on the internal listener.
+- [x] `tunneld/`: `go build ./...`, `go vet ./...`, `golangci-lint run`, `go test ./...` all clean; `make test-e2e` passes; `make test-scripts` (the US12 droplist/DB-IP harness) passes; `shellcheck` + `docker compose config -q` pass.
+- [x] The ingress allowlist is re-diffed against the CURRENT app code (McpServer.kt, McpStreamableHttpExtension.kt, OAuthRoutes.kt, Cors.kt, CapabilityToken.kt, EphemeralFileLinkService.kt — the last confirms `PATH_PREFIX` is still `/s/`) — every allowlisted method+path still matches; no app route added/removed since planning is unaccounted for.
+- [x] Every default in the Config table matches this plan; every `--limit-*` flag has a working env twin.
+- [x] No permanent Redis state anywhere: every key set has a TTL (grep + review).
+- [x] Ban check is provably FIRST among HANDLER-level checks on all three ingress edges (public, `/enroll`, `/connect`), keyed on the trusted `--client-ip-header` IP (checked BEFORE the WS upgrade on `/connect`). (Exactly TWO refusals necessarily precede it: Go's `MaxHeaderBytes` `431` emitted during header parsing before ANY handler runs — US7 step 6 — and the mandatory client-IP extraction's fail-closed `400 missing_client_ip`, since an IP must exist before it can be ban-checked. NO other logic precedes the ban check.)
+- [x] Source IP comes ONLY from the configured `--client-ip-header` via the single `clientip.TrustedIP` helper (single value, or right-most token for `X-Forwarded-For`; never the left-most); grep confirms no other code path derives the ban/rate/quota IP; absent header → `400` `missing_client_ip`.
+- [x] There is NO TLS-mTLS anywhere (no `clientAuth`/`passTLSClientCert` in Traefik, no client-cert header parsing in tunneld). `/connect` auth is the app-layer challenge-response; possession verification rejects wrong-key/wrong-nonce (no replay); CN == Host `<name>` enforced.
+- [x] Revocation is enforced at ALL THREE points: `ban.MatchTunnel(name, fingerprint)` at `/connect` (after auth, before `Bind`), `MatchTunnel` on the resolved route at public ingress (US7 step 3), AND `EvictBanned` as the ban-reload hook (US10) dropping live banned tunnels mid-session; grep confirms all three are actually invoked (not just defined). `/connect` has a per-IP attempt limit + a bounded pre-auth semaphore before the WS upgrade.
+- [x] Header sanitization strips client `X-Forwarded-*`/hop-by-hop; public side rejects the fixed client-cert/mTLS-indicating header set (`400 public_mtls_header`).
+- [x] The edge performs NO authentication on forwarded requests (user decision): a token-less `POST /mcp` is forwarded and the app's `401` + RFC 9728 `WWW-Authenticate` header passes back unmodified; grep confirms the ingress never inspects the `Authorization` header.
+- [x] Orange-cloud origin-trust documented: `Cf-Connecting-Ip` is used only with the Cloudflare IPAllowList / Authenticated Origin Pulls restriction; `--ping-interval < 100s` and `--limit-request-timeout < 100s` (Cloudflare limits) enforced by `Validate()`.
+- [x] Every Redis counter's TTL is set atomically with its INCR/HINCRBY (single Lua), not in a separate call.
+- [x] No AI attribution anywhere (commits, comments, docs).
+- [x] No real country names/codes in ANY module artifact; DB-IP attribution present.
+- [x] `/health` is NOT reachable through the tunnel; `/healthz` exists only on the internal listener.
 
 ### Task 16.1: Automated gate sweep
 **File**: (no new file) — run the full quality gate for the module and capture output to
@@ -2348,10 +2348,10 @@ parsing) and confirm NONE exist (auth is app-layer challenge-response); confirm 
 Prometheus labels; confirm no country names/codes and no AI attribution across `tunneld/`.
 
 ### Definition of Done
-- [ ] All gates green; `/tmp/tunnel-verify.log` shows clean runs.
-- [ ] Allowlist re-diff recorded and matching.
-- [ ] All invariants (TTLs, ban-first, no cardinality, no country codes, no AI attribution) confirmed.
-- [ ] Any deviation from this plan is surfaced to the user (never silently "fixed" against the plan).
+- [x] All gates green; `/tmp/tunnel-verify.log` shows clean runs.
+- [x] Allowlist re-diff recorded and matching.
+- [x] All invariants (TTLs, ban-first, no cardinality, no country codes, no AI attribution) confirmed.
+- [x] Any deviation from this plan is surfaced to the user (never silently "fixed" against the plan).
 
 ---
 
