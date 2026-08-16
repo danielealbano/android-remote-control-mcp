@@ -51,7 +51,7 @@ type prefixSource struct {
 // caller, which distinguishes not-exist (skip) from a hard read error (keep previous snapshot).
 // Malformed individual lines are warned-and-skipped (never fatal).
 func parseFile(path string, log *slog.Logger) (parsed, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- operator-configured --ban-file path (deployment trust boundary, not request-derived)
 	if err != nil {
 		return parsed{}, err
 	}

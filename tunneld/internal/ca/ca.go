@@ -33,11 +33,11 @@ type CA struct {
 // Load reads the CA certificate + private key (PEM), verifies the certificate is a CA, and returns
 // an in-memory signer. Bad/unreadable/non-CA material fails fast.
 func Load(certPath, keyPath string, validity time.Duration) (*CA, error) {
-	certPEM, err := os.ReadFile(certPath)
+	certPEM, err := os.ReadFile(certPath) // #nosec G304 -- operator-configured --ca-cert path (deployment trust boundary, not request-derived)
 	if err != nil {
 		return nil, fmt.Errorf("read ca cert: %w", err)
 	}
-	keyPEM, err := os.ReadFile(keyPath)
+	keyPEM, err := os.ReadFile(keyPath) // #nosec G304 -- operator-configured --ca-key path (deployment trust boundary, not request-derived)
 	if err != nil {
 		return nil, fmt.Errorf("read ca key: %w", err)
 	}

@@ -21,7 +21,7 @@ func ExpandCountries(csvPath string, wanted map[string]struct{}) ([]netip.Prefix
 	if csvPath == "" {
 		return nil, errors.New("no dbip-country-lite-csv configured")
 	}
-	f, err := os.Open(csvPath)
+	f, err := os.Open(csvPath) // #nosec G304 -- operator-configured --dbip-country-lite-csv path (deployment trust boundary, not request-derived)
 	if err != nil {
 		return nil, err
 	}

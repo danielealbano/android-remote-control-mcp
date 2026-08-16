@@ -2251,10 +2251,10 @@ CI workflow for the Go module, linter config, the protocol spec, and the README 
 attribution).
 
 ### Acceptance Criteria
-- [ ] `.golangci.yml` for the module; `make lint` runs `golangci-lint` + `shellcheck` + `docker compose config`.
-- [ ] A GitHub Actions workflow builds, vets, lints, unit-tests the module, and builds the image; e2e is a separate opt-in job.
-- [ ] `tunneld/docs/PROTOCOL.md` fully specifies the WS frame format + Redis envelopes + enrollment, with the golden fixtures referenced so the future Kotlin client matches.
-- [ ] `tunneld/README.md` documents deployment, the "never publish tunneld's port" rule, and the DB-IP CC-BY attribution line. Country filtering is described ONLY as a generic operator-configurable GeoIP feature with placeholder codes — no country names/codes.
+- [x] `.golangci.yml` for the module; `make lint` runs `golangci-lint` + `shellcheck` + `docker compose config`.
+- [x] A GitHub Actions workflow builds, vets, lints, unit-tests the module, and builds the image; e2e is a separate opt-in job.
+- [x] `tunneld/docs/PROTOCOL.md` fully specifies the WS frame format + Redis envelopes + enrollment, with the golden fixtures referenced so the future Kotlin client matches.
+- [x] `tunneld/README.md` documents deployment, the "never publish tunneld's port" rule, and the DB-IP CC-BY attribution line. Country filtering is described ONLY as a generic operator-configurable GeoIP feature with placeholder codes — no country names/codes.
 
 ### Task 15.1: Lint config + CI
 **File**: `tunneld/.golangci.yml` — enable a reasonable set (govet, staticcheck, errcheck, revive,
@@ -2300,10 +2300,10 @@ Consequently a phone in OPEN mode (no bearer/OAuth) is reachable unauthenticated
 the tunnel hostname: a tunnelled deployment MUST keep bearer or OAuth enabled on the app.
 
 ### Definition of Done
-- [ ] `.golangci.yml`, the CI workflow, `PROTOCOL.md`, and `README.md` authored (CI/lint execution happens in US16 and via the workflow on push).
-- [ ] `PROTOCOL.md` is complete enough to implement a matching client from scratch, and documents the app-layer possession proof + the origin-trust security invariants.
-- [ ] README contains the DB-IP attribution; NO country names/codes anywhere in the module.
-- [ ] All Mermaid diagrams validated with `mmdc`.
+- [x] `.golangci.yml`, the CI workflow, `PROTOCOL.md`, and `README.md` authored (CI/lint execution happens in US16 and via the workflow on push).
+- [x] `PROTOCOL.md` is complete enough to implement a matching client from scratch, and documents the app-layer possession proof + the origin-trust security invariants.
+- [x] README contains the DB-IP attribution; NO country names/codes anywhere in the module.
+- [x] All Mermaid diagrams validated with `mmdc`.
 
 ---
 

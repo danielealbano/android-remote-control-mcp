@@ -1,0 +1,42 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # The v2 "standard" default set (errcheck, govet, ineffassign, staticcheck, unused) plus:
+  enable:
+    - revive
+    - gosec
+    - misspell
+  settings:
+    revive:
+      # A curated, high-signal ruleset (style-noise rules like unused-parameter/exported are
+      # intentionally omitted; this is rule SELECTION, not suppression of a violation).
+      rules:
+        - name: blank-imports
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+  exclusions:
+    rules:
+      # gosec is a production-security linter; test files exercise edge cases (fixture files, etc.)
+      # that are not part of the shipped attack surface.
+      - path: _test\.go
+        linters:
+          - gosec

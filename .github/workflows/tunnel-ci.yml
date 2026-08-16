@@ -1,0 +1,60 @@
+name: tunneld CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['tunneld/**', '.github/workflows/tunnel-ci.yml']
+  pull_request:
+    paths: ['tunneld/**', '.github/workflows/tunnel-ci.yml']
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tunneld
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - run: go build ./...
+      - run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          working-directory: tunneld
+      - name: shellcheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck deploy/scripts/*.sh deploy/fetcher/command.sh
+      - name: script tests
+        run: make test-scripts
+      - name: unit + integration tests
+        run: go test ./...
+      - name: compose config
+        run: docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config -q
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t tunneld:ci -f tunneld/Dockerfile tunneld
+
+  e2e:
+    # Opt-in: e2e spins up containers (slow); run via the Actions "Run workflow" button.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tunneld
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - name: e2e
+        run: make test-e2e
