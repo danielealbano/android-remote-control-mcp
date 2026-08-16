@@ -51,7 +51,7 @@ func (c *Conn) Do(ctx context.Context, req *wire.ReqEnvelope) *wire.RespEnvelope
 		return synthErr(req.ReqID, "tunnel_gone")
 	}
 	// Double-pacing guard: if this node's up-bucket already paced the ingress body read (US7 step 8),
-	// skip the token drain here (byte accounting is still recorded for every chunk).
+	// skip the token drain here (byte accounting is still recorded for every chunk written).
 	skipPace := req.PacedByNode == c.mgr.nodeID
 	for _, chunk := range chunkBytes(req.Body, wire.ChunkSize) {
 		if !skipPace {
@@ -59,10 +59,12 @@ func (c *Conn) Do(ctx context.Context, req *wire.ReqEnvelope) *wire.RespEnvelope
 				return synthErr(req.ReqID, "tunnel_gone")
 			}
 		}
-		c.mgr.rec.Bytes(c.name, "out", int64(len(chunk)))
 		if err := c.write(ctx, wire.REQUEST_BODY_CHUNK, wire.EncodeReqIDHeader(req.ReqID), chunk); err != nil {
 			return synthErr(req.ReqID, "tunnel_gone")
 		}
+		// Record AFTER a successful write (mirrors the read-pump's record-after-receipt): a chunk that
+		// failed to reach the wire must not inflate bytes_out.
+		c.mgr.rec.Bytes(c.name, "out", int64(len(chunk)))
 	}
 	if err := c.write(ctx, wire.REQUEST_END, wire.EncodeReqIDHeader(req.ReqID), nil); err != nil {
 		return synthErr(req.ReqID, "tunnel_gone")
