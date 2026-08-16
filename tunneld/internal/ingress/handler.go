@@ -184,7 +184,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-reqCtx.Done():
 		_ = r.Body.Close()
 		h.rec.Reject("body_read_timeout", name, ipStr)
-		h.finishCode(w, name, route.Class, http.StatusRequestTimeout, start)
+		h.writeStatus(w, http.StatusRequestTimeout)
 		return
 	case res := <-bodyCh:
 		if res.err != nil {
@@ -192,12 +192,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case errors.As(res.err, &mbe):
 				h.rec.Reject("body_too_large", name, ipStr)
-				h.finishCode(w, name, route.Class, http.StatusRequestEntityTooLarge, start)
+				h.writeStatus(w, http.StatusRequestEntityTooLarge)
 			case errors.Is(res.err, context.DeadlineExceeded), errors.Is(res.err, context.Canceled):
 				h.rec.Reject("body_read_timeout", name, ipStr)
-				h.finishCode(w, name, route.Class, http.StatusRequestTimeout, start)
+				h.writeStatus(w, http.StatusRequestTimeout)
 			default:
-				h.finishCode(w, name, route.Class, http.StatusBadRequest, start)
+				h.writeStatus(w, http.StatusBadRequest)
 			}
 			return
 		}
@@ -224,16 +224,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, transport.ErrTimeout) {
 			h.rec.Timeout()
 			h.rec.Reject("timeout", name, ipStr)
-			h.finishCode(w, name, route.Class, http.StatusGatewayTimeout, start)
+			h.writeStatus(w, http.StatusGatewayTimeout)
 			return
 		}
 		h.rec.PublishError()
-		h.finishCode(w, name, route.Class, http.StatusBadGateway, start)
+		h.writeStatus(w, http.StatusBadGateway)
 		return
 	}
 	if resp.ErrCode == "tunnel_gone" {
 		h.rec.Reject("tunnel_offline", name, ipStr)
-		h.finishCode(w, name, route.Class, http.StatusBadGateway, start)
+		h.writeStatus(w, http.StatusBadGateway)
 		return
 	}
 	// 9. Write status + sanitized headers + body (real response, or a node-recorded synthetic like
@@ -300,10 +300,13 @@ func (h *Handler) serverError(w http.ResponseWriter) {
 	http.Error(w, "internal error", http.StatusInternalServerError)
 }
 
-// finishCode writes a synthetic status (no phone body) and records the forwarded-request metric.
-func (h *Handler) finishCode(w http.ResponseWriter, name, class string, code int, start time.Time) {
+// writeStatus writes a synthetic status (no phone body). It does NOT record rec.Request: these
+// paths never received a real phone response and are already recorded via rec.Reject/Timeout/
+// PublishError (US7 step 8/9). rec.Request is reserved for a forwarded request that produced a real
+// response (the writeResp path), so tunneld_http_requests_total and the per-tunnel tcnt counter are
+// not inflated by requests that never reached the phone.
+func (h *Handler) writeStatus(w http.ResponseWriter, code int) {
 	http.Error(w, http.StatusText(code), code)
-	h.rec.Request(name, class, code, time.Since(start))
 }
 
 func writeResp(w http.ResponseWriter, resp *wire.RespEnvelope) {
