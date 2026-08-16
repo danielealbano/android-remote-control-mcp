@@ -65,7 +65,15 @@ func Run(ctx context.Context, cfg config.ServeCmd, logger *slog.Logger, version 
 	caplogger := caplog.New(logger)
 	rec := metrics.NewPromRecorder(m, caplogger, adminStore)
 
-	manager, err := wsconn.NewManager(ctx, cfg, nodeID, rdb, reg, banEng, caObj, buckets, rec, logger)
+	// drainCtx keeps the NODE-serving path (ServeNode, the per-message handlers, the async flusher,
+	// and every Conn's lifetime) ALIVE after the parent ctx is cancelled — cancelled only AFTER
+	// http.Server.Shutdown has drained in-flight ingress handlers within --shutdown-grace, so an
+	// in-flight tunnel request completes instead of being abandoned to a 504 (US10 AC: "drain
+	// in-flight up to --shutdown-grace"). It derives from Background, NOT ctx.
+	drainCtx, drainCancel := context.WithCancel(context.Background())
+	defer drainCancel()
+
+	manager, err := wsconn.NewManager(drainCtx, cfg, nodeID, rdb, reg, banEng, caObj, buckets, rec, logger)
 	if err != nil {
 		return err
 	}
@@ -102,10 +110,11 @@ func Run(ctx context.Context, cfg config.ServeCmd, logger *slog.Logger, version 
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return serveHTTP(publicSrv) })
 	g.Go(func() error { return serveHTTP(internalSrv) })
+	// Node-serving path runs on drainCtx (survives parent-cancel until the grace window ends).
 	g.Go(func() error {
-		return transport.ServeNode(gctx, rdb, nodeID, cfg.LimitRequestTimeout, rec, manager.RouteLocal)
+		return transport.ServeNode(drainCtx, rdb, nodeID, cfg.LimitRequestTimeout, rec, manager.RouteLocal)
 	})
-	g.Go(func() error { return rec.RunFlusher(gctx, flushInterval) })
+	g.Go(func() error { return rec.RunFlusher(drainCtx, flushInterval) })
 	g.Go(func() error {
 		ban.Watch(gctx, banEng, cfg.BanFile, cfg.DBIPCountryLiteCSV, cfg.BanPoll, manager.EvictBanned, logger)
 		return nil
@@ -114,8 +123,12 @@ func Run(ctx context.Context, cfg config.ServeCmd, logger *slog.Logger, version 
 		<-gctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
 		defer cancel()
+		// Stop accepting + DRAIN in-flight ingress handlers first: the node path (ServeNode + Conns)
+		// is still alive on drainCtx, so those handlers' RoundTrips can complete within the grace
+		// window. Only then cancel the drain and tear down the WebSockets.
 		_ = publicSrv.Shutdown(shutCtx)
 		_ = internalSrv.Shutdown(shutCtx)
+		drainCancel()
 		manager.Shutdown()
 		return nil
 	})

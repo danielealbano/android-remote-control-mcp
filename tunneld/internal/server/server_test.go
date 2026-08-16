@@ -240,6 +240,92 @@ func TestDistinctNodeIDPerProcess(t *testing.T) {
 	}
 }
 
+func doMCP(publicAddr, name string) (int, string, error) {
+	req, _ := http.NewRequest("POST", "http://"+publicAddr+"/mcp", nil)
+	req.Host = name + ".example.test"
+	req.Header.Set("X-Real-Ip", "203.0.113.7")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, "", err
+	}
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	return resp.StatusCode, string(b), nil
+}
+
+func TestGracefulShutdownDrains(t *testing.T) {
+	r := startServer(t)
+	name, cert, key := r.enroll(t)
+	// A phone whose handler is SLOW, so a request stays in flight across the shutdown boundary.
+	slow := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		time.Sleep(700 * time.Millisecond)
+		_, _ = io.WriteString(w, "drained")
+	})
+	phone, err := tunneltest.DialWithHeaders(context.Background(),
+		"ws://"+r.publicA+"/connect", name+".example.test",
+		http.Header{"X-Real-Ip": {"203.0.113.7"}}, cert, key, slow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = phone.Close() }()
+
+	// Warm-up (retry to absorb bind + ServeNode-subscription readiness).
+	warm := time.Now().Add(6 * time.Second)
+	for {
+		if code, body, e := doMCP(r.publicA, name); e == nil && code == 200 && body == "drained" {
+			break
+		}
+		if time.Now().After(warm) {
+			t.Fatal("warm-up request never succeeded")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Fire an in-flight request and let it reach the (sleeping) phone.
+	type res struct {
+		code int
+		body string
+	}
+	ch := make(chan res, 1)
+	go func() {
+		code, body, e := doMCP(r.publicA, name)
+		if e != nil {
+			ch <- res{0, e.Error()}
+			return
+		}
+		ch <- res{code, body}
+	}()
+	time.Sleep(250 * time.Millisecond)
+
+	// Begin shutdown WHILE the request is in flight.
+	r.cancel()
+
+	// The in-flight request MUST complete (drained), not be abandoned to a 504/502.
+	select {
+	case got := <-ch:
+		if got.code != 200 || got.body != "drained" {
+			t.Errorf("in-flight request not drained during shutdown: %d %q", got.code, got.body)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("in-flight request never completed during shutdown")
+	}
+
+	// New requests after shutdown started must be refused (the listener stopped accepting).
+	refused := false
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, _, e := doMCP(r.publicA, name); e != nil {
+			refused = true
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !refused {
+		t.Error("new requests must be refused once shutdown has begun")
+	}
+	<-r.done
+}
+
 func TestShutdownUnbindsAllRoutes(t *testing.T) {
 	r := startServer(t)
 	name, cert, key := r.enroll(t)
