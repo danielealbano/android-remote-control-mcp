@@ -7,8 +7,10 @@
 set -eu
 
 OUT_DIR="${OUT_DIR:?OUT_DIR required}"
-# Base URL (not a printf format — avoids shellcheck SC2059); the month suffix is appended below.
-DBIP_URL_BASE="${DBIP_URL_BASE:-https://download.db-ip.com/free/}"
+# Month-versioned template with a literal `%s` placeholder for the YYYY-MM month. The URL is built
+# by POSIX parameter-expansion substitution (NOT printf with a variable format string — that would
+# trip shellcheck SC2059), so the operator-supplied template stays fully honoured.
+DBIP_URL_TEMPLATE="${DBIP_URL_TEMPLATE:-https://download.db-ip.com/free/dbip-country-lite-%s.csv.gz}"
 
 month="$(date -u +%Y-%m)"
 sentinel="$OUT_DIR/dbip-country-lite.month"
@@ -21,7 +23,10 @@ if [ -f "$sentinel" ]; then
   fi
 fi
 
-url="${DBIP_URL_BASE}dbip-country-lite-${month}.csv.gz"
+# Substitute the month for the first `%s` in the template (SC2059-safe; no printf, no pipeline).
+url_prefix="${DBIP_URL_TEMPLATE%%%s*}"
+url_suffix="${DBIP_URL_TEMPLATE#*%s}"
+url="${url_prefix}${month}${url_suffix}"
 gz="$OUT_DIR/dbip-country-lite.csv.gz.tmp"
 csvtmp="$OUT_DIR/dbip-country-lite.csv.tmp"
 
