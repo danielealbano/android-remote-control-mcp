@@ -271,13 +271,13 @@ Create the `tunneld/` Go module, the full configuration surface (kong flags + en
 story imports.
 
 ### Acceptance Criteria
-- [ ] `tunneld/go.mod` declares module `github.com/danielealbano/android-remote-control-mcp/tunneld`, Go 1.26.
-- [ ] `tunneld serve` and `tunneld version` parse; `serve` validates config then calls `server.Run` (a stub created here, fleshed out in US10 — so the module compiles from US1 with no forward dependency).
-- [ ] Every flag in the Config table has a working `TUNNELD_*` env twin.
-- [ ] `--log`/`TUNNELD_LOG` accepts repeated composite specs; `std` sinks split by severity (info+ → stdout, warn+ → stderr), file sinks are lumberjack-backed; default `output=std;level=info`.
-- [ ] `internal/observ` defines the `Recorder` interface + a `Nop` implementation (Task 1.5), with a compile-time assertion `var _ Recorder = Nop{}`, so US6/US7/US8 handlers depend on the interface, not the US9 metrics/caplog concrete types. `internal/tunneltest` provides the shared capturing `Recorder` fake (Task 1.5) used by US5/US6/US7/US8/US9/US10 tests.
-- [ ] `ParseByteSize`, `ParseBitrate`, `Validate()`, and the `slog` fan-out have unit-test tables (Task 1.6).
-- [ ] All US1 code + test tables are authored/committed in this story (the DoD is the gate; gate execution is in US16, per repo workflow).
+- [x] `tunneld/go.mod` declares module `github.com/danielealbano/android-remote-control-mcp/tunneld`, Go 1.26.
+- [x] `tunneld serve` and `tunneld version` parse; `serve` validates config then calls `server.Run` (a stub created here, fleshed out in US10 — so the module compiles from US1 with no forward dependency).
+- [x] Every flag in the Config table has a working `TUNNELD_*` env twin.
+- [x] `--log`/`TUNNELD_LOG` accepts repeated composite specs; `std` sinks split by severity (info+ → stdout, warn+ → stderr), file sinks are lumberjack-backed; default `output=std;level=info`.
+- [x] `internal/observ` defines the `Recorder` interface + a `Nop` implementation (Task 1.5), with a compile-time assertion `var _ Recorder = Nop{}`, so US6/US7/US8 handlers depend on the interface, not the US9 metrics/caplog concrete types. `internal/tunneltest` provides the shared capturing `Recorder` fake (Task 1.5) used by US5/US6/US7/US8/US9/US10 tests.
+- [x] `ParseByteSize`, `ParseBitrate`, `Validate()`, and the `slog` fan-out have unit-test tables (Task 1.6).
+- [x] All US1 code + test tables are authored/committed in this story (the DoD is the gate; gate execution is in US16, per repo workflow).
 
 ### Task 1.1: Module + entrypoint + kong CLI
 **File**: `tunneld/go.mod` — create
@@ -525,9 +525,9 @@ func (r *Recorder) Count(kind, reason string) int {
 | `cli dispatch + version` | `version` prints the version string; `serve` runs `Validate()` then calls the `runServe` seam (overridden by a fake in the test — asserts dispatch + args, no real server) |
 
 ### Definition of Done
-- [ ] `go.mod` + `go.sum` (committed), `main.go` (with the `server.Run` stub), config struct + `Validate()`, `ParseByteSize`/`ParseBitrate`, the `slog` fan-out, the Makefile, `internal/observ` (Recorder + Nop), and `internal/tunneltest` (capturing Recorder fake) all authored/committed.
-- [ ] The `--log` composite grammar (`output=std` and `output=/path;maxsize=…;maxfiles=…`) and severity split are specified and covered by the Task 1.6 test tables.
-- [ ] US1 test tables authored/committed for `size`, `config`, `logging`, and `cmd/tunneld` (the `runServe`-seam dispatch test) packages (execution deferred to US16, per repo workflow).
+- [x] `go.mod` + `go.sum` (committed), `main.go` (with the `server.Run` stub), config struct + `Validate()`, `ParseByteSize`/`ParseBitrate`, the `slog` fan-out, the Makefile, `internal/observ` (Recorder + Nop), and `internal/tunneltest` (capturing Recorder fake) all authored/committed.
+- [x] The `--log` composite grammar (`output=std` and `output=/path;maxsize=…;maxfiles=…`) and severity split are specified and covered by the Task 1.6 test tables.
+- [x] US1 test tables authored/committed for `size`, `config`, `logging`, and `cmd/tunneld` (the `runServe`-seam dispatch test) packages (execution deferred to US16, per repo workflow).
 
 ---
 
