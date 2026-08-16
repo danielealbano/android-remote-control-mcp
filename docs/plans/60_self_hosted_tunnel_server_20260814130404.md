@@ -1695,10 +1695,10 @@ TLS client cert — so it works identically through Cloudflare (orange) or direc
 The two fetcher scripts run by the Compose `fetcher` service. Pure shell/Python, atomic handoff.
 
 ### Acceptance Criteria
-- [ ] `fetch-droplist.sh` downloads the Spamhaus DROP feed(s), converts to `cidr <prefix>` ban-file lines, writes a temp file in the target dir and `mv`s it into place. Non-zero exit on download failure WITHOUT clobbering the existing file.
-- [ ] `fetch-dbip.sh` downloads the current-month DB-IP Country Lite CSV ONLY if the month's file is absent (URL is month-versioned), decompresses, and `mv`s it into place; no-op when already present.
-- [ ] Both scripts are idempotent and safe to run at container start and via cron.
-- [ ] No secrets embedded; URLs configurable via env with sane defaults.
+- [x] `fetch-droplist.sh` downloads the Spamhaus DROP feed(s), converts to `cidr <prefix>` ban-file lines, writes a temp file in the target dir and `mv`s it into place. Non-zero exit on download failure WITHOUT clobbering the existing file.
+- [x] `fetch-dbip.sh` downloads the current-month DB-IP Country Lite CSV ONLY if the month's file is absent (URL is month-versioned), decompresses, and `mv`s it into place; no-op when already present.
+- [x] Both scripts are idempotent and safe to run at container start and via cron.
+- [x] No secrets embedded; URLs configurable via env with sane defaults.
 
 ### Task 12.1: Droplist script
 Both fetch scripts start with a `#!/bin/sh` shebang, use `set -eu`, and contain NO pipelines —
@@ -1753,8 +1753,8 @@ openssl req -x509 -new -key "$OUT_DIR/ca-key.pem" -sha256 -days 3650 \
 **Setup**: stub `curl` via a shim on `PATH` returning fixture bytes; assert temp-then-`mv` (never partial).
 
 ### Definition of Done
-- [ ] Scripts authored with `#!/bin/sh` shebangs and committed executable (git mode `100755`); `shellcheck` wired into `make lint`; script test harness authored (all execution in US16).
-- [ ] Atomic `mv` handoff and never-clobber-on-failure covered by the script test table.
+- [x] Scripts authored with `#!/bin/sh` shebangs and committed executable (git mode `100755`); `shellcheck` wired into `make lint`; script test harness authored (all execution in US16).
+- [x] Atomic `mv` handoff and never-clobber-on-failure covered by the script test table.
 
 ---
 
