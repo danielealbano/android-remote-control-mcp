@@ -703,13 +703,13 @@ generate tunnel names, sign CSRs, parse the phone-sent certificate, verify it ag
 verify the possession signature over the server nonce. Pure crypto; no HTTP yet.
 
 ### Acceptance Criteria
-- [ ] `--ca-cert`/`--ca-key` loaded into an in-memory signer at startup; bad material fails fast.
-- [ ] `GenerateName(prefix string, length int)` → `prefix + base32(crypto/rand)[:length]`, lowercase `[a-z2-7]`, skipping a reserved-hostname set.
-- [ ] `SignCSR(der []byte, name string)` validates the CSR signature, issues a leaf cert with CN=name, `--cert-validity` lifetime; returns PEM. Ignores all CSR-provided subject/extensions except the public key. REJECTS a CSR whose public key is not ECDSA P-256 (distinct error — US8 maps it to `400 unsupported_key_type`).
-- [ ] `ParseCertB64DER(b64)` decodes the base64-DER certificate the phone sends in the `AUTH` frame.
-- [ ] `VerifyEnrolledCert(cert, pool)` verifies the chain against the CA and the validity window, returns `(name=CN, fingerprint)`.
-- [ ] `VerifyPossession(cert, nonce, signature)` verifies the ECDSA-P256 signature over `ConnectAuthContext ‖ nonce` using the cert's public key (the app-layer proof-of-possession — see Identity).
-- [ ] `Fingerprint(cert)` = `"sha256:" + hex(sha256(cert.Raw))`.
+- [x] `--ca-cert`/`--ca-key` loaded into an in-memory signer at startup; bad material fails fast.
+- [x] `GenerateName(prefix string, length int)` → `prefix + base32(crypto/rand)[:length]`, lowercase `[a-z2-7]`, skipping a reserved-hostname set.
+- [x] `SignCSR(der []byte, name string)` validates the CSR signature, issues a leaf cert with CN=name, `--cert-validity` lifetime; returns PEM. Ignores all CSR-provided subject/extensions except the public key. REJECTS a CSR whose public key is not ECDSA P-256 (distinct error — US8 maps it to `400 unsupported_key_type`).
+- [x] `ParseCertB64DER(b64)` decodes the base64-DER certificate the phone sends in the `AUTH` frame.
+- [x] `VerifyEnrolledCert(cert, pool)` verifies the chain against the CA and the validity window, returns `(name=CN, fingerprint)`.
+- [x] `VerifyPossession(cert, nonce, signature)` verifies the ECDSA-P256 signature over `ConnectAuthContext ‖ nonce` using the cert's public key (the app-layer proof-of-possession — see Identity).
+- [x] `Fingerprint(cert)` = `"sha256:" + hex(sha256(cert.Raw))`.
 
 ### Task 4.1: CA signer
 **File**: `tunneld/internal/ca/ca.go` — create
@@ -776,9 +776,9 @@ caller (US6) additionally checks `name == Host <name>`.
 | `generate name shape + reserved skip` | 10 chars `[a-z2-7]`; never a reserved label |
 
 ### Definition of Done
-- [ ] US4 test tables authored and committed (execution in US16).
-- [ ] `SignCSR` provably ignores attacker-controlled CSR subject/extensions.
-- [ ] Possession verification rejects wrong-key and wrong-nonce signatures (no replay).
+- [x] US4 test tables authored and committed (execution in US16).
+- [x] `SignCSR` provably ignores attacker-controlled CSR subject/extensions.
+- [x] Possession verification rejects wrong-key and wrong-nonce signatures (no replay).
 
 ---
 
