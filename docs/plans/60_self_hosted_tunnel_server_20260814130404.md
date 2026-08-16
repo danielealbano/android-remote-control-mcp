@@ -788,11 +788,11 @@ Cross-replica routing table (name→node, heartbeat TTL) and the request/respons
 including the wire envelopes carried between frontends and the WS-holding node.
 
 ### Acceptance Criteria
-- [ ] `Registry.Bind(ctx, name, nodeID, fingerprint, connID)` writes `route:{name}` (node + fingerprint + per-connection `connID`) with a TTL; `Heartbeat` refreshes it and `Unbind` removes it — BOTH owner-conditionally on the `connID` (they touch `route:{name}` ONLY while it still belongs to that exact connection — a node-only guard would break same-node reconnects). `Lookup(name)` returns the node AND the stored fingerprint (for the US7 ingress ban gate) or "no tunnel".
-- [ ] Fingerprint guard: `route:{name}` stores the cert fingerprint; a bind for `name` with a different fingerprint is rejected (distinct error, logged loudly).
-- [ ] The ingress handler resolves `name → node` via `Lookup` (US7 step 3); `RoundTrip(ctx, rdb, node, req, timeout)` then receives the resolved `node`, subscribes to `resp:{reqid}` BEFORE publishing to `req:{node}`, and returns the `RespEnvelope`, or `(nil, ErrTimeout)` on `--limit-request-timeout` (a publish failure returns a different non-nil error). `ServeNode` takes the per-message `timeout` (US10 passes `--limit-request-timeout`) and an `observ.Recorder`, and records `PublishError()` on a failed response-publish.
-- [ ] Node loop: subscribe to `req:{nodeID}`, invoke a handler, publish `RespEnvelope` to `resp:{reqid}`.
-- [ ] Envelopes serialize without base64 (JSON header + raw body, length-prefixed).
+- [x] `Registry.Bind(ctx, name, nodeID, fingerprint, connID)` writes `route:{name}` (node + fingerprint + per-connection `connID`) with a TTL; `Heartbeat` refreshes it and `Unbind` removes it — BOTH owner-conditionally on the `connID` (they touch `route:{name}` ONLY while it still belongs to that exact connection — a node-only guard would break same-node reconnects). `Lookup(name)` returns the node AND the stored fingerprint (for the US7 ingress ban gate) or "no tunnel".
+- [x] Fingerprint guard: `route:{name}` stores the cert fingerprint; a bind for `name` with a different fingerprint is rejected (distinct error, logged loudly).
+- [x] The ingress handler resolves `name → node` via `Lookup` (US7 step 3); `RoundTrip(ctx, rdb, node, req, timeout)` then receives the resolved `node`, subscribes to `resp:{reqid}` BEFORE publishing to `req:{node}`, and returns the `RespEnvelope`, or `(nil, ErrTimeout)` on `--limit-request-timeout` (a publish failure returns a different non-nil error). `ServeNode` takes the per-message `timeout` (US10 passes `--limit-request-timeout`) and an `observ.Recorder`, and records `PublishError()` on a failed response-publish.
+- [x] Node loop: subscribe to `req:{nodeID}`, invoke a handler, publish `RespEnvelope` to `resp:{reqid}`.
+- [x] Envelopes serialize without base64 (JSON header + raw body, length-prefixed).
 
 ### Task 5.1: Wire envelopes (shared package)
 **File**: `tunneld/internal/wire/envelope.go` — create
@@ -901,8 +901,8 @@ response-publish fails it records `rec.PublishError()` (hence `ServeNode` takes 
 | `subscribe before publish (no lost response)` | A responder that publishes to `resp:{reqid}` the instant the request lands still resolves the call — proves the caller subscribed BEFORE publishing (ordering enforced) |
 
 ### Definition of Done
-- [ ] US5 test tables authored and committed; envelope fixtures committed for cross-client reuse (execution in US16).
-- [ ] Subscribe-before-publish ordering is enforced and covered by a test.
+- [x] US5 test tables authored and committed; envelope fixtures committed for cross-client reuse (execution in US16).
+- [x] Subscribe-before-publish ordering is enforced and covered by a test.
 
 ---
 
