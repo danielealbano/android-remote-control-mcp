@@ -1,0 +1,21 @@
+# Dedicated grey-cloud Traefik dynamic config for the e2e (the production deploy/traefik/dynamic.yml
+# is NOT reused — its orange-cloud cf-only IPAllowList would 403 every docker-network request). Plain
+# `web` entrypoint (no TLS/ACME); Traefik is the direct edge and sets X-Real-Ip to the real peer, so
+# tunneld runs with --client-ip-header=X-Real-Ip.
+http:
+  routers:
+    enroll:
+      rule: Host(`enroll.example.test`)
+      priority: 100
+      entryPoints: [web]
+      service: tunneld
+    tunnels:
+      rule: HostRegexp(`^[a-z0-9-]+\.example\.test$`)
+      entryPoints: [web]
+      service: tunneld
+  services:
+    tunneld:
+      loadBalancer:
+        servers:
+          - url: "http://tunneld-1:8080"
+          - url: "http://tunneld-2:8080"

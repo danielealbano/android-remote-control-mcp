@@ -2199,9 +2199,9 @@ Full-infrastructure e2e: Redis + Traefik + two `tunneld` replicas + a fake phone
 enrollment, cross-replica routing, allowlist, and the caps.
 
 ### Acceptance Criteria
-- [ ] `//go:build e2e`-tagged tests spin up the stack via `testcontainers-go` and drive it with the Go client (US11, app-layer challenge-response) + a raw HTTP client for the public side.
-- [ ] Covers: enroll → connect on node A (challenge-response) → public request landing on node B routes across Redis → response; allowlist denials; a representative cap (body/rate); banned IP via a mounted ban file; client-cert/mTLS-header rejection on the public side.
-- [ ] Runs under `make test-e2e`; skipped by default unit runs.
+- [x] `//go:build e2e`-tagged tests spin up the stack via `testcontainers-go` and drive it with the Go client (US11, app-layer challenge-response) + a raw HTTP client for the public side.
+- [x] Covers: enroll → connect on node A (challenge-response) → public request landing on node B routes across Redis → response; allowlist denials; a representative cap (body/rate); banned IP via a mounted ban file; client-cert/mTLS-header rejection on the public side.
+- [x] Runs under `make test-e2e`; skipped by default unit runs.
 
 ### Task 14.1: E2E harness
 **File**: `tunneld/e2e/harness_test.go` — bring up containers (reuse the built image), wire the
@@ -2240,8 +2240,8 @@ containing the client container's source IP (the one Traefik sets).
 | `tunnel offline 502/404` | Kill the WS → subsequent request errors correctly |
 
 ### Definition of Done
-- [ ] US14 e2e harness + all scenarios authored and committed (`make test-e2e` execution happens in US16 per repo workflow).
-- [ ] Scenarios include cross-node routing (request on a different replica than the WS).
+- [x] US14 e2e harness + all scenarios authored and committed (`make test-e2e` execution happens in US16 per repo workflow).
+- [x] Scenarios include cross-node routing (request on a different replica than the WS).
 
 ---
 
