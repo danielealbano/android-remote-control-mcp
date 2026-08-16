@@ -28,7 +28,14 @@ type FakePhone struct {
 // Dial connects to connectURL (Host set to hostName), authenticates with cert+key, and starts serving.
 func Dial(ctx context.Context, connectURL, hostName string, cert *x509.Certificate, key crypto.Signer,
 	handler http.Handler) (*FakePhone, error) {
-	ws, _, err := websocket.Dial(ctx, connectURL, &websocket.DialOptions{Host: hostName})
+	return DialWithHeaders(ctx, connectURL, hostName, nil, cert, key, handler)
+}
+
+// DialWithHeaders is Dial plus extra HTTP headers on the upgrade request (e.g. the trusted client-IP
+// header the in-process US10 test must inject since no proxy is in front).
+func DialWithHeaders(ctx context.Context, connectURL, hostName string, extra http.Header,
+	cert *x509.Certificate, key crypto.Signer, handler http.Handler) (*FakePhone, error) {
+	ws, _, err := websocket.Dial(ctx, connectURL, &websocket.DialOptions{Host: hostName, HTTPHeader: extra})
 	if err != nil {
 		return nil, err
 	}

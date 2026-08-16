@@ -242,6 +242,14 @@ func (m *Manager) RouteLocal(ctx context.Context, req *wire.ReqEnvelope) *wire.R
 	return v.(*Conn).Do(ctx, req)
 }
 
+// Shutdown tears down every live Conn (closing the WS and unbinding its route) for graceful drain.
+func (m *Manager) Shutdown() {
+	m.conns.Range(func(_, v any) bool {
+		v.(*Conn).teardown("shutdown")
+		return true
+	})
+}
+
 // EvictBanned is the ban-reload hook: it drops any live Conn whose (name, fingerprint) is now banned
 // (required because there is no idle disconnect).
 func (m *Manager) EvictBanned(e *ban.Engine) {

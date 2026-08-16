@@ -1592,10 +1592,10 @@ Wire every component together in `server.Run`, bind the public + internal listen
 pub/sub loop and ban watcher, and shut down cleanly.
 
 ### Acceptance Criteria
-- [ ] `server.Run(ctx, cfg, log, version)` constructs Redis client, CA, ban engine + watcher, routing registry, ONE `limit.BucketRegistry` (injected into BOTH the wsconn manager and the ingress handler — same instance), wsconn manager, metrics/internal server, and the public server; assigns a per-process `nodeID` (`crypto/rand`).
-- [ ] Public listener serves the Host-dispatch mux (US8.2); internal listener serves US9.
-- [ ] `ServeNode` loop runs, routing `req:{nodeID}` → local `Conn.Do`.
-- [ ] On ctx cancel: stop accepting, drain in-flight up to `--shutdown-grace`, close WSes, unbind routes, close Redis, flush logs.
+- [x] `server.Run(ctx, cfg, log, version)` constructs Redis client, CA, ban engine + watcher, routing registry, ONE `limit.BucketRegistry` (injected into BOTH the wsconn manager and the ingress handler — same instance), wsconn manager, metrics/internal server, and the public server; assigns a per-process `nodeID` (`crypto/rand`).
+- [x] Public listener serves the Host-dispatch mux (US8.2); internal listener serves US9.
+- [x] `ServeNode` loop runs, routing `req:{nodeID}` → local `Conn.Do`.
+- [x] On ctx cancel: stop accepting, drain in-flight up to `--shutdown-grace`, close WSes, unbind routes, close Redis, flush logs.
 
 ### Task 10.1: Run + lifecycle
 **File**: `tunneld/internal/server/server.go` — replace the US1 `Run` stub with the real assembly using
@@ -1644,8 +1644,8 @@ There is NO client-cert header (auth is app-layer over the WS).
 | `shutdown unbinds all routes` | After `Run` returns (ctx cancel), no `route:{name}` remains in miniredis |
 
 ### Definition of Done
-- [ ] US10 test tables authored and committed (single in-process node + miniredis; execution in US16).
-- [ ] Clean shutdown leaves no bound routes in Redis (covered by a test).
+- [x] US10 test tables authored and committed (single in-process node + miniredis; execution in US16).
+- [x] Clean shutdown leaves no bound routes in Redis (covered by a test).
 
 ---
 
