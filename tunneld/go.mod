@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/coder/websocket v1.8.15
 	github.com/gaissmai/bart v0.29.0
 	github.com/redis/go-redis/v9 v9.22.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
