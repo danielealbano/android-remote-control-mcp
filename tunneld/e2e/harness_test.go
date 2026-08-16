@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	tcnetwork "github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -123,10 +124,11 @@ func startCluster(t *testing.T) *cluster {
 				"TUNNELD_BAN_FILE":          "/banfiles/bans.txt",
 				"TUNNELD_BAN_POLL":          "1s",
 			},
-			Files: []testcontainers.ContainerFile{
-				{HostFilePath: filepath.Join(caDir, "ca.pem"), ContainerFilePath: "/ca/ca.pem", FileMode: 0o644},
-				{HostFilePath: filepath.Join(caDir, "ca-key.pem"), ContainerFilePath: "/ca/ca-key.pem", FileMode: 0o644},
-				{HostFilePath: banPath, ContainerFilePath: "/banfiles/bans.txt", FileMode: 0o644},
+			// Bind-mount CA + banfiles (read-only in the container) so host-side ban-file updates
+			// propagate with REAL mtimes — the ban watcher is mtime-based, and CopyToContainer would
+			// set a stale mtime the watcher never sees.
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.Binds = []string{caDir + ":/ca:ro", banDir + ":/banfiles:ro"}
 			},
 			WaitingFor: wait.ForHTTP("/healthz").WithPort("9090/tcp").WithStartupTimeout(60 * time.Second),
 		})
@@ -178,14 +180,11 @@ func mappedURL(t *testing.T, ctx context.Context, ct testcontainers.Container, p
 	return fmt.Sprintf("http://%s:%s", host, mp.Port())
 }
 
-// writeBans updates the ban file inside EACH replica (copied in, since we use file injection rather
-// than a shared bind mount). The ban watcher (~1s poll) picks it up.
+// writeBans rewrites the host-side ban file; the bind mount reflects it (with a real mtime) into
+// both replicas, and the ban watcher (~1s poll) picks it up.
 func (c *cluster) writeBans(t *testing.T, content string) {
 	t.Helper()
-	ctx := context.Background()
-	for _, rc := range c.replicas {
-		if err := rc.CopyToContainer(ctx, []byte(content), "/banfiles/bans.txt", 0o644); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(filepath.Join(c.banDir, "bans.txt"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

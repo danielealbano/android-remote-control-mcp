@@ -48,7 +48,10 @@ func enrollRaw(t *testing.T, url string) (*x509.Certificate, *ecdsa.PrivateKey, 
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("enroll %d: %s", resp.StatusCode, b)
 	}
-	var out struct{ Name, CertificatePEM string }
+	var out struct {
+		Name           string `json:"name"`
+		CertificatePEM string `json:"certificate_pem"`
+	}
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	block, _ := pem.Decode([]byte(out.CertificatePEM))
 	cert, _ := x509.ParseCertificate(block.Bytes)
