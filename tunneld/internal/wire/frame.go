@@ -2,7 +2,9 @@ package wire
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -147,4 +149,11 @@ func FrameReqID(header []byte) string {
 	var h reqidHeaderJSON
 	_ = json.Unmarshal(header, &h)
 	return h.ReqID
+}
+
+// NewReqID returns a fresh random request id (hex of 16 crypto/rand bytes).
+func NewReqID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }

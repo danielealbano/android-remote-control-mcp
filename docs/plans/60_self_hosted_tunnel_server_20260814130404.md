@@ -1254,18 +1254,18 @@ The public side: parse the tunnel name from Host, enforce the allowlist, sanitiz
 ban/rate/size/concurrency limits, and dispatch through Redis to the phone.
 
 ### Acceptance Criteria
-- [ ] Host `<name>.<tunnel-domain>` → tunnel name; unknown host / no tunnel → `404`. `/connect` on this host is handed to the WebSocket manager (US6), NOT the public pipeline.
-- [ ] After route resolution, `ban.MatchTunnel(name, fingerprint)` (fingerprint from `Lookup`) → `403` — a just-banned tunnel is refused at ingress without waiting for `EvictBanned` to remove the route.
-- [ ] Source IP from the MANDATORY `--client-ip-header` (no default; `Cf-Connecting-Ip` orange / `X-Real-Ip` grey; single value, or right-most token for `X-Forwarded-For`); a request without the header → `400` reason `missing_client_ip` (fail-closed); client-injected left-most `X-Forwarded-For` entries MUST NOT influence the ban/rate/quota key.
-- [ ] Ban check FIRST (trusted source IP), before anything else → `403`.
-- [ ] Allowlist enforced by exact method+path (and the `^/s/[0-9a-f]{64}$` regex); non-allowlisted → `404`; `GET /mcp` → `405` at edge; `OPTIONS` on allowlisted paths → forwarded.
-- [ ] NO edge Authorization check on ANY path (user decision — see the allowlist design section): token-less `POST`/`DELETE /mcp` is forwarded so the app's own `401` + RFC 9728 `WWW-Authenticate` discovery header reaches OAuth clients; the app is the sole authenticator.
-- [ ] Any request carrying a client-cert / mTLS-indicating header on the PUBLIC side → `400` (fixed header-name set; the app does not support client mTLS).
-- [ ] Client-supplied `X-Forwarded-*`/`Forwarded` stripped; proxy-set proto/host/for forwarded to the phone; hop-by-hop headers stripped both directions.
-- [ ] Size caps: request headers (`16kb` total / `8kb` single) → `431`; body (`1mb`) → `413` (declared oversize `Content-Length` → immediate `413` with NO body read; chunked/undeclared bodies bounded by actual-bytes-read); response (`10mb`) enforced in US6.
-- [ ] The request body is read through a PACED reader drawing from the per-process `BucketRegistry` up-bucket for the resolved tunnel (≤ `ChunkSize` slices) — client uploads arrive at the paced rate via TCP backpressure. Client-side egress is deliberately unpaced (already produced at the paced phone-leg rate).
-- [ ] Per-IP `rps`/`rpm` → `429`+`Retry-After`; per-tunnel concurrency → `429`.
-- [ ] Timeout `60s` → `504`; tunnel offline → `502`.
+- [x] Host `<name>.<tunnel-domain>` → tunnel name; unknown host / no tunnel → `404`. `/connect` on this host is handed to the WebSocket manager (US6), NOT the public pipeline.
+- [x] After route resolution, `ban.MatchTunnel(name, fingerprint)` (fingerprint from `Lookup`) → `403` — a just-banned tunnel is refused at ingress without waiting for `EvictBanned` to remove the route.
+- [x] Source IP from the MANDATORY `--client-ip-header` (no default; `Cf-Connecting-Ip` orange / `X-Real-Ip` grey; single value, or right-most token for `X-Forwarded-For`); a request without the header → `400` reason `missing_client_ip` (fail-closed); client-injected left-most `X-Forwarded-For` entries MUST NOT influence the ban/rate/quota key.
+- [x] Ban check FIRST (trusted source IP), before anything else → `403`.
+- [x] Allowlist enforced by exact method+path (and the `^/s/[0-9a-f]{64}$` regex); non-allowlisted → `404`; `GET /mcp` → `405` at edge; `OPTIONS` on allowlisted paths → forwarded.
+- [x] NO edge Authorization check on ANY path (user decision — see the allowlist design section): token-less `POST`/`DELETE /mcp` is forwarded so the app's own `401` + RFC 9728 `WWW-Authenticate` discovery header reaches OAuth clients; the app is the sole authenticator.
+- [x] Any request carrying a client-cert / mTLS-indicating header on the PUBLIC side → `400` (fixed header-name set; the app does not support client mTLS).
+- [x] Client-supplied `X-Forwarded-*`/`Forwarded` stripped; proxy-set proto/host/for forwarded to the phone; hop-by-hop headers stripped both directions.
+- [x] Size caps: request headers (`16kb` total / `8kb` single) → `431`; body (`1mb`) → `413` (declared oversize `Content-Length` → immediate `413` with NO body read; chunked/undeclared bodies bounded by actual-bytes-read); response (`10mb`) enforced in US6.
+- [x] The request body is read through a PACED reader drawing from the per-process `BucketRegistry` up-bucket for the resolved tunnel (≤ `ChunkSize` slices) — client uploads arrive at the paced rate via TCP backpressure. Client-side egress is deliberately unpaced (already produced at the paced phone-leg rate).
+- [x] Per-IP `rps`/`rpm` → `429`+`Retry-After`; per-tunnel concurrency → `429`.
+- [x] Timeout `60s` → `504`; tunnel offline → `502`.
 
 ### Task 7.1: Allowlist
 **File**: `tunneld/internal/ingress/allowlist.go` — create a static allowlist:
@@ -1406,8 +1406,8 @@ created in US6):
 | `inflight add/sub paired` | A forwarded request produces `InflightAdd(+1)` then `InflightAdd(-1)` (fake `Recorder` sees both, net 0) — the `tunneld_http_inflight` gauge has a wired writer |
 
 ### Definition of Done
-- [ ] US7 test tables authored and committed (execution in US16).
-- [ ] Allowlist matches the cited app routes exactly (reviewer will verify).
+- [x] US7 test tables authored and committed (execution in US16).
+- [x] Allowlist matches the cited app routes exactly (reviewer will verify).
 
 ---
 
