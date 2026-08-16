@@ -1416,10 +1416,10 @@ created in US6):
 `POST /enroll` on the enroll host: ban check, enrollment quota, CSR → signed certificate.
 
 ### Acceptance Criteria
-- [ ] `POST /enroll` (on `--enroll-host`) accepts a CSR (PEM in body), ban-checks the source IP (`403`), applies enrollment quota (`429`+`Retry-After`), generates a name, signs, and returns the leaf PEM + assigned name as JSON.
-- [ ] Body size capped at `--limit-enroll-body` (default `16kb`) via `http.MaxBytesReader` → `413`; malformed CSR → `400`; a CSR whose public key is not ECDSA P-256 (US4 `SignCSR` sentinel) → `400` with error `unsupported_key_type`. EACH of these records via the injected `Recorder`: `rec.Reject("enroll_body_too_large"|"enroll_malformed_csr"|"enroll_unsupported_key", "", ip.String())` — every registered enroll-side `tunneld_rejections_total{reason}` label has a writer.
-- [ ] `Retry-After` body is a clear JSON message the app can surface ("you or your network enrolled too many times, retry in N seconds").
-- [ ] No Redis persistence of the identity (only the transient quota counters).
+- [x] `POST /enroll` (on `--enroll-host`) accepts a CSR (PEM in body), ban-checks the source IP (`403`), applies enrollment quota (`429`+`Retry-After`), generates a name, signs, and returns the leaf PEM + assigned name as JSON.
+- [x] Body size capped at `--limit-enroll-body` (default `16kb`) via `http.MaxBytesReader` → `413`; malformed CSR → `400`; a CSR whose public key is not ECDSA P-256 (US4 `SignCSR` sentinel) → `400` with error `unsupported_key_type`. EACH of these records via the injected `Recorder`: `rec.Reject("enroll_body_too_large"|"enroll_malformed_csr"|"enroll_unsupported_key", "", ip.String())` — every registered enroll-side `tunneld_rejections_total{reason}` label has a writer.
+- [x] `Retry-After` body is a clear JSON message the app can surface ("you or your network enrolled too many times, retry in N seconds").
+- [x] No Redis persistence of the identity (only the transient quota counters).
 
 ### Task 8.1: Enroll handler
 **File**: `tunneld/internal/ingress/enroll.go` — create `EnrollHandler` (deps include the injected
@@ -1468,8 +1468,8 @@ tunnel domain otherwise; `expires_at` tells the phone when to re-enroll.)
 | `enroll response fields complete` | Success JSON contains ALL required fields: `name`, `hostname` == `<name>.<tunnel-domain>`, `connect_url` == `wss://<name>.<tunnel-domain>/connect`, `certificate_pem`, `expires_at` ≈ now + `--cert-validity` |
 
 ### Definition of Done
-- [ ] US8 test tables authored and committed (execution in US16).
-- [ ] Issued certs verify end-to-end with US6 `/connect`.
+- [x] US8 test tables authored and committed (execution in US16).
+- [x] Issued certs verify end-to-end with US6 `/connect`.
 
 ---
 
