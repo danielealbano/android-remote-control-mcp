@@ -537,13 +537,13 @@ Build the longest-prefix-match ban engine (IP/CIDR/country/tunnel-name/tunnel-fi
 hot-reload and DB-IP CSV country expansion. Pure, network-free, fully unit-testable in isolation.
 
 ### Acceptance Criteria
-- [ ] Ban-file parser handles `ip`, `cidr`, `country XX`, `tunnel-name`, `tunnel-fingerprint`, `#` comments, blank lines; unknown/malformed lines are skipped with a warning (never fatal).
-- [ ] IP/CIDR/country entries live in one `bart` table keyed by prefix; `/32` and `/128` handled uniformly with CIDRs.
-- [ ] `country XX` entries expand from the DB-IP CSV via range→prefix conversion; missing/unreadable CSV → those entries skipped + warned, everything else still enforced.
-- [ ] Multiple ban files are UNIONed; each polled independently by mtime; reload builds a fresh table and swaps atomically (lock-free reads).
-- [ ] A configured `--ban-file` that is ABSENT or unreadable at (re)load is skipped with a warning — never fatal, never empties the engine; the mtime poll loads it when it appears (first deploy: the fetcher-produced `droplist.bans` does not exist until the fetcher's first run completes, and the operator's `bans.txt` may legitimately be absent).
-- [ ] `Match(ip)` returns whether banned + the reason/source; `MatchTunnel(name, fingerprint)` covers name/fingerprint bans.
-- [ ] Only placeholder country codes (`XX`, `YY`) appear anywhere in code, comments, and tests.
+- [x] Ban-file parser handles `ip`, `cidr`, `country XX`, `tunnel-name`, `tunnel-fingerprint`, `#` comments, blank lines; unknown/malformed lines are skipped with a warning (never fatal).
+- [x] IP/CIDR/country entries live in one `bart` table keyed by prefix; `/32` and `/128` handled uniformly with CIDRs.
+- [x] `country XX` entries expand from the DB-IP CSV via range→prefix conversion; missing/unreadable CSV → those entries skipped + warned, everything else still enforced.
+- [x] Multiple ban files are UNIONed; each polled independently by mtime; reload builds a fresh table and swaps atomically (lock-free reads).
+- [x] A configured `--ban-file` that is ABSENT or unreadable at (re)load is skipped with a warning — never fatal, never empties the engine; the mtime poll loads it when it appears (first deploy: the fetcher-produced `droplist.bans` does not exist until the fetcher's first run completes, and the operator's `bans.txt` may legitimately be absent).
+- [x] `Match(ip)` returns whether banned + the reason/source; `MatchTunnel(name, fingerprint)` covers name/fingerprint bans.
+- [x] Only placeholder country codes (`XX`, `YY`) appear anywhere in code, comments, and tests.
 
 ### Task 2.1: Ban entry model + parser
 **File**: `tunneld/internal/ban/entry.go` — create `type Reason string` with consts
@@ -613,9 +613,9 @@ codes `XX`/`YY` and a handful of ranges.
 | `fresh engine is panic-safe` | `Match`/`MatchTunnel` on a `NewEngine()` BEFORE any `Load` → `(Source{}, false)`, no panic (empty non-nil initial snapshot) |
 
 ### Definition of Done
-- [ ] US2 test tables authored and committed (suite execution deferred to US16 per repo workflow).
-- [ ] No real country codes/names in any file (only `XX`/`YY`).
-- [ ] Reload never leaves the engine empty on parse error.
+- [x] US2 test tables authored and committed (suite execution deferred to US16 per repo workflow).
+- [x] No real country codes/names in any file (only `XX`/`YY`).
+- [x] Reload never leaves the engine empty on parse error.
 
 ---
 
