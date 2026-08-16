@@ -625,11 +625,11 @@ Redis-backed per-source-IP request limits and per-tunnel concurrency (must be co
 replicas), enrollment quotas, and an in-process per-direction bandwidth token bucket.
 
 ### Acceptance Criteria
-- [ ] Per-IP `rps` (fixed 1-second wall-clock window) and `rpm` (fixed 1-minute wall-clock window) via Redis atomic INCR+EXPIRE; over limit → decision carries `Retry-After` seconds to window end.
-- [ ] Enrollment quota: `20`/hour AND `2`/minute per source IP (fixed wall-clock windows); over → `Retry-After`.
-- [ ] Per-tunnel concurrency guard via Redis INCR/DECR with a safety TTL; `Acquire` fails over `--limit-concurrent`; `Release` always decrements (defer-safe).
-- [ ] Bandwidth: `TokenBucket` with rate = `ParseBitrate` bytes/sec, one bucket per direction per tunnel, in-process on the WS-holding node; `WaitN(ctx, n)` paces chunk writes.
-- [ ] All Redis keys have TTLs (no permanent state).
+- [x] Per-IP `rps` (fixed 1-second wall-clock window) and `rpm` (fixed 1-minute wall-clock window) via Redis atomic INCR+EXPIRE; over limit → decision carries `Retry-After` seconds to window end.
+- [x] Enrollment quota: `20`/hour AND `2`/minute per source IP (fixed wall-clock windows); over → `Retry-After`.
+- [x] Per-tunnel concurrency guard via Redis INCR/DECR with a safety TTL; `Acquire` fails over `--limit-concurrent`; `Release` always decrements (defer-safe).
+- [x] Bandwidth: `TokenBucket` with rate = `ParseBitrate` bytes/sec, one bucket per direction per tunnel, in-process on the WS-holding node; `WaitN(ctx, n)` paces chunk writes.
+- [x] All Redis keys have TTLs (no permanent state).
 
 ### Task 3.1: Redis fixed-window limiter
 **File**: `tunneld/internal/limit/window.go` — create
@@ -691,8 +691,8 @@ the bucket (inject `now func() time.Time`).
 | `registry evicts idle pairs` | Pair idle past the eviction window (fake clock) → dropped; next `Pair` recreates a full bucket |
 
 ### Definition of Done
-- [ ] US3 test tables authored and committed (miniredis + fake clock; execution in US16).
-- [ ] Every Redis key created carries a TTL, set atomically with its INCR/HINCRBY (asserted in the test tables).
+- [x] US3 test tables authored and committed (miniredis + fake clock; execution in US16).
+- [x] Every Redis key created carries a TTL, set atomically with its INCR/HINCRBY (asserted in the test tables).
 
 ---
 
