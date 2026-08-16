@@ -95,6 +95,12 @@ func (c *Conn) readPump() string {
 		switch typ {
 		case wire.RESPONSE_HEAD:
 			rid, code, h := wire.DecodeRespHeader(hdr)
+			// The phone is authenticated but its response CONTENT is untrusted: an out-of-range status
+			// (0 from an omitted field, or > 599) would panic the frontend's http.WriteHeader and
+			// poison the {code} metric label. Clamp a malformed status to 502 at this trust boundary.
+			if code < 100 || code > 599 {
+				code = http.StatusBadGateway
+			}
 			if inf := c.get(rid); inf != nil {
 				inf.head = &wire.RespEnvelope{ReqID: rid, Status: code, Header: h}
 			}

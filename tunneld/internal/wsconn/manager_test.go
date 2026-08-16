@@ -328,6 +328,25 @@ func TestZeroLengthChunkTolerated(t *testing.T) {
 	}
 }
 
+func TestPhoneMalformedStatusClampedTo502(t *testing.T) {
+	// A phone is authenticated but its response CONTENT is untrusted; an out-of-range status
+	// (0 from an omitted field, or > 599) must be clamped, not passed through (it would panic the
+	// frontend's http.WriteHeader).
+	for _, bad := range []int{0, 1000, 42} {
+		h := newHarness(t, 0, nil)
+		p := h.rawPhoneConnect(tName)
+		respCh := make(chan *wire.RespEnvelope, 1)
+		go func() { respCh <- h.mgr.RouteLocal(context.Background(), routeReq(tName, "r1", "GET", "/mcp", nil)) }()
+		reqid, _ := p.drainRequest()
+		p.write(wire.RESPONSE_HEAD, wire.EncodeRespHeader(reqid, bad, nil), nil)
+		p.write(wire.RESPONSE_END, wire.EncodeReqIDHeader(reqid), nil)
+		resp := <-respCh
+		if resp.Status != http.StatusBadGateway {
+			t.Errorf("phone status %d must clamp to 502, got %d", bad, resp.Status)
+		}
+	}
+}
+
 func TestResponseOverCapAborts(t *testing.T) {
 	h := newHarness(t, 0, func(c *config.ServeCmd) { c.LimitResponse = "64kb" })
 	p := h.rawPhoneConnect(tName)
