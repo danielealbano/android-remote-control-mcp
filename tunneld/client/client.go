@@ -33,10 +33,13 @@ const (
 )
 
 // Client carries optional HTTP settings. Headers is normally empty (a proxy supplies the client-IP
-// header); tests against a proxy-less server inject it here.
+// header); tests against a proxy-less server inject it here. EnrollHost, when set, overrides the
+// enroll request's Host header (needed when the enroll URL is an IP:port rather than the enroll host,
+// e.g. a proxy-less test).
 type Client struct {
-	HTTP    *http.Client
-	Headers http.Header
+	HTTP       *http.Client
+	Headers    http.Header
+	EnrollHost string
 }
 
 // New returns a Client using http.DefaultClient.
@@ -63,6 +66,9 @@ func (c *Client) Enroll(ctx context.Context, enrollURL string, key *ecdsa.Privat
 		return nil, "", err
 	}
 	c.applyHeaders(req)
+	if c.EnrollHost != "" {
+		req.Host = c.EnrollHost
+	}
 	resp, err := c.httpClient().Do(req)
 	if err != nil {
 		return nil, "", err

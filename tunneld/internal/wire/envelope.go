@@ -85,7 +85,7 @@ func UnmarshalResp(data []byte) (*RespEnvelope, error) {
 
 func frameBytes(hdr, body []byte) []byte {
 	out := make([]byte, 4+len(hdr)+len(body))
-	binary.BigEndian.PutUint32(out[:4], uint32(len(hdr)))
+	binary.BigEndian.PutUint32(out[:4], uint32(len(hdr))) // #nosec G115 -- protocol-bounded header length, never near uint32 max
 	copy(out[4:], hdr)
 	copy(out[4+len(hdr):], body)
 	return out

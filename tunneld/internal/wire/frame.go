@@ -36,7 +36,7 @@ var errShortFrame = errors.New("wire: frame too short")
 func EncodeFrame(t FrameType, header, body []byte) []byte {
 	out := make([]byte, 1+4+len(header)+len(body))
 	out[0] = byte(t)
-	binary.BigEndian.PutUint32(out[1:5], uint32(len(header)))
+	binary.BigEndian.PutUint32(out[1:5], uint32(len(header))) // #nosec G115 -- protocol-bounded header length (< 16 KB), never near uint32 max
 	copy(out[5:], header)
 	copy(out[5+len(header):], body)
 	return out

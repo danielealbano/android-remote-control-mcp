@@ -8,7 +8,7 @@ import (
 	"github.com/danielealbano/android-remote-control-mcp/tunneld/internal/config"
 )
 
-type recordHandler struct{ hit string }
+type recordHandler struct{}
 
 func (h *recordHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) { w.WriteHeader(299) }
 

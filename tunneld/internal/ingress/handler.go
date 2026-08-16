@@ -313,7 +313,7 @@ func writeResp(w http.ResponseWriter, resp *wire.RespEnvelope) {
 		}
 	}
 	w.WriteHeader(resp.Status)
-	_, _ = w.Write(resp.Body)
+	_, _ = w.Write(resp.Body) // #nosec G705 -- transparent tunnel passthrough of the phone's response bytes to an MCP JSON client (not an HTML browser); nothing to sanitize
 }
 
 // firstLabel returns the first DNS label of a Host header (stripping any port).

@@ -395,7 +395,7 @@ func TestConcurrency429(t *testing.T) {
 	x := newIngress(t, 0, func(c *config.ServeCmd) { c.LimitConcurrent = 1 })
 	x.bind(iName)
 	// Occupy the only slot with a never-answered request.
-	x.mr.Set("conc:"+iName, "1")
+	_ = x.mr.Set("conc:"+iName, "1")
 	rr := x.do("POST", host(iName), "/mcp", []byte(`{}`))
 	if rr.Code != http.StatusTooManyRequests || x.rec.Count("reject", "concurrency") != 1 {
 		t.Errorf("concurrency = %d", rr.Code)
@@ -478,6 +478,8 @@ func TestSlowBodyRead408ReleasesSlot(t *testing.T) {
 // --- helpers ---
 
 func repeat(s string, n int) string { return string(repeatBytes(s[0], n)) }
+
+func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
 
 func repeatBytes(b byte, n int) []byte {
 	out := make([]byte, n)

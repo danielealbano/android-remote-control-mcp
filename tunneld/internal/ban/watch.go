@@ -71,7 +71,7 @@ func (w *watcher) tick() {
 // replaced by a directory is still detected as a change (and the subsequent Load reports the read
 // error).
 func maxMtime(files []string, csvPath string) time.Time {
-	var max time.Time
+	var latest time.Time
 	paths := files
 	if csvPath != "" {
 		paths = append(append([]string{}, files...), csvPath)
@@ -84,9 +84,9 @@ func maxMtime(files []string, csvPath string) time.Time {
 		if err != nil {
 			continue
 		}
-		if mt := fi.ModTime(); mt.After(max) {
-			max = mt
+		if mt := fi.ModTime(); mt.After(latest) {
+			latest = mt
 		}
 	}
-	return max
+	return latest
 }

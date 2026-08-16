@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -64,6 +65,8 @@ type Manager struct {
 	responseLimit int64
 	connectSem    chan struct{}
 	conns         sync.Map // name -> *Conn
+	closed        atomic.Bool
+	connWG        sync.WaitGroup // in-flight HandleConnect goroutines (for graceful drain)
 }
 
 // NewManager constructs the manager; responseLimit is parsed from --limit-response.
@@ -93,6 +96,12 @@ func NewManager(baseCtx context.Context, cfg config.ServeCmd, nodeID string, rdb
 
 // HandleConnect owns the entire reserved /connect path.
 func (m *Manager) HandleConnect(w http.ResponseWriter, r *http.Request) {
+	// Track the goroutine so Shutdown can drain in-flight connects (a hijacked WS handler is not
+	// tracked by http.Server.Shutdown). Safe from an Add-vs-Wait race because the shutdown sequence
+	// closes the public http.Server FIRST (no new connections), then calls manager.Shutdown → Wait.
+	m.connWG.Add(1)
+	defer m.connWG.Done()
+
 	ip, ok := clientip.TrustedIP(r, m.cfg.ClientIPHeader)
 	if !ok {
 		m.rec.Reject("missing_client_ip", "", "")
@@ -179,6 +188,13 @@ func (m *Manager) HandleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	m.conns.Store(name, conn) // a same-name Store overwrites a lingering stale Conn (new conn owns the name)
 	m.rec.WSConnect()
+	// Close the shutdown race: if Shutdown ran between Bind (route visible) and this Store, its
+	// conns.Range could have missed this conn; the flag check tears it down here instead so the route
+	// never outlives shutdown.
+	if m.closed.Load() {
+		conn.teardown("shutdown")
+		return
+	}
 	conn.serve()
 }
 
@@ -243,11 +259,17 @@ func (m *Manager) RouteLocal(ctx context.Context, req *wire.ReqEnvelope) *wire.R
 }
 
 // Shutdown tears down every live Conn (closing the WS and unbinding its route) for graceful drain.
+// The closed flag is set BEFORE ranging so a conn mid-connect (Stored after the range) tears itself
+// down via the HandleConnect post-Store check.
 func (m *Manager) Shutdown() {
+	m.closed.Store(true)
 	m.conns.Range(func(_, v any) bool {
 		v.(*Conn).teardown("shutdown")
 		return true
 	})
+	// Wait for in-flight HandleConnect goroutines (incl. a conn mid-connect that binds its route
+	// after the Range above) to finish tearing down, so no route outlives shutdown.
+	m.connWG.Wait()
 }
 
 // EvictBanned is the ban-reload hook: it drops any live Conn whose (name, fingerprint) is now banned

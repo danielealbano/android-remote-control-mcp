@@ -39,7 +39,7 @@ func TestFrameEncodeDecodeRoundTrip(t *testing.T) {
 			if !bytes.Equal(hdr, tc.header) {
 				t.Errorf("header mismatch")
 			}
-			if !bytes.Equal(body, tc.body) && !(len(body) == 0 && len(tc.body) == 0) {
+			if !bytes.Equal(body, tc.body) && (len(body) != 0 || len(tc.body) != 0) {
 				t.Errorf("body mismatch: %d vs %d", len(body), len(tc.body))
 			}
 		})

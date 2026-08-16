@@ -40,7 +40,7 @@ func TestConnectNonUpgrade426(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUpgradeRequired {
 		t.Errorf("status = %d, want 426", resp.StatusCode)
 	}
@@ -53,7 +53,7 @@ func TestConnectMissingClientIP400(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
 	}
@@ -70,7 +70,7 @@ func TestConnectRejectsBannedIP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", resp.StatusCode)
 	}
@@ -82,7 +82,7 @@ func TestConnectRejectsBannedIP(t *testing.T) {
 func TestConnectBindsAndServes(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	phone := h.connectPhone(tName, okHandler("pong"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	resp := h.mgr.RouteLocal(context.Background(), routeReq(tName, "r1", "GET", "/mcp", nil))
 	if resp.Status != 200 || string(resp.Body) != "pong" {
 		t.Errorf("resp = %+v body=%q", resp, resp.Body)
@@ -111,7 +111,7 @@ func TestConnectRejectsBadPossession(t *testing.T) {
 	cert, _ := h.issue(tName)
 	_, wrongKey := h.issue(tName) // a different key
 	ws, nonce := rawDial(t, h.wsURL(), h.host(tName))
-	defer ws.Close(1000, "")
+	defer func() { _ = ws.Close(1000, "") }()
 	sendAuth(t, ws, base64.StdEncoding.EncodeToString(cert.Raw), signNonce(wrongKey, nonce))
 	waitRec(t, h.rec, "reject", "connect_auth_failed", 1)
 	if _, _, ok, _ := h.reg.Lookup(context.Background(), tName); ok {
@@ -123,7 +123,7 @@ func TestConnectRejectsCNMismatch(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	cert, key := h.issue(tName) // CN = tName
 	ws, nonce := rawDial(t, h.wsURL(), h.host("differentname9"))
-	defer ws.Close(1000, "")
+	defer func() { _ = ws.Close(1000, "") }()
 	sendAuth(t, ws, base64.StdEncoding.EncodeToString(cert.Raw), signNonce(key, nonce))
 	waitRec(t, h.rec, "reject", "connect_auth_failed", 1)
 	if _, _, ok, _ := h.reg.Lookup(context.Background(), tName); ok {
@@ -134,7 +134,7 @@ func TestConnectRejectsCNMismatch(t *testing.T) {
 func TestConnectRejectsAuthTimeout(t *testing.T) {
 	h := newHarness(t, 0, func(c *config.ServeCmd) { c.ConnectAuthTimeout = 200 * time.Millisecond })
 	ws, _ := rawDial(t, h.wsURL(), h.host(tName))
-	defer ws.Close(1000, "")
+	defer func() { _ = ws.Close(1000, "") }()
 	// never send AUTH → server times out
 	waitRec(t, h.rec, "reject", "connect_auth_failed", 1)
 	if _, _, ok, _ := h.reg.Lookup(context.Background(), tName); ok {
@@ -147,7 +147,7 @@ func TestConnectRefusesBannedTunnel(t *testing.T) {
 	h.loadBans("tunnel-name " + tName + "\n")
 	cert, key := h.issue(tName)
 	ws, nonce := rawDial(t, h.wsURL(), h.host(tName))
-	defer ws.Close(1000, "")
+	defer func() { _ = ws.Close(1000, "") }()
 	sendAuth(t, ws, base64.StdEncoding.EncodeToString(cert.Raw), signNonce(key, nonce))
 	waitRec(t, h.rec, "reject", "banned_tunnel_name", 1)
 	if _, _, ok, _ := h.reg.Lookup(context.Background(), tName); ok {
@@ -158,11 +158,11 @@ func TestConnectRefusesBannedTunnel(t *testing.T) {
 func TestFingerprintConflictRejected(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	phone := h.connectPhone(tName, okHandler("ok"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	// Second connect, SAME name, DIFFERENT cert (different fingerprint).
 	cert2, key2 := h.issue(tName)
 	ws, nonce := rawDial(t, h.wsURL(), h.host(tName))
-	defer ws.Close(1000, "")
+	defer func() { _ = ws.Close(1000, "") }()
 	sendAuth(t, ws, base64.StdEncoding.EncodeToString(cert2.Raw), signNonce(key2, nonce))
 	waitRec(t, h.rec, "reject", "fingerprint_conflict", 1)
 }
@@ -170,7 +170,7 @@ func TestFingerprintConflictRejected(t *testing.T) {
 func TestEvictDropsLiveBannedTunnel(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	phone := h.connectPhone(tName, okHandler("ok"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	h.loadBans("tunnel-name " + tName + "\n")
 	h.mgr.EvictBanned(h.ban)
 	waitRec(t, h.rec, "wsdisconnect", "banned_tunnel_name", 1)
@@ -193,7 +193,7 @@ func TestConnectPerIPRateLimited(t *testing.T) {
 			t.Fatal(err)
 		}
 		last = resp.StatusCode
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 	if last != http.StatusTooManyRequests {
 		t.Errorf("3rd attempt status = %d, want 429", last)
@@ -210,13 +210,13 @@ func TestConnectPreAuthSemaphoreFull(t *testing.T) {
 	})
 	// First raw dial holds the only slot (server is blocked in authenticate awaiting AUTH).
 	ws1, _ := rawDial(t, h.wsURL(), h.host(tName))
-	defer ws1.Close(1000, "")
+	defer func() { _ = ws1.Close(1000, "") }()
 	// Second attempt must be refused 503 before upgrade.
 	resp, err := http.Get(h.srv.URL + "/connect")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", resp.StatusCode)
 	}
@@ -230,7 +230,7 @@ func TestConcurrentRequestsDemuxByReqid(t *testing.T) {
 	phone := h.connectPhone(tName, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, r.URL.Path)
 	}))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 
 	var wg sync.WaitGroup
 	errs := make(chan string, 4)
@@ -287,7 +287,7 @@ func TestChunkedResponseReassembles(t *testing.T) {
 	phone := h.connectPhone(tName, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(big)
 	}))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	resp := h.mgr.RouteLocal(context.Background(), routeReq(tName, "r1", "GET", "/mcp", nil))
 	if !bytes.Equal(resp.Body, big) {
 		t.Errorf("chunked response not reassembled byte-exact (%d vs %d)", len(resp.Body), len(big))
@@ -300,7 +300,7 @@ func TestRequestChunksReassembleOnPhone(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_, _ = w.Write(body) // echo
 	}))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	big := bytes.Repeat([]byte("B"), wire.ChunkSize*2+7)
 	resp := h.mgr.RouteLocal(context.Background(), routeReq(tName, "r1", "POST", "/mcp", big))
 	if !bytes.Equal(resp.Body, big) {
@@ -376,7 +376,7 @@ func TestSameNodeReconnectNotClobbered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p2.Close()
+	defer func() { _ = p2.Close() }()
 	// Give the server a moment to overwrite conns[name] with conn2.
 	time.Sleep(100 * time.Millisecond)
 	_ = p1.Close() // stale conn teardown must NOT clobber conn2
@@ -393,7 +393,7 @@ func TestSameNodeReconnectNotClobbered(t *testing.T) {
 func TestHeartbeatNotOwnerClosesStale(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	phone := h.connectPhone(tName, okHandler("ok"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	v, _ := h.mgr.conns.Load(tName)
 	c := v.(*Conn)
 	// Simulate the phone re-binding elsewhere.
@@ -413,7 +413,7 @@ func TestHeartbeatNotOwnerClosesStale(t *testing.T) {
 func TestLapsedRouteReboundByHeartbeat(t *testing.T) {
 	h := newHarness(t, 0, nil)
 	phone := h.connectPhone(tName, okHandler("ok"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	v, _ := h.mgr.conns.Load(tName)
 	c := v.(*Conn)
 	h.mr.Del("route:" + tName) // TTL lapsed while the WS stayed healthy
@@ -431,7 +431,7 @@ func TestCoLocatedRequestNotDoublePaced(t *testing.T) {
 	// the up-bucket drain, so a multi-chunk body completes fast instead of pacing ~seconds.
 	h := newHarness(t, wire.ChunkSize, nil)
 	phone := h.connectPhone(tName, okHandler("ok"))
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	body := bytes.Repeat([]byte("Z"), wire.ChunkSize*5) // 5 chunks; if paced would take ~5s
 	req := routeReq(tName, "r1", "POST", "/mcp", body)
 	req.PacedByNode = "nodeA" // this node already paced the ingress read

@@ -93,7 +93,7 @@ func waitHealthy(t *testing.T, internal string) {
 }
 
 func testClient() *Client {
-	return &Client{Headers: http.Header{"X-Real-Ip": {"203.0.113.7"}}}
+	return &Client{Headers: http.Header{"X-Real-Ip": {"203.0.113.7"}}, EnrollHost: "enroll.example.test"}
 }
 
 // postMCP sends a public POST /mcp, retrying to absorb the ServeNode readiness window.

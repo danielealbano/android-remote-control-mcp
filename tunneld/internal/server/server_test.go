@@ -125,13 +125,14 @@ func (r *running) waitHealthy(t *testing.T) {
 	t.Fatal("server never became healthy")
 }
 
-func (r *running) stop() (error, bool) {
+// stop cancels the server and waits for Run to return; returns (returned, runErr).
+func (r *running) stop() (bool, error) {
 	r.cancel()
 	select {
 	case err := <-r.done:
-		return err, true
+		return true, err
 	case <-time.After(10 * time.Second):
-		return nil, false
+		return false, nil
 	}
 }
 
@@ -149,7 +150,7 @@ func (r *running) enroll(t *testing.T) (string, *x509.Certificate, *ecdsa.Privat
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("enroll status %d: %s", resp.StatusCode, body)
@@ -169,7 +170,7 @@ func (r *running) enroll(t *testing.T) (string, *x509.Certificate, *ecdsa.Privat
 
 func TestEnrollThenConnectThenRequest(t *testing.T) {
 	r := startServer(t)
-	defer r.stop()
+	defer func() { _, _ = r.stop() }()
 
 	name, cert, key := r.enroll(t)
 	phone, err := tunneltest.DialWithHeaders(context.Background(),
@@ -179,7 +180,7 @@ func TestEnrollThenConnectThenRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 
 	// Wait until the route is bound.
 	deadline := time.Now().Add(3 * time.Second)
@@ -218,7 +219,7 @@ func TestEnrollThenConnectThenRequest(t *testing.T) {
 
 func TestRequestToUnboundTunnel404(t *testing.T) {
 	r := startServer(t)
-	defer r.stop()
+	defer func() { _, _ = r.stop() }()
 	req, _ := http.NewRequest("POST", "http://"+r.publicA+"/mcp", bytesReaderT([]byte(`{}`)))
 	req.Host = "neverbound99.example.test"
 	req.Header.Set("X-Real-Ip", "203.0.113.7")
@@ -226,7 +227,7 @@ func TestRequestToUnboundTunnel404(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("unbound tunnel = %d, want 404", resp.StatusCode)
 	}
@@ -249,7 +250,7 @@ func TestShutdownUnbindsAllRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer phone.Close()
+	defer func() { _ = phone.Close() }()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if r.mr.Exists("route:" + name) {
@@ -260,7 +261,7 @@ func TestShutdownUnbindsAllRoutes(t *testing.T) {
 	if !r.mr.Exists("route:" + name) {
 		t.Fatal("route never bound")
 	}
-	err2, returned := r.stop()
+	returned, err2 := r.stop()
 	if !returned {
 		t.Fatal("Run did not return after ctx cancel (graceful shutdown hung)")
 	}

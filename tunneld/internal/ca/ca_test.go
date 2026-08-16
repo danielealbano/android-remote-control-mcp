@@ -35,7 +35,7 @@ func genCAMaterial(t *testing.T, isCA bool) ([]byte, *ecdsa.PrivateKey) {
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  isCA,
-		MaxPathLenZero:        true,
+		MaxPathLenZero:        isCA, // MaxPathLen is only valid on a CA cert
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {

@@ -1,3 +1,4 @@
+// Command tunneld is the self-hosted HTTP tunnel server (see tunneld/README.md).
 package main
 
 import (

@@ -70,15 +70,14 @@ func DialWithHeaders(ctx context.Context, connectURL, hostName string, extra htt
 		return nil, err
 	}
 	p := &FakePhone{ws: ws, done: make(chan struct{})}
-	go p.serve(handler)
+	go p.serve(ctx, handler)
 	return p, nil
 }
 
 // serve accumulates REQUEST_HEAD + REQUEST_BODY_CHUNKs per reqid, dispatches on REQUEST_END against
 // an httptest.ResponseRecorder, and writes RESPONSE_HEAD + chunked RESPONSE_BODY_CHUNK + RESPONSE_END.
-func (p *FakePhone) serve(handler http.Handler) {
+func (p *FakePhone) serve(ctx context.Context, handler http.Handler) {
 	defer close(p.done)
-	ctx := context.Background()
 	type partial struct{ hdr, body []byte }
 	pending := map[string]*partial{}
 	for {

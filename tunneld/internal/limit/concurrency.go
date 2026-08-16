@@ -34,9 +34,9 @@ return c
 // Acquire reserves one of max in-flight slots for tunnel name. ttl is the safety expiry
 // (2×request-timeout at the call site) so a crashed holder's slot self-heals. The returned release
 // DECRs exactly once (idempotent via sync.Once); it MUST always be deferred.
-func Acquire(ctx context.Context, rdb redis.UniversalClient, name string, max int, ttl time.Duration) (release func(), ok bool, err error) {
+func Acquire(ctx context.Context, rdb redis.UniversalClient, name string, maxInFlight int, ttl time.Duration) (release func(), ok bool, err error) {
 	key := "conc:" + name
-	res, err := acquireScript.Run(ctx, rdb, []string{key}, max, ttl.Milliseconds()).Int64()
+	res, err := acquireScript.Run(ctx, rdb, []string{key}, maxInFlight, ttl.Milliseconds()).Int64()
 	if err != nil {
 		return nil, false, err
 	}

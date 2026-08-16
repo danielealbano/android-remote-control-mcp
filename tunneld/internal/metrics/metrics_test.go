@@ -52,8 +52,11 @@ func TestHealthz503WhenRedisDown(t *testing.T) {
 
 func TestMetricsEndpointExposesFamilies(t *testing.T) {
 	m, rec, store, _, rdb := setup(t)
+	// Exercise each family so CounterVecs emit at least one series (Prometheus omits empty families).
 	rec.WSConnect()
 	rec.Reject("rate_rps", "t", "1.1.1.1")
+	rec.Bytes("t", "in", 10)
+	rec.Request("t", "mcp", 200, time.Millisecond)
 	h := Handler(m.Registry(), rdb, store, discardLog())
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest("GET", "/metrics", nil))
