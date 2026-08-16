@@ -233,7 +233,8 @@ func TestRequestToUnboundTunnel404(t *testing.T) {
 }
 
 func TestDistinctNodeIDPerProcess(t *testing.T) {
-	if newNodeID() == newNodeID() {
+	a, b := newNodeID(), newNodeID()
+	if a == b {
 		t.Error("nodeIDs must be distinct per call (crypto/rand)")
 	}
 }

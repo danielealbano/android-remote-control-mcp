@@ -1655,10 +1655,10 @@ A reusable Go client implementing the phone side (enroll + connect + bridge to a
 used by the in-process test above and the containerized e2e tests.
 
 ### Acceptance Criteria
-- [ ] `client.Enroll(ctx, enrollURL, key) (cert, name, error)` builds a CSR from a provided EC key and returns the signed cert + name.
-- [ ] `client.Connect(ctx, connectURL, cert, key, backend http.Handler|url)` dials the `/connect` WS, completes the challenge-response (receives `CHALLENGE`, replies `AUTH` with `{base64(DER cert), ECDSA-P256 sig over context‖nonce}`), then bridges each incoming request to a local backend, returning responses as chunked frames.
-- [ ] Reconnect with exponential backoff on drop (bounded).
-- [ ] Uses the SAME `wire` package as the server (no protocol drift).
+- [x] `client.Enroll(ctx, enrollURL, key) (cert, name, error)` builds a CSR from a provided EC key and returns the signed cert + name.
+- [x] `client.Connect(ctx, connectURL, cert, key, backend http.Handler|url)` dials the `/connect` WS, completes the challenge-response (receives `CHALLENGE`, replies `AUTH` with `{base64(DER cert), ECDSA-P256 sig over context‖nonce}`), then bridges each incoming request to a local backend, returning responses as chunked frames.
+- [x] Reconnect with exponential backoff on drop (bounded).
+- [x] Uses the SAME `wire` package as the server (no protocol drift).
 
 ### Task 11.1: Client
 **File**: `tunneld/client/client.go` — create `Enroll`, `Connect` (with the CHALLENGE/AUTH handshake),
@@ -1685,8 +1685,8 @@ TLS client cert — so it works identically through Cloudflare (orange) or direc
 | `client reconnects after drop` | Forced WS close → client re-dials and resumes serving |
 
 ### Definition of Done
-- [ ] US11 test tables authored and committed (against the in-process server; execution in US16).
-- [ ] Client and server share `wire` with zero duplicated constants.
+- [x] US11 test tables authored and committed (against the in-process server; execution in US16).
+- [x] Client and server share `wire` with zero duplicated constants.
 
 ---
 
