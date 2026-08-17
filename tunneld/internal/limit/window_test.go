@@ -11,6 +11,7 @@ var testIP = netip.MustParseAddr("203.0.113.7")
 func TestRPSAllowsUpToLimitThenDenies(t *testing.T) {
 	rdb, _ := newTestRedis(t)
 	ctx := ctxT(t)
+	freezeClock(t)
 	for i := 0; i < 10; i++ {
 		ok, _, err := Allow(ctx, rdb, "rps", testIP, 10, time.Second)
 		if err != nil || !ok {
@@ -32,6 +33,7 @@ func TestRPSAllowsUpToLimitThenDenies(t *testing.T) {
 func TestRPMAllowsUpToLimitThenDenies(t *testing.T) {
 	rdb, _ := newTestRedis(t)
 	ctx := ctxT(t)
+	freezeClock(t)
 	for i := 0; i < 100; i++ {
 		ok, _, err := Allow(ctx, rdb, "rpm", testIP, 100, time.Minute)
 		if err != nil || !ok {
@@ -53,6 +55,7 @@ func TestRPMAllowsUpToLimitThenDenies(t *testing.T) {
 func TestWindowResetsOnBoundary(t *testing.T) {
 	rdb, mr := newTestRedis(t)
 	ctx := ctxT(t)
+	freezeClock(t)
 	for i := 0; i < 2; i++ {
 		if ok, _, _ := Allow(ctx, rdb, "rps", testIP, 2, time.Second); !ok {
 			t.Fatalf("call %d must be allowed", i+1)
@@ -71,6 +74,7 @@ func TestWindowResetsOnBoundary(t *testing.T) {
 func TestEveryKeyHasTTLAfterFirstOp(t *testing.T) {
 	rdb, mr := newTestRedis(t)
 	ctx := ctxT(t)
+	freezeClock(t)
 	if _, _, err := Allow(ctx, rdb, "rps", testIP, 10, time.Second); err != nil {
 		t.Fatal(err)
 	}

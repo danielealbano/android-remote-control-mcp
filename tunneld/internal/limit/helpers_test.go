@@ -25,6 +25,15 @@ func ctxT(t *testing.T) context.Context {
 	return ctx
 }
 
+// freezeClock pins the window limiter's clock so a burst never straddles a real window boundary
+// (deterministic + instant). Restored on cleanup. Callers must not run in parallel.
+func freezeClock(t *testing.T) {
+	t.Helper()
+	base := time.Unix(1_700_000_000, 0)
+	nowFunc = func() time.Time { return base }
+	t.Cleanup(func() { nowFunc = time.Now })
+}
+
 // fakeClock is a manually-advanced clock for bucket/registry tests.
 type fakeClock struct {
 	mu sync.Mutex

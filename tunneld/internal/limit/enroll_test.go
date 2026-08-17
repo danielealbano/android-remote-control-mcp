@@ -7,6 +7,7 @@ import (
 func TestEnrollDeniesWhenEitherSubLimitTrips(t *testing.T) {
 	rdb, _ := newTestRedis(t)
 	ctx := ctxT(t)
+	freezeClock(t)
 	// perHour=20 (room), perMinute=2 (the binding limit).
 	for i := 0; i < 2; i++ {
 		ok, _, err := AllowEnroll(ctx, rdb, testIP, 20, 2)
