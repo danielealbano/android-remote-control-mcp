@@ -351,6 +351,9 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	fi
 	@echo "Compiling cloudflared from submodule ($(CLOUDFLARED_SRC_DIR))..."
 	@echo "Using NDK: $(NDK_ROOT)"
+	@if [ -f "vendor/cloudflared-android-dns.patch" ]; then \
+		cd $(CLOUDFLARED_SRC_DIR) && git apply --check ../cloudflared-android-dns.patch 2>/dev/null && git apply ../cloudflared-android-dns.patch || true; \
+	fi
 	@echo ""
 	@echo "Compiling cloudflared for arm64-v8a..."
 	mkdir -p $(CLOUDFLARED_JNILIBS_DIR)/arm64-v8a

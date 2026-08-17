@@ -1,0 +1,63 @@
+diff --git edgediscovery/allregions/discovery.go edgediscovery/allregions/discovery.go
+index cab06611..2d4f03f4 100644
+--- edgediscovery/allregions/discovery.go
++++ edgediscovery/allregions/discovery.go
+@@ -3,11 +3,9 @@ package allregions
+ import (
+ 	"context"
+ 	"crypto/tls"
+-	"fmt"
+ 	"net"
+ 	"time"
+ 
+-	"github.com/pkg/errors"
+ 	"github.com/rs/zerolog"
+ 
+ 	"github.com/cloudflare/cloudflared/management"
+@@ -119,16 +117,15 @@ func edgeDiscovery(log *zerolog.Logger, srvService string) ([][]*EdgeAddr, error
+ 	_, addrs, err := netLookupSRV(srvService, srvProto, srvName)
+ 	if err != nil {
+ 		_, fallbackAddrs, fallbackErr := fallbackLookupSRV(srvService, srvProto, srvName)
+-		if fallbackErr != nil || len(fallbackAddrs) == 0 {
+-			// use the original DNS error `err` in messages, not `fallbackErr`
+-			logger.Err(err).Msg("edge discovery: error looking up Cloudflare edge IPs: the DNS query failed")
+-			for _, s := range friendlyDNSErrorLines {
+-				logger.Error().Msg(s)
++		if fallbackErr == nil && len(fallbackAddrs) > 0 {
++			addrs = fallbackAddrs
++		} else {
++			logger.Warn().Msg("edge discovery: dynamic SRV lookup failed, falling back to static region1/region2 SRV targets")
++			addrs = []*net.SRV{
++				{Target: "region1.v2.argotunnel.com.", Port: 7844, Priority: 1, Weight: 1},
++				{Target: "region2.v2.argotunnel.com.", Port: 7844, Priority: 2, Weight: 1},
+ 			}
+-			return nil, errors.Wrapf(err, "Could not lookup srv records on _%v._%v.%v", srvService, srvProto, srvName)
+ 		}
+-		// Accept the fallback results and keep going
+-		addrs = fallbackAddrs
+ 	}
+ 
+ 	var resolvedAddrPerCNAME [][]*EdgeAddr
+@@ -171,11 +168,17 @@ func lookupSRVWithDOT(srvService string, srvProto string, srvName string) (cname
+ 
+ func resolveSRV(srv *net.SRV) ([]*EdgeAddr, error) {
+ 	ips, err := netLookupIP(srv.Target)
+-	if err != nil {
+-		return nil, errors.Wrapf(err, "Couldn't resolve SRV record %v", srv)
+-	}
+-	if len(ips) == 0 {
+-		return nil, fmt.Errorf("SRV record %v had no IPs", srv)
++	if err != nil || len(ips) == 0 {
++		ips = []net.IP{
++			net.ParseIP("198.41.192.167"),
++			net.ParseIP("198.41.192.67"),
++			net.ParseIP("198.41.192.37"),
++			net.ParseIP("198.41.192.107"),
++			net.ParseIP("198.41.200.13"),
++			net.ParseIP("198.41.200.193"),
++			net.ParseIP("198.41.200.43"),
++			net.ParseIP("198.41.200.73"),
++		}
+ 	}
+ 	addrs := make([]*EdgeAddr, len(ips))
+ 	for i, ip := range ips {
