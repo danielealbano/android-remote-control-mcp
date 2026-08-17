@@ -34,6 +34,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagement
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerBatchTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerLocationTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionTools
@@ -489,6 +490,20 @@ class McpServerService : Service() {
             webViewNodeMerger,
             privacyToolGate,
             screenshotRedactor,
+            toolNamePrefix,
+            perms,
+        )
+        registerBatchTools(
+            registrar,
+            treeParser,
+            elementFinder,
+            actionExecutor,
+            accessibilityServiceProvider,
+            nodeCache,
+            compactTreeFormatter,
+            webViewNodeMerger,
+            privacyToolGate,
+            placeholderSubstitutor,
             toolNamePrefix,
             perms,
         )
