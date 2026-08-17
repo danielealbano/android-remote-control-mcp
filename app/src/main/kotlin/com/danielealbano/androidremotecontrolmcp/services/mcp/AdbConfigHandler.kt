@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
+import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
@@ -57,6 +58,8 @@ class AdbConfigHandler(
         applyCertificateHostname(intent)
         applyTunnelEnabled(intent)
         applyTunnelProvider(intent)
+        applyCloudflareTunnelMode(intent)
+        applyCloudflareTunnelToken(intent)
         applyNgrokAuthtoken(intent)
         applyNgrokDomain(intent)
         applyFileSizeLimit(intent)
@@ -225,6 +228,33 @@ class AdbConfigHandler(
         Log.i(TAG, "Tunnel provider updated to $provider")
     }
 
+    private suspend fun applyCloudflareTunnelMode(intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_CLOUDFLARE_TUNNEL_MODE) ?: return
+        val mode =
+            try {
+                CloudflareTunnelMode.valueOf(value)
+            } catch (_: IllegalArgumentException) {
+                Log.w(
+                    TAG,
+                    "Ignoring invalid cloudflare_tunnel_mode '$value' " +
+                        "(valid: ${CloudflareTunnelMode.entries.joinToString()})",
+                )
+                return
+            }
+        settingsRepository.updateCloudflareTunnelMode(mode)
+        Log.i(TAG, "Cloudflare tunnel mode updated to $mode")
+    }
+
+    private suspend fun applyCloudflareTunnelToken(intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_CLOUDFLARE_TUNNEL_TOKEN) ?: return
+        if (value.isEmpty()) {
+            Log.w(TAG, "Ignoring empty cloudflare_tunnel_token")
+            return
+        }
+        settingsRepository.updateCloudflareTunnelToken(value)
+        Log.i(TAG, "Cloudflare tunnel token updated (length=${value.length})")
+    }
+
     private suspend fun applyNgrokAuthtoken(intent: Intent) {
         val value = intent.getStringExtra(EXTRA_NGROK_AUTHTOKEN) ?: return
         if (value.isEmpty()) {
@@ -360,6 +390,8 @@ class AdbConfigHandler(
         internal const val EXTRA_CERTIFICATE_HOSTNAME = "certificate_hostname"
         internal const val EXTRA_TUNNEL_ENABLED = "tunnel_enabled"
         internal const val EXTRA_TUNNEL_PROVIDER = "tunnel_provider"
+        internal const val EXTRA_CLOUDFLARE_TUNNEL_MODE = "cloudflare_tunnel_mode"
+        internal const val EXTRA_CLOUDFLARE_TUNNEL_TOKEN = "cloudflare_tunnel_token"
         internal const val EXTRA_NGROK_AUTHTOKEN = "ngrok_authtoken"
         internal const val EXTRA_NGROK_DOMAIN = "ngrok_domain"
         internal const val EXTRA_FILE_SIZE_LIMIT_MB = "file_size_limit_mb"

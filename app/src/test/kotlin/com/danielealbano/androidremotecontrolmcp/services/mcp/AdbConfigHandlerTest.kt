@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
+import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
@@ -402,6 +403,66 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify(exactly = 0) { settingsRepository.updateTunnelProvider(any()) }
+            }
+
+        @Test
+        @DisplayName("cloudflare_tunnel_mode FREE is applied")
+        fun cloudflareTunnelModeFree() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_CLOUDFLARE_TUNNEL_MODE, "FREE")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateCloudflareTunnelMode(CloudflareTunnelMode.FREE) }
+            }
+
+        @Test
+        @DisplayName("cloudflare_tunnel_mode TOKEN is applied")
+        fun cloudflareTunnelModeToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_CLOUDFLARE_TUNNEL_MODE, "TOKEN")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateCloudflareTunnelMode(CloudflareTunnelMode.TOKEN) }
+            }
+
+        @Test
+        @DisplayName("invalid cloudflare_tunnel_mode is rejected")
+        fun invalidCloudflareTunnelMode() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_CLOUDFLARE_TUNNEL_MODE, "INVALID")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateCloudflareTunnelMode(any()) }
+            }
+
+        @Test
+        @DisplayName("cloudflare_tunnel_token is applied")
+        fun cloudflareTunnelToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_CLOUDFLARE_TUNNEL_TOKEN, "eyJhIjoidGVzdCJ9")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateCloudflareTunnelToken("eyJhIjoidGVzdCJ9") }
+            }
+
+        @Test
+        @DisplayName("empty cloudflare_tunnel_token is ignored")
+        fun emptyCloudflareTunnelToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_CLOUDFLARE_TUNNEL_TOKEN, "")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateCloudflareTunnelToken(any()) }
             }
 
         @Test
