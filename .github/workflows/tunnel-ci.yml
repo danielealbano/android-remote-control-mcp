@@ -8,6 +8,12 @@ on:
     paths: ['tunneld/**', '.github/workflows/tunnel-ci.yml']
   workflow_dispatch:
 
+# Minimal GITHUB_TOKEN permissions (CodeQL hardening): these jobs only read the repo — they build,
+# lint, and test; they never push images, comment, or release. Image publishing lives in the
+# separate release-tunneld workflow, which requests packages:write on its own job.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
