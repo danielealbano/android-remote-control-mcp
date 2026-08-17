@@ -1,0 +1,5 @@
+# Used by goreleaser: it builds the static tunneld binary itself, then this image just copies it in
+# (contrast with ./Dockerfile, the self-contained multi-stage build the Compose stack uses locally).
+FROM gcr.io/distroless/static:nonroot
+COPY tunneld /tunneld
+ENTRYPOINT ["/tunneld", "serve"]
