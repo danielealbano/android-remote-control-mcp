@@ -45,8 +45,8 @@ jobs:
         run: docker build -t tunneld:ci -f tunneld/Dockerfile tunneld
 
   e2e:
-    # Opt-in: e2e spins up containers (slow); run via the Actions "Run workflow" button.
-    if: github.event_name == 'workflow_dispatch'
+    # Runs on every push/PR that touches tunneld/** (the workflow's path filter already scopes it),
+    # so the full-stack path is regression-tested — not left to rot behind a manual trigger.
     runs-on: ubuntu-latest
     defaults:
       run:
