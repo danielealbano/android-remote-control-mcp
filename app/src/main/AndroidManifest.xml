@@ -41,6 +41,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <!-- Android 12 (API 31/32) port: READ_MEDIA_* do not exist below API 33; the
+         equivalent media-read grant on 31/32 is READ_EXTERNAL_STORAGE (normal
+         permission, granted at install). maxSdkVersion 32 keeps it off 33+. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

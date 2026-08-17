@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.ui
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -82,9 +83,14 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Requests the POST_NOTIFICATIONS runtime permission.
+     *
+     * Android 12 (API 31/32) port: POST_NOTIFICATIONS does not exist below API 33,
+     * so the request is skipped there (notifications are always allowed on 31/32).
      */
     private fun requestNotificationPermission() {
-        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     /**

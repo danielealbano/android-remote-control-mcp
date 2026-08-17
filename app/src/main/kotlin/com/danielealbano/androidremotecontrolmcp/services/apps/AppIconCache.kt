@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.apps
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import androidx.core.graphics.drawable.toBitmap
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -129,8 +130,14 @@ class AppIconCache
                 android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
                     addCategory(android.content.Intent.CATEGORY_LAUNCHER)
                 }
-            return pm
-                .queryIntentActivities(launchIntent, PackageManager.ResolveInfoFlags.of(0))
+            val resolveInfos =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.queryIntentActivities(launchIntent, PackageManager.ResolveInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.queryIntentActivities(launchIntent, 0)
+                }
+            return resolveInfos
                 .mapNotNull { resolveInfo ->
                     val pkgName = resolveInfo.activityInfo?.packageName ?: return@mapNotNull null
                     val label = resolveInfo.loadLabel(pm)?.toString() ?: return@mapNotNull null
