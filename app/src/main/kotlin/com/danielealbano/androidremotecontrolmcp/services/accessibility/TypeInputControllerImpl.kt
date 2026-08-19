@@ -1,7 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
-import android.annotation.SuppressLint
 import android.accessibilityservice.InputMethod.AccessibilityInputConnection
+import android.annotation.SuppressLint
 import android.os.Build
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
@@ -38,13 +38,12 @@ class TypeInputControllerImpl
 
         private fun getClassicInputConnection(): InputConnection? = McpInputMethodService.instance?.currentConnection()
 
-        override fun isReady(): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        override fun isReady(): Boolean =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 McpAccessibilityService.inputMethodInstance?.getCurrentInputStarted() == true
             } else {
                 getClassicInputConnection() != null
             }
-        }
 
         override fun commitText(
             text: CharSequence,
@@ -76,13 +75,12 @@ class TypeInputControllerImpl
             beforeLength: Int,
             afterLength: Int,
             flags: Int,
-        ): SurroundingText? {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ): SurroundingText? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 getAccessibilityInputConnection()?.getSurroundingText(beforeLength, afterLength, flags)
             } else {
                 getClassicInputConnection()?.getSurroundingText(beforeLength, afterLength, flags)
             }
-        }
 
         override fun performContextMenuAction(id: Int): Boolean {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
