@@ -276,12 +276,12 @@ class PermissionUtilsTest {
         }
 
         @Test
-        fun `returns false when permission is denied`() {
+        fun `returns true below API 33 even when permission is denied`() {
             every {
                 ContextCompat.checkSelfPermission(mockContext, Manifest.permission.POST_NOTIFICATIONS)
             } returns PackageManager.PERMISSION_DENIED
 
-            assertFalse(PermissionUtils.isNotificationPermissionGranted(mockContext))
+            assertTrue(PermissionUtils.isNotificationPermissionGranted(mockContext))
         }
     }
 
