@@ -4,24 +4,17 @@ import android.annotation.SuppressLint
 import android.accessibilityservice.InputMethod.AccessibilityInputConnection
 import android.os.Build
 import android.view.KeyEvent
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.SurroundingText
 import javax.inject.Inject
 
 /**
  * Implementation of [TypeInputController] that delegates to the
- * [AccessibilityInputConnection] obtained from the [McpAccessibilityService]'s
- * [InputMethod] instance.
+ * API-33+ [AccessibilityInputConnection] or the classic [InputConnection] exposed by
+ * [McpInputMethodService] on API 31/32.
  *
- * **Android 12 (API 31/32) port**: `android.accessibilityservice.InputMethod` and
- * `AccessibilityInputConnection` only exist from API 33 on, and
- * [McpAccessibilityService.onCreateInputMethod] never creates the input method below 33,
- * so every method short-circuits to "not available" there. The typing tools surface this
- * as "input method not ready" instead of crashing. `@SuppressLint("NewApi")` is justified
- * because every API-33 reference is behind an explicit `SDK_INT >= TIRAMISU` guard, so no
- * API-33 symbol is ever resolved below 33.
- *
- * All methods access the singleton [McpAccessibilityService.inputMethodInstance]
- * to get the current [AccessibilityInputConnection].
+ * API-33 references are guarded by `SDK_INT >= TIRAMISU`; below API 33 all operations use
+ * [McpInputMethodService.instance].
  *
  * **Threading**: The AccessibilityInputConnection is an IPC proxy managed by
  * the accessibility framework — NOT a View-bound InputConnection. Methods can
@@ -33,43 +26,50 @@ import javax.inject.Inject
  * Callers must use the file-level `typeOperationMutex` in the typing tools
  * to serialize operations and prevent interleaved character commits.
  *
- * **Return values**: The underlying AccessibilityInputConnection methods return
- * `void`. The Boolean return here indicates IC availability only — NOT whether
- * the target field accepted the operation.
+ * **Return values**: API-33+ calls wrap the void accessibility methods as `true` when
+ * dispatched. API 31/32 calls forward the classic input connection's Boolean result.
  */
 @SuppressLint("NewApi")
 class TypeInputControllerImpl
     @Inject
     constructor() : TypeInputController {
-        private fun getInputConnection(): AccessibilityInputConnection? {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
-            return McpAccessibilityService.inputMethodInstance?.getCurrentInputConnection()
-        }
+        private fun getAccessibilityInputConnection(): AccessibilityInputConnection? =
+            McpAccessibilityService.inputMethodInstance?.getCurrentInputConnection()
+
+        private fun getClassicInputConnection(): InputConnection? = McpInputMethodService.instance?.currentConnection()
 
         override fun isReady(): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            return McpAccessibilityService.inputMethodInstance?.getCurrentInputStarted() == true &&
-                getInputConnection() != null
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                McpAccessibilityService.inputMethodInstance?.getCurrentInputStarted() == true
+            } else {
+                getClassicInputConnection() != null
+            }
         }
 
         override fun commitText(
             text: CharSequence,
             newCursorPosition: Int,
         ): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            val ic = getInputConnection() ?: return false
-            ic.commitText(text, newCursorPosition, null)
-            return true
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val connection = getAccessibilityInputConnection() ?: return false
+                connection.commitText(text, newCursorPosition, null)
+                true
+            } else {
+                getClassicInputConnection()?.commitText(text, newCursorPosition) ?: false
+            }
         }
 
         override fun setSelection(
             start: Int,
             end: Int,
         ): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            val ic = getInputConnection() ?: return false
-            ic.setSelection(start, end)
-            return true
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val connection = getAccessibilityInputConnection() ?: return false
+                connection.setSelection(start, end)
+                true
+            } else {
+                getClassicInputConnection()?.setSelection(start, end) ?: false
+            }
         }
 
         override fun getSurroundingText(
@@ -77,31 +77,43 @@ class TypeInputControllerImpl
             afterLength: Int,
             flags: Int,
         ): SurroundingText? {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
-            return getInputConnection()?.getSurroundingText(beforeLength, afterLength, flags)
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                getAccessibilityInputConnection()?.getSurroundingText(beforeLength, afterLength, flags)
+            } else {
+                getClassicInputConnection()?.getSurroundingText(beforeLength, afterLength, flags)
+            }
         }
 
         override fun performContextMenuAction(id: Int): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            val ic = getInputConnection() ?: return false
-            ic.performContextMenuAction(id)
-            return true
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val connection = getAccessibilityInputConnection() ?: return false
+                connection.performContextMenuAction(id)
+                true
+            } else {
+                getClassicInputConnection()?.performContextMenuAction(id) ?: false
+            }
         }
 
         override fun sendKeyEvent(event: KeyEvent): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            val ic = getInputConnection() ?: return false
-            ic.sendKeyEvent(event)
-            return true
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val connection = getAccessibilityInputConnection() ?: return false
+                connection.sendKeyEvent(event)
+                true
+            } else {
+                getClassicInputConnection()?.sendKeyEvent(event) ?: false
+            }
         }
 
         override fun deleteSurroundingText(
             beforeLength: Int,
             afterLength: Int,
         ): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-            val ic = getInputConnection() ?: return false
-            ic.deleteSurroundingText(beforeLength, afterLength)
-            return true
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val connection = getAccessibilityInputConnection() ?: return false
+                connection.deleteSurroundingText(beforeLength, afterLength)
+                true
+            } else {
+                getClassicInputConnection()?.deleteSurroundingText(beforeLength, afterLength) ?: false
+            }
         }
     }
