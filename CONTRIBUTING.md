@@ -35,7 +35,7 @@ See [docs/PROJECT.md](docs/PROJECT.md) for the complete project conventions.
 - **Maven** (for compiling ngrok Java library; install from [maven.apache.org](https://maven.apache.org/install.html))
 
 ### For Running
-- Android device or emulator running **Android 13+** (API 33+), targeting **Android 14** (API 34)
+- Android device or emulator running **Android 12+** (API 31+), targeting **Android 14** (API 34)
 - **adb** (Android Debug Bridge) for device/emulator management
 
 ### For E2E Tests

@@ -89,7 +89,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **Android Gradle Plugin (AGP)**: 8.13 (latest stable 8.x)
 - **Gradle**: 8.14.4 (latest stable 8.x)
 - **KSP**: 2.3.5 (Kotlin Symbol Processing, decoupled from Kotlin since 2.3.0)
-- **Android SDK**: Target API 34 (Android 14), Minimum API 33 (Android 13 Tiramisu)
+- **Android SDK**: Target API 34 (Android 14), Minimum API 31 (Android 12; API 33+ calls are guarded at runtime)
 - **JDK**: Java 17 (standard for Android development)
 
 ### Frameworks & Libraries
