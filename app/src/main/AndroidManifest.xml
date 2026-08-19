@@ -41,9 +41,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
-    <!-- Android 12 (API 31/32) port: READ_MEDIA_* do not exist below API 33; the
-         equivalent media-read grant on 31/32 is READ_EXTERNAL_STORAGE (normal
-         permission, granted at install). maxSdkVersion 32 keeps it off 33+. -->
+    <!-- Android 12 (API 31/32) port: READ_EXTERNAL_STORAGE is a dangerous permission
+         that users can grant at runtime. maxSdkVersion 32 is set because READ_MEDIA_*
+         supersedes it on API 33+. -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

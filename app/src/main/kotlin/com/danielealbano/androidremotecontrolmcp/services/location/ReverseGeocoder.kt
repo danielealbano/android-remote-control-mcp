@@ -6,7 +6,9 @@ import android.location.Geocoder
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.coroutines.resume
 
@@ -32,12 +34,16 @@ internal suspend fun reverseGeocode(
                     1,
                     object : Geocoder.GeocodeListener {
                         override fun onGeocode(addresses: List<Address>) {
-                            cont.resume(addresses.firstOrNull()?.getAddressLine(0))
+                            if (cont.isActive) {
+                                cont.resume(addresses.firstOrNull()?.getAddressLine(0))
+                            }
                         }
 
                         override fun onError(errorMessage: String?) {
                             Log.d(TAG, "Geocoder onError: $errorMessage")
-                            cont.resume(null)
+                            if (cont.isActive) {
+                                cont.resume(null)
+                            }
                         }
                     },
                 )
@@ -46,11 +52,13 @@ internal suspend fun reverseGeocode(
             // Android 12 (API 31/32) port: the GeocodeListener overload of
             // Geocoder.getFromLocation is API 33+; use the classic synchronous
             // overload below 33 (deprecated on 33+ but functional everywhere).
-            @Suppress("DEPRECATION")
-            Geocoder(context, Locale.getDefault())
-                .getFromLocation(latitude, longitude, 1)
-                ?.firstOrNull()
-                ?.getAddressLine(0)
+            withContext(Dispatchers.IO) {
+                @Suppress("DEPRECATION")
+                Geocoder(context, Locale.getDefault())
+                    .getFromLocation(latitude, longitude, 1)
+                    ?.firstOrNull()
+                    ?.getAddressLine(0)
+            }
         }
     } catch (e: CancellationException) {
         throw e
