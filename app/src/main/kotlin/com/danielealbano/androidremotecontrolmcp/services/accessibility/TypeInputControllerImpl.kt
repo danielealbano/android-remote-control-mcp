@@ -1,11 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.InputMethod.AccessibilityInputConnection
-import android.annotation.SuppressLint
 import android.os.Build
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.SurroundingText
+import androidx.annotation.RequiresApi
 import javax.inject.Inject
 
 /**
@@ -29,10 +29,10 @@ import javax.inject.Inject
  * **Return values**: API-33+ calls wrap the void accessibility methods as `true` when
  * dispatched. API 31/32 calls forward the classic input connection's Boolean result.
  */
-@SuppressLint("NewApi")
 class TypeInputControllerImpl
     @Inject
     constructor() : TypeInputController {
+        @RequiresApi(Build.VERSION_CODES.TIRAMISU)
         private fun getAccessibilityInputConnection(): AccessibilityInputConnection? =
             McpAccessibilityService.inputMethodInstance?.getCurrentInputConnection()
 
