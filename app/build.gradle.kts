@@ -537,6 +537,7 @@ val jacocoExcludes =
         "**/services/mcp/BootCompletedReceiver*",
         "**/services/screencapture/ScreenCaptureService*",
         "**/services/accessibility/McpAccessibilityService*",
+        "**/services/accessibility/McpInputMethodService*",
         // Update check: WorkManager worker, scheduler, and notifier require Android framework
         "**/services/update/UpdateCheckWorker*",
         "**/services/update/UpdateCheckScheduler*",
