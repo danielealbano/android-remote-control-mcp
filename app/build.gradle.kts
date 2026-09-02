@@ -218,7 +218,10 @@ android {
 
     defaultConfig {
         applicationId = "com.danielealbano.androidremotecontrolmcp"
-        minSdk = 33
+        // Android 12 (API 31) port: lowered from 33. All Android 13+ (API 33) and
+        // Android 14+ (API 34) API calls are guarded at runtime (see
+        // PermissionUtils, PermissionCheckerImpl, MainActivity, NotificationProviderImpl).
+        minSdk = 31
         targetSdk = 34
         versionCode = versionCodeProp
         versionName = versionNameProp
@@ -534,6 +537,7 @@ val jacocoExcludes =
         "**/services/mcp/BootCompletedReceiver*",
         "**/services/screencapture/ScreenCaptureService*",
         "**/services/accessibility/McpAccessibilityService*",
+        "**/services/accessibility/McpInputMethodService*",
         // Update check: WorkManager worker, scheduler, and notifier require Android framework
         "**/services/update/UpdateCheckWorker*",
         "**/services/update/UpdateCheckScheduler*",
