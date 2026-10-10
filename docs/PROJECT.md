@@ -135,7 +135,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
   - `services/location/` — `LocationProvider.kt`, `LocationProviderImpl.kt`
   - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
-  - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
+  - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`, `RelayTunnelProvider.kt`, `RelaySession.kt`, `RelayTarget.kt`, `RelayFrames.kt`, `LocalRequestReplayer.kt`
   - `mcp/` — `McpServer.kt`, `McpStatelessTransport.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
@@ -144,7 +144,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/screens/` — `HomeScreen.kt`
   - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`
-  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
+  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `RelaySettings.kt`, `RelaySettingsImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`, `RecentsUtils.kt`
@@ -154,10 +154,12 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/test/kotlin/` — Unit tests and JVM-based integration tests
 - `app/src/test/kotlin/.../integration/` — Integration tests (Ktor `testApplication`, no emulator)
 - `e2e-tests/` — E2E tests (redroid/Podman, JVM-only module)
+- `relay/` — Self-hosted WebSocket relay for the `RELAY` tunnel provider (Node 24 + `ws`, `node:test`, `Dockerfile`)
 - `gradle/libs.versions.toml` — Gradle version catalog
 - `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`
 - `Makefile`, `CLAUDE.md`, `README.md`, `LICENSE`
 - `.github/workflows/ci.yml` — GitHub Actions CI workflow
+- `.github/workflows/relay.yml` — Relay lint, tests and image build (runs only when `relay/**` changes)
 
 ---
 
@@ -518,7 +520,7 @@ Each storage location has per-location permission flags controlling what MCP too
 
 ### Screen Structure
 
-HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS, file size limit, download settings), RemoteAccessSection (tunnel toggle, provider selection, ngrok config, tunnel status), StorageLocationsSection (user-managed SAF storage locations with add/edit/delete), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
+HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard (status, start/stop), ConfigurationSection (binding address, port, token, auto-start, HTTPS, file size limit, download settings), RemoteAccessSection (tunnel toggle, provider selection, ngrok / relay config, tunnel status), StorageLocationsSection (user-managed SAF storage locations with add/edit/delete), PermissionsSection (accessibility/screenshot links), ServerLogsSection (scrollable recent server events including MCP tool calls and tunnel events), and ConnectionInfoCard (IP, port, token, tunnel URL, share button).
 
 ### Accessibility (UI)
 
@@ -630,7 +632,7 @@ debug builds get a per-flavor suffix so both can be installed side by side.
 - **HTTP is the default and primary transport.** The server starts on plain HTTP. This is intentional and the recommended mode for most users.
 - **Why HTTP is the priority**: The MCP server runs on an Android device whose IP address changes frequently (WiFi reconnects, mobile data, different networks). Standard/public Certificate Authorities (CAs) cannot issue valid TLS certificates for bare IP addresses or dynamic IPs. Any HTTPS certificate the device can generate will be self-signed, meaning every MCP client would need to explicitly trust it or disable certificate verification. This makes HTTPS impractical as a default — it adds configuration friction with no real security benefit for the primary use case (localhost via ADB port forwarding, where traffic never leaves the USB cable).
 - **HTTPS is a nice-to-have, not a priority.** It exists for users who need encrypted transport over a local network (binding to `0.0.0.0`), but even then the certificate will be self-signed and clients must allow insecure/untrusted certificates. Users who enable HTTPS must understand this trade-off.
-- **Remote access tunnels**: The app integrates with **Cloudflare Quick Tunnels** (no account required, random `*.trycloudflare.com` URL) and **ngrok** (account required, optional custom domain) to expose the local MCP server via a public HTTPS URL with valid certificates. See the Remote Access / Tunnel section below.
+- **Remote access tunnels**: The app integrates with **Cloudflare Quick Tunnels** (no account required, random `*.trycloudflare.com` URL), **ngrok** (account required, optional custom domain) and a **self-hosted WebSocket relay** (your own server; the device connects outbound) to expose the local MCP server via a public HTTPS URL with valid certificates. See the Remote Access / Tunnel section below.
 - **When HTTPS is enabled** (user opt-in via UI toggle):
   - **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable. Clients must allow insecure/self-signed certificates.
   - **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage.
@@ -641,6 +643,7 @@ The app supports exposing the local MCP server to the internet via tunnel provid
 
 - **Cloudflare Quick Tunnels** (default): Runs the `cloudflared` binary as a child process. Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL. No account or configuration needed. The cloudflared binary is bundled as a native library (`libcloudflared.so`) via a git submodule in `vendor/cloudflared/`.
 - **ngrok**: Uses the `ngrok-java` library (JNI-based, in-process). Requires an ngrok authtoken (free tier available). Supports optional custom domains. Available on arm64-v8a and x86_64 devices.
+- **WebSocket relay**: The device opens an outbound WebSocket (`<relayUrl>/device`, bearer-authenticated with the relay device token, ≥ 16 characters) to a relay you host — the Node service in `relay/` (container image from `relay/Dockerfile`). The relay forwards each HTTP request it receives as a JSON frame (`{"type":"request",id,method,path,headers,body(base64)}`); the app replays it against `http://127.0.0.1:<port>` (at most 8 concurrently, 100 s each, responses up to 8 MiB) and answers with a `response` frame. The relay URL is `ws[s]://host[:port]` only (no path); the public URL is the same authority with `wss`→`https` (`ws`→`http`). The provider reconnects with exponential backoff (1 s … 30 s, reset after a session ≥ 10 s) and redials a socket silent for 90 s. No inbound port on the device, no third-party account. The relay answers `GET /relay/health` itself; everything else reaches the app. Cleartext `ws://` is allowed only with a warning (loopback/private hosts excepted).
 
 Tunnel architecture:
 - `TunnelProvider` interface defines `start(localPort, config)` / `stop()` with `status: StateFlow<TunnelStatus>`
@@ -663,7 +666,7 @@ Tunnel architecture:
 | Device as Hotspot | Not accessible | Accessible to hotspot clients |
 | ADB Port Forward | Accessible via host | Accessible via host |
 
-**CORS (browser clients)**: The server sends permissive CORS (`Access-Control-Allow-Origin: *`, no credentials mode) so browser-based MCP clients (e.g. MCP Inspector) can complete the OAuth flow and `/mcp` exchange. This does not weaken authentication — `/mcp` still requires a bearer/OAuth token that a cross-origin page cannot obtain, and non-browser clients send no `Origin` so CORS is a no-op for them. **Trade-off**: the wildcard removes the browser same-origin barrier, so in OPEN mode (both auth methods disabled) on a network-reachable or DNS-rebindable binding, a malicious web page in the victim's browser could drive the tool surface. No `Origin`/`Host` allowlist is enforced because the device's public host is dynamic (changing IPs, Cloudflare/ngrok tunnels, `public_url_override`); any static allowlist would break remote access. Mitigation: stay on the loopback binding and keep at least one auth method enabled unless the network is trusted.
+**CORS (browser clients)**: The server sends permissive CORS (`Access-Control-Allow-Origin: *`, no credentials mode) so browser-based MCP clients (e.g. MCP Inspector) can complete the OAuth flow and `/mcp` exchange. This does not weaken authentication — `/mcp` still requires a bearer/OAuth token that a cross-origin page cannot obtain, and non-browser clients send no `Origin` so CORS is a no-op for them. **Trade-off**: the wildcard removes the browser same-origin barrier, so in OPEN mode (both auth methods disabled) on a network-reachable or DNS-rebindable binding, a malicious web page in the victim's browser could drive the tool surface. No `Origin`/`Host` allowlist is enforced because the device's public host is dynamic (changing IPs, Cloudflare/ngrok tunnels, the WebSocket relay, `public_url_override`); any static allowlist would break remote access. Mitigation: stay on the loopback binding and keep at least one auth method enabled unless the network is trusted.
 
 ### Permission Security
 
@@ -704,6 +707,8 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **Tunnel Provider**: Cloudflare (no account required)
 - **ngrok Authtoken**: Empty (required when using ngrok)
 - **ngrok Domain**: Empty (auto-assigned when empty)
+- **Relay URL**: Empty (required when using the WebSocket relay; `ws://host[:port]` or `wss://host[:port]`, the app appends `/device`)
+- **Relay Device Token**: Empty (required when using the WebSocket relay; at least 16 characters, presented as bearer on the relay's `/device` socket)
 - **File Size Limit**: 50 MB (range 1-500 MB, configurable via UI, applies to all file operations)
 - **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
 - **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)

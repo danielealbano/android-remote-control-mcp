@@ -57,7 +57,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1) or network (0.0.0.0)
 - Auto-start on boot
-- Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
+- Remote access tunnels via Cloudflare Quick Tunnels, ngrok or a self-hosted WebSocket relay (public HTTPS URL)
 
 ### 57 MCP Tools across 14 Categories
 
@@ -73,7 +73,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full tool reference with inpu
 - Connection info display (IP, port, token, tunnel URL)
 - Per-tool and per-parameter permissions (enable/disable individual MCP tools)
 - Permission management (Accessibility, Notifications, Camera, Microphone)
-- Remote access tunnel configuration (Cloudflare / ngrok)
+- Remote access tunnel configuration (Cloudflare / ngrok / WebSocket relay)
 - Storage location management (automatic locations + SAF authorization for file tools)
 - Server log viewer (MCP tool calls, tunnel events)
 - Headless setup via ADB (configure, grant permissions, start/stop server without UI)
@@ -336,7 +336,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
 | Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
-| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (Cloudflare Quick Tunnels or ngrok) |
+| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (Cloudflare Quick Tunnels, ngrok or a self-hosted WebSocket relay) |
 | Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
@@ -373,6 +373,7 @@ For connecting from outside the local network without port forwarding:
 
 1. **Cloudflare Quick Tunnels** (default, no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
 2. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Available on arm64-v8a and x86_64 devices.
+3. **WebSocket relay** (self-hosted, no account): Run the relay from [`relay/`](relay/README.md) on a server that terminates HTTPS (e.g. behind Coolify/Traefik), then enter its base URL (`wss://relay.example.com`, no path) and the relay device token (≥ 16 characters) in the app. The device connects outbound, so no port is opened on the phone; MCP clients use `https://relay.example.com/mcp`. Responses above 8 MiB are not relayed.
 
 Enable the tunnel in the app's "Remote Access" section. The public URL is displayed in the connection info and server logs.
 
@@ -448,6 +449,8 @@ adb shell am broadcast \
   --es cloudflare_tunnel_extra_args "--edge region1.v2.argotunnel.com:7844" \
   --es ngrok_authtoken "your-ngrok-token" \
   --es ngrok_domain "your-domain.ngrok-free.app" \
+  --es relay_url "wss://relay.example.com" \
+  --es relay_device_token "your-relay-device-token" \
   --ei file_size_limit_mb 50 \
   --ez allow_http_downloads false \
   --ez allow_unverified_https_certs false \
@@ -481,12 +484,14 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `certificate_source` | string | `AUTO_GENERATED` or `CUSTOM` |
 | `certificate_hostname` | string | Hostname for auto-generated certificate |
 | `tunnel_enabled` | boolean | Enable remote access tunnel |
-| `tunnel_provider` | string | `CLOUDFLARE` or `NGROK` |
+| `tunnel_provider` | string | `CLOUDFLARE`, `NGROK` or `RELAY` |
 | `cloudflare_tunnel_mode` | string | `FREE` (Quick Tunnel, random `*.trycloudflare.com` URL) or `TOKEN` (named tunnel with static hostname) |
 | `cloudflare_tunnel_token` | string | Cloudflare named-tunnel token (used when `cloudflare_tunnel_mode` is `TOKEN`) |
 | `cloudflare_tunnel_extra_args` | string | Optional extra arguments passed to cloudflared (e.g. `--edge region1.v2.argotunnel.com:7844`) |
 | `ngrok_authtoken` | string | ngrok authentication token |
 | `ngrok_domain` | string | ngrok custom domain (optional) |
+| `relay_url` | string | WebSocket relay base URL (`ws://host[:port]` or `wss://host[:port]`; empty clears it) |
+| `relay_device_token` | string | Bearer token the device presents to the relay (≥ 16 characters; empty is ignored) |
 | `file_size_limit_mb` | int | Max file size for file operations (1-500) |
 | `allow_http_downloads` | boolean | Allow non-HTTPS downloads |
 | `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |

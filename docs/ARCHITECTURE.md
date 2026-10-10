@@ -57,9 +57,11 @@ graph TB
             subgraph Tunnel["TunnelManager (optional)"]
                 CF["CloudflareTunnelProvider\n(process-based)"]
                 Ngrok["NgrokTunnelProvider\n(in-process JNI)"]
-                PubURL["Public HTTPS URL\n(*.trycloudflare.com / ngrok)"]
+                Relay["RelayTunnelProvider\n(outbound WebSocket)"]
+                PubURL["Public HTTPS URL\n(*.trycloudflare.com / ngrok / relay)"]
                 CF --> PubURL
                 Ngrok --> PubURL
+                Relay --> PubURL
             end
         end
 
@@ -91,7 +93,7 @@ graph TB
      d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
      e. Starts Ktor server (HTTP by default, HTTPS if enabled)
      f. Updates `ServerStatus.Running` via companion-level StateFlow
-     g. If tunnel enabled: starts `TunnelManager` (connects to Cloudflare or ngrok)
+     g. If tunnel enabled: starts `TunnelManager` (connects to Cloudflare, ngrok or the WebSocket relay)
      h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence

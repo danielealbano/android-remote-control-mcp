@@ -160,7 +160,7 @@ graph TB
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
             SDK -->|"57 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
-            TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
+            TunnelMgr -->|"Cloudflare / ngrok / relay"| PublicURL["Public HTTPS URL"]
         end
 
         subgraph Accessibility["McpAccessibilityService"]
