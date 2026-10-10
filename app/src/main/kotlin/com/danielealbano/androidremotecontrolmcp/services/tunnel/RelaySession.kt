@@ -67,9 +67,8 @@ internal class RelaySession(
         val reason = withTimeoutOrNull(CLOSE_TIMEOUT_MS) { session.closeReason.await() }
         return when {
             reason == null -> RelaySessionEnd("Relay connection closed", replaced = false)
-            reason.code == CLOSE_CODE_REPLACED ->
-                RelaySessionEnd("Relay replaced this device with another connection", replaced = true)
-            else -> RelaySessionEnd("Relay connection closed (code ${reason.code}: ${reason.message})", replaced = false)
+            reason.code == CLOSE_CODE_REPLACED -> RelaySessionEnd(REPLACED_MESSAGE, replaced = true)
+            else -> RelaySessionEnd("Relay connection closed (${reason.code}: ${reason.message})", replaced = false)
         }
     }
 
@@ -79,13 +78,9 @@ internal class RelaySession(
     ) {
         when (val inbound = RelayFrameCodec.decode(text)) {
             is RelayInbound.Request -> replayScope.launch { answer(inbound.frame) }
-
             RelayInbound.Ping -> replayScope.launch { sendText(RelayFrameCodec.encodePong()) }
-
             RelayInbound.Pong -> Unit
-
             is RelayInbound.Unknown -> Logger.w(TAG, "Ignoring relay frame of unknown type '${inbound.type}'")
-
             is RelayInbound.Malformed -> Logger.w(TAG, "Ignoring malformed relay frame: ${inbound.reason}")
         }
     }
@@ -118,6 +113,7 @@ internal class RelaySession(
     companion object {
         private const val TAG = "MCP:RelaySession"
         private const val CLOSE_TIMEOUT_MS = 2_000L
+        private const val REPLACED_MESSAGE = "Relay replaced this device with another connection"
 
         /** Relay close code: another authenticated device connection took this device's slot. */
         internal const val CLOSE_CODE_REPLACED: Short = 4000

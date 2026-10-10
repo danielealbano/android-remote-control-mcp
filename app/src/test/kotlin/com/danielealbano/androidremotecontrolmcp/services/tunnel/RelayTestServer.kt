@@ -73,7 +73,11 @@ internal class RelayTestServer(
 
     suspend fun start() {
         server.start(wait = false)
-        port = server.engine.resolvedConnectors().first().port
+        port =
+            server.engine
+                .resolvedConnectors()
+                .first()
+                .port
     }
 
     fun stop() = server.stop(gracePeriodMillis = 0, timeoutMillis = 1_000)

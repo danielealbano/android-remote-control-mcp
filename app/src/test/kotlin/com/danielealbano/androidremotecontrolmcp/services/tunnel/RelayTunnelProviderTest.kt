@@ -103,7 +103,7 @@ class RelayTunnelProviderTest {
             ),
         )
 
-    private fun decodeResponse(text: String): RelayResponseFrame = json.decodeFromString(RelayResponseFrame.serializer(), text)
+    private fun decodeResponse(text: String) = json.decodeFromString(RelayResponseFrame.serializer(), text)
 
     private fun decodedBody(response: RelayResponseFrame): String = String(Base64.getDecoder().decode(response.body))
 
@@ -159,7 +159,8 @@ class RelayTunnelProviderTest {
     @Test
     fun `start with https url sets error`() =
         withRelay(deviceHandler = { awaitClientClose() }) { server, provider ->
-            provider.start(server.port, ServerConfig(relayUrl = "https://127.0.0.1", relayDeviceToken = RELAY_TEST_TOKEN))
+            val config = ServerConfig(relayUrl = "https://127.0.0.1", relayDeviceToken = RELAY_TEST_TOKEN)
+            provider.start(server.port, config)
 
             assertTrue((provider.status.value as TunnelStatus.Error).message.contains("ws://"))
         }
@@ -294,7 +295,12 @@ class RelayTunnelProviderTest {
         withRelay(
             deviceHandler = {
                 repeat(SLOTS) { send(Frame.Text(requestJson("r$it", "GET", "/slow"))) }
-                val reader = launch { for (frame in incoming) replies.send(decodeResponse((frame as Frame.Text).readText())) }
+                val reader =
+                    launch {
+                        for (frame in incoming) {
+                            replies.send(decodeResponse((frame as Frame.Text).readText()))
+                        }
+                    }
                 sendNinth.await()
                 send(Frame.Text(requestJson("r$SLOTS", "GET", "/slow")))
                 reader.join()
@@ -344,7 +350,9 @@ class RelayTunnelProviderTest {
 
     @Test
     fun `relay replacing the device waits the maximum backoff`() =
-        withRelay(deviceHandler = { close(CloseReason(RelaySession.CLOSE_CODE_REPLACED, "replaced")) }) { server, provider ->
+        withRelay(
+            deviceHandler = { close(CloseReason(RelaySession.CLOSE_CODE_REPLACED, "replaced")) },
+        ) { server, provider ->
             provider.start(server.port, server.config())
 
             val message = awaitError(provider)

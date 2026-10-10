@@ -224,7 +224,9 @@ class RelayTunnelProvider
                 connectedForMs: Long,
             ): Int = if (connectedForMs >= MIN_STABLE_SESSION_MS) 1 else previous + 1
 
-            private fun connectedFor(connectedAt: Long): Long =
-                if (connectedAt == 0L) 0L else System.currentTimeMillis() - connectedAt
+            private fun connectedFor(connectedAt: Long): Long {
+                if (connectedAt == 0L) return 0L
+                return System.currentTimeMillis() - connectedAt
+            }
         }
     }

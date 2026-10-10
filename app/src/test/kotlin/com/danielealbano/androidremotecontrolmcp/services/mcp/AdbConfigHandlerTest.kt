@@ -99,23 +99,7 @@ class AdbConfigHandlerTest {
                 else -> Result.failure(IllegalArgumentException("Invalid URL"))
             }
         }
-        every { settingsRepository.validateRelayUrl(any()) } answers {
-            val url = firstArg<String>()
-            when {
-                url.isBlank() -> Result.success("")
-                url.startsWith("ws://") || url.startsWith("wss://") -> Result.success(url)
-                else -> Result.failure(IllegalArgumentException("Relay URL must start with ws:// or wss://"))
-            }
-        }
-        every { settingsRepository.validateRelayDeviceToken(any()) } answers {
-            val token = firstArg<String>().trim()
-            when {
-                token.isEmpty() -> Result.success("")
-                token.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH ->
-                    Result.failure(IllegalArgumentException("Relay device token must be at least 16 characters"))
-                else -> Result.success(token)
-            }
-        }
+        stubRelayValidators()
 
         storageLocationProvider = mockk(relaxUnitFun = true)
         coEvery { storageLocationProvider.isLocationAuthorized(any()) } returns false
@@ -127,6 +111,34 @@ class AdbConfigHandlerTest {
     @AfterEach
     fun tearDown() {
         unmockkStatic(Log::class)
+    }
+
+    /** Relay validators mirror `RelaySettingsImpl` closely enough for the handler to exercise both branches. */
+    private fun stubRelayValidators() {
+        every { settingsRepository.validateRelayUrl(any()) } answers {
+            val url = firstArg<String>()
+            when {
+                url.isBlank() -> Result.success("")
+                url.startsWith("ws://") || url.startsWith("wss://") -> Result.success(url)
+                else -> Result.failure(IllegalArgumentException("Relay URL must start with ws:// or wss://"))
+            }
+        }
+        every { settingsRepository.validateRelayDeviceToken(any()) } answers {
+            val token = firstArg<String>().trim()
+            when {
+                token.isEmpty() -> {
+                    Result.success("")
+                }
+
+                token.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH -> {
+                    Result.failure(IllegalArgumentException("Relay device token must be at least 16 characters"))
+                }
+
+                else -> {
+                    Result.success(token)
+                }
+            }
+        }
     }
 
     /**

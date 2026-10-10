@@ -237,10 +237,7 @@ class SettingsRepositoryImpl
     ) : SettingsRepository,
         EventChannelSettings by eventChannelSettings,
         RelaySettings by relaySettings {
-        override val serverConfig: Flow<ServerConfig> =
-            dataStore.data.map { prefs ->
-                mapPreferencesToServerConfig(prefs)
-            }
+        override val serverConfig: Flow<ServerConfig> = dataStore.data.map { mapPreferencesToServerConfig(it) }
 
         override suspend fun getServerConfig(): ServerConfig {
             ensureAuthModelMigrated()

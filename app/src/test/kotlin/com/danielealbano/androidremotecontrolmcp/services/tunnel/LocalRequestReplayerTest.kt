@@ -71,7 +71,10 @@ class LocalRequestReplayerTest {
     private fun errorMessage(response: RelayResponseFrame): String =
         checkNotNull(Json.parseToJsonElement(decodedBody(response)).jsonObject["error"]).jsonPrimitive.content
 
-    private fun headerNames(response: RelayResponseFrame): Set<String> = response.headers.keys.map { it.lowercase() }.toSet()
+    private fun headerNames(response: RelayResponseFrame): Set<String> =
+        response.headers.keys
+            .map { it.lowercase() }
+            .toSet()
 
     @Test
     fun `replay targets loopback with method and raw path`() =

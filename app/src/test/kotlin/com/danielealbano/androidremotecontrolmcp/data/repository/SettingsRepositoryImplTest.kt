@@ -681,7 +681,9 @@ class SettingsRepositoryImplTest {
 
         @Test
         fun `trimmed value is returned`() {
-            assertEquals("wss://relay.example.com", repository.validateRelayUrl(" wss://relay.example.com ").getOrNull())
+            val result = repository.validateRelayUrl(" wss://relay.example.com ")
+
+            assertEquals("wss://relay.example.com", result.getOrNull())
         }
 
         @Test
@@ -689,7 +691,13 @@ class SettingsRepositoryImplTest {
             val result = repository.validateRelayUrl("https://relay.example.com")
 
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("ws://"))
+            assertTrue(
+                result
+                    .exceptionOrNull()
+                    ?.message
+                    .orEmpty()
+                    .contains("ws://"),
+            )
         }
 
         @Test
@@ -707,7 +715,13 @@ class SettingsRepositoryImplTest {
             val result = repository.validateRelayUrl("wss://relay.example.com/base")
 
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("path"))
+            assertTrue(
+                result
+                    .exceptionOrNull()
+                    ?.message
+                    .orEmpty()
+                    .contains("path"),
+            )
         }
 
         @Test
@@ -725,7 +739,13 @@ class SettingsRepositoryImplTest {
             val result = repository.validateRelayUrl("wss://relay example.com")
 
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().startsWith("Invalid relay URL"))
+            assertTrue(
+                result
+                    .exceptionOrNull()
+                    ?.message
+                    .orEmpty()
+                    .startsWith("Invalid relay URL"),
+            )
         }
     }
 
@@ -747,7 +767,13 @@ class SettingsRepositoryImplTest {
             val result = repository.validateRelayDeviceToken("0123456789abcde")
 
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("16"))
+            assertTrue(
+                result
+                    .exceptionOrNull()
+                    ?.message
+                    .orEmpty()
+                    .contains("16"),
+            )
         }
     }
 

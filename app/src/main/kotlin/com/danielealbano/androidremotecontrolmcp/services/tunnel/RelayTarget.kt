@@ -26,17 +26,39 @@ internal data class RelayTarget(
             val token = config.relayDeviceToken.trim()
             val uri = runCatching { URI(base) }.getOrNull()
             return when {
-                base.isEmpty() -> failure("Relay URL is required")
-                token.isEmpty() -> failure("Relay device token is required")
-                token.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH ->
-                    failure("Relay device token must be at least ${ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH} characters")
-                uri == null -> failure("Relay URL is not a valid URI")
-                uri.scheme?.lowercase() !in WS_SCHEMES || uri.host.isNullOrEmpty() ->
+                base.isEmpty() -> {
+                    failure("Relay URL is required")
+                }
+
+                token.isEmpty() -> {
+                    failure("Relay device token is required")
+                }
+
+                token.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH -> {
+                    failure(
+                        "Relay device token must be at least ${ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH} characters",
+                    )
+                }
+
+                uri == null -> {
+                    failure("Relay URL is not a valid URI")
+                }
+
+                uri.scheme?.lowercase() !in WS_SCHEMES || uri.host.isNullOrEmpty() -> {
                     failure("Relay URL must be ws:// or wss:// with a host")
-                uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null ->
+                }
+
+                uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null -> {
                     failure("Relay URL must not contain credentials, query or fragment")
-                uri.rawPath.isNotEmpty() -> failure("Relay URL must not contain a path")
-                else -> Result.success(RelayTarget(base + DEVICE_PATH, publicUrlFor(uri), token))
+                }
+
+                uri.rawPath.isNotEmpty() -> {
+                    failure("Relay URL must not contain a path")
+                }
+
+                else -> {
+                    Result.success(RelayTarget(base + DEVICE_PATH, publicUrlFor(uri), token))
+                }
             }
         }
 

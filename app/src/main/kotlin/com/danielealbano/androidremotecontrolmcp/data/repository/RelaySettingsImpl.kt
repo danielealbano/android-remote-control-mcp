@@ -65,29 +65,34 @@ class RelaySettingsImpl
             return runCatching { URI(trimmed) }
                 .fold(
                     onSuccess = { validateRelayUri(it, trimmed) },
-                    onFailure = { Result.failure(IllegalArgumentException("Invalid relay URL: ${it.message}")) },
+                    onFailure = { invalid("Invalid relay URL: ${it.message}") },
                 )
         }
 
         override fun validateRelayDeviceToken(token: String): Result<String> {
             val trimmed = token.trim()
             return when {
-                trimmed.isEmpty() -> Result.success("")
-                trimmed.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH ->
-                    Result.failure(
-                        IllegalArgumentException(
-                            "Relay device token must be at least " +
-                                "${ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH} characters",
-                        ),
+                trimmed.isEmpty() -> {
+                    Result.success("")
+                }
+
+                trimmed.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH -> {
+                    invalid(
+                        "Relay device token must be at least " +
+                            "${ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH} characters",
                     )
-                else -> Result.success(trimmed)
+                }
+
+                else -> {
+                    Result.success(trimmed)
+                }
             }
         }
 
         override fun isRelayUrlInsecure(url: String): Boolean {
             val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
-            val host = uri.host ?: return false
-            return uri.scheme.equals("ws", ignoreCase = true) && !PRIVATE_HOST_PATTERN.matches(host)
+            val host = uri.host
+            return host != null && uri.scheme.equals("ws", ignoreCase = true) && !PRIVATE_HOST_PATTERN.matches(host)
         }
 
         private fun validateRelayUri(
@@ -95,14 +100,26 @@ class RelaySettingsImpl
             original: String,
         ): Result<String> =
             when {
-                uri.scheme?.lowercase() !in RELAY_SCHEMES ->
-                    Result.failure(IllegalArgumentException("Relay URL must start with ws:// or wss://"))
-                uri.host.isNullOrEmpty() ->
-                    Result.failure(IllegalArgumentException("Relay URL must include a valid host"))
-                uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null ->
-                    Result.failure(IllegalArgumentException("Relay URL must not contain credentials, query or fragment"))
-                uri.rawPath.trimEnd('/').isNotEmpty() ->
-                    Result.failure(IllegalArgumentException("Relay URL must not contain a path (scheme://host[:port] only)"))
-                else -> Result.success(original.trimEnd('/'))
+                uri.scheme?.lowercase() !in RELAY_SCHEMES -> {
+                    invalid("Relay URL must start with ws:// or wss://")
+                }
+
+                uri.host.isNullOrEmpty() -> {
+                    invalid("Relay URL must include a valid host")
+                }
+
+                uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null -> {
+                    invalid("Relay URL must not contain credentials, query or fragment")
+                }
+
+                uri.rawPath.trimEnd('/').isNotEmpty() -> {
+                    invalid("Relay URL must not contain a path (scheme://host[:port] only)")
+                }
+
+                else -> {
+                    Result.success(original.trimEnd('/'))
+                }
             }
+
+        private fun invalid(message: String): Result<String> = Result.failure(IllegalArgumentException(message))
     }
