@@ -1,0 +1,19 @@
+{
+  "name": "lucky-tool-android-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSocket relay for Lucky-Tool-Android: the device dials out, MCP clients hit this server's HTTPS URL",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "lint": "node --check src/config.js && node --check src/frames.js && node --check src/relay.js && node --check src/server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}
