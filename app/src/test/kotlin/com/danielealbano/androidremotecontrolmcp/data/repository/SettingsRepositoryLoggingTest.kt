@@ -61,6 +61,7 @@ class SettingsRepositoryLoggingTest {
                 dataStore,
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
+                RelaySettingsImpl(dataStore, changeLogger),
             )
     }
 
@@ -153,6 +154,24 @@ class SettingsRepositoryLoggingTest {
                 "Event channel endpoint changed http://old:1 → http://new:2",
                 settingsMessages().single(),
             )
+        }
+
+    @Test
+    fun `relay url logs old to new`() =
+        testScope.runTest {
+            repository.updateRelayUrl("wss://r.example.com")
+            advanceUntilIdle()
+            assertEquals("Relay URL changed (none) → wss://r.example.com", settingsMessages().single())
+        }
+
+    @Test
+    fun `relay device token logs without value`() =
+        testScope.runTest {
+            repository.updateRelayDeviceToken("super-secret-relay-token")
+            advanceUntilIdle()
+            val message = settingsMessages().single()
+            assertEquals("Relay device token changed", message)
+            assertFalse(message.contains("super-secret"))
         }
 
     private companion object {

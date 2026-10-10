@@ -8,6 +8,8 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSet
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepositoryImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.RelaySettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.RelaySettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
@@ -155,6 +157,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindEventChannelSettings(impl: EventChannelSettingsImpl): EventChannelSettings
+
+    /** Binds the relay-tunnel settings slice that [SettingsRepositoryImpl] delegates to. */
+    @Binds
+    @Singleton
+    abstract fun bindRelaySettings(impl: RelaySettingsImpl): RelaySettings
 
     /** Binds the persisted OAuth client registry. */
     @Binds

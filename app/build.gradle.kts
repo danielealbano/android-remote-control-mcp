@@ -365,6 +365,9 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
 
+    // Ktor Client WebSockets (relay tunnel provider — device-side socket to the self-hosted relay)
+    implementation(libs.ktor.client.websockets)
+
     // Force patched Netty: Ktor's server engine ships netty 4.2.9, which is vulnerable.
     // Covers the HTTP Request Smuggling / HTTP/2 CONTINUATION-flood CVEs (CVE-2026-33870,
     // CVE-2026-33871) plus the native-transport advisories that the engine also pulls onto the
@@ -447,6 +450,7 @@ dependencies {
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.server.websockets)
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)

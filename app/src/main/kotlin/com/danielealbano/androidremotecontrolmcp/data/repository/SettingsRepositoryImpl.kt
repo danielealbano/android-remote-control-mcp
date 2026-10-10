@@ -131,6 +131,8 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
                 ?: CloudflareTunnelMode.FREE,
         cloudflareTunnelToken = prefs[CLOUDFLARE_TUNNEL_TOKEN_KEY] ?: "",
         cloudflareTunnelExtraArgs = prefs[CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY] ?: "",
+        relayUrl = prefs[RELAY_URL_KEY] ?: "",
+        relayDeviceToken = prefs[RELAY_DEVICE_TOKEN_KEY] ?: "",
         fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
         allowHttpDownloads = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false,
         allowUnverifiedHttpsCerts = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false,
@@ -231,8 +233,10 @@ class SettingsRepositoryImpl
         private val dataStore: DataStore<Preferences>,
         private val settingsChangeLogger: SettingsChangeLogger,
         eventChannelSettings: EventChannelSettings,
+        relaySettings: RelaySettings,
     ) : SettingsRepository,
-        EventChannelSettings by eventChannelSettings {
+        EventChannelSettings by eventChannelSettings,
+        RelaySettings by relaySettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)

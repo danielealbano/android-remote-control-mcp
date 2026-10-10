@@ -16,11 +16,15 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property certificateSource The source of the HTTPS certificate.
  * @property certificateHostname The hostname for auto-generated certificates.
  * @property tunnelEnabled Whether remote access via tunnel is enabled.
- * @property tunnelProvider The tunnel provider type (Cloudflare or ngrok).
+ * @property tunnelProvider The tunnel provider type (Cloudflare, ngrok or the self-hosted WebSocket relay).
  * @property ngrokAuthtoken The ngrok authtoken (required when using ngrok).
  * @property ngrokDomain The ngrok domain (optional, empty means auto-assigned).
  * @property cloudflareTunnelMode The Cloudflare tunnel mode (Free quick tunnel vs token-based named tunnel).
  * @property cloudflareTunnelToken The Cloudflare tunnel token (required when using token mode).
+ * @property relayUrl Base URL of the self-hosted WebSocket relay (`ws://host[:port]` or `wss://host[:port]`, no
+ *   path — the device appends `/device`). Empty means not configured.
+ * @property relayDeviceToken Bearer token the device presents when opening the relay's `/device` socket
+ *   (at least [MIN_RELAY_DEVICE_TOKEN_LENGTH] characters once trimmed).
  * @property fileSizeLimitMb File size limit for file operations (in MB).
  * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
  * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
@@ -52,6 +56,8 @@ data class ServerConfig(
     val cloudflareTunnelMode: CloudflareTunnelMode = CloudflareTunnelMode.FREE,
     val cloudflareTunnelToken: String = "",
     val cloudflareTunnelExtraArgs: String = "",
+    val relayUrl: String = "",
+    val relayDeviceToken: String = "",
     val fileSizeLimitMb: Int = DEFAULT_FILE_SIZE_LIMIT_MB,
     val allowHttpDownloads: Boolean = false,
     val allowUnverifiedHttpsCerts: Boolean = false,
@@ -97,6 +103,9 @@ data class ServerConfig(
 
         /** Maximum length for device slug. */
         const val MAX_DEVICE_SLUG_LENGTH = 20
+
+        /** Minimum length of the relay device token (the relay enforces the same bound). */
+        const val MIN_RELAY_DEVICE_TOKEN_LENGTH = 16
 
         /** Pattern for valid device slug characters (letters, digits, underscores). */
         val DEVICE_SLUG_PATTERN = Regex("^[a-zA-Z0-9_]*$")

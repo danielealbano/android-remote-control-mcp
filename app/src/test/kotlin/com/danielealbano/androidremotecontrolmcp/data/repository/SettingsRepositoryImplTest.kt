@@ -81,6 +81,7 @@ class SettingsRepositoryImplTest {
                 dataStore,
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
+                RelaySettingsImpl(dataStore, changeLogger),
             )
     }
 
@@ -562,6 +563,15 @@ class SettingsRepositoryImplTest {
 
                 assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
             }
+
+        @Test
+        fun `updates tunnel provider to RELAY`() =
+            testScope.runTest {
+                repository.updateTunnelProvider(TunnelProviderType.RELAY)
+                val config = repository.getServerConfig()
+
+                assertEquals(TunnelProviderType.RELAY, config.tunnelProvider)
+            }
     }
 
     @Nested
@@ -608,6 +618,171 @@ class SettingsRepositoryImplTest {
 
                 assertEquals(config1.ngrokDomain, config2.ngrokDomain)
             }
+    }
+
+    @Nested
+    @DisplayName("updateRelayUrl")
+    inner class UpdateRelayUrl {
+        @Test
+        fun `updates relay url trimmed`() =
+            testScope.runTest {
+                repository.updateRelayUrl("  wss://relay.example.com ")
+                val config = repository.getServerConfig()
+
+                assertEquals("wss://relay.example.com", config.relayUrl)
+            }
+
+        @Test
+        fun `clears relay url with empty string`() =
+            testScope.runTest {
+                repository.updateRelayUrl("wss://relay.example.com")
+                repository.updateRelayUrl("")
+                val config = repository.getServerConfig()
+
+                assertEquals("", config.relayUrl)
+            }
+    }
+
+    @Nested
+    @DisplayName("updateRelayDeviceToken")
+    inner class UpdateRelayDeviceToken {
+        @Test
+        fun `updates relay device token trimmed`() =
+            testScope.runTest {
+                repository.updateRelayDeviceToken(" 0123456789abcdef ")
+                val config = repository.getServerConfig()
+
+                assertEquals("0123456789abcdef", config.relayDeviceToken)
+            }
+    }
+
+    @Nested
+    @DisplayName("validateRelayUrl")
+    inner class ValidateRelayUrl {
+        @Test
+        fun `empty url is valid and normalizes to empty`() {
+            assertEquals("", repository.validateRelayUrl("  ").getOrNull())
+        }
+
+        @Test
+        fun `ws url with host is valid`() {
+            assertEquals("ws://127.0.0.1:8081", repository.validateRelayUrl("ws://127.0.0.1:8081").getOrNull())
+        }
+
+        @Test
+        fun `wss url with port is valid`() {
+            assertTrue(repository.validateRelayUrl("wss://relay.example.com:8443").isSuccess)
+        }
+
+        @Test
+        fun `trailing slash is stripped`() {
+            assertEquals("wss://relay.example.com", repository.validateRelayUrl("wss://relay.example.com/").getOrNull())
+        }
+
+        @Test
+        fun `trimmed value is returned`() {
+            assertEquals("wss://relay.example.com", repository.validateRelayUrl(" wss://relay.example.com ").getOrNull())
+        }
+
+        @Test
+        fun `https scheme is rejected`() {
+            val result = repository.validateRelayUrl("https://relay.example.com")
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("ws://"))
+        }
+
+        @Test
+        fun `missing host is rejected`() {
+            assertTrue(repository.validateRelayUrl("wss://").isFailure)
+        }
+
+        @Test
+        fun `user info is rejected`() {
+            assertTrue(repository.validateRelayUrl("wss://user:pw@relay.example.com").isFailure)
+        }
+
+        @Test
+        fun `path is rejected`() {
+            val result = repository.validateRelayUrl("wss://relay.example.com/base")
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("path"))
+        }
+
+        @Test
+        fun `query is rejected`() {
+            assertTrue(repository.validateRelayUrl("wss://relay.example.com/?x=1").isFailure)
+        }
+
+        @Test
+        fun `fragment is rejected`() {
+            assertTrue(repository.validateRelayUrl("wss://relay.example.com/#frag").isFailure)
+        }
+
+        @Test
+        fun `unparsable url is rejected`() {
+            val result = repository.validateRelayUrl("wss://relay example.com")
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().startsWith("Invalid relay URL"))
+        }
+    }
+
+    @Nested
+    @DisplayName("validateRelayDeviceToken")
+    inner class ValidateRelayDeviceToken {
+        @Test
+        fun `empty token is valid`() {
+            assertEquals("", repository.validateRelayDeviceToken("").getOrNull())
+        }
+
+        @Test
+        fun `token of 16 characters is valid and trimmed`() {
+            assertEquals("0123456789abcdef", repository.validateRelayDeviceToken(" 0123456789abcdef ").getOrNull())
+        }
+
+        @Test
+        fun `token shorter than 16 characters is rejected`() {
+            val result = repository.validateRelayDeviceToken("0123456789abcde")
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("16"))
+        }
+    }
+
+    @Nested
+    @DisplayName("isRelayUrlInsecure")
+    inner class IsRelayUrlInsecure {
+        @Test
+        fun `wss url is not insecure`() {
+            assertFalse(repository.isRelayUrlInsecure("wss://relay.example.com"))
+        }
+
+        @Test
+        fun `ws url to public host is insecure`() {
+            assertTrue(repository.isRelayUrlInsecure("ws://relay.example.com"))
+        }
+
+        @Test
+        fun `ws url to loopback and private hosts is not insecure`() {
+            val privateUrls =
+                listOf(
+                    "ws://127.0.0.1:8080",
+                    "ws://localhost",
+                    "ws://[::1]:8080",
+                    "ws://192.168.1.5",
+                    "ws://10.0.0.2",
+                    "ws://172.16.0.9",
+                )
+
+            privateUrls.forEach { assertFalse(repository.isRelayUrlInsecure(it), it) }
+        }
+
+        @Test
+        fun `unparsable url is not insecure`() {
+            assertFalse(repository.isRelayUrlInsecure("ws://a b"))
+        }
     }
 
     @Nested

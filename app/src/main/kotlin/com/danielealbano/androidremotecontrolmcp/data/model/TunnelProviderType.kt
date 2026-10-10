@@ -9,4 +9,7 @@ enum class TunnelProviderType {
 
     /** ngrok tunnel — requires authtoken, supports stable domains. */
     NGROK,
+
+    /** Self-hosted WebSocket relay — the device dials out to a relay you run; clients use the relay's HTTPS URL. */
+    RELAY,
 }

@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.Flow
  * and Services must not access DataStore directly.
  */
 @Suppress("TooManyFunctions")
-interface SettingsRepository : EventChannelSettings {
+interface SettingsRepository :
+    EventChannelSettings,
+    RelaySettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.

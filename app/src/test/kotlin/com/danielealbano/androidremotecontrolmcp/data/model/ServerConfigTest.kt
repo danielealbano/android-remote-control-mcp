@@ -92,6 +92,18 @@ class ServerConfigTest {
         }
 
         @Test
+        fun `default relayUrl is empty`() {
+            val config = ServerConfig()
+            assertEquals("", config.relayUrl)
+        }
+
+        @Test
+        fun `default relayDeviceToken is empty`() {
+            val config = ServerConfig()
+            assertEquals("", config.relayDeviceToken)
+        }
+
+        @Test
         fun `default deviceSlug is empty`() {
             val config = ServerConfig()
             assertEquals("", config.deviceSlug)
@@ -154,6 +166,11 @@ class ServerConfigTest {
         @Test
         fun `MAX_DEVICE_SLUG_LENGTH is 20`() {
             assertEquals(20, ServerConfig.MAX_DEVICE_SLUG_LENGTH)
+        }
+
+        @Test
+        fun `MIN_RELAY_DEVICE_TOKEN_LENGTH is 16`() {
+            assertEquals(16, ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH)
         }
 
         @Test
