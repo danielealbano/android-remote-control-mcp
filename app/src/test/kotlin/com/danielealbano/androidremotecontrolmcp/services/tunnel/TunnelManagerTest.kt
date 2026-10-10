@@ -29,6 +29,7 @@ class TunnelManagerTest {
     private val mockSettingsRepository = mockk<SettingsRepository>()
     private val mockCloudflareProvider = mockk<CloudflareTunnelProvider>(relaxed = true)
     private val mockNgrokProvider = mockk<NgrokTunnelProvider>(relaxed = true)
+    private val mockRelayProvider = mockk<RelayTunnelProvider>(relaxed = true)
 
     private val cloudflareFactory =
         mockk<Provider<CloudflareTunnelProvider>> {
@@ -40,6 +41,11 @@ class TunnelManagerTest {
             every { get() } returns mockNgrokProvider
         }
 
+    private val relayFactory =
+        mockk<Provider<RelayTunnelProvider>> {
+            every { get() } returns mockRelayProvider
+        }
+
     private val serverLog = RecordingServerLogRepository()
 
     private fun createManager(): TunnelManager =
@@ -47,6 +53,7 @@ class TunnelManagerTest {
             settingsRepository = mockSettingsRepository,
             cloudflareTunnelProviderFactory = cloudflareFactory,
             ngrokTunnelProviderFactory = ngrokFactory,
+            relayTunnelProviderFactory = relayFactory,
             serverLogRepository = serverLog,
         )
 
@@ -89,6 +96,25 @@ class TunnelManagerTest {
                 manager.start(8080)
 
                 coVerify { mockNgrokProvider.start(8080, config) }
+            }
+
+        @Test
+        fun `start with tunnel enabled and relay provider starts relay tunnel`() =
+            runTest {
+                val config =
+                    ServerConfig(
+                        tunnelEnabled = true,
+                        tunnelProvider = TunnelProviderType.RELAY,
+                    )
+                every { mockSettingsRepository.serverConfig } returns flowOf(config)
+                every { mockRelayProvider.status } returns
+                    MutableStateFlow(TunnelStatus.Disconnected)
+                coEvery { mockRelayProvider.start(8080, config) } just Runs
+
+                val manager = createManager()
+                manager.start(8080)
+
+                coVerify { mockRelayProvider.start(8080, config) }
             }
 
         @Test
