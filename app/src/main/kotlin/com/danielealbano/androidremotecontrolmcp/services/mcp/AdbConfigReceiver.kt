@@ -53,6 +53,8 @@ import javax.inject.Inject
  *   --es tunnel_provider "CLOUDFLARE" \
  *   --es ngrok_authtoken "your-ngrok-token" \
  *   --es ngrok_domain "your-domain.ngrok-free.app" \
+ *   --es relay_url "wss://relay.example.com" \
+ *   --es relay_device_token "your-relay-device-token" \
  *   --ei file_size_limit_mb 50 \
  *   --ez allow_http_downloads false \
  *   --ez allow_unverified_https_certs false \

@@ -68,6 +68,8 @@ class AdbConfigHandler(
         applyCloudflareTunnelExtraArgs(intent)
         applyNgrokAuthtoken(intent)
         applyNgrokDomain(intent)
+        applyRelayUrl(intent)
+        applyRelayDeviceToken(intent)
         applyFileSizeLimit(intent)
         applyAllowHttpDownloads(intent)
         applyAllowUnverifiedHttpsCerts(intent)
@@ -295,6 +297,33 @@ class AdbConfigHandler(
         Log.i(TAG, "ngrok domain updated to '$value'")
     }
 
+    private suspend fun applyRelayUrl(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_RELAY_URL)) return
+        val value = intent.getStringExtra(EXTRA_RELAY_URL) ?: ""
+        settingsRepository.validateRelayUrl(value).fold(
+            onSuccess = {
+                settingsRepository.updateRelayUrl(it)
+                Log.i(TAG, if (it.isEmpty()) "Relay URL cleared" else "Relay URL updated to $it")
+            },
+            onFailure = { Log.w(TAG, "Ignoring invalid relay_url: ${it.message}") },
+        )
+    }
+
+    private suspend fun applyRelayDeviceToken(intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_RELAY_DEVICE_TOKEN) ?: return
+        if (value.isEmpty()) {
+            Log.w(TAG, "Ignoring empty relay_device_token")
+            return
+        }
+        settingsRepository.validateRelayDeviceToken(value).fold(
+            onSuccess = {
+                settingsRepository.updateRelayDeviceToken(it)
+                Log.i(TAG, "Relay device token updated (length=${it.length})")
+            },
+            onFailure = { Log.w(TAG, "Ignoring invalid relay_device_token: ${it.message}") },
+        )
+    }
+
     private suspend fun applyFileSizeLimit(intent: Intent) {
         if (!intent.hasExtra(EXTRA_FILE_SIZE_LIMIT_MB)) return
         val value = intent.getIntExtra(EXTRA_FILE_SIZE_LIMIT_MB, -1)
@@ -419,6 +448,8 @@ class AdbConfigHandler(
         internal const val EXTRA_CLOUDFLARE_TUNNEL_EXTRA_ARGS = "cloudflare_tunnel_extra_args"
         internal const val EXTRA_NGROK_AUTHTOKEN = "ngrok_authtoken"
         internal const val EXTRA_NGROK_DOMAIN = "ngrok_domain"
+        internal const val EXTRA_RELAY_URL = "relay_url"
+        internal const val EXTRA_RELAY_DEVICE_TOKEN = "relay_device_token"
         internal const val EXTRA_FILE_SIZE_LIMIT_MB = "file_size_limit_mb"
         internal const val EXTRA_ALLOW_HTTP_DOWNLOADS = "allow_http_downloads"
         internal const val EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS = "allow_unverified_https_certs"

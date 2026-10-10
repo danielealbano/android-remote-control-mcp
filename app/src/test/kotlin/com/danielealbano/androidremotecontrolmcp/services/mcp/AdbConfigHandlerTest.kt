@@ -99,6 +99,23 @@ class AdbConfigHandlerTest {
                 else -> Result.failure(IllegalArgumentException("Invalid URL"))
             }
         }
+        every { settingsRepository.validateRelayUrl(any()) } answers {
+            val url = firstArg<String>()
+            when {
+                url.isBlank() -> Result.success("")
+                url.startsWith("ws://") || url.startsWith("wss://") -> Result.success(url)
+                else -> Result.failure(IllegalArgumentException("Relay URL must start with ws:// or wss://"))
+            }
+        }
+        every { settingsRepository.validateRelayDeviceToken(any()) } answers {
+            val token = firstArg<String>().trim()
+            when {
+                token.isEmpty() -> Result.success("")
+                token.length < ServerConfig.MIN_RELAY_DEVICE_TOKEN_LENGTH ->
+                    Result.failure(IllegalArgumentException("Relay device token must be at least 16 characters"))
+                else -> Result.success(token)
+            }
+        }
 
         storageLocationProvider = mockk(relaxUnitFun = true)
         coEvery { storageLocationProvider.isLocationAuthorized(any()) } returns false
@@ -570,6 +587,102 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify { settingsRepository.updateNgrokDomain("my-app.ngrok-free.app") }
+            }
+
+        @Test
+        @DisplayName("tunnel_provider RELAY is applied")
+        fun tunnelProviderRelay() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_TUNNEL_PROVIDER, "RELAY")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateTunnelProvider(TunnelProviderType.RELAY) }
+            }
+
+        @Test
+        @DisplayName("relay_url is applied")
+        fun relayUrl() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_URL, "wss://relay.example.com")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateRelayUrl("wss://relay.example.com") }
+            }
+
+        @Test
+        @DisplayName("empty relay_url clears setting")
+        fun emptyRelayUrlClears() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_URL, "")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateRelayUrl("") }
+            }
+
+        @Test
+        @DisplayName("invalid relay_url is ignored")
+        fun invalidRelayUrl() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_URL, "https://relay.example.com")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateRelayUrl(any()) }
+            }
+
+        @Test
+        @DisplayName("absent relay_url does not update setting")
+        fun absentRelayUrl() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_DEVICE_TOKEN, "0123456789abcdef")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateRelayUrl(any()) }
+            }
+
+        @Test
+        @DisplayName("relay_device_token is applied")
+        fun relayDeviceToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_DEVICE_TOKEN, "0123456789abcdef")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateRelayDeviceToken("0123456789abcdef") }
+            }
+
+        @Test
+        @DisplayName("empty relay_device_token is ignored")
+        fun emptyRelayDeviceToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_DEVICE_TOKEN, "")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateRelayDeviceToken(any()) }
+            }
+
+        @Test
+        @DisplayName("short relay_device_token is ignored")
+        fun shortRelayDeviceToken() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_RELAY_DEVICE_TOKEN, "short")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateRelayDeviceToken(any()) }
             }
     }
 
