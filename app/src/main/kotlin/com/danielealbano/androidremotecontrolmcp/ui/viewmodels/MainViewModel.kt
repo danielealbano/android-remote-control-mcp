@@ -107,6 +107,21 @@ class MainViewModel
         private val _cloudflareExtraArgsInput = MutableStateFlow("")
         val cloudflareExtraArgsInput: StateFlow<String> = _cloudflareExtraArgsInput.asStateFlow()
 
+        private val _relayUrlInput = MutableStateFlow("")
+        val relayUrlInput: StateFlow<String> = _relayUrlInput.asStateFlow()
+
+        private val _relayUrlError = MutableStateFlow<String?>(null)
+        val relayUrlError: StateFlow<String?> = _relayUrlError.asStateFlow()
+
+        private val _relayUrlInsecure = MutableStateFlow(false)
+        val relayUrlInsecure: StateFlow<Boolean> = _relayUrlInsecure.asStateFlow()
+
+        private val _relayDeviceTokenInput = MutableStateFlow("")
+        val relayDeviceTokenInput: StateFlow<String> = _relayDeviceTokenInput.asStateFlow()
+
+        private val _relayDeviceTokenError = MutableStateFlow<String?>(null)
+        val relayDeviceTokenError: StateFlow<String?> = _relayDeviceTokenError.asStateFlow()
+
         private val _storageLocations = MutableStateFlow<List<StorageLocation>>(emptyList())
         val storageLocations: StateFlow<List<StorageLocation>> = _storageLocations.asStateFlow()
 
@@ -151,6 +166,11 @@ class MainViewModel
                     _ngrokDomainInput.value = config.ngrokDomain
                     _cloudflareTokenInput.value = config.cloudflareTunnelToken
                     _cloudflareExtraArgsInput.value = config.cloudflareTunnelExtraArgs
+                    _relayUrlInput.value = config.relayUrl
+                    _relayUrlError.value = null
+                    _relayUrlInsecure.value = settingsRepository.isRelayUrlInsecure(config.relayUrl)
+                    _relayDeviceTokenInput.value = config.relayDeviceToken
+                    _relayDeviceTokenError.value = null
                     _fileSizeLimitInput.value = config.fileSizeLimitMb.toString()
                     _fileSizeLimitError.value = null
                     _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
@@ -343,6 +363,37 @@ class MainViewModel
             _cloudflareExtraArgsInput.value = extraArgs
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateCloudflareTunnelExtraArgs(extraArgs)
+            }
+        }
+
+        fun updateRelayUrl(url: String) {
+            _relayUrlInput.value = url
+
+            val result = settingsRepository.validateRelayUrl(url)
+            if (result.isFailure) {
+                _relayUrlError.value = result.exceptionOrNull()?.message
+                return
+            }
+
+            _relayUrlError.value = null
+            _relayUrlInsecure.value = settingsRepository.isRelayUrlInsecure(url)
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateRelayUrl(url)
+            }
+        }
+
+        fun updateRelayDeviceToken(token: String) {
+            _relayDeviceTokenInput.value = token
+
+            val result = settingsRepository.validateRelayDeviceToken(token)
+            if (result.isFailure) {
+                _relayDeviceTokenError.value = result.exceptionOrNull()?.message
+                return
+            }
+
+            _relayDeviceTokenError.value = null
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateRelayDeviceToken(token)
             }
         }
 

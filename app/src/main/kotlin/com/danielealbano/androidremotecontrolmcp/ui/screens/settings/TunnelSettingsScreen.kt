@@ -72,6 +72,11 @@ fun TunnelSettingsScreen(
     val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
     val cloudflareTokenInput by viewModel.cloudflareTokenInput.collectAsStateWithLifecycle()
     val cloudflareExtraArgsInput by viewModel.cloudflareExtraArgsInput.collectAsStateWithLifecycle()
+    val relayUrlInput by viewModel.relayUrlInput.collectAsStateWithLifecycle()
+    val relayUrlError by viewModel.relayUrlError.collectAsStateWithLifecycle()
+    val relayUrlInsecure by viewModel.relayUrlInsecure.collectAsStateWithLifecycle()
+    val relayDeviceTokenInput by viewModel.relayDeviceTokenInput.collectAsStateWithLifecycle()
+    val relayDeviceTokenError by viewModel.relayDeviceTokenError.collectAsStateWithLifecycle()
 
     val isEnabled =
         serverStatus !is ServerStatus.Running &&
@@ -170,6 +175,10 @@ fun TunnelSettingsScreen(
                                             TunnelProviderType.NGROK -> {
                                                 stringResource(R.string.remote_access_provider_ngrok)
                                             }
+
+                                            TunnelProviderType.RELAY -> {
+                                                stringResource(R.string.remote_access_provider_relay)
+                                            }
                                         },
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
@@ -183,6 +192,10 @@ fun TunnelSettingsScreen(
 
                                             TunnelProviderType.NGROK -> {
                                                 stringResource(R.string.remote_access_provider_ngrok_desc)
+                                            }
+
+                                            TunnelProviderType.RELAY -> {
+                                                stringResource(R.string.remote_access_provider_relay_desc)
                                             }
                                         },
                                     style = MaterialTheme.typography.bodySmall,
@@ -247,6 +260,27 @@ fun TunnelSettingsScreen(
                                 enabled = sectionEnabled,
                                 onAuthtokenChange = viewModel::updateNgrokAuthtoken,
                                 onDomainChange = viewModel::updateNgrokDomain,
+                            )
+                        }
+                    }
+
+                    // WebSocket relay fields
+                    AnimatedVisibility(visible = serverConfig.tunnelProvider == TunnelProviderType.RELAY) {
+                        Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            RelayUrlField(
+                                url = relayUrlInput,
+                                urlError = relayUrlError,
+                                insecure = relayUrlInsecure,
+                                enabled = sectionEnabled,
+                                onUrlChange = viewModel::updateRelayUrl,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            RelayTokenField(
+                                token = relayDeviceTokenInput,
+                                tokenError = relayDeviceTokenError,
+                                enabled = sectionEnabled,
+                                onTokenChange = viewModel::updateRelayDeviceToken,
                             )
                         }
                     }
@@ -325,6 +359,95 @@ private fun NgrokConfigFields(
                 Text(text = stringResource(R.string.remote_access_ngrok_domain_hint))
             },
             modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun RelayUrlField(
+    url: String,
+    urlError: String?,
+    insecure: Boolean,
+    enabled: Boolean,
+    onUrlChange: (String) -> Unit,
+) {
+    val insecureWarning = stringResource(R.string.remote_access_relay_insecure_warning)
+    val supporting = urlError ?: insecureWarning.takeIf { insecure }
+
+    Column {
+        Text(
+            text = stringResource(R.string.remote_access_relay_url_label),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = url,
+            onValueChange = onUrlChange,
+            singleLine = true,
+            enabled = enabled,
+            isError = urlError != null,
+            supportingText = supporting?.let { { Text(it) } },
+            placeholder = {
+                Text(text = stringResource(R.string.remote_access_relay_url_hint))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun RelayTokenField(
+    token: String,
+    tokenError: String?,
+    enabled: Boolean,
+    onTokenChange: (String) -> Unit,
+) {
+    var showToken by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            text = stringResource(R.string.remote_access_relay_token_label),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = token,
+            onValueChange = onTokenChange,
+            singleLine = true,
+            enabled = enabled,
+            isError = tokenError != null,
+            supportingText = tokenError?.let { { Text(it) } },
+            visualTransformation =
+                if (showToken) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+            trailingIcon = {
+                IconButton(onClick = { showToken = !showToken }) {
+                    Icon(
+                        imageVector =
+                            if (showToken) {
+                                Icons.Default.VisibilityOff
+                            } else {
+                                Icons.Default.Visibility
+                            },
+                        contentDescription =
+                            if (showToken) {
+                                stringResource(R.string.config_token_hide)
+                            } else {
+                                stringResource(R.string.config_token_show)
+                            },
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.remote_access_relay_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

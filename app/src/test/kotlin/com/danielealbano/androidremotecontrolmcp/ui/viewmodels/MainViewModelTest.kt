@@ -480,6 +480,114 @@ class MainViewModelTest {
         }
 
     @Test
+    fun `updateRelayUrl with valid url clears error and saves`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateRelayUrl("wss://relay.example.com")
+            advanceUntilIdle()
+
+            assertEquals("wss://relay.example.com", viewModel.relayUrlInput.value)
+            assertNull(viewModel.relayUrlError.value)
+            coVerify { settingsRepository.updateRelayUrl("wss://relay.example.com") }
+        }
+
+    @Test
+    fun `updateRelayUrl with empty url saves empty`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateRelayUrl("")
+            advanceUntilIdle()
+
+            assertNull(viewModel.relayUrlError.value)
+            coVerify { settingsRepository.updateRelayUrl("") }
+        }
+
+    @Test
+    fun `updateRelayUrl with invalid url sets error and does not save`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateRelayUrl("https://x") } returns
+                Result.failure(IllegalArgumentException("Relay URL must start with ws:// or wss://"))
+            viewModel.updateRelayUrl("https://x")
+            advanceUntilIdle()
+
+            assertEquals("https://x", viewModel.relayUrlInput.value)
+            assertEquals("Relay URL must start with ws:// or wss://", viewModel.relayUrlError.value)
+            coVerify(exactly = 0) { settingsRepository.updateRelayUrl(any()) }
+        }
+
+    @Test
+    fun `updateRelayUrl flags an insecure url`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.isRelayUrlInsecure("ws://relay.example.com") } returns true
+            viewModel.updateRelayUrl("ws://relay.example.com")
+            advanceUntilIdle()
+
+            assertTrue(viewModel.relayUrlInsecure.value)
+            assertNull(viewModel.relayUrlError.value)
+            coVerify { settingsRepository.updateRelayUrl("ws://relay.example.com") }
+        }
+
+    @Test
+    fun `updateRelayDeviceToken with valid token clears error and saves`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateRelayDeviceToken("0123456789abcdef")
+            advanceUntilIdle()
+
+            assertEquals("0123456789abcdef", viewModel.relayDeviceTokenInput.value)
+            assertNull(viewModel.relayDeviceTokenError.value)
+            coVerify { settingsRepository.updateRelayDeviceToken("0123456789abcdef") }
+        }
+
+    @Test
+    fun `updateRelayDeviceToken with short token sets error and does not save`() =
+        runTest {
+            advanceUntilIdle()
+
+            every { settingsRepository.validateRelayDeviceToken("short") } returns
+                Result.failure(IllegalArgumentException("Relay device token must be at least 16 characters"))
+            viewModel.updateRelayDeviceToken("short")
+            advanceUntilIdle()
+
+            assertEquals("short", viewModel.relayDeviceTokenInput.value)
+            assertEquals("Relay device token must be at least 16 characters", viewModel.relayDeviceTokenError.value)
+            coVerify(exactly = 0) { settingsRepository.updateRelayDeviceToken(any()) }
+        }
+
+    @Test
+    fun `serverConfig collection sets relay input fields`() =
+        runTest {
+            // Set relay fields BEFORE creating ViewModel so initial load picks them up
+            configFlow.value =
+                configFlow.value.copy(
+                    relayUrl = "wss://relay.example.com",
+                    relayDeviceToken = "0123456789abcdef",
+                )
+            viewModel =
+                MainViewModel(
+                    settingsRepository,
+                    tunnelManager,
+                    storageLocationProvider,
+                    batteryOptimizationManager,
+                    testDispatcher,
+                    approvalCoordinator,
+                )
+            advanceUntilIdle()
+
+            assertEquals("wss://relay.example.com", viewModel.relayUrlInput.value)
+            assertEquals("0123456789abcdef", viewModel.relayDeviceTokenInput.value)
+            assertNull(viewModel.relayUrlError.value)
+            assertNull(viewModel.relayDeviceTokenError.value)
+        }
+
+    @Test
     fun `updateCloudflareTunnelMode calls repository`() =
         runTest {
             advanceUntilIdle()

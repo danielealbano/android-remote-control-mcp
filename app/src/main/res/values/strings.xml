@@ -27,7 +27,7 @@
     <string name="settings_security_title">Security</string>
     <string name="settings_security_subtitle">HTTPS, certificate</string>
     <string name="settings_tunnel_title">Tunnel</string>
-    <string name="settings_tunnel_subtitle">Cloudflare, ngrok</string>
+    <string name="settings_tunnel_subtitle">Cloudflare, ngrok, WebSocket relay</string>
     <string name="settings_mcp_tools_title">MCP Tools</string>
     <string name="settings_mcp_tools_subtitle">Enable or disable tools</string>
     <string name="settings_mcp_tools_placeholder">Tool permissions — available in next update</string>
@@ -171,6 +171,13 @@
     <string name="remote_access_ngrok_authtoken_label">ngrok Authtoken</string>
     <string name="remote_access_ngrok_domain_label">Domain (optional)</string>
     <string name="remote_access_ngrok_domain_hint">Leave empty for auto-assigned</string>
+    <string name="remote_access_provider_relay">WebSocket relay</string>
+    <string name="remote_access_provider_relay_desc">Your own relay server</string>
+    <string name="remote_access_relay_url_label">Relay URL</string>
+    <string name="remote_access_relay_url_hint">wss://relay.example.com</string>
+    <string name="remote_access_relay_insecure_warning">Unencrypted ws:// URL: the device token and every client credential travel in cleartext. Use wss:// outside localhost or a private network.</string>
+    <string name="remote_access_relay_token_label">Relay device token</string>
+    <string name="remote_access_relay_help">The device opens an outbound WebSocket to the relay. MCP clients connect to the relay\'s HTTPS URL and every request is replayed to the local server.</string>
     <string name="remote_access_status_disconnected">Disconnected</string>
     <string name="remote_access_status_connecting">Connecting…</string>
     <string name="remote_access_status_connected">Connected</string>
