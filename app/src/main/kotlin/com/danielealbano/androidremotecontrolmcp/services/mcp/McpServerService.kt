@@ -192,6 +192,7 @@ class McpServerService : Service() {
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
     private var approvalObserverJob: Job? = null
+    private var accessibilityToolCallIndicator: AccessibilityToolCallIndicator? = null
 
     /**
      * Tracks whether the LAST [onStartCommand] action was an explicit stop. Lets [onDestroy] re-commit
@@ -446,7 +447,9 @@ class McpServerService : Service() {
         fileSizeLimitMb: Int,
         toolCallIndicatorEnabled: Boolean,
     ) {
-        val toolCallIndicator = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator())
+        val accessibilityIndicator = AccessibilityToolCallIndicator(coroutineScope, settingsRepository)
+        accessibilityToolCallIndicator = accessibilityIndicator
+        val toolCallIndicator = ReferenceCountedToolCallIndicator(accessibilityIndicator)
         toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
         val registrar =
             LoggedToolRegistrar(
@@ -552,6 +555,8 @@ class McpServerService : Service() {
     }
 
     override fun onDestroy() {
+        accessibilityToolCallIndicator?.close()
+        accessibilityToolCallIndicator = null
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
         privacyModeManager.shutdown()

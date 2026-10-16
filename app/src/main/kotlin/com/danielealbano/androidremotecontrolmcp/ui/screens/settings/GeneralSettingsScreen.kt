@@ -58,6 +58,8 @@ fun GeneralSettingsScreen(
     val portError by viewModel.portError.collectAsStateWithLifecycle()
     val deviceSlugInput by viewModel.deviceSlugInput.collectAsStateWithLifecycle()
     val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
+    val screenAwakeTimeoutInput by viewModel.screenAwakeTimeoutInput.collectAsStateWithLifecycle()
+    val screenAwakeTimeoutError by viewModel.screenAwakeTimeoutError.collectAsStateWithLifecycle()
 
     val isEnabled =
         serverStatus !is ServerStatus.Running &&
@@ -195,6 +197,21 @@ fun GeneralSettingsScreen(
                     enabled = isEnabled,
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = screenAwakeTimeoutInput,
+                onValueChange = viewModel::updateScreenAwakeTimeout,
+                label = { Text(stringResource(R.string.config_screen_awake_timeout_label)) },
+                supportingText = {
+                    Text(screenAwakeTimeoutError ?: stringResource(R.string.config_screen_awake_timeout_description))
+                },
+                isError = screenAwakeTimeoutError != null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

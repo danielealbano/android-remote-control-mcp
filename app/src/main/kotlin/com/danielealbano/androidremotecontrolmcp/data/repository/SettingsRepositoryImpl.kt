@@ -48,6 +48,7 @@ private val JWT_SIGNING_SECRET_KEY = stringPreferencesKey("jwt_signing_secret")
 private val AUTO_START_KEY = booleanPreferencesKey("auto_start_on_boot")
 private val HIDE_FROM_RECENTS_KEY = booleanPreferencesKey("hide_from_recents")
 private val TOOL_CALL_INDICATOR_ENABLED_KEY = booleanPreferencesKey("tool_call_indicator_enabled")
+private val SCREEN_AWAKE_TIMEOUT_KEY = intPreferencesKey("screen_awake_timeout_seconds")
 private val SERVER_RUNNING_KEY = booleanPreferencesKey("server_running")
 private val HTTPS_ENABLED_KEY = booleanPreferencesKey("https_enabled")
 private val CERTIFICATE_SOURCE_KEY = stringPreferencesKey("certificate_source")
@@ -76,6 +77,16 @@ private val AVAILABLE_UPDATE_VERSION_KEY = stringPreferencesKey("available_updat
 private val AVAILABLE_UPDATE_URL_KEY = stringPreferencesKey("available_update_url")
 private val NOTIFIED_UPDATE_VERSION_KEY = stringPreferencesKey("notified_update_version")
 private val LAST_AUTO_CHECK_AT_KEY = longPreferencesKey("last_auto_update_check_at_millis")
+
+private suspend fun persistScreenAwakeTimeout(
+    dataStore: DataStore<Preferences>,
+    seconds: Int,
+) {
+    require(seconds >= ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS) {
+        "Screen-awake timeout must be at least 60 seconds"
+    }
+    dataStore.edit { prefs -> prefs[SCREEN_AWAKE_TIMEOUT_KEY] = seconds }
+}
 
 /**
  * Regex pattern for valid hostnames.
@@ -113,6 +124,10 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         bearerToken = prefs[BEARER_TOKEN_KEY] ?: "",
         autoStartOnBoot = prefs[AUTO_START_KEY] ?: false,
         toolCallIndicatorEnabled = prefs[TOOL_CALL_INDICATOR_ENABLED_KEY] ?: true,
+        screenAwakeTimeoutSeconds =
+            (prefs.asMap()[SCREEN_AWAKE_TIMEOUT_KEY] as? Int)
+                ?.takeIf { it >= ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS }
+                ?: ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
         httpsEnabled = prefs[HTTPS_ENABLED_KEY] ?: false,
         certificateSource =
             CertificateSource.entries.firstOrNull { it.name == certificateSourceName }
@@ -401,6 +416,8 @@ class SettingsRepositoryImpl
 
         override val serverRunning: Flow<Boolean> =
             dataStore.data.map { prefs -> prefs[SERVER_RUNNING_KEY] ?: false }
+
+        override suspend fun updateScreenAwakeTimeout(seconds: Int) = persistScreenAwakeTimeout(dataStore, seconds)
 
         override suspend fun updateServerRunning(running: Boolean) {
             dataStore.edit { prefs -> prefs[SERVER_RUNNING_KEY] = running }

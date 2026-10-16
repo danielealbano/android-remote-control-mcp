@@ -42,6 +42,7 @@ data class ServerConfig(
     val bearerToken: String = "",
     val autoStartOnBoot: Boolean = false,
     val toolCallIndicatorEnabled: Boolean = true,
+    val screenAwakeTimeoutSeconds: Int = DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
     val httpsEnabled: Boolean = false,
     val certificateSource: CertificateSource = CertificateSource.AUTO_GENERATED,
     val certificateHostname: String = DEFAULT_CERTIFICATE_HOSTNAME,
@@ -67,6 +68,11 @@ data class ServerConfig(
     companion object {
         /** Default server port. */
         const val DEFAULT_PORT = 8080
+
+        /** Idle grace after the final MCP action, independent of the visual indicator. */
+        const val DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS = 180
+
+        const val MIN_SCREEN_AWAKE_TIMEOUT_SECONDS = 60
 
         /** Minimum valid port number. */
         const val MIN_PORT = 1

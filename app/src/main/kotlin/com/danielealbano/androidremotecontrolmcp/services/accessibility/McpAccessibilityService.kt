@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.InputMethod
+import android.app.KeyguardManager
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -12,6 +13,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -50,6 +52,8 @@ class McpAccessibilityService : AccessibilityService() {
     private var cacheInvalidationDebouncer: CacheInvalidationDebouncer? = null
 
     private var toolCallIndicatorView: View? = null
+
+    private var screenAwakeView: View? = null
 
     @Volatile
     private var currentPackageName: String? = null
@@ -117,6 +121,7 @@ class McpAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        setScreenAwakeInternal(false)
         Log.w(TAG, "Accessibility service interrupted")
     }
 
@@ -137,6 +142,7 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
+        setScreenAwakeInternal(false)
         instance = null
 
         super.onDestroy()
@@ -254,6 +260,36 @@ class McpAccessibilityService : AccessibilityService() {
                 windowManager.addView(textView, createToolCallIndicatorLayoutParams())
                 toolCallIndicatorView = textView
             }.onFailure { Log.w(TAG, "Could not show MCP tool-call indicator", it) }
+        }
+    }
+
+    private fun setScreenAwakeInternal(awake: Boolean) {
+        val windows = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (!awake) {
+            screenAwakeView?.let { view ->
+                runCatching { windows.removeView(view) }
+                    .onFailure { Log.w(TAG, "Could not remove screen-awake overlay", it) }
+            }
+            screenAwakeView = null
+        } else if (screenAwakeView == null) {
+            val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            if (power.isInteractive && !keyguard.isKeyguardLocked) {
+                val view = View(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+                val params =
+                    WindowManager.LayoutParams(
+                        1,
+                        1,
+                        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                        PixelFormat.TRANSLUCENT,
+                    )
+                runCatching { windows.addView(view, params) }
+                    .onSuccess { screenAwakeView = view }
+                    .onFailure { Log.w(TAG, "Could not keep the unlocked screen awake", it) }
+            }
         }
     }
 
@@ -422,6 +458,19 @@ class McpAccessibilityService : AccessibilityService() {
         @Volatile
         var inputMethodInstance: McpInputMethod? = null
             private set
+
+        fun setScreenAwake(awake: Boolean) {
+            val service = instance ?: return
+            val action =
+                Runnable {
+                    if (instance === service) service.setScreenAwakeInternal(awake)
+                }
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                action.run()
+            } else {
+                Handler(Looper.getMainLooper()).post(action)
+            }
+        }
 
         fun showToolCallIndicator(toolName: String) {
             if (instance == null) return

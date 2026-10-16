@@ -111,6 +111,9 @@ interface SettingsRepository : EventChannelSettings {
     /** Enables or disables the on-device MCP tool-call activity indicator. */
     suspend fun updateToolCallIndicatorEnabled(enabled: Boolean)
 
+    /** Persists the screen-awake idle grace; at least 60 seconds. */
+    suspend fun updateScreenAwakeTimeout(seconds: Int)
+
     /**
      * Observes the persisted server-running intent flag (`true` after ACTION_START, `false` after
      * ACTION_STOP). Used by restart triggers to decide whether to bring the MCP server back up.

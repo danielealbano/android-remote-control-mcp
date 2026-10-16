@@ -1,4 +1,6 @@
 <resources>
+    <string name="config_screen_awake_timeout_label">Keep screen awake after MCP actions (seconds)</string>
+    <string name="config_screen_awake_timeout_description">Default 180 seconds; minimum 60. Keeps an already unlocked screen on during actions and the idle grace. Does not unlock or wake the phone.</string>
     <string name="app_name">Android Remote Control MCP</string>
     <string name="share_target_label">Android Remote Control MCP</string>
 
