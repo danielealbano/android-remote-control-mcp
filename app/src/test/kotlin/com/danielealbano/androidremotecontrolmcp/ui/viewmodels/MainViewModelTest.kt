@@ -116,6 +116,32 @@ class MainViewModelTest {
             )
     }
 
+    @Test
+    fun `screen awake input validates without writing invalid values`() =
+        runTest {
+            advanceUntilIdle()
+            listOf("", "abc", "-1", "59", "2147483648").forEach { input ->
+                viewModel.updateScreenAwakeTimeout(input)
+                advanceUntilIdle()
+                assertTrue(viewModel.screenAwakeTimeoutError.value != null)
+            }
+            coVerify(exactly = 0) { settingsRepository.updateScreenAwakeTimeout(any()) }
+            viewModel.updateScreenAwakeTimeout("60")
+            advanceUntilIdle()
+            assertNull(viewModel.screenAwakeTimeoutError.value)
+            coVerify(exactly = 1) { settingsRepository.updateScreenAwakeTimeout(60) }
+        }
+
+    @Test
+    fun `screen awake input follows persisted config updates`() =
+        runTest {
+            advanceUntilIdle()
+            assertEquals("180", viewModel.screenAwakeTimeoutInput.value)
+            configFlow.value = configFlow.value.copy(screenAwakeTimeoutSeconds = 300)
+            advanceUntilIdle()
+            assertEquals("300", viewModel.screenAwakeTimeoutInput.value)
+        }
+
     @AfterEach
     fun tearDown() {
         Dispatchers.resetMain()

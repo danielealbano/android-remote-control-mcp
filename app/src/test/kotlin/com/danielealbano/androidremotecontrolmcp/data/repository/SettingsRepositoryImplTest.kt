@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -88,6 +89,29 @@ class SettingsRepositoryImplTest {
     fun tearDown() {
         unmockkStatic(Log::class)
     }
+
+    @Test
+    fun `screen awake defaults and persists independently of visual indicator`() =
+        testScope.runTest {
+            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            repository.updateScreenAwakeTimeout(60)
+            repository.updateToolCallIndicatorEnabled(false)
+            assertEquals(60, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            assertFalse(repository.getServerConfig().toolCallIndicatorEnabled)
+            assertEquals(60, dataStore.data.first()[intPreferencesKey("screen_awake_timeout_seconds")])
+            val invalidUpdate = runCatching { repository.updateScreenAwakeTimeout(59) }.exceptionOrNull()
+            assertTrue(invalidUpdate is IllegalArgumentException)
+            assertEquals(60, repository.getServerConfig().screenAwakeTimeoutSeconds)
+        }
+
+    @Test
+    fun `invalid persisted screen awake timeout falls back to default`() =
+        testScope.runTest {
+            dataStore.edit { it[intPreferencesKey("screen_awake_timeout_seconds")] = -1 }
+            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            dataStore.edit { it[stringPreferencesKey("screen_awake_timeout_seconds")] = "bad" }
+            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+        }
 
     @Nested
     @DisplayName("getServerConfig")
