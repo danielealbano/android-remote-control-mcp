@@ -6,7 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Main-thread lifecycle: active calls hold the screen; the final completion starts the idle grace. */
+/** Main-thread lifecycle using the same uptime clock as coroutine delay; zero disables holding. */
 internal class ScreenAwakeController(
     private val scope: CoroutineScope,
     private val nowMillis: () -> Long,
@@ -19,9 +19,9 @@ internal class ScreenAwakeController(
 
     fun started() {
         releaseJob?.cancel()
-        active = true
+        active = timeoutSeconds > 0
         finishedAt = null
-        setAwake(true)
+        if (active) setAwake(true)
     }
 
     fun finished() {
@@ -34,11 +34,15 @@ internal class ScreenAwakeController(
 
     fun updateTimeout(seconds: Int) {
         val valid =
-            seconds.takeIf { it >= ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS }
+            seconds.takeIf(ServerConfig::isValidScreenAwakeTimeout)
                 ?: ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS
         if (valid != timeoutSeconds) {
             timeoutSeconds = valid
-            if (!active && finishedAt != null) scheduleRelease()
+            if (valid == 0) {
+                stop()
+            } else if (!active && finishedAt != null) {
+                scheduleRelease()
+            }
         }
     }
 

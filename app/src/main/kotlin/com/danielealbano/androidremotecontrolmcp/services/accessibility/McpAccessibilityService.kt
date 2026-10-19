@@ -3,7 +3,6 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.InputMethod
-import android.app.KeyguardManager
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -13,7 +12,6 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -53,7 +51,8 @@ class McpAccessibilityService : AccessibilityService() {
 
     private var toolCallIndicatorView: View? = null
 
-    private var screenAwakeView: View? = null
+    private var screenAwakeOverlay: ScreenAwakeOverlay? = null
+    private val screenStateObserver = ScreenStateObserver(this) { screenAwakeOverlay?.refresh() }
 
     @Volatile
     private var currentPackageName: String? = null
@@ -76,11 +75,16 @@ class McpAccessibilityService : AccessibilityService() {
             )
 
         configureServiceInfo()
+        val awakeOverlay = ScreenAwakeOverlay(this)
+        screenAwakeOverlay = awakeOverlay
+        screenAwakeConnection.connect(awakeOverlay)
+        screenStateObserver.start()
 
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        screenAwakeOverlay?.refresh()
         if (event == null) return
 
         when (event.eventType) {
@@ -121,7 +125,6 @@ class McpAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        setScreenAwakeInternal(false)
         Log.w(TAG, "Accessibility service interrupted")
     }
 
@@ -142,8 +145,10 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
-        setScreenAwakeInternal(false)
-        instance = null
+        screenStateObserver.close()
+        screenAwakeOverlay?.let(screenAwakeConnection::disconnect)
+        screenAwakeOverlay = null
+        if (instance === this) instance = null
 
         super.onDestroy()
     }
@@ -260,36 +265,6 @@ class McpAccessibilityService : AccessibilityService() {
                 windowManager.addView(textView, createToolCallIndicatorLayoutParams())
                 toolCallIndicatorView = textView
             }.onFailure { Log.w(TAG, "Could not show MCP tool-call indicator", it) }
-        }
-    }
-
-    private fun setScreenAwakeInternal(awake: Boolean) {
-        val windows = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        if (!awake) {
-            screenAwakeView?.let { view ->
-                runCatching { windows.removeView(view) }
-                    .onFailure { Log.w(TAG, "Could not remove screen-awake overlay", it) }
-            }
-            screenAwakeView = null
-        } else if (screenAwakeView == null) {
-            val power = getSystemService(Context.POWER_SERVICE) as PowerManager
-            val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            if (power.isInteractive && !keyguard.isKeyguardLocked) {
-                val view = View(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-                val params =
-                    WindowManager.LayoutParams(
-                        1,
-                        1,
-                        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-                        PixelFormat.TRANSLUCENT,
-                    )
-                runCatching { windows.addView(view, params) }
-                    .onSuccess { screenAwakeView = view }
-                    .onFailure { Log.w(TAG, "Could not keep the unlocked screen awake", it) }
-            }
         }
     }
 
@@ -459,31 +434,26 @@ class McpAccessibilityService : AccessibilityService() {
         var inputMethodInstance: McpInputMethod? = null
             private set
 
-        fun setScreenAwake(awake: Boolean) {
-            val service = instance ?: return
-            val action =
-                Runnable {
-                    if (instance === service) service.setScreenAwakeInternal(awake)
-                }
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                action.run()
-            } else {
-                Handler(Looper.getMainLooper()).post(action)
-            }
-        }
+        private val screenAwakeConnection = ScreenAwakeConnection(::dispatchAccessibilityAction)
+
+        fun setScreenAwake(awake: Boolean) = screenAwakeConnection.setRequested(awake)
 
         fun showToolCallIndicator(toolName: String) {
-            if (instance == null) return
-            Handler(Looper.getMainLooper()).post {
-                instance?.showToolCallIndicatorInternal(toolName)
+            val service = instance ?: return
+            dispatchAccessibilityAction {
+                if (instance === service) {
+                    runCatching { service.showToolCallIndicatorInternal(toolName) }
+                        .onFailure { Log.w(TAG, "Could not show MCP tool-call indicator", it) }
+                }
             }
         }
 
         fun hideToolCallIndicator() {
             val service = instance ?: return
-            Handler(Looper.getMainLooper()).post {
+            dispatchAccessibilityAction {
                 if (instance === service) {
-                    service.removeToolCallIndicator()
+                    runCatching { service.removeToolCallIndicator() }
+                        .onFailure { Log.w(TAG, "Could not hide MCP tool-call indicator", it) }
                 }
             }
         }

@@ -125,6 +125,11 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 Log.i(TAG, "Hide from recents updated to $hideFromRecents")
             }
             applyAuthFlags(intent)
+            if (intent.hasExtra(EXTRA_TOOL_CALL_INDICATOR_ENABLED)) {
+                settingsRepository.updateToolCallIndicatorEnabled(
+                    intent.getBooleanExtra(EXTRA_TOOL_CALL_INDICATOR_ENABLED, true),
+                )
+            }
             applyDownloadSettings(intent)
             val storageLocationId = intent.getStringExtra(EXTRA_STORAGE_LOCATION_ID)
             if (!storageLocationId.isNullOrEmpty()) {
@@ -195,6 +200,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
         private const val EXTRA_BINDING_ADDRESS = "binding_address"
         private const val EXTRA_PORT = "port"
         private const val EXTRA_AUTO_START_ON_BOOT = "auto_start_on_boot"
+        private const val EXTRA_TOOL_CALL_INDICATOR_ENABLED = "tool_call_indicator_enabled"
         private const val EXTRA_HIDE_FROM_RECENTS = "hide_from_recents"
         private const val EXTRA_STORAGE_LOCATION_ID = "storage_location_id"
         private const val EXTRA_STORAGE_ALLOW_WRITE = "storage_allow_write"

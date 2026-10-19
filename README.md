@@ -341,6 +341,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
 | Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
+| Screen-awake timeout | 0 (disabled) | Keep an already unlocked screen awake during MCP calls and for 60-172800 seconds after the last call. Read at server start; editing is disabled while running. |
 
 ### Using with adb Port Forwarding
 
@@ -491,6 +492,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `allow_http_downloads` | boolean | Allow non-HTTPS downloads |
 | `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |
 | `download_timeout_seconds` | int | Download timeout (10-300) |
+| `screen_awake_timeout_seconds` | int | Keep an unlocked screen awake during MCP calls and for this many seconds afterward. Default 0 (disabled); enabled range 60-172800. Requires server restart. |
 | `device_slug` | string | Device identifier for tool name prefix |
 | `tool_permissions` | string (JSON) | Per-tool and per-parameter permissions: `{"disabled_tools":["tool_name"],"disabled_params":{"tool_name":["param"]}}` |
 | `storage_location_id` | string | ID of an existing storage location (from `android_list_storage_locations` or Settings > Storage); required by the two extras below, unknown IDs are ignored |

@@ -78,16 +78,6 @@ private val AVAILABLE_UPDATE_URL_KEY = stringPreferencesKey("available_update_ur
 private val NOTIFIED_UPDATE_VERSION_KEY = stringPreferencesKey("notified_update_version")
 private val LAST_AUTO_CHECK_AT_KEY = longPreferencesKey("last_auto_update_check_at_millis")
 
-private suspend fun persistScreenAwakeTimeout(
-    dataStore: DataStore<Preferences>,
-    seconds: Int,
-) {
-    require(seconds >= ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS) {
-        "Screen-awake timeout must be at least 60 seconds"
-    }
-    dataStore.edit { prefs -> prefs[SCREEN_AWAKE_TIMEOUT_KEY] = seconds }
-}
-
 /**
  * Regex pattern for valid hostnames.
  *
@@ -125,8 +115,9 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         autoStartOnBoot = prefs[AUTO_START_KEY] ?: false,
         toolCallIndicatorEnabled = prefs[TOOL_CALL_INDICATOR_ENABLED_KEY] ?: true,
         screenAwakeTimeoutSeconds =
-            (prefs.asMap()[SCREEN_AWAKE_TIMEOUT_KEY] as? Int)
-                ?.takeIf { it >= ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS }
+            runCatching { prefs[SCREEN_AWAKE_TIMEOUT_KEY] }
+                .getOrNull()
+                ?.takeIf(ServerConfig::isValidScreenAwakeTimeout)
                 ?: ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
         httpsEnabled = prefs[HTTPS_ENABLED_KEY] ?: false,
         certificateSource =
@@ -417,8 +408,6 @@ class SettingsRepositoryImpl
         override val serverRunning: Flow<Boolean> =
             dataStore.data.map { prefs -> prefs[SERVER_RUNNING_KEY] ?: false }
 
-        override suspend fun updateScreenAwakeTimeout(seconds: Int) = persistScreenAwakeTimeout(dataStore, seconds)
-
         override suspend fun updateServerRunning(running: Boolean) {
             dataStore.edit { prefs -> prefs[SERVER_RUNNING_KEY] = running }
         }
@@ -554,6 +543,18 @@ class SettingsRepositoryImpl
             ) { o, n ->
                 "Download timeout changed $o → $n s"
             }
+
+        override suspend fun updateScreenAwakeTimeout(seconds: Int) {
+            validateScreenAwakeTimeout(seconds).getOrThrow()
+            logScalarChange(
+                SCREEN_AWAKE_TIMEOUT_KEY,
+                "screen_awake_timeout_seconds",
+                seconds,
+                ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
+            ) { old, new -> "Screen-awake timeout changed $old to $new s" }
+        }
+
+        override fun validateScreenAwakeTimeout(seconds: Int): Result<Int> = validateScreenAwakeTimeoutValue(seconds)
 
         override suspend fun updateDeviceSlug(slug: String) =
             logScalarChange(DEVICE_SLUG_KEY, "device_slug", slug, "") { o, n -> "Device slug changed $o → $n" }
@@ -706,17 +707,7 @@ class SettingsRepositoryImpl
             dataStore.edit { prefs -> prefs[LAST_AUTO_CHECK_AT_KEY] = millis }
         }
 
-        override fun validateDownloadTimeout(seconds: Int): Result<Int> =
-            if (seconds in ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS..ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS) {
-                Result.success(seconds)
-            } else {
-                Result.failure(
-                    IllegalArgumentException(
-                        "Download timeout must be between ${ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS} and " +
-                            "${ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS} seconds",
-                    ),
-                )
-            }
+        override fun validateDownloadTimeout(seconds: Int): Result<Int> = validateDownloadTimeoutValue(seconds)
 
         @Suppress("ReturnCount")
         override fun validateDeviceSlug(slug: String): Result<String> {
@@ -912,4 +903,29 @@ class SettingsRepositoryImpl
 
             return Result.success(hostname)
         }
+    }
+
+private fun validateScreenAwakeTimeoutValue(seconds: Int): Result<Int> =
+    if (ServerConfig.isValidScreenAwakeTimeout(seconds)) {
+        Result.success(seconds)
+    } else {
+        Result.failure(
+            IllegalArgumentException(
+                "Screen-awake timeout must be 0 (disabled) or between " +
+                    "${ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS} and " +
+                    "${ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS} seconds",
+            ),
+        )
+    }
+
+private fun validateDownloadTimeoutValue(seconds: Int): Result<Int> =
+    if (seconds in ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS..ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS) {
+        Result.success(seconds)
+    } else {
+        Result.failure(
+            IllegalArgumentException(
+                "Download timeout must be between ${ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS} and " +
+                    "${ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS} seconds",
+            ),
+        )
     }

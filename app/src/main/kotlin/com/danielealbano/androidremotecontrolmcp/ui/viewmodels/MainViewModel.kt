@@ -187,13 +187,10 @@ class MainViewModel
         fun updateScreenAwakeTimeout(input: String) {
             _screenAwakeTimeoutInput.value = input
             val seconds = input.toIntOrNull()
+            val result = seconds?.let(settingsRepository::validateScreenAwakeTimeout)
             _screenAwakeTimeoutError.value =
-                when {
-                    seconds == null -> "Enter a whole number of seconds"
-                    seconds < ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS -> "Must be at least 60 seconds"
-                    else -> null
-                }
-            if (seconds != null && _screenAwakeTimeoutError.value == null) {
+                if (result == null) "Enter a whole number of seconds" else result.exceptionOrNull()?.message
+            if (seconds != null && result?.isSuccess == true) {
                 viewModelScope.launch(ioDispatcher) {
                     settingsRepository.updateScreenAwakeTimeout(seconds)
                 }

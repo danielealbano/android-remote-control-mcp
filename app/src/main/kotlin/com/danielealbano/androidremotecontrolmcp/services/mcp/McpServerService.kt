@@ -29,7 +29,6 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -52,11 +51,11 @@ import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpToolCallIndicators
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
@@ -86,6 +85,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,6 +93,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
@@ -192,7 +193,7 @@ class McpServerService : Service() {
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
     private var approvalObserverJob: Job? = null
-    private var accessibilityToolCallIndicator: AccessibilityToolCallIndicator? = null
+    private var toolCallIndicators: McpToolCallIndicators? = null
 
     /**
      * Tracks whether the LAST [onStartCommand] action was an explicit stop. Lets [onDestroy] re-commit
@@ -246,7 +247,7 @@ class McpServerService : Service() {
     }
 
     @Suppress("TooGenericExceptionCaught", "LongMethod")
-    private suspend fun startServer() {
+    internal suspend fun startServer() {
         try {
             updateStatus(ServerStatus.Starting)
 
@@ -314,6 +315,7 @@ class McpServerService : Service() {
                 effectivePerms,
                 config.fileSizeLimitMb,
                 config.toolCallIndicatorEnabled,
+                config.screenAwakeTimeoutSeconds,
             )
 
             // Create and start the Ktor server
@@ -415,6 +417,10 @@ class McpServerService : Service() {
 
             Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
         } catch (e: Exception) {
+            withContext(NonCancellable + Dispatchers.Main.immediate) {
+                toolCallIndicators?.close()
+                toolCallIndicators = null
+            }
             Log.e(TAG, "Failed to start MCP server", e)
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
             serverActive.set(false)
@@ -446,10 +452,11 @@ class McpServerService : Service() {
         perms: ToolPermissionsConfig,
         fileSizeLimitMb: Int,
         toolCallIndicatorEnabled: Boolean,
+        screenAwakeTimeoutSeconds: Int,
     ) {
-        val accessibilityIndicator = AccessibilityToolCallIndicator(coroutineScope, settingsRepository)
-        accessibilityToolCallIndicator = accessibilityIndicator
-        val toolCallIndicator = ReferenceCountedToolCallIndicator(accessibilityIndicator)
+        val indicators = McpToolCallIndicators(coroutineScope, screenAwakeTimeoutSeconds)
+        toolCallIndicators = indicators
+        val toolCallIndicator = ReferenceCountedToolCallIndicator(indicators)
         toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
         val registrar =
             LoggedToolRegistrar(
@@ -555,8 +562,8 @@ class McpServerService : Service() {
     }
 
     override fun onDestroy() {
-        accessibilityToolCallIndicator?.close()
-        accessibilityToolCallIndicator = null
+        toolCallIndicators?.close()
+        toolCallIndicators = null
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
         privacyModeManager.shutdown()

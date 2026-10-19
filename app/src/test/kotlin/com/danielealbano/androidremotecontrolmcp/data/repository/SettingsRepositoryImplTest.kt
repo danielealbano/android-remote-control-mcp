@@ -93,7 +93,7 @@ class SettingsRepositoryImplTest {
     @Test
     fun `screen awake defaults and persists independently of visual indicator`() =
         testScope.runTest {
-            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            assertEquals(0, repository.getServerConfig().screenAwakeTimeoutSeconds)
             repository.updateScreenAwakeTimeout(60)
             repository.updateToolCallIndicatorEnabled(false)
             assertEquals(60, repository.getServerConfig().screenAwakeTimeoutSeconds)
@@ -108,9 +108,25 @@ class SettingsRepositoryImplTest {
     fun `invalid persisted screen awake timeout falls back to default`() =
         testScope.runTest {
             dataStore.edit { it[intPreferencesKey("screen_awake_timeout_seconds")] = -1 }
-            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            assertEquals(0, repository.getServerConfig().screenAwakeTimeoutSeconds)
             dataStore.edit { it[stringPreferencesKey("screen_awake_timeout_seconds")] = "bad" }
-            assertEquals(180, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            assertEquals(0, repository.getServerConfig().screenAwakeTimeoutSeconds)
+        }
+
+    @Test
+    fun `screen awake accepts off and endpoints and rejects out of range values`() =
+        testScope.runTest {
+            listOf(0, 60, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS).forEach { seconds ->
+                assertTrue(repository.validateScreenAwakeTimeout(seconds).isSuccess)
+                repository.updateScreenAwakeTimeout(seconds)
+                assertEquals(seconds, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            }
+            listOf(-1, 1, 59, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS + 1, Int.MAX_VALUE).forEach {
+                assertTrue(repository.validateScreenAwakeTimeout(it).isFailure)
+                assertTrue(runCatching { repository.updateScreenAwakeTimeout(it) }.isFailure)
+                dataStore.edit { prefs -> prefs[intPreferencesKey("screen_awake_timeout_seconds")] = it }
+                assertEquals(0, repository.getServerConfig().screenAwakeTimeoutSeconds)
+            }
         }
 
     @Nested

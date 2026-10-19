@@ -708,6 +708,7 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
 - **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)
 - **Download Timeout**: 60 seconds (range 10-300 seconds, configurable via UI)
+- **Screen-awake timeout**: 0 (disabled); nonzero range 60-172800 seconds (48 hours). Opt in via General settings or the `screen_awake_timeout_seconds` ADB extra. Read at server start; editing is disabled while running. Keeps an already unlocked screen awake during calls and for the configured idle grace. Never wakes or unlocks the device.
 - **Device Slug** (`String`, default: `""`): Optional device identifier used as part of the MCP tool name prefix. When empty, tools use the `android_` prefix. When set (e.g., `pixel7`), tools use `android_pixel7_` prefix. Valid characters: letters (a-z, A-Z), digits (0-9), underscores (_). Maximum length: 20 characters.
 
 ### MCP Defaults

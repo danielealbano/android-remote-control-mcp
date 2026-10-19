@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.loggedToolHandler
@@ -24,6 +25,7 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             val indicator =
                 ReferenceCountedToolCallIndicator(
                     object : ToolCallIndicator {
@@ -44,10 +46,11 @@ class ScreenAwakeControllerTest {
         }
 
     @Test
-    fun `active action never expires and final completion receives full default grace`() =
+    fun `active action never expires and final completion receives full configured grace`() =
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             controller.started()
             advanceTimeBy(400_000)
             assertTrue(awake)
@@ -65,6 +68,7 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             controller.started()
             controller.finished()
             runCurrent()
@@ -85,10 +89,12 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             controller.started()
             controller.finished()
             runCurrent()
             advanceTimeBy(90_000)
+            assertTrue(awake)
             controller.updateTimeout(60)
             assertFalse(awake)
         }
@@ -98,6 +104,7 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             controller.started()
             controller.finished()
             runCurrent()
@@ -116,9 +123,13 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             controller.started()
+            assertTrue(awake)
             controller.stop()
+            assertFalse(awake)
             controller.finished()
+            assertFalse(awake)
             advanceTimeBy(180_000)
             runCurrent()
             assertFalse(awake)
@@ -129,6 +140,7 @@ class ScreenAwakeControllerTest {
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
+            controller.updateTimeout(180)
             val indicator =
                 ReferenceCountedToolCallIndicator(
                     object : ToolCallIndicator {
@@ -150,23 +162,27 @@ class ScreenAwakeControllerTest {
         }
 
     @Test
-    fun `invalid timeout uses default and maximum integer seconds does not overflow`() =
+    fun `disabled default and invalid or excessive timeouts never hold screen`() =
         runTest {
             var awake = false
             val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(-1)
+            listOf(0, -1, 59, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS + 1, Int.MAX_VALUE).forEach {
+                controller.updateTimeout(it)
+                controller.started()
+                assertFalse(awake)
+                controller.finished()
+                runCurrent()
+                assertFalse(awake)
+            }
+            controller.updateTimeout(ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS)
             controller.started()
+            assertTrue(awake)
             controller.finished()
             runCurrent()
-            advanceTimeBy(180_000)
+            advanceTimeBy(ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS * 1000L - 1)
+            assertTrue(awake)
+            advanceTimeBy(1)
             runCurrent()
             assertFalse(awake)
-            controller.updateTimeout(Int.MAX_VALUE)
-            controller.started()
-            controller.finished()
-            runCurrent()
-            advanceTimeBy(180_000)
-            assertTrue(awake)
-            controller.stop()
         }
 }

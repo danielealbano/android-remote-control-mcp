@@ -111,7 +111,7 @@ interface SettingsRepository : EventChannelSettings {
     /** Enables or disables the on-device MCP tool-call activity indicator. */
     suspend fun updateToolCallIndicatorEnabled(enabled: Boolean)
 
-    /** Persists the screen-awake idle grace; at least 60 seconds. */
+    /** Persists a validated screen-awake idle grace; zero disables it. */
     suspend fun updateScreenAwakeTimeout(seconds: Int)
 
     /**
@@ -215,6 +215,9 @@ interface SettingsRepository : EventChannelSettings {
      * @return [Result.success] with the validated timeout, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateDownloadTimeout(seconds: Int): Result<Int>
+
+    /** Validates zero (disabled) or the configured nonzero screen-awake timeout range. */
+    fun validateScreenAwakeTimeout(seconds: Int): Result<Int>
 
     /**
      * Validates a device slug string.

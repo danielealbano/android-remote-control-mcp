@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
@@ -205,8 +206,16 @@ fun GeneralSettingsScreen(
                 onValueChange = viewModel::updateScreenAwakeTimeout,
                 label = { Text(stringResource(R.string.config_screen_awake_timeout_label)) },
                 supportingText = {
-                    Text(screenAwakeTimeoutError ?: stringResource(R.string.config_screen_awake_timeout_description))
+                    Text(
+                        screenAwakeTimeoutError ?: stringResource(
+                            R.string.config_screen_awake_timeout_description,
+                            ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                            ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                            ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                        ),
+                    )
                 },
+                enabled = isEnabled,
                 isError = screenAwakeTimeoutError != null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
