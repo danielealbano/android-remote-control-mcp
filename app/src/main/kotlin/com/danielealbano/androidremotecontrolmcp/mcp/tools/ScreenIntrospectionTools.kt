@@ -28,6 +28,7 @@ import com.danielealbano.androidremotecontrolmcp.services.screencapture.Screensh
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -73,6 +74,7 @@ class GetScreenStateHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val includeScreenshot = parseIncludeScreenshot(arguments)
             val cursorElement = arguments?.get("cursor")
+            val fingerprintParam = arguments?.get("fingerprint")?.jsonPrimitive?.contentOrNull
             // Absent, JSON null, or a blank string ⇒ fresh cursorless capture (settled behavior 1).
             // A present, non-blank value (INCLUDING a non-primitive object/array) ⇒ paged path,
             // where an unusable value yields INVALID_CURSOR_MESSAGE guidance rather than throwing.
@@ -81,7 +83,7 @@ class GetScreenStateHandler
                     cursorElement is JsonNull ||
                     ((cursorElement as? JsonPrimitive)?.contentOrNull?.isBlank() == true)
             return if (isFresh) {
-                handleFreshRequest(includeScreenshot)
+                handleFreshRequest(includeScreenshot, fingerprintParam)
             } else {
                 McpToolUtils.untrustedTextResult(buildPagedText(cursorElement, includeScreenshot))
             }
@@ -94,7 +96,19 @@ class GetScreenStateHandler
                 false
             }
 
-        private suspend fun handleFreshRequest(includeScreenshot: Boolean): CallToolResult {
+        /**
+         * Fresh (cursorless) capture with optional delta-gating via [fingerprintParam].
+         *
+         * When the client passes the `fingerprint` it received on the previous call and the
+         * on-screen tree is unchanged, the response is a tiny "UNCHANGED" blob instead of a
+         * full tree — the common case when polling after an action. The fingerprint is a
+         * deterministic hash over the compact node rows, so any UI change (text, bounds,
+         * visibility, flags, window set) produces a different fingerprint.
+         */
+        private suspend fun handleFreshRequest(
+            includeScreenshot: Boolean,
+            fingerprintParam: String?,
+        ): CallToolResult {
             // getFreshWindows clears the framework accessibility cache before reading (see there),
             // so this fresh capture — and the node cache it populates for element/action tools —
             // round-trips live even for stale-prone WebView content.
@@ -110,13 +124,73 @@ class GetScreenStateHandler
             val screenInfo = accessibilityServiceProvider.getScreenInfo()
             val totalKept = compactTreeFormatter.countKeptNodes(result)
             val totalPages = ceilDiv(totalKept, CompactTreeFormatter.PAGE_SIZE)
-            val compactOutput = buildFreshPageText(result, screenInfo, totalKept, totalPages)
-            Log.d(TAG, "get_screen_state: includeScreenshot=$includeScreenshot pages=$totalPages")
-            return if (includeScreenshot) {
-                buildScreenshotResult(result, screenInfo, compactOutput, processed.flaggedBounds)
-            } else {
-                McpToolUtils.untrustedTextResult(compactOutput)
+            val fingerprint = computeFingerprint(result, screenInfo)
+            // Delta gate: if the client's fingerprint matches the current tree, nothing changed.
+            if (fingerprintParam != null && fingerprintParam == fingerprint) {
+                Log.d(TAG, "get_screen_state: UNCHANGED (fingerprint match)")
+                return McpToolUtils.untrustedTextResult(
+                    buildJsonObject {
+                        put("changed", false)
+                        put("fingerprint", fingerprint)
+                    }.let { Json.encodeToString(it) },
+                )
             }
+            val compactOutput = buildFreshPageText(result, screenInfo, totalKept, totalPages)
+            Log.d(TAG, "get_screen_state: includeScreenshot=$includeScreenshot pages=$totalPages changed=true")
+            return if (includeScreenshot) {
+                buildScreenshotResult(result, screenInfo, compactOutput, processed.flaggedBounds, fingerprint)
+            } else {
+                McpToolUtils.untrustedTextResult(
+                    buildJsonObject {
+                        put("changed", true)
+                        put("fingerprint", fingerprint)
+                        put("state", compactOutput)
+                    }.let { Json.encodeToString(it) },
+                )
+            }
+        }
+
+        /**
+         * Deterministic fingerprint over the kept node rows of every window. Nodes are
+         * sorted by (window id, node id) so row order never flips the hash between parses.
+         */
+        private fun computeFingerprint(
+            result: MultiWindowResult,
+            screenInfo: ScreenInfo,
+        ): String {
+            val rows = mutableListOf<String>()
+            rows += "screen:${screenInfo.width}x${screenInfo.height}"
+            for (window in result.windows) {
+                rows += "win:${window.windowId}:${window.packageName}:${window.focused}"
+                collectNodeRows(window.tree, rows)
+            }
+            rows.sort()
+            return Integer.toHexString(rows.hashCode())
+        }
+
+        private fun collectNodeRows(
+            node: AccessibilityNodeData,
+            out: MutableList<String>,
+        ) {
+            out += nodeRow(node)
+            for (child in node.children) {
+                collectNodeRows(child, out)
+            }
+        }
+
+        private fun nodeRow(node: AccessibilityNodeData): String {
+            val b = node.bounds
+            return listOf(
+                node.id,
+                node.className,
+                node.text,
+                node.contentDescription,
+                node.resourceId,
+                "${b.left},${b.top},${b.right},${b.bottom}",
+                node.visible.toString(),
+                node.clickable.toString(),
+                node.editable.toString(),
+            ).joinToString("\u0001")
         }
 
         private fun buildFreshPageText(
@@ -184,6 +258,7 @@ class GetScreenStateHandler
             screenInfo: ScreenInfo,
             compactOutput: String,
             flaggedBounds: List<BoundsData>,
+            fingerprint: String,
         ): CallToolResult {
             if (!screenCaptureProvider.isScreenCaptureAvailable()) {
                 throw McpToolException.PermissionDenied(
@@ -230,7 +305,11 @@ class GetScreenStateHandler
                     )
 
                 return McpToolUtils.untrustedTextAndImageResult(
-                    compactOutput,
+                    buildJsonObject {
+                        put("changed", true)
+                        put("fingerprint", fingerprint)
+                        put("state", compactOutput)
+                    }.let { Json.encodeToString(it) },
                     screenshotData.data,
                     "image/jpeg",
                 )
@@ -316,6 +395,17 @@ class GetScreenStateHandler
                                             "starting at page 1. A cursor is tied to one screen " +
                                             "snapshot; if the screen changed you will be told to " +
                                             "request a fresh one.",
+                                    )
+                                }
+                                putJsonObject("fingerprint") {
+                                    put("type", "string")
+                                    put(
+                                        "description",
+                                        "Delta gate: pass the 'fingerprint' value from the previous " +
+                                            "fresh (cursorless) response. If the on-screen tree is " +
+                                            "unchanged the server returns {\"changed\":false, \"fingerprint\":...} " +
+                                            "instead of a full tree — use this when polling to avoid " +
+                                            "re-reading identical state.",
                                     )
                                 }
                             },
