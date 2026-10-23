@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.notifications
 import android.app.Notification
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.service.notification.StatusBarNotification
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import java.util.concurrent.ConcurrentHashMap
@@ -21,10 +22,14 @@ object NotificationDataExtractor {
             appNameCache.getOrPut(sbn.packageName) {
                 val pm = context.packageManager
                 try {
-                    pm
-                        .getApplicationLabel(
-                            pm.getApplicationInfo(sbn.packageName, PackageManager.ApplicationInfoFlags.of(0)),
-                        ).toString()
+                    val appInfo =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            pm.getApplicationInfo(sbn.packageName, PackageManager.ApplicationInfoFlags.of(0))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.getApplicationInfo(sbn.packageName, 0)
+                        }
+                    pm.getApplicationLabel(appInfo).toString()
                 } catch (_: PackageManager.NameNotFoundException) {
                     Logger.d(TAG, "App not found for ${sbn.packageName}, using package name")
                     sbn.packageName

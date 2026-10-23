@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 
@@ -55,14 +56,22 @@ object PermissionUtils {
     /**
      * Checks whether the `POST_NOTIFICATIONS` runtime permission is granted.
      *
+     * Android 12 (API 31/32) port: POST_NOTIFICATIONS only exists from API 33 on;
+     * below that, notifications are posted without a runtime grant, so this returns
+     * `true` unconditionally on API < 33.
+     *
      * @param context Application context.
      * @return `true` if notification permission is granted, `false` otherwise.
      */
     fun isNotificationPermissionGranted(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            true
+        } else {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        }
 
     /**
      * Checks whether the `CAMERA` runtime permission is granted.

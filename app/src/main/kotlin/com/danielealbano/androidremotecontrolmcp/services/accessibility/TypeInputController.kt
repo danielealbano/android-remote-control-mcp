@@ -4,12 +4,12 @@ import android.view.KeyEvent
 import android.view.inputmethod.SurroundingText
 
 /**
- * Abstraction over AccessibilityInputConnection operations for natural text input.
- * Wraps the InputMethod API (API 33+) provided by the AccessibilityService
- * with FLAG_INPUT_METHOD_EDITOR.
+ * Abstraction over input connection operations for natural text input.
+ * API 33+ uses the AccessibilityService InputMethod API with FLAG_INPUT_METHOD_EDITOR;
+ * API 31/32 uses the classic InputMethodService fallback.
  *
- * Implementations access the real AccessibilityInputConnection via
- * McpAccessibilityService's InputMethod instance.
+ * Implementations access either the AccessibilityInputConnection via McpAccessibilityService
+ * or the classic InputConnection via McpInputMethodService.
  *
  * **Threading**: The AccessibilityInputConnection obtained from InputMethod is an
  * IPC proxy managed by the accessibility framework — it is NOT a View-bound

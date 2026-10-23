@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -239,6 +240,12 @@ class McpAccessibilityService : AccessibilityService() {
         )
     }
 
+    /**
+     * Android 12 (API 31/32) port: the framework only invokes this override on API 33+
+     * (the base AccessibilityService.onCreateInputMethod did not exist before 33), so the
+     * whole method is @RequiresApi(TIRAMISU) — no guard needed, and never called below 33.
+     */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreateInputMethod(): InputMethod {
         val method = McpInputMethod(this)
         inputMethodInstance = method
@@ -375,16 +382,30 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Drops the framework's accessibility node cache for this service via [clearCache] (public
-     * since API 33; minSdk is 33). See [AccessibilityServiceProvider.clearFrameworkNodeCache] for
+     * since API 33). See [AccessibilityServiceProvider.clearFrameworkNodeCache] for
      * why this is needed to defeat stale WebView reads after JavaScript DOM changes.
+     *
+     * Android 12 (API 31/32) port: [AccessibilityService.clearCache] does not exist below
+     * API 33 — guard the call. On 31/32 the framework cache cannot be flushed this way; the
+     * caller's own [invalidateCache] (our id→node cache) still works, so this is a best-effort
+     * no-op rather than a crash.
      *
      * This is distinct from [invalidateCache], which flushes our own id→node [nodeCache]; this
      * clears the framework-side cache that backs [rootInActiveWindow]/[getWindows] traversal.
      */
     fun clearFrameworkNodeCache() {
-        clearCache()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clearCache()
+        }
     }
 
+    /**
+     * API 33+ only: android.accessibilityservice.InputMethod (and its
+     * AccessibilityInputConnection) do not exist below API 33, and
+     * [McpAccessibilityService.onCreateInputMethod] never creates [McpInputMethod] below
+     * 33, so this class can never be instantiated on API < 33.
+     */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
     class McpInputMethod(
         service: AccessibilityService,
     ) : InputMethod(service)

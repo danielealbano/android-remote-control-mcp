@@ -103,6 +103,8 @@ class NotificationProviderImplTest {
                 PackageManager.ApplicationInfoFlags.of(0),
             )
         } returns appInfo
+        @Suppress("DEPRECATION")
+        every { mockPackageManager.getApplicationInfo(packageName, 0) } returns appInfo
         every { mockPackageManager.getApplicationLabel(appInfo) } returns "Test App"
 
         return mockk<StatusBarNotification> {
@@ -820,6 +822,10 @@ class NotificationProviderImplTest {
                         "com.unknown.app",
                         PackageManager.ApplicationInfoFlags.of(0),
                     )
+                } throws PackageManager.NameNotFoundException()
+                @Suppress("DEPRECATION")
+                every {
+                    mockPackageManager.getApplicationInfo("com.unknown.app", 0)
                 } throws PackageManager.NameNotFoundException()
 
                 val sbn =
