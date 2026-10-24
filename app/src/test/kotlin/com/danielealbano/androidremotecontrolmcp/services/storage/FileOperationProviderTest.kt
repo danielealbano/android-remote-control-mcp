@@ -19,8 +19,11 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -882,7 +885,7 @@ class FileOperationProviderTest {
                         provider.downloadFromUrl("loc1", "file.txt", "http://example.com/file.txt")
                     }
                 assertTrue(exception.message!!.contains("HTTP downloads are not allowed"))
-                verify(exactly = 0) { mockDownloadHttpClient.open(any(), any()) }
+                coVerify(exactly = 0) { mockDownloadHttpClient.download<Any?>(any(), any(), any()) }
             }
 
         @Test
@@ -909,7 +912,7 @@ class FileOperationProviderTest {
                 coEvery { mockSettingsRepository.getServerConfig() } returns
                     ServerConfig(fileSizeLimitMb = 1, allowHttpDownloads = true)
                 val response = FakeDownloadResponse(200, 2L * BYTES_PER_MB)
-                every { mockDownloadHttpClient.open(any(), any()) } returns response
+                mockDownloadHttpClient.stubDownload(response)
 
                 // Act & Assert
                 val exception =
@@ -928,7 +931,7 @@ class FileOperationProviderTest {
                 coEvery { mockSettingsRepository.getServerConfig() } returns
                     ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB, allowHttpDownloads = true)
                 val response = FakeDownloadResponse(200, 5L, ByteArrayInputStream("hello".toByteArray()))
-                every { mockDownloadHttpClient.open(any(), any()) } returns response
+                mockDownloadHttpClient.stubDownload(response)
                 val (_, outputStream) = setupDestinationFile()
 
                 // Act
@@ -952,15 +955,19 @@ class FileOperationProviderTest {
                         blockLocalNetworkDownloads = true,
                     )
                 coEvery { mockSettingsRepository.getServerConfig() } returns config
-                every { mockDownloadHttpClient.open(any(), any()) } returns FakeDownloadResponse(200, 0L)
+                mockDownloadHttpClient.stubDownload(FakeDownloadResponse(200, 0L))
                 setupDestinationFile()
 
                 // Act
                 provider.downloadFromUrl("loc1", "file.txt", "https://example.com/file.txt")
 
                 // Assert
-                verify {
-                    mockDownloadHttpClient.open(match { it.toString() == "https://example.com/file.txt" }, config)
+                coVerify {
+                    mockDownloadHttpClient.download<Any?>(
+                        match { it.toString() == "https://example.com/file.txt" },
+                        config,
+                        any(),
+                    )
                 }
             }
 
@@ -971,8 +978,9 @@ class FileOperationProviderTest {
                 setupAuthorizedLocation("loc1")
                 coEvery { mockSettingsRepository.getServerConfig() } returns
                     ServerConfig(fileSizeLimitMb = 1, allowHttpDownloads = true)
-                every { mockDownloadHttpClient.open(any(), any()) } returns
-                    FakeDownloadResponse(200, -1L, ByteArrayInputStream(ByteArray(BYTES_PER_MB + 1)))
+                mockDownloadHttpClient.stubDownload(
+                    FakeDownloadResponse(200, -1L, ByteArrayInputStream(ByteArray(BYTES_PER_MB + 1))),
+                )
                 val (mockFile, _) = setupDestinationFile(deletable = true)
 
                 // Act & Assert
@@ -992,7 +1000,7 @@ class FileOperationProviderTest {
                 coEvery { mockSettingsRepository.getServerConfig() } returns
                     ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
                 val response = FakeDownloadResponse(404)
-                every { mockDownloadHttpClient.open(any(), any()) } returns response
+                mockDownloadHttpClient.stubDownload(response)
 
                 // Act & Assert
                 val exception =
@@ -1029,7 +1037,7 @@ class FileOperationProviderTest {
                         }
                     }
                 val response = FakeDownloadResponse(200, -1L, failingBody)
-                every { mockDownloadHttpClient.open(any(), any()) } returns response
+                mockDownloadHttpClient.stubDownload(response)
                 val (mockFile, _) = setupDestinationFile(deletable = true)
 
                 // Act & Assert
@@ -1043,13 +1051,43 @@ class FileOperationProviderTest {
             }
 
         @Test
+        fun `a cancelled downloadFromUrl stops, deletes the partial file and stays a cancellation`() =
+            runBlocking {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+                coEvery { mockSettingsRepository.getServerConfig() } returns
+                    ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+                lateinit var request: Job
+                mockDownloadHttpClient.stubDownload(FakeDownloadResponse(200, -1L, cancellingBody { request.cancel() }))
+                val (mockFile, _) = setupDestinationFile(deletable = true)
+                var outcome: Throwable? = null
+
+                // Act
+                request =
+                    launch {
+                        try {
+                            provider.downloadFromUrl("loc1", "file.txt", "https://example.com/file.txt")
+                        } catch (e: CancellationException) {
+                            outcome = e
+                            throw e
+                        }
+                    }
+                request.join()
+
+                // Assert
+                assertTrue(request.isCancelled)
+                assertTrue(outcome is CancellationException, "the cancellation became $outcome")
+                verify { mockFile.delete() }
+            }
+
+        @Test
         fun `downloadFromUrl reports a blocked local network connection without creating the file`() =
             runTest {
                 // Arrange
                 setupAuthorizedLocation("loc1")
                 coEvery { mockSettingsRepository.getServerConfig() } returns
                     ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB, blockLocalNetworkDownloads = true)
-                every { mockDownloadHttpClient.open(any(), any()) } throws
+                coEvery { mockDownloadHttpClient.download<Any?>(any(), any(), any()) } throws
                     LocalNetworkDownloadBlockedException(InetSocketAddress("192.168.1.1", 443))
 
                 // Act & Assert
@@ -1096,7 +1134,7 @@ class FileOperationProviderTest {
             coEvery { mockSettingsRepository.getServerConfig() } returns
                 ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
             var downloadThread: String? = null
-            every { mockDownloadHttpClient.open(any(), any()) } answers {
+            coEvery { mockDownloadHttpClient.download<Any?>(any(), any(), any()) } answers {
                 downloadThread = Thread.currentThread().name
                 throw IOException("offline")
             }

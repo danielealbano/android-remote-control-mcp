@@ -17,13 +17,17 @@ import javax.net.ssl.SNIHostName
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 
-/** [allowLocalTargets]: only the debug edge override may point a dial-back at a loopback/link-local address. */
+/**
+ * [allowLocalTargets]: only the debug edge override may point a dial-back at a loopback/link-local address.
+ * [keepalive] is applied to every connected dial-back socket (see [ArcTunnelKeepalive]).
+ */
 class ArcTunnelDialBack(
     private val controlHost: String,
     private val mtls: SSLContext,
     private val serverTls: SSLContext,
     private val allowLocalTargets: Boolean = false,
     private val timeoutMs: Long = TIMEOUT_MS,
+    private val keepalive: (Socket) -> Unit = ArcTunnelKeepalive::enable,
 ) {
     /**
      * [socket] is what the splice reads/writes (the TLS socket when `use_https`); [raw] is the registered
@@ -101,6 +105,8 @@ class ArcTunnelDialBack(
         require(allowLocalTargets || !isLocalTarget(address)) { "dial-back target $host is not allowed" }
         raw.tcpNoDelay = true
         raw.connect(InetSocketAddress(address, port), timeoutMs.toInt())
+        // The stream may stay silent for a whole tool call: keepalive detects a path that died meanwhile
+        keepalive(raw)
         raw.soTimeout = timeoutMs.toInt()
         val socket = if (target.useHttps) tls(raw, port, if (target.useMtls) mtls else serverTls) else raw
         val request =

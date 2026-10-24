@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfi
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.effectiveBaseUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpBasePlugins
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpStatelessTransport
@@ -253,7 +254,7 @@ object McpIntegrationTestHelper {
         perms: ToolPermissionsConfig = ToolPermissionsConfig(),
     ) {
         val toolNamePrefix = McpToolUtils.buildToolNamePrefix(deviceSlug)
-        val registrar = LoggedToolRegistrar(server, deps.serverLog)
+        val registrar = LoggedToolRegistrar(server, deps.serverLog, inFlightToolCalls = deps.inFlightToolCalls)
         registerScreenIntrospectionTools(
             registrar,
             deps.treeParser,
@@ -434,7 +435,7 @@ object McpIntegrationTestHelper {
                     expectedToken = TEST_BEARER_TOKEN
                     onAuthFailure = { deps.serverLog.log(ServerLogEntry.Type.AUTH, "Authentication failed from $it") }
                 }
-                installMcpStatelessTransport { sdkServer }
+                installMcpStatelessTransport(inFlightToolCalls = deps.inFlightToolCalls) { sdkServer }
             }
 
             val httpClient =
@@ -492,7 +493,7 @@ object McpIntegrationTestHelper {
                     this.oauthEnabled = oauthEnabled
                     onAuthFailure = { deps.serverLog.log(ServerLogEntry.Type.AUTH, "Authentication failed from $it") }
                 }
-                installMcpStatelessTransport { sdkServer }
+                installMcpStatelessTransport(inFlightToolCalls = deps.inFlightToolCalls) { sdkServer }
             }
 
             testBlock(deps)
@@ -572,7 +573,10 @@ object McpIntegrationTestHelper {
                         ),
                     )
                 }
-                installMcpStatelessTransport(publicUrlOverride = publicUrlOverride) { sdkServer }
+                installMcpStatelessTransport(
+                    publicUrlOverride = publicUrlOverride,
+                    inFlightToolCalls = deps.inFlightToolCalls,
+                ) { sdkServer }
             }
 
             val httpClient =
@@ -619,4 +623,6 @@ data class MockDependencies(
     val privacyToolGate: PrivacyToolGate,
     val placeholderSubstitutor: PlaceholderSubstitutor,
     val serverLog: RecordingServerLogRepository = RecordingServerLogRepository(),
+    /** The running tool calls, shared by the tool registration and the transport as in production. */
+    val inFlightToolCalls: InFlightToolCalls = InFlightToolCalls(),
 )

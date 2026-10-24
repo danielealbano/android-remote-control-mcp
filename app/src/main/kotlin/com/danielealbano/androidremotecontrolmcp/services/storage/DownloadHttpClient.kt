@@ -1,6 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import okhttp3.Call
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -15,7 +23,7 @@ import java.net.URL
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/** An open download response, whatever its status; the caller MUST close it. */
+/** An open download response, whatever its status. */
 interface DownloadResponse : Closeable {
     /** The HTTP status code. */
     val code: Int
@@ -30,14 +38,19 @@ interface DownloadResponse : Closeable {
 /** Sends the GET request of `download_from_url`, applying the download settings of a [ServerConfig]. */
 interface DownloadHttpClient {
     /**
-     * Requests [url] and returns the response once its headers arrived. Throws [IOException] when no
-     * response could be obtained, including [LocalNetworkDownloadBlockedException] when
-     * [ServerConfig.blockLocalNetworkDownloads] refused a connection.
+     * Requests [url] and, once the response headers arrived, returns what [onResponse] makes of the response,
+     * whatever its status; the response is closed afterwards. Throws [IOException] when no response could be
+     * obtained, including [LocalNetworkDownloadBlockedException] when [ServerConfig.blockLocalNetworkDownloads]
+     * refused a connection.
+     *
+     * Cancelling the calling coroutine stops the download at once, also while a read waits for data: the request is
+     * cancelled, which closes its connection, so the blocked read fails and [onResponse] ends.
      */
-    fun open(
+    suspend fun <T> download(
         url: URL,
         config: ServerConfig,
-    ): DownloadResponse
+        onResponse: suspend (DownloadResponse) -> T,
+    ): T
 }
 
 /**
@@ -48,29 +61,64 @@ interface DownloadHttpClient {
  * Otherwise it behaves as the platform `HttpURLConnection` did before: redirects followed within the same scheme only
  * (http to https and back are not), every TLS version and cipher suite the platform enables, HTTP/1.1, and the
  * platform User-Agent.
+ *
+ * The blocking request and [DownloadHttpClient.download]'s `onResponse` run on [ioDispatcher].
  */
 class DownloadHttpClientImpl
     internal constructor(
         /** The addresses "Block Local Network Downloads" refuses; another predicate is for tests only. */
         private val isBlockedAddress: (InetAddress) -> Boolean,
+        private val ioDispatcher: CoroutineDispatcher,
     ) : DownloadHttpClient {
         @Inject
-        constructor() : this(::isLocalNetworkAddress)
+        constructor(
+            @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        ) : this(::isLocalNetworkAddress, ioDispatcher)
 
-        override fun open(
+        override suspend fun <T> download(
             url: URL,
             config: ServerConfig,
-        ): DownloadResponse {
+            onResponse: suspend (DownloadResponse) -> T,
+        ): T {
             val client = buildClient(config)
-            val request =
-                Request
-                    .Builder()
-                    .url(url)
-                    .apply { platformUserAgent()?.let { header(USER_AGENT_HEADER, it) } }
-                    .build()
+            val call =
+                client.newCall(
+                    Request
+                        .Builder()
+                        .url(url)
+                        .apply { platformUserAgent()?.let { header(USER_AGENT_HEADER, it) } }
+                        .build(),
+                )
+            return coroutineScope {
+                // The transfer blocks its own thread while this coroutine only waits for it, so a cancellation
+                // reaches the catch below at once: cancelling the call closes the connection under any blocked read.
+                val transfer =
+                    async(ioDispatcher) {
+                        try {
+                            execute(call, client).use { response -> onResponse(response) }
+                        } catch (e: IOException) {
+                            // Once cancelled, the failure of the closed connection IS the cancellation: report it as
+                            // such, or this real exception would replace the cancellation for the caller
+                            currentCoroutineContext().ensureActive()
+                            throw e
+                        }
+                    }
+                try {
+                    transfer.await()
+                } catch (e: CancellationException) {
+                    call.cancel()
+                    throw e
+                }
+            }
+        }
+
+        private fun execute(
+            call: Call,
+            client: OkHttpClient,
+        ): DownloadResponse {
             val response =
                 try {
-                    client.newCall(request).execute()
+                    call.execute()
                 } catch (e: IOException) {
                     client.connectionPool.evictAll()
                     throw e

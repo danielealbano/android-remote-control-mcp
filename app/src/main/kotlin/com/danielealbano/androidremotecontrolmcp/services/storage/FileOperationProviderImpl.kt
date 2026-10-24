@@ -12,7 +12,10 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -347,7 +350,7 @@ class FileOperationProviderImpl
                 val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
 
                 try {
-                    downloadHttpClient.open(parsedUrl, config).use { response ->
+                    downloadHttpClient.download(parsedUrl, config) { response ->
                         val responseCode = response.code
                         if (responseCode !in HTTP_SUCCESS_RANGE) {
                             throw McpToolException.ActionFailed(
@@ -368,7 +371,7 @@ class FileOperationProviderImpl
                         val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
 
                         // Stream to file, checking cumulative size.
-                        // Wrap in try-catch to clean up the orphan file on any error.
+                        // Wrap in try-catch to clean up the orphan file on any error, cancellation included.
                         var totalBytesWritten = 0L
                         try {
                             context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
@@ -376,6 +379,8 @@ class FileOperationProviderImpl
                                     val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
                                     var bytesRead: Int
                                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                        // A cancelled download stops here (a blocked read fails instead)
+                                        currentCoroutineContext().ensureActive()
                                         totalBytesWritten += bytesRead
                                         if (totalBytesWritten > limitBytes) {
                                             // Clean up partial file
@@ -401,8 +406,11 @@ class FileOperationProviderImpl
                         }
 
                         Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
-                        return@withContext totalBytesWritten
+                        totalBytesWritten
                     }
+                } catch (e: CancellationException) {
+                    // A cancelled download is not a failed one
+                    throw e
                 } catch (e: McpToolException) {
                     throw e
                 } catch (e: Exception) {
@@ -728,7 +736,6 @@ class FileOperationProviderImpl
          * Writes content to a file URI, attempting advisory file lock for local providers.
          * Falls back to a plain write if locking is unsupported by the provider.
          */
-        @Suppress("NestedBlockDepth")
         private fun writeWithOptionalLock(
             uri: Uri,
             content: String,

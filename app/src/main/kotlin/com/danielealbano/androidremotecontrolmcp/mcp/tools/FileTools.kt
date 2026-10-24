@@ -9,6 +9,7 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocatio
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -605,6 +606,9 @@ class DownloadFromUrlHandler
                 McpToolUtils.textResult(
                     "File downloaded successfully. Size: $downloadedBytes bytes. Saved to: $locationId/$path",
                 )
+            } catch (e: CancellationException) {
+                // A cancelled download stays a cancellation, never a failed download
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {

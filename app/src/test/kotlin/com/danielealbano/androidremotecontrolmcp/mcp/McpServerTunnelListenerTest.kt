@@ -67,6 +67,7 @@ class McpServerTunnelListenerTest {
                     mockk(relaxed = true),
                 ),
                 RecordingServerLogRepository(),
+                InFlightToolCalls(),
             )
     }
 

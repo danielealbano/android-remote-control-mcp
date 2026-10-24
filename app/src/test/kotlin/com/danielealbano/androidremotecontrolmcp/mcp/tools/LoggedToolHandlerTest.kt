@@ -189,7 +189,7 @@ class LoggedToolHandlerTest {
         }
 
     @Test
-    fun `cancelled invocation records no entry`() =
+    fun `cancelled invocation logs the constant cancelled marker`() =
         runTest {
             val recorder = RecordingServerLogRepository()
             val handler =
@@ -202,6 +202,27 @@ class LoggedToolHandlerTest {
             advanceTimeBy(100)
             job.cancelAndJoin()
 
-            assertTrue(recorder.ofType(ServerLogEntry.Type.TOOL_CALL).isEmpty())
+            val entry = recorder.ofType(ServerLogEntry.Type.TOOL_CALL).single()
+            assertEquals("cancelled", entry.message)
+            assertEquals("tap", entry.toolName)
+        }
+
+    @Test
+    fun `cancelled invocation logs the cancelled marker even when the tool turns the cancellation into a result`() =
+        runTest {
+            val recorder = RecordingServerLogRepository()
+            val handler =
+                loggedToolHandler(recorder, "tap") {
+                    val waited = runCatching { delay(10_000) }
+                    CallToolResult(content = listOf(TextContent(text = "gave up")), isError = waited.isFailure)
+                }
+
+            val job = launch { handler(request) }
+            advanceTimeBy(100)
+            job.cancelAndJoin()
+
+            val entry = recorder.ofType(ServerLogEntry.Type.TOOL_CALL).single()
+            assertEquals("cancelled", entry.message)
+            assertEquals("tap", entry.toolName)
         }
 }

@@ -7,32 +7,39 @@ import android.provider.MediaStore
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.net.URL
 
 /**
  * Streams an HTTP(S) download into a pending MediaStore entry, clearing IS_PENDING on
- * success and deleting the entry on any failure.
+ * success and deleting the entry on any failure or cancellation.
  */
 internal class MediaStoreDownloader(
     private val context: Context,
     private val downloadHttpClient: DownloadHttpClient,
 ) {
     @Suppress("TooGenericExceptionCaught")
-    fun downloadToPendingUri(
+    suspend fun downloadToPendingUri(
         insertUri: Uri,
         parsedUrl: URL,
         url: String,
         config: ServerConfig,
         logContext: String,
-    ): Long {
+    ): Long =
         try {
-            downloadHttpClient.open(parsedUrl, config).use { response ->
+            downloadHttpClient.download(parsedUrl, config) { response ->
                 validateResponse(response, url, config)
                 val totalBytesWritten = streamToDestination(response, insertUri, config)
                 markDownloadComplete(insertUri)
                 Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $logContext")
-                return totalBytesWritten
+                totalBytesWritten
             }
+        } catch (e: CancellationException) {
+            // A cancelled download is not a failed one: drop the partial entry and let the cancellation through
+            context.contentResolver.delete(insertUri, null, null)
+            throw e
         } catch (e: McpToolException) {
             context.contentResolver.delete(insertUri, null, null)
             throw e
@@ -43,7 +50,6 @@ internal class MediaStoreDownloader(
                 e,
             )
         }
-    }
 
     private fun validateResponse(
         response: DownloadResponse,
@@ -67,7 +73,7 @@ internal class MediaStoreDownloader(
         }
     }
 
-    private fun streamToDestination(
+    private suspend fun streamToDestination(
         response: DownloadResponse,
         insertUri: Uri,
         config: ServerConfig,
@@ -79,6 +85,8 @@ internal class MediaStoreDownloader(
                 val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
                 var bytesRead: Int
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    // A cancelled download stops here (a blocked read fails instead)
+                    currentCoroutineContext().ensureActive()
                     totalBytesWritten += bytesRead
                     if (totalBytesWritten > limitBytes) {
                         throw McpToolException.ActionFailed(

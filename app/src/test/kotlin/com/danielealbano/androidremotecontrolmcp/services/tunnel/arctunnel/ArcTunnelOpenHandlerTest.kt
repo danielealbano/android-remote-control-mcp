@@ -32,6 +32,7 @@ class ArcTunnelOpenHandlerTest {
             SSLContext.getDefault(),
             SSLContext.getDefault(),
             allowLocalTargets = true,
+            keepalive = {},
         )
 
     @AfterEach

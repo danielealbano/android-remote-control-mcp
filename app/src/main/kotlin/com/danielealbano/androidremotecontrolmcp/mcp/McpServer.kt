@@ -58,6 +58,8 @@ class HttpsMaterial(
  * @param ephemeralFileLinkService Backs the unauthenticated `/s/{token}` capability-link route.
  * @param oauth The OAuth authorization-server collaborators (used only when `config.oauthEnabled`).
  * @param serverLog Disk-backed server log sink (auth-failure and, via collaborators, OAuth events).
+ * @param inFlightToolCalls The running tool calls `notifications/cancelled` cancels; MUST be the instance the tools
+ *   are registered with.
  */
 class McpServer(
     private val config: ServerConfig,
@@ -66,6 +68,7 @@ class McpServer(
     private val ephemeralFileLinkService: EphemeralFileLinkService,
     private val oauth: OAuthServerDeps,
     private val serverLog: ServerLogRepository,
+    private val inFlightToolCalls: InFlightToolCalls,
 ) : TunnelListenerHost {
     @Volatile
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
@@ -301,7 +304,10 @@ class McpServer(
 
         // MCP Stateless Streamable HTTP transport at /mcp, plus the per-request base-URL element
         // scoped to that route. See installMcpStatelessTransport for the rationale.
-        installMcpStatelessTransport(publicUrlOverride = config.publicUrlOverride) {
+        installMcpStatelessTransport(
+            publicUrlOverride = config.publicUrlOverride,
+            inFlightToolCalls = inFlightToolCalls,
+        ) {
             mcpSdkServer
         }
     }

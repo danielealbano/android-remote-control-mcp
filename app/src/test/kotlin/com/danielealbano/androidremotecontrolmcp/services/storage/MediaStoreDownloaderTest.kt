@@ -7,6 +7,8 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import io.mockk.MockKMatcherScope
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -14,6 +16,10 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -69,11 +75,11 @@ class MediaStoreDownloaderTest {
     private fun MockKMatcherScope.sameUrl(): URL = match { it.toString() == url.toString() }
 
     private fun respond(response: FakeDownloadResponse): FakeDownloadResponse {
-        every { mockHttpClient.open(sameUrl(), any()) } returns response
+        mockHttpClient.stubDownload(response)
         return response
     }
 
-    private fun download(config: ServerConfig = ServerConfig()): Long =
+    private suspend fun downloadSuspending(config: ServerConfig = ServerConfig()): Long =
         downloader.downloadToPendingUri(
             insertUri,
             url,
@@ -81,6 +87,8 @@ class MediaStoreDownloaderTest {
             config,
             "builtin:downloads/file.bin",
         )
+
+    private fun download(config: ServerConfig = ServerConfig()): Long = runBlocking { downloadSuspending(config) }
 
     @Test
     fun `downloadToPendingUri streams bytes and clears IS_PENDING`() {
@@ -105,7 +113,7 @@ class MediaStoreDownloaderTest {
 
         download(config)
 
-        verify { mockHttpClient.open(sameUrl(), config) }
+        coVerify { mockHttpClient.download<Any?>(sameUrl(), config, any()) }
     }
 
     @Test
@@ -163,7 +171,7 @@ class MediaStoreDownloaderTest {
 
     @Test
     fun `downloadToPendingUri wraps connect failure with cause and deletes entry`() {
-        every { mockHttpClient.open(sameUrl(), any()) } throws IOException("boom")
+        coEvery { mockHttpClient.download<Any?>(sameUrl(), any(), any()) } throws IOException("boom")
 
         val exception = assertThrows<McpToolException.ActionFailed> { download() }
 
@@ -174,7 +182,7 @@ class MediaStoreDownloaderTest {
 
     @Test
     fun `downloadToPendingUri reports a blocked local network connection`() {
-        every { mockHttpClient.open(sameUrl(), any()) } throws
+        coEvery { mockHttpClient.download<Any?>(sameUrl(), any(), any()) } throws
             LocalNetworkDownloadBlockedException(InetSocketAddress("127.0.0.1", 80))
 
         val exception = assertThrows<McpToolException.ActionFailed> { download() }
@@ -182,4 +190,29 @@ class MediaStoreDownloaderTest {
         assertTrue(exception.message!!.contains("Block Local Network Downloads"))
         verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
     }
+
+    @Test
+    fun `a cancelled download stops, deletes the pending entry and stays a cancellation`() =
+        runBlocking {
+            lateinit var request: Job
+            respond(FakeDownloadResponse(200, -1L, cancellingBody { request.cancel() }))
+            every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns ByteArrayOutputStream()
+            var outcome: Throwable? = null
+
+            request =
+                launch {
+                    try {
+                        downloadSuspending()
+                    } catch (e: CancellationException) {
+                        outcome = e
+                        throw e
+                    }
+                }
+            request.join()
+
+            assertTrue(request.isCancelled)
+            assertTrue(outcome is CancellationException, "the cancellation became $outcome")
+            verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
+            verify(exactly = 0) { mockContentResolver.update(any(), any(), any(), any()) }
+        }
 }

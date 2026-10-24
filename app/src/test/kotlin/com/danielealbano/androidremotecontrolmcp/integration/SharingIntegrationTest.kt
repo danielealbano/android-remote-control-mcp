@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
+import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.McpAuthPlugin
 import com.danielealbano.androidremotecontrolmcp.mcp.contentTypeOrOctetStream
@@ -449,8 +450,9 @@ class SharingIntegrationTest {
         block: suspend (Client, io.ktor.client.HttpClient) -> Unit,
     ) {
         val server = newServer()
+        val inFlightToolCalls = InFlightToolCalls()
         registerSharingTools(
-            LoggedToolRegistrar(server, RecordingServerLogRepository()),
+            LoggedToolRegistrar(server, RecordingServerLogRepository(), inFlightToolCalls = inFlightToolCalls),
             inbox,
             linkService,
             config.fileOperationProvider,
@@ -470,7 +472,7 @@ class SharingIntegrationTest {
                     excludedPaths = setOf("/health")
                     excludedPathPrefixes = setOf(EphemeralFileLinkService.PATH_PREFIX)
                 }
-                installMcpStatelessTransport { server }
+                installMcpStatelessTransport(inFlightToolCalls = inFlightToolCalls) { server }
                 routing {
                     get("${EphemeralFileLinkService.PATH_PREFIX}{token}") {
                         val entry = linkService.resolve(call.parameters["token"].orEmpty())

@@ -6,7 +6,8 @@ import android.net.Uri
  * File operations for built-in MediaStore storage locations.
  *
  * All methods mirror [FileOperationProvider] but are scoped to built-in locations.
- * Path traversal protection is enforced on all operations.
+ * Path traversal protection is enforced on all operations. Implementations run their blocking I/O on the I/O
+ * dispatcher, so callers may invoke them from any coroutine.
  */
 interface MediaStoreFileOperations {
     suspend fun listFiles(

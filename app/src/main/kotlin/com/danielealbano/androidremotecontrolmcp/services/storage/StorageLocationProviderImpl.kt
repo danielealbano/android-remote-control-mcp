@@ -331,7 +331,7 @@ class StorageLocationProviderImpl
          * Queries available bytes for a location by querying the provider's roots.
          * Returns null if the query fails or the provider doesn't report this info.
          */
-        @Suppress("TooGenericExceptionCaught", "SwallowedException", "NestedBlockDepth", "ReturnCount")
+        @Suppress("TooGenericExceptionCaught", "ReturnCount")
         private fun queryAvailableBytes(treeUriString: String): Long? {
             return try {
                 val treeUri = Uri.parse(treeUriString)

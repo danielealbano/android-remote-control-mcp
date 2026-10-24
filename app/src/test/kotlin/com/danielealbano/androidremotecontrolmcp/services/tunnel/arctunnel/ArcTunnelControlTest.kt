@@ -109,6 +109,7 @@ class ArcTunnelControlTest {
                 SSLContext.getDefault(),
                 SSLContext.getDefault(),
                 allowLocalTargets = true,
+                keepalive = {},
             ),
             { localPort },
             events,

@@ -49,7 +49,7 @@ graph TB
         subgraph McpServerSvc["McpServerService (Foreground Service)"]
             subgraph Ktor["McpServer (Ktor)"]
                 HTTP["HTTP :8080 (HTTPS optional)"]
-                StreamHTTP["Streamable HTTP /mcp\n(POST, DELETE; JSON-only, no SSE)"]
+                StreamHTTP["Streamable HTTP /mcp\n(stateless, POST only; JSON-only, no SSE)"]
                 Auth["BearerTokenAuth (global)"]
                 SDK["SDK Server → Server.addTool()"]
                 HTTP --> StreamHTTP --> Auth --> SDK
@@ -159,6 +159,7 @@ graph TB
 - `McpAccessibilityService.instance`: `@Volatile` singleton
 - `McpNotificationListenerService.instance`: `@Volatile` singleton
 - `McpServer.running`: `AtomicBoolean`
+- `InFlightToolCalls` (the running tool calls a `notifications/cancelled` can cancel): `synchronized`
 - Accessibility node access: Must be on main thread (Android requirement)
 
 ---
@@ -170,7 +171,7 @@ sequenceDiagram
     participant Client as MCP Client
     participant Ktor as Ktor Netty (IO threads)
     participant Auth as BearerTokenAuth Plugin
-    participant Route as McpStreamableHttp (/mcp)
+    participant Route as McpStatelessTransport (/mcp)
     participant SDK as SDK Server (MCP Kotlin SDK)
     participant Tool as Tool Handler
     participant Acc as AccessibilityService (Main Thread)
@@ -182,7 +183,7 @@ sequenceDiagram
         Auth-->>Client: 401 Unauthorized
     end
     Auth->>Route: Authenticated request
-    Route->>SDK: StreamableHttpServerTransport<br/>(JSON-only, no SSE)
+    Route->>SDK: A session of its own per POST<br/>StreamableHttpServerTransport (JSON-only, no SSE)
     SDK->>SDK: Route by method ("tools/call")<br/>Extract tool name + arguments<br/>Look up registered tool
     SDK->>Tool: Execute tool lambda
     Tool->>Acc: withContext(Dispatchers.Main)<br/>dispatchGesture / performAction / ...
@@ -191,6 +192,34 @@ sequenceDiagram
     Tool-->>SDK: CallToolResult<br/>(TextContent or ImageContent)
     SDK-->>Ktor: JSON-RPC response via transport
     Ktor-->>Client: HTTP 200 + JSON body
+```
+
+### Tool Call Cancellation
+
+A tool call runs in its HTTP request's coroutine. Ktor does not cancel it when the client goes away, so the endpoint cancels it when the Netty channel of the request (the connection, or the HTTP/2 stream) closes. The SDK cannot match a `notifications/cancelled` (another POST, another session) to the call it names, so every running call is tracked in `InFlightToolCalls` by its caller (the SHA-256 of the bearer credential, or `open` without one) and JSON-RPC id.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Route as McpStatelessTransport (/mcp)
+    participant Calls as InFlightToolCalls
+    participant Tool as Tool Handler
+
+    Client->>Route: POST tools/call (id 7)
+    Route->>Tool: Run in the request's coroutine
+    Tool->>Calls: Track (caller, 7)
+    alt Client closes the request
+        Route->>Tool: Netty channel closed: cancel the request
+        Tool->>Calls: Untrack
+        Note over Client,Tool: Nothing is answered
+    else Client sends notifications/cancelled
+        Client->>Route: POST notifications/cancelled (requestId 7)
+        Route-->>Client: 202 Accepted
+        Route->>Calls: Cancel (caller, 7)
+        Calls->>Tool: Cancel, only when exactly one call of the caller has id 7
+        Tool->>Calls: Untrack
+        Tool-->>Client: isError result "The client cancelled this tool call"
+    end
 ```
 
 ---

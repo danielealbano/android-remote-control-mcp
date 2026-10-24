@@ -278,45 +278,30 @@ This opens a UI at `http://localhost:6274` where you can connect to your server 
 
 ### Testing with curl
 
-All requests are sent as JSON-RPC 2.0 via `POST /mcp` (Streamable HTTP transport). The server requires a session initialization handshake before tool calls:
+All requests are sent as JSON-RPC 2.0 via `POST /mcp` (Streamable HTTP transport). The server is stateless: every request stands alone, so there is no session to open and no `mcp-session-id` to send, and tools can be called directly:
 
 ```bash
-# Initialize a session (required before any tool call)
-# Capture the mcp-session-id from the response headers
-curl -s -D- -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl-client","version":"1.0.0"}}}'
-
-# Use the mcp-session-id from the response headers in all subsequent requests
-
 # List available tools
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -H "mcp-session-id: SESSION_ID" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Get the current screen state (UI nodes + optional screenshot)
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -H "mcp-session-id: SESSION_ID" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"android_get_screen_state","arguments":{}}}'
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"android_get_screen_state","arguments":{}}}'
 
 # Tap at coordinates
 curl -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -H "mcp-session-id: SESSION_ID" \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"android_tap","arguments":{"x":540,"y":1200}}}'
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"android_tap","arguments":{"x":540,"y":1200}}}'
 ```
-
-Replace `SESSION_ID` with the `mcp-session-id` value from the initialize response headers.
 
 The bearer token is shown in the app's connection info and can be copied directly. Bearer authentication is controlled by the **Bearer token** toggle in **Settings → Access** (not by clearing the value): with it enabled, every `/mcp` request must present the token (or a valid OAuth access token). The server accepts unauthenticated requests only when **both** the Bearer token and OAuth are disabled.
 

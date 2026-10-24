@@ -9,6 +9,10 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -20,6 +24,9 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 /**
  * E2E Tier 1 core storage suite: all 8 file tools against the real MediaProvider,
@@ -37,6 +44,12 @@ class E2EStorageToolsTest {
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
         private const val DOWNLOADS = "builtin:downloads"
+        private const val STALL_START_TIMEOUT_S = 30L
+        private const val STALL_STOP_TIMEOUT_S = 10L
+        private const val STALL_PROMPT_STOP_MS = 5_000L
+        private const val POLL_MS = 250L
+        private const val CANCELLED_ID = 9001
+        private const val HTTP_ACCEPTED = 202
         private const val PICTURES = "builtin:pictures"
         private const val MOVIES = "builtin:movies"
         private const val MUSIC = "builtin:music"
@@ -525,5 +538,117 @@ class E2EStorageToolsTest {
         } finally {
             StorageE2E.configureBlockLocalNetworkDownloads(false)
         }
+    }
+
+    /** A raw MCP POST (no SDK client), so a test can abort it or send a notification of its own. */
+    private fun mcpPost(body: String): Request =
+        Request
+            .Builder()
+            .url("${SharedAndroidContainer.mcpServerUrl}/mcp")
+            .header("Authorization", "Bearer ${AndroidContainerSetup.E2E_BEARER_TOKEN}")
+            .header("Accept", "application/json, text/event-stream")
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+    /** A download of the fixture's /stall.bin into [path], as a raw tools/call with JSON-RPC id [id]. */
+    private fun stallDownload(
+        id: Int,
+        path: String,
+    ): Request {
+        val arguments = """{"location_id":"$DOWNLOADS","path":"$path","url":"$fixtureBaseUrl/stall.bin"}"""
+        return mcpPost(
+            """{"jsonrpc":"2.0","id":$id,"method":"tools/call",""" +
+                """"params":{"name":"${TOOL_PREFIX}download_from_url","arguments":$arguments}}""",
+        )
+    }
+
+    /** Waits for the device to hang up on /stall.bin, at most [STALL_PROMPT_STOP_MS] after [cancelledAt]. */
+    private fun assertDeviceStoppedDownloading(cancelledAt: Long) {
+        assertTrue(
+            fixtureServer.stallClientGone.await(STALL_STOP_TIMEOUT_S, TimeUnit.SECONDS),
+            "the device kept downloading after the tool call was cancelled",
+        )
+        val stoppedAfterMs = System.currentTimeMillis() - cancelledAt
+        assertTrue(stoppedAfterMs < STALL_PROMPT_STOP_MS, "the download stopped ${stoppedAfterMs}ms after the cancel")
+    }
+
+    /**
+     * The device's Download directory entries named [name], hidden ones included: a download's file stays pending
+     * (`.pending-<expiry>-<name>` on disk, absent from `list_files`) until it completes.
+     */
+    private fun downloadDirEntries(name: String): List<String> =
+        StorageE2E
+            .shell("ls -a /sdcard/Download")
+            .lines()
+            .map { it.trim() }
+            .filter { it.endsWith(name) }
+
+    /** The stalled download is writing its file: waits for it to appear in the Download directory. */
+    private fun assertDownloadFileExists(name: String) {
+        val deadline = System.currentTimeMillis() + STALL_PROMPT_STOP_MS
+        while (downloadDirEntries(name).isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(POLL_MS)
+        assertTrue(downloadDirEntries(name).isNotEmpty(), "the download's file never appeared")
+    }
+
+    /** The cancelled download's file is deleted as it unwinds: waits for it to leave the Download directory. */
+    private fun assertNoFileLeft(name: String) {
+        val deadline = System.currentTimeMillis() + STALL_PROMPT_STOP_MS
+        while (downloadDirEntries(name).isNotEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(POLL_MS)
+        assertEquals(emptyList<String>(), downloadDirEntries(name))
+        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains(name))
+    }
+
+    @Test
+    @Order(33)
+    fun `download_from_url stops at once and leaves no file when its client closes the request`() {
+        fixtureServer.resetStall()
+        val call = OkHttpClient().newCall(stallDownload(id = 1, path = "e2e-closed.bin"))
+        val requestThread = thread { runCatching { call.execute().close() } }
+        assertTrue(
+            fixtureServer.stallStarted.await(STALL_START_TIMEOUT_S, TimeUnit.SECONDS),
+            "the device never started the download",
+        )
+        assertDownloadFileExists("e2e-closed.bin")
+
+        // The MCP client gives up: it closes its HTTP request
+        val cancelledAt = System.currentTimeMillis()
+        call.cancel()
+
+        assertDeviceStoppedDownloading(cancelledAt)
+        requestThread.join(STALL_PROMPT_STOP_MS)
+        assertNoFileLeft("e2e-closed.bin")
+    }
+
+    @Test
+    @Order(34)
+    fun `download_from_url stops at once and leaves no file when its client sends notifications cancelled`() {
+        fixtureServer.resetStall()
+        val answer = AtomicReference<String>()
+        val requestThread =
+            thread {
+                runCatching {
+                    OkHttpClient().newCall(stallDownload(id = CANCELLED_ID, path = "e2e-cancelled.bin")).execute().use {
+                        answer.set(it.body.string())
+                    }
+                }
+            }
+        assertTrue(
+            fixtureServer.stallStarted.await(STALL_START_TIMEOUT_S, TimeUnit.SECONDS),
+            "the device never started the download",
+        )
+        assertDownloadFileExists("e2e-cancelled.bin")
+
+        // The MCP client cancels the call with the protocol's notification, keeping its request open
+        val cancelledAt = System.currentTimeMillis()
+        val notification =
+            """{"jsonrpc":"2.0","method":"notifications/cancelled",""" +
+                """"params":{"requestId":$CANCELLED_ID,"reason":"e2e"}}"""
+        OkHttpClient().newCall(mcpPost(notification)).execute().use { assertEquals(HTTP_ACCEPTED, it.code) }
+
+        assertDeviceStoppedDownloading(cancelledAt)
+        requestThread.join(STALL_PROMPT_STOP_MS)
+        // The open request is answered, with the error result of a cancelled call
+        assertTrue(answer.get().orEmpty().contains("The client cancelled this tool call"), answer.get())
+        assertNoFileLeft("e2e-cancelled.bin")
     }
 }

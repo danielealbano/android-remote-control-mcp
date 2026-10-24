@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolCallIndicator
@@ -30,6 +31,7 @@ class McpToolRegistration
     @Inject
     constructor(
         private val serverLogRepository: ServerLogRepository,
+        private val inFlightToolCalls: InFlightToolCalls,
         private val accessibility: AccessibilityToolDeps,
         private val screen: ScreenToolDeps,
         private val privacy: PrivacyToolDeps,
@@ -53,6 +55,7 @@ class McpToolRegistration
                     server,
                     serverLogRepository,
                     toolCallIndicator,
+                    inFlightToolCalls,
                 )
             registerAccessibilityToolBundle(registrar, toolNamePrefix, perms)
             val d = device

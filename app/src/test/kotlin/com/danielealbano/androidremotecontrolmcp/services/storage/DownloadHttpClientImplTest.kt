@@ -1,6 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.ConnectionSpec
@@ -18,11 +23,13 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.Proxy
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import kotlin.system.measureTimeMillis
 
 @DisplayName("DownloadHttpClientImpl")
 class DownloadHttpClientImplTest {
     private lateinit var server: MockWebServer
-    private val client = DownloadHttpClientImpl()
+    private val client = DownloadHttpClientImpl(Dispatchers.IO)
     private val loopback: InetAddress = InetAddress.getLoopbackAddress()
     private val loopbackHost: String = checkNotNull(loopback.hostAddress)
 
@@ -84,6 +91,13 @@ class DownloadHttpClientImplTest {
         }
     }
 
+    /** Downloads [url] with this client and returns what [onResponse] makes of the response. */
+    private fun <T> DownloadHttpClientImpl.fetch(
+        url: URL,
+        config: ServerConfig,
+        onResponse: (DownloadResponse) -> T,
+    ): T = runBlocking { download(url, config) { onResponse(it) } }
+
     /** The full chain of [e] (cause and suppressed), since OkHttp may wrap a connect failure. */
     private fun chainOf(e: Throwable): List<Throwable> =
         generateSequence(e) { it.cause }.flatMap { sequenceOf(it) + it.suppressed.asSequence() }.toList()
@@ -92,7 +106,7 @@ class DownloadHttpClientImplTest {
     fun `returns status, length and body with the block off`() {
         server.enqueue(ok())
 
-        client.open(url(), ServerConfig()).use { response ->
+        client.fetch(url(), ServerConfig()) { response ->
             assertEquals(OK, response.code)
             assertEquals(BODY.length.toLong(), response.contentLength)
             assertEquals(BODY, response.body.readBytes().toString(Charsets.UTF_8))
@@ -103,14 +117,14 @@ class DownloadHttpClientImplTest {
     fun `returns a non-2xx response instead of throwing`() {
         server.enqueue(MockResponse.Builder().code(NOT_FOUND).build())
 
-        client.open(url(), ServerConfig()).use { response -> assertEquals(NOT_FOUND, response.code) }
+        client.fetch(url(), ServerConfig()) { response -> assertEquals(NOT_FOUND, response.code) }
     }
 
     @Test
     fun `refuses an IP literal on the local network with the block on`() {
         server.enqueue(ok())
 
-        val e = assertThrows<IOException> { client.open(url(), ServerConfig(blockLocalNetworkDownloads = true)) }
+        val e = assertThrows<IOException> { client.fetch(url(), ServerConfig(blockLocalNetworkDownloads = true)) {} }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
         // The callers report the top-level message: it must name the switch
@@ -123,7 +137,7 @@ class DownloadHttpClientImplTest {
         server.enqueue(ok())
         val byName = URL("http", "localhost", server.port, "/file.bin")
 
-        val e = assertThrows<IOException> { client.open(byName, ServerConfig(blockLocalNetworkDownloads = true)) }
+        val e = assertThrows<IOException> { client.fetch(byName, ServerConfig(blockLocalNetworkDownloads = true)) {} }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
         // The callers report the top-level message: it must name the switch
@@ -139,11 +153,11 @@ class DownloadHttpClientImplTest {
         try {
             target.enqueue(ok())
             server.enqueue(redirectTo(URL("http", BLOCKED_LOOPBACK, target.port, "/inner").toString()))
-            val secondLoopbackBlocked = DownloadHttpClientImpl { it.hostAddress == BLOCKED_LOOPBACK }
+            val secondLoopbackBlocked = DownloadHttpClientImpl({ it.hostAddress == BLOCKED_LOOPBACK }, Dispatchers.IO)
 
             val e =
                 assertThrows<IOException> {
-                    secondLoopbackBlocked.open(url(), ServerConfig(blockLocalNetworkDownloads = true))
+                    secondLoopbackBlocked.fetch(url(), ServerConfig(blockLocalNetworkDownloads = true)) {}
                 }
 
             assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
@@ -161,8 +175,8 @@ class DownloadHttpClientImplTest {
         server.enqueue(ok())
         server.enqueue(ok())
 
-        client.open(url(), ServerConfig()).use { it.body.readBytes() }
-        val e = assertThrows<IOException> { client.open(url(), ServerConfig(blockLocalNetworkDownloads = true)) }
+        client.fetch(url(), ServerConfig()) { it.body.readBytes() }
+        val e = assertThrows<IOException> { client.fetch(url(), ServerConfig(blockLocalNetworkDownloads = true)) {} }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
         // The callers report the top-level message: it must name the switch
@@ -175,7 +189,7 @@ class DownloadHttpClientImplTest {
         server.enqueue(redirectTo(url("/final").toString()))
         server.enqueue(ok())
 
-        client.open(url(), ServerConfig()).use { response ->
+        client.fetch(url(), ServerConfig()) { response ->
             assertEquals(OK, response.code)
             assertEquals(BODY, response.body.readBytes().toString(Charsets.UTF_8))
         }
@@ -186,7 +200,7 @@ class DownloadHttpClientImplTest {
     fun `does not follow a redirect from http to https`() {
         server.enqueue(redirectTo(url("/secure", scheme = "https").toString()))
 
-        client.open(url(), ServerConfig()).use { response -> assertEquals(FOUND, response.code) }
+        client.fetch(url(), ServerConfig()) { response -> assertEquals(FOUND, response.code) }
         assertEquals(1, server.requestCount)
     }
 
@@ -199,7 +213,7 @@ class DownloadHttpClientImplTest {
             useHttps()
             server.enqueue(redirectTo(URL("http", loopbackHost, plain.port, "/plain").toString()))
 
-            client.open(url(scheme = "https"), ServerConfig(allowUnverifiedHttpsCerts = true)).use { response ->
+            client.fetch(url(scheme = "https"), ServerConfig(allowUnverifiedHttpsCerts = true)) { response ->
                 assertEquals(FOUND, response.code)
             }
             assertEquals(1, server.requestCount)
@@ -214,8 +228,8 @@ class DownloadHttpClientImplTest {
         useHttps()
         server.enqueue(ok())
 
-        assertThrows<IOException> { client.open(url(scheme = "https"), ServerConfig()) }
-        client.open(url(scheme = "https"), ServerConfig(allowUnverifiedHttpsCerts = true)).use { response ->
+        assertThrows<IOException> { client.fetch(url(scheme = "https"), ServerConfig()) {} }
+        client.fetch(url(scheme = "https"), ServerConfig(allowUnverifiedHttpsCerts = true)) { response ->
             assertEquals(OK, response.code)
         }
     }
@@ -226,13 +240,16 @@ class DownloadHttpClientImplTest {
         server.enqueue(ok())
         val checked = mutableListOf<InetAddress>()
         val nothingBlocked =
-            DownloadHttpClientImpl { address ->
-                checked += address
-                false
-            }
+            DownloadHttpClientImpl(
+                { address ->
+                    checked += address
+                    false
+                },
+                Dispatchers.IO,
+            )
         val config = ServerConfig(allowUnverifiedHttpsCerts = true, blockLocalNetworkDownloads = true)
 
-        nothingBlocked.open(url(scheme = "https"), config).use { response ->
+        nothingBlocked.fetch(url(scheme = "https"), config) { response ->
             assertEquals(OK, response.code)
             assertEquals(BODY, response.body.readBytes().toString(Charsets.UTF_8))
         }
@@ -245,7 +262,7 @@ class DownloadHttpClientImplTest {
         server.enqueue(ok())
         val config = ServerConfig(allowUnverifiedHttpsCerts = true, blockLocalNetworkDownloads = true)
 
-        val e = assertThrows<IOException> { client.open(url(scheme = "https"), config) }
+        val e = assertThrows<IOException> { client.fetch(url(scheme = "https"), config) {} }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
         assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
@@ -253,11 +270,62 @@ class DownloadHttpClientImplTest {
     }
 
     @Test
+    fun `cancelling stops a download at once while a read waits for data`() =
+        runBlocking {
+            // The headers and the first bytes arrive, then the body stalls far longer than the test may take
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(OK)
+                    .body("x".repeat(STALLED_BODY_BYTES))
+                    .throttleBody(FIRST_BYTES.toLong(), STALL_SECONDS, TimeUnit.SECONDS)
+                    .build(),
+            )
+            val reading = CompletableDeferred<Unit>()
+            val download =
+                launch(Dispatchers.IO) {
+                    client.download(url(), ServerConfig()) { response ->
+                        response.body.read(ByteArray(FIRST_BYTES))
+                        reading.complete(Unit)
+                        response.body.readBytes()
+                    }
+                }
+            reading.await()
+
+            val elapsed = measureTimeMillis { download.cancelAndJoin() }
+
+            assertTrue(elapsed < PROMPT_STOP_MS, "the download took $elapsed ms to stop")
+            // A cancellation, not the failure of the connection it closed (which would also fail this runBlocking)
+            assertTrue(download.isCancelled)
+        }
+
+    @Test
+    fun `cancelling stops a download at once while it waits for the response headers`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(OK)
+                    .headersDelay(STALL_SECONDS, TimeUnit.SECONDS)
+                    .build(),
+            )
+            val download = launch(Dispatchers.IO) { client.download(url(), ServerConfig()) { it.code } }
+            // The request reached the server, which now holds the headers back
+            server.takeRequest()
+
+            val elapsed = measureTimeMillis { download.cancelAndJoin() }
+
+            assertTrue(elapsed < PROMPT_STOP_MS, "the download took $elapsed ms to stop")
+            // A cancellation, not the failure of the connection it closed (which would also fail this runBlocking)
+            assertTrue(download.isCancelled)
+        }
+
+    @Test
     fun `sends the platform user agent when the platform defines one`() {
         withHttpAgent("Dalvik/2.1.0 (Linux; U; Android 14)") {
             server.enqueue(ok())
 
-            client.open(url(), ServerConfig()).use { it.body.readBytes() }
+            client.fetch(url(), ServerConfig()) { it.body.readBytes() }
 
             assertEquals("Dalvik/2.1.0 (Linux; U; Android 14)", server.takeRequest().headers["User-Agent"])
         }
@@ -268,7 +336,7 @@ class DownloadHttpClientImplTest {
         withHttpAgent("Dalvik/2.1.0 (Linux; U; Android 14; \u5c0f\u7c73 Build/AB1)") {
             server.enqueue(ok())
 
-            client.open(url(), ServerConfig()).use { it.body.readBytes() }
+            client.fetch(url(), ServerConfig()) { it.body.readBytes() }
 
             val sent = server.takeRequest().headers["User-Agent"]
             assertEquals("Dalvik/2.1.0 (Linux; U; Android 14; ?? Build/AB1)", sent)
@@ -317,6 +385,10 @@ class DownloadHttpClientImplTest {
         const val FOUND = 302
         const val NOT_FOUND = 404
         const val BLOCKED_LOOPBACK = "127.0.0.2"
+        const val STALLED_BODY_BYTES = 1_000_000
+        const val FIRST_BYTES = 1024
+        const val STALL_SECONDS = 30L
+        const val PROMPT_STOP_MS = 2_000L
         const val SWITCH_NAME = "'Block Local Network Downloads' is enabled"
         const val HTTP_AGENT = "http.agent"
         const val TIMEOUT_SECONDS = 42

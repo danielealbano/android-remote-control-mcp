@@ -38,6 +38,9 @@ class ArcTunnelDialBackTest {
     private val sessions = ArcTunnelSessions {}
     private val fillers = mutableListOf<Socket>()
 
+    /** The sockets the dial-back applied its keepalive to, and whether each was connected at that moment. */
+    private val keptAlive = mutableListOf<Pair<Socket, Boolean>>()
+
     @AfterEach
     fun tearDown() {
         fillers.forEach { it.close() }
@@ -47,7 +50,9 @@ class ArcTunnelDialBackTest {
     private fun dialBack(
         timeoutMs: Long = OPEN_TIMEOUT_MS,
         allowLocal: Boolean = true,
-    ) = ArcTunnelDialBack(ArcTunnelTestServer.CONTROL_HOST, clientTls, clientTls, allowLocal, timeoutMs)
+    ) = ArcTunnelDialBack(ArcTunnelTestServer.CONTROL_HOST, clientTls, clientTls, allowLocal, timeoutMs) { socket ->
+        keptAlive += socket to socket.isConnected
+    }
 
     private fun target(
         addr: String = "127.0.0.1:${peer.localPort}",
@@ -110,6 +115,22 @@ class ArcTunnelDialBackTest {
             assertTrue(request.get().contains("X-Dial-Token: t\r\n"), request.get())
             assertTrue(request.get().contains("Upgrade: tunneld-dial\r\n"), request.get())
             assertTrue(request.get().startsWith("GET /api/v1/data HTTP/1.1\r\n"), request.get())
+            conn.socket.close()
+            done.countDown()
+        }
+
+    @Test
+    fun `the keepalive is applied to the connected raw socket`() =
+        runBlocking {
+            val done = CountDownLatch(1)
+            servePeer {
+                respond(it, "HTTP/1.1 101 Switching Protocols")
+                done.await(5, TimeUnit.SECONDS)
+            }
+
+            val conn = dialBack().open(target(), sessions)
+
+            assertEquals(listOf(conn.raw to true), keptAlive)
             conn.socket.close()
             done.countDown()
         }

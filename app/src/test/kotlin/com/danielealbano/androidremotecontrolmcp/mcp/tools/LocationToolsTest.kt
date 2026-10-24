@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.data.model.LocationData
+import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
@@ -211,7 +212,11 @@ class LocationToolsTest {
             } returns Unit
 
             handler.register(
-                LoggedToolRegistrar(mockServer, RecordingServerLogRepository()),
+                LoggedToolRegistrar(
+                    mockServer,
+                    RecordingServerLogRepository(),
+                    inFlightToolCalls = InFlightToolCalls(),
+                ),
                 "android_",
                 freshFixParamEnabled = true,
             )

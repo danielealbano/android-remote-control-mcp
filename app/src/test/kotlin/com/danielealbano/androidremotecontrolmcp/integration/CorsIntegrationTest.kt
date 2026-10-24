@@ -72,7 +72,7 @@ class CorsIntegrationTest {
                     get("/health") { call.respondText("{}", ContentType.Application.Json) }
                     post("/register") { call.respondText("{}", ContentType.Application.Json) }
                 }
-                installMcpStatelessTransport { sdkServer }
+                installMcpStatelessTransport(inFlightToolCalls = deps.inFlightToolCalls) { sdkServer }
             }
             testBlock()
         }

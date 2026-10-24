@@ -11,14 +11,19 @@ import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocati
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
 import com.danielealbano.androidremotecontrolmcp.data.model.MediaCollection
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import javax.inject.Inject
 
+/**
+ * MediaStore implementation of [MediaStoreFileOperations]. Every operation runs its blocking I/O (content resolver,
+ * network) on [ioDispatcher], never on the caller's dispatcher (the MCP request handling threads).
+ */
 @Suppress("SwallowedException")
 class MediaStoreFileOperationsImpl
     @Inject
@@ -28,6 +33,7 @@ class MediaStoreFileOperationsImpl
         private val settingsRepository: SettingsRepository,
         private val permissionChecker: PermissionChecker,
         downloadHttpClient: DownloadHttpClient,
+        @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : MediaStoreFileOperations {
         private val downloader = MediaStoreDownloader(context, downloadHttpClient)
 
@@ -39,7 +45,7 @@ class MediaStoreFileOperationsImpl
             offset: Int,
             limit: Int,
         ): FileListResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val builtin = resolveBuiltin(locationId)
                 BuiltinStorageLocation.validatePath(path)
                 val targetRelativePath = buildRelativePathForListing(builtin, path)
@@ -107,7 +113,6 @@ class MediaStoreFileOperationsImpl
                 FileListResult(files = paginated, totalCount = totalCount, hasMore = hasMore)
             }
 
-        @Suppress("LongParameterList")
         private fun processCursorRow(
             cursor: android.database.Cursor,
             nameIdx: Int,
@@ -183,14 +188,13 @@ class MediaStoreFileOperationsImpl
 
         // ─── readFile ───────────────────────────────────────────────────────
 
-        @Suppress("NestedBlockDepth")
         override suspend fun readFile(
             locationId: String,
             path: String,
             offset: Int,
             limit: Int,
         ): FileReadResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 if (offset < 1) {
                     throw McpToolException.InvalidParams("offset must be >= 1, got $offset")
                 }
@@ -237,7 +241,7 @@ class MediaStoreFileOperationsImpl
             path: String,
             maxBytes: Long,
         ): FileBytesResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val builtin = resolveBuiltin(locationId)
                 BuiltinStorageLocation.validatePath(path)
                 val uri = findFileOrThrow(builtin, path)
@@ -256,7 +260,7 @@ class MediaStoreFileOperationsImpl
             locationId: String,
             path: String,
             content: String,
-        ) = withContext(Dispatchers.IO) {
+        ) = withContext(ioDispatcher) {
             val builtin = resolveBuiltin(locationId)
             BuiltinStorageLocation.validatePath(path)
             checkWritePermission(locationId)
@@ -303,7 +307,7 @@ class MediaStoreFileOperationsImpl
             locationId: String,
             path: String,
             content: String,
-        ) = withContext(Dispatchers.IO) {
+        ) = withContext(ioDispatcher) {
             val builtin = resolveBuiltin(locationId)
             BuiltinStorageLocation.validatePath(path)
             checkWritePermission(locationId)
@@ -348,7 +352,7 @@ class MediaStoreFileOperationsImpl
             newString: String,
             replaceAll: Boolean,
         ): FileReplaceResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val builtin = resolveBuiltin(locationId)
                 BuiltinStorageLocation.validatePath(path)
                 checkWritePermission(locationId)
@@ -387,7 +391,7 @@ class MediaStoreFileOperationsImpl
             path: String,
             url: String,
         ): Long =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val builtin = resolveBuiltin(locationId)
                 BuiltinStorageLocation.validatePath(path)
                 checkWritePermission(locationId)
@@ -419,7 +423,7 @@ class MediaStoreFileOperationsImpl
         override suspend fun deleteFile(
             locationId: String,
             path: String,
-        ) = withContext(Dispatchers.IO) {
+        ) = withContext(ioDispatcher) {
             val builtin = resolveBuiltin(locationId)
             BuiltinStorageLocation.validatePath(path)
             checkDeletePermission(locationId)
@@ -443,7 +447,7 @@ class MediaStoreFileOperationsImpl
             path: String,
             mimeType: String,
         ): Uri =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val builtin = resolveBuiltin(locationId)
                 BuiltinStorageLocation.validatePath(path)
                 checkWritePermission(locationId)

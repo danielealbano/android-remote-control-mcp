@@ -20,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.geo.GeoIpResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.HttpsMaterial
+import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStore
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
@@ -82,6 +83,8 @@ class McpServerService : Service() {
     @Inject lateinit var tunnelManager: TunnelManager
 
     @Inject lateinit var toolRegistration: McpToolRegistration
+
+    @Inject lateinit var inFlightToolCalls: InFlightToolCalls
 
     @Inject lateinit var screenStateSnapshotCache: ScreenStateSnapshotCache
 
@@ -261,6 +264,7 @@ class McpServerService : Service() {
                             geoIpResolver = geoIpResolver,
                         ),
                     serverLog = serverLogRepository,
+                    inFlightToolCalls = inFlightToolCalls,
                 )
             mcpServer?.start()
 

@@ -70,7 +70,7 @@ The device slug is configured in the app's **Configuration** section. Valid slug
 ### Endpoint
 
 All MCP communication goes through a single endpoint:
-- **MCP endpoint**: `POST /mcp` — Streamable HTTP transport (JSON-only, no SSE). Handles all protocol messages: `initialize`, `tools/list`, `tools/call`, etc.
+- **MCP endpoint**: `POST /mcp` — Streamable HTTP transport (JSON-only, no SSE), stateless: every request stands alone and no `Mcp-Session-Id` is issued. Handles all protocol messages: `initialize`, `tools/list`, `tools/call`, etc. `GET` and `DELETE` are refused with `405 Method Not Allowed` (`Allow: POST`).
 
 ---
 
@@ -148,6 +148,15 @@ Tool errors are returned as `CallToolResult(isError = true)` with the error mess
   }
 }
 ```
+
+### Cancellation
+
+A running tool call is cancelled when:
+- **The client closes its HTTP request** (the connection, or the request's HTTP/2 stream): nothing is answered.
+- **The client sends `notifications/cancelled`** naming the call's `requestId`, as a POST of its own (answered with `202 Accepted`): the call's request, still open, is answered with an error result reading `The client cancelled this tool call` (which the client ignores, as the MCP specification says). Only the client that started the call can cancel it: the one sending the same bearer credential (static token or OAuth access token); requests without one (possible only while authentication is off) all count as one client. Clients sharing a credential, such as the static token, count as one client too, so when two of their running calls have the same `requestId` the cancellation cannot tell them apart and cancels neither. A `requestId` with no running call is ignored.
+- **The server stops.**
+
+Cancelling a call stops its work on the device at the first point where that work can stop: an operation already handed to Android (a gesture being performed, a photo being saved) may still complete. `android_download_from_url` stops the transfer at once and deletes the partial file.
 
 ### Anti-Prompt-Injection Warning
 
@@ -2307,7 +2316,7 @@ Downloads a file from a URL and saves it to a storage location.
     "content": [
       {
         "type": "text",
-        "text": "File downloaded successfully: images/photo.jpg"
+        "text": "File downloaded successfully. Size: 48213 bytes. Saved to: com.android.providers.downloads.documents/downloads/images/photo.jpg"
       }
     ]
   }
@@ -2320,6 +2329,7 @@ Downloads a file from a URL and saves it to a storage location.
 - Unverified HTTPS certificates must be explicitly allowed in app settings.
 - When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
 - Parent directories are created automatically if they don't exist.
+- Cancelling the call (see [Cancellation](#cancellation)) stops the transfer at once and deletes the partial file.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `url`; invalid URL format

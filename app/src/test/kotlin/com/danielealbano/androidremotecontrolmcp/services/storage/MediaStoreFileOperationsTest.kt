@@ -23,6 +23,9 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.Executors
 
 @ExtendWith(MockKExtension::class)
 @DisplayName("MediaStoreFileOperationsImpl")
@@ -95,6 +99,7 @@ class MediaStoreFileOperationsTest {
                 mockSettingsRepository,
                 mockPermissionChecker,
                 mockk(),
+                Dispatchers.Unconfined,
             )
     }
 
@@ -1397,8 +1402,67 @@ class MediaStoreFileOperationsTest {
             }
     }
 
+    @Nested
+    @DisplayName("I/O dispatcher")
+    inner class RunsOnIoDispatcher {
+        @Test
+        fun `every operation runs on the I-O dispatcher`() {
+            // Each operation resolves its built-in location inside its I/O block: refusing it records the thread
+            val executor = Executors.newSingleThreadExecutor { Thread(it, IO_THREAD) }
+            mockkObject(BuiltinStorageLocation.Companion)
+            try {
+                val onIoThread =
+                    MediaStoreFileOperationsImpl(
+                        mockContext,
+                        mockStorageLocationProvider,
+                        mockSettingsRepository,
+                        mockPermissionChecker,
+                        mockk(),
+                        executor.asCoroutineDispatcher(),
+                    )
+                val threads = mutableMapOf<String, String>()
+                var current = ""
+                every { BuiltinStorageLocation.fromLocationId(any()) } answers {
+                    threads[current] = Thread.currentThread().name
+                    null
+                }
+                val location = "builtin:downloads"
+                val operations: List<Pair<String, suspend (MediaStoreFileOperationsImpl) -> Unit>> =
+                    listOf(
+                        "listFiles" to { it.listFiles(location, "", 0, PAGE_LIMIT) },
+                        "readFile" to { it.readFile(location, "file.txt", 1, PAGE_LIMIT) },
+                        "readFileBytes" to { it.readFileBytes(location, "file.txt", TEN_MB) },
+                        "writeFile" to { it.writeFile(location, "file.txt", "x") },
+                        "appendFile" to { it.appendFile(location, "file.txt", "x") },
+                        "replaceInFile" to { it.replaceInFile(location, "file.txt", "a", "b", false) },
+                        "downloadFromUrl" to { it.downloadFromUrl(location, "file.txt", "https://example.com/f") },
+                        "deleteFile" to { it.deleteFile(location, "file.txt") },
+                        "createFileUri" to { it.createFileUri(location, "file.txt", "text/plain") },
+                    )
+
+                runBlocking {
+                    for ((name, operation) in operations) {
+                        current = name
+                        val failure = runCatching { operation(onIoThread) }.exceptionOrNull()
+                        assertTrue(failure is McpToolException.PermissionDenied, "$name: $failure")
+                    }
+                }
+
+                // Coroutine debug mode (on in tests: the JVM runs with assertions enabled) appends " @coroutine#N"
+                for ((name, _) in operations) {
+                    assertTrue(threads[name].orEmpty().startsWith(IO_THREAD), "$name ran on ${threads[name]}")
+                }
+            } finally {
+                unmockkObject(BuiltinStorageLocation.Companion)
+                executor.shutdownNow()
+            }
+        }
+    }
+
     private companion object {
         const val TEN_MB = 10L * 1024 * 1024
         const val OVERSIZE_BYTES = 100_000_000L
+        const val IO_THREAD = "mediastore-io-test"
+        const val PAGE_LIMIT = 10
     }
 }
