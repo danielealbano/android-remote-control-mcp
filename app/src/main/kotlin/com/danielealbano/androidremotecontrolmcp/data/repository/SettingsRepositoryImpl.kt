@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.data.repository
 
 import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -60,9 +61,8 @@ private val NGROK_DOMAIN_KEY = stringPreferencesKey("ngrok_domain")
 private val CLOUDFLARE_TUNNEL_MODE_KEY = stringPreferencesKey("cloudflare_tunnel_mode")
 private val CLOUDFLARE_TUNNEL_TOKEN_KEY = stringPreferencesKey("cloudflare_tunnel_token")
 private val CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY = stringPreferencesKey("cloudflare_tunnel_extra_args")
+private val TUNNEL_PROVIDER_MIGRATED_KEY = booleanPreferencesKey("tunnel_provider_migrated")
 private val FILE_SIZE_LIMIT_KEY = intPreferencesKey("file_size_limit_mb")
-private val ALLOW_HTTP_DOWNLOADS_KEY = booleanPreferencesKey("allow_http_downloads")
-private val ALLOW_UNVERIFIED_HTTPS_KEY = booleanPreferencesKey("allow_unverified_https_certs")
 private val DOWNLOAD_TIMEOUT_KEY = intPreferencesKey("download_timeout_seconds")
 private val DEVICE_SLUG_KEY = stringPreferencesKey("device_slug")
 private val TOOL_PERMISSIONS_KEY = stringPreferencesKey("tool_permissions")
@@ -102,7 +102,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
     val bindingAddressName = prefs[BINDING_ADDRESS_KEY] ?: BindingAddress.LOCALHOST.name
     val certificateSourceName = prefs[CERTIFICATE_SOURCE_KEY] ?: CertificateSource.AUTO_GENERATED.name
 
-    val tunnelProviderName = prefs[TUNNEL_PROVIDER_KEY] ?: TunnelProviderType.CLOUDFLARE.name
+    val tunnelProviderName = prefs[TUNNEL_PROVIDER_KEY] ?: TunnelProviderType.ARC_TUNNEL.name
     val cloudflareTunnelModeName =
         prefs[CLOUDFLARE_TUNNEL_MODE_KEY] ?: CloudflareTunnelMode.FREE.name
 
@@ -129,7 +129,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         tunnelEnabled = prefs[TUNNEL_ENABLED_KEY] ?: false,
         tunnelProvider =
             TunnelProviderType.entries.firstOrNull { it.name == tunnelProviderName }
-                ?: TunnelProviderType.CLOUDFLARE,
+                ?: TunnelProviderType.ARC_TUNNEL,
         ngrokAuthtoken = prefs[NGROK_AUTHTOKEN_KEY] ?: "",
         ngrokDomain = prefs[NGROK_DOMAIN_KEY] ?: "",
         cloudflareTunnelMode =
@@ -137,9 +137,14 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
                 ?: CloudflareTunnelMode.FREE,
         cloudflareTunnelToken = prefs[CLOUDFLARE_TUNNEL_TOKEN_KEY] ?: "",
         cloudflareTunnelExtraArgs = prefs[CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY] ?: "",
+        arcTunnelBaseAddress = prefs[ARC_TUNNEL_BASE_ADDRESS_KEY] ?: ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS,
+        arcTunnelCtCheckEnabled = prefs[ARC_TUNNEL_CT_CHECK_ENABLED_KEY] ?: true,
+        arcTunnelEdgeOverride = prefs[ARC_TUNNEL_EDGE_OVERRIDE_KEY] ?: "",
+        arcTunnelTrustedCaPem = prefs[ARC_TUNNEL_TRUSTED_CA_PEM_KEY] ?: "",
         fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
         allowHttpDownloads = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false,
         allowUnverifiedHttpsCerts = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false,
+        blockLocalNetworkDownloads = prefs[BLOCK_LOCAL_NETWORK_DOWNLOADS_KEY] ?: false,
         downloadTimeoutSeconds =
             prefs[DOWNLOAD_TIMEOUT_KEY]
                 ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
@@ -157,6 +162,28 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
  * Generates a random UUID string for use as a bearer token.
  */
 private fun generateTokenString(): String = UUID.randomUUID().toString()
+
+/**
+ * One-time tunnel-provider migration: an install that ever wrote a tunnel setting without choosing a
+ * provider was using the old default (Cloudflare) and keeps it; a fresh install (no tunnel key at all)
+ * gets the new default, the free E2E tunnel.
+ */
+private fun migrateTunnelProvider(prefs: MutablePreferences) {
+    if (prefs[TUNNEL_PROVIDER_MIGRATED_KEY] == true) return
+    val tunnelKeys =
+        listOf(
+            TUNNEL_ENABLED_KEY,
+            NGROK_AUTHTOKEN_KEY,
+            NGROK_DOMAIN_KEY,
+            CLOUDFLARE_TUNNEL_MODE_KEY,
+            CLOUDFLARE_TUNNEL_TOKEN_KEY,
+            CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY,
+        )
+    if (tunnelKeys.any { prefs.contains(it) } && prefs[TUNNEL_PROVIDER_KEY] == null) {
+        prefs[TUNNEL_PROVIDER_KEY] = TunnelProviderType.CLOUDFLARE.name
+    }
+    prefs[TUNNEL_PROVIDER_MIGRATED_KEY] = true
+}
 
 private fun getBuiltinLocationPermissionsInternal(prefs: Preferences): Map<String, BuiltinPermissions> {
     val json = prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] ?: return emptyMap()
@@ -237,8 +264,12 @@ class SettingsRepositoryImpl
         private val dataStore: DataStore<Preferences>,
         private val settingsChangeLogger: SettingsChangeLogger,
         eventChannelSettings: EventChannelSettings,
+        arcTunnelSettings: ArcTunnelSettings,
+        downloadSettings: DownloadSettings,
     ) : SettingsRepository,
-        EventChannelSettings by eventChannelSettings {
+        EventChannelSettings by eventChannelSettings,
+        ArcTunnelSettings by arcTunnelSettings,
+        DownloadSettings by downloadSettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)
@@ -265,6 +296,7 @@ class SettingsRepositoryImpl
                     }
                     prefs[BEARER_TOKEN_INITIALIZED_KEY] = true
                 }
+                migrateTunnelProvider(prefs)
             }
         }
 
@@ -291,9 +323,7 @@ class SettingsRepositoryImpl
             onWord: String = "enabled",
             offWord: String = "disabled",
         ) {
-            settingsChangeLogger.submit(key, oldValue.toString(), newValue.toString()) { _, n ->
-                "$subject ${if (n.toBoolean()) onWord else offWord}"
-            }
+            settingsChangeLogger.submitToggle(key, oldValue, newValue, subject, onWord, offWord)
         }
 
         override suspend fun updateOauthEnabled(enabled: Boolean) {
@@ -453,7 +483,7 @@ class SettingsRepositoryImpl
                 TUNNEL_PROVIDER_KEY,
                 "tunnel_provider",
                 provider.name,
-                TunnelProviderType.CLOUDFLARE.name,
+                TunnelProviderType.ARC_TUNNEL.name,
             ) { o, n ->
                 "Tunnel provider changed $o → $n"
             }
@@ -510,29 +540,6 @@ class SettingsRepositoryImpl
                     ),
                 )
             }
-
-        override suspend fun updateAllowHttpDownloads(enabled: Boolean) {
-            dataStore.edit { prefs ->
-                val old = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false
-                prefs[ALLOW_HTTP_DOWNLOADS_KEY] = enabled
-                logToggle("allow_http_downloads", old, enabled, "HTTP downloads", "allowed", "disallowed")
-            }
-        }
-
-        override suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean) {
-            dataStore.edit { prefs ->
-                val old = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false
-                prefs[ALLOW_UNVERIFIED_HTTPS_KEY] = enabled
-                logToggle(
-                    "allow_unverified_https_certs",
-                    old,
-                    enabled,
-                    "Unverified HTTPS certificates",
-                    "allowed",
-                    "disallowed",
-                )
-            }
-        }
 
         override suspend fun updateDownloadTimeout(seconds: Int) =
             logScalarChange(
@@ -829,11 +836,8 @@ class SettingsRepositoryImpl
             }
         }
 
-        override suspend fun getBuiltinLocationPermissions(): Map<String, BuiltinPermissions> {
-            val prefs = dataStore.data.first()
-            val json = prefs[BUILTIN_LOCATION_PERMISSIONS_KEY] ?: return emptyMap()
-            return parseBuiltinPermissionsJson(json)
-        }
+        override suspend fun getBuiltinLocationPermissions(): Map<String, BuiltinPermissions> =
+            getBuiltinLocationPermissionsInternal(dataStore.data.first())
 
         override suspend fun updateBuiltinLocationAllowWrite(
             locationId: String,

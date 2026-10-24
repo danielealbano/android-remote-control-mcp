@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ReportProblem
@@ -41,27 +43,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.BuildConfig
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateCheckUiState
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateViewModel
-
-private const val GITHUB_URL = "https://github.com/danielealbano/android-remote-control-mcp"
-private const val LICENSE_URL = "https://github.com/danielealbano/android-remote-control-mcp/blob/main/LICENSE"
-private const val ISSUES_URL = "https://github.com/danielealbano/android-remote-control-mcp/issues"
-private const val LINKEDIN_URL = "https://linkedin.com/in/danielesalvatorealbano"
-private const val X_URL = "https://x.com/daniele_dll"
-private const val DBIP_URL = "https://db-ip.com"
-private const val PRIVACY_MODEL_URL =
-    "https://huggingface.co/ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,27 +142,14 @@ fun AboutScreen(
             Spacer(Modifier.height(4.dp))
 
             Text(
-                text = stringResource(R.string.about_author_email),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier =
-                    Modifier.clickable {
-                        val intent =
-                            Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:d.albano@gmail.com")
-                            }
-                        context.startActivity(intent)
-                    },
-            )
-            Spacer(Modifier.height(4.dp))
-
-            Text(
                 text = stringResource(R.string.about_author_linkedin),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
                     Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LINKEDIN_URL)))
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.LINKEDIN_URL)))
+                        }
                     },
             )
             Spacer(Modifier.height(4.dp))
@@ -179,7 +160,9 @@ fun AboutScreen(
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
                     Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(X_URL)))
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.X_URL)))
+                        }
                     },
             )
 
@@ -194,45 +177,14 @@ fun AboutScreen(
             )
             Spacer(Modifier.height(8.dp))
 
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.about_link_github)) },
-                leadingContent = {
-                    Icon(Icons.Default.Code, contentDescription = null)
-                },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier =
-                    Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-                    },
+            AboutLinkItem(R.string.about_link_github, Icons.Default.Code, AboutLinks.GITHUB_URL)
+            AboutLinkItem(R.string.about_link_license, Icons.Default.Description, AboutLinks.LICENSE_URL)
+            AboutLinkItem(
+                R.string.about_link_third_party_licenses,
+                Icons.AutoMirrored.Filled.LibraryBooks,
+                AboutLinks.THIRD_PARTY_LICENSES_URL,
             )
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.about_link_license)) },
-                leadingContent = {
-                    Icon(Icons.Default.Description, contentDescription = null)
-                },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier =
-                    Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LICENSE_URL)))
-                    },
-            )
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.about_link_issues)) },
-                leadingContent = {
-                    Icon(Icons.Default.ReportProblem, contentDescription = null)
-                },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier =
-                    Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ISSUES_URL)))
-                    },
-            )
+            AboutLinkItem(R.string.about_link_issues, Icons.Default.ReportProblem, AboutLinks.ISSUES_URL)
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
@@ -250,7 +202,9 @@ fun AboutScreen(
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
                     Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DBIP_URL)))
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.DBIP_URL)))
+                        }
                     },
             )
             Spacer(Modifier.height(8.dp))
@@ -260,7 +214,9 @@ fun AboutScreen(
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
                     Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_MODEL_URL)))
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.PRIVACY_MODEL_URL)))
+                        }
                     },
             )
 
@@ -276,6 +232,25 @@ fun AboutScreen(
             )
         }
     }
+}
+
+/** A "Links" row that opens [url] in the browser; a no-op when no app handles ACTION_VIEW (never crash). */
+@Composable
+private fun AboutLinkItem(
+    @StringRes labelRes: Int,
+    icon: ImageVector,
+    url: String,
+) {
+    val context = LocalContext.current
+    ListItem(
+        headlineContent = { Text(stringResource(labelRes)) },
+        leadingContent = { Icon(icon, contentDescription = null) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+        modifier =
+            Modifier.clickable {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            },
+    )
 }
 
 @Composable

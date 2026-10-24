@@ -5,6 +5,8 @@ package com.danielealbano.androidremotecontrolmcp.integration
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
@@ -303,6 +305,51 @@ class TextInputIntegrationTest {
 
             // Verify mock interaction: select all was called
             verify { deps.typeInputController.performContextMenuAction(android.R.id.selectAll) }
+        }
+
+    @Test
+    fun `type_clear_text with a selector clears the matched field`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(
+                    any<List<WindowData>>(),
+                    FindBy.CLASS_NAME,
+                    "android.widget.EditText",
+                    true,
+                )
+            } returns
+                listOf(
+                    ElementInfo(
+                        id = "node_edit",
+                        className = "android.widget.EditText",
+                        bounds = BoundsData(50, 800, 500, 900),
+                        editable = true,
+                        enabled = true,
+                        visible = true,
+                    ),
+                )
+            coEvery {
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
+            } returns Result.success(Unit)
+            every { deps.typeInputController.isReady() } returns true
+            every { deps.typeInputController.performContextMenuAction(any()) } returns true
+            every { deps.typeInputController.sendKeyEvent(any()) } returns true
+            every {
+                deps.typeInputController.getSurroundingText(any(), any(), any())
+            } returnsMany listOf(createMockSurroundingText("Hello"), createMockSurroundingText(""))
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_type_clear_text",
+                        arguments =
+                            mapOf("by" to "class_name", "value" to "android.widget.EditText", "exact_match" to true),
+                    )
+                assertNotEquals(true, result.isError)
+                assertTrue((result.content[0] as TextContent).text.contains("Text cleared from node 'node_edit'"))
+            }
         }
 
     @Test

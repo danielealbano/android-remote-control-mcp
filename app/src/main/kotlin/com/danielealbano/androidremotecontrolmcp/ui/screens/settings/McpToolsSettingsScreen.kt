@@ -31,7 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -108,6 +108,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                 ToolEntry("long_click_node", "Long Click Node"),
                 ToolEntry("tap_node", "Tap Node"),
                 ToolEntry("scroll_to_node", "Scroll to Node"),
+                ToolEntry("scroll_node", "Scroll Node"),
             ),
         ),
         ToolCategory(

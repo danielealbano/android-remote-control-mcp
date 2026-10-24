@@ -2,8 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.ui.components
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.ARC_TUNNEL
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.CLOUDFLARE
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -303,5 +305,43 @@ class ConnectionInfoCardTest {
                 tunnelStatus = TunnelStatus.Error("boom"),
             )
         assertEquals(TunnelRowContent.Failed("boom"), result)
+    }
+
+    @Test
+    fun `tunnelRowContent and connection string carry the free E2E tunnel endpoint`() {
+        val url = "https://name.d.arc-tunnel.io"
+        val result =
+            tunnelRowContent(
+                tunnelEnabled = true,
+                serverStatus = running,
+                tunnelStatus = TunnelStatus.Connected(listOf(ep(url)), ARC_TUNNEL),
+            )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "https://127.0.0.1:8080/mcp",
+                tunnelEndpoints = listOf(ep(url)),
+                bearerToken = "",
+            )
+
+        assertEquals(TunnelRowContent.Connected(listOf(ep(url))), result)
+        assertEquals("URL: https://127.0.0.1:8080/mcp\nTunnel: $url/mcp", connectionString)
+    }
+
+    @Test
+    fun `tunnelRowContent shows the start renewal over the tunnel status`() {
+        assertEquals(
+            TunnelRowContent.Renewing,
+            tunnelRowContent(true, running, TunnelStatus.Connecting, ArcTunnelRenewalState.Renewing),
+        )
+        assertEquals(
+            TunnelRowContent.RenewalFailed("acme_rate_limited"),
+            tunnelRowContent(true, running, TunnelStatus.Error("x"), ArcTunnelRenewalState.Failed("acme_rate_limited")),
+        )
+    }
+
+    @Test
+    fun `tunnelRowContent hides the start renewal while the server is stopped`() {
+        val renewing = ArcTunnelRenewalState.Renewing
+        assertNull(tunnelRowContent(true, ServerStatus.Stopped, TunnelStatus.Connecting, renewing))
     }
 }

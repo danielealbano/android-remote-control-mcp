@@ -12,6 +12,9 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
 import com.danielealbano.androidremotecontrolmcp.utils.RecentsUtils
 
 /**
@@ -26,6 +29,7 @@ class AdbConfigHandler(
     private val settingsRepository: SettingsRepository,
     private val storageLocationProvider: StorageLocationProvider,
     private val serverLogRepository: ServerLogRepository,
+    private val arcTunnelEnrollment: ArcTunnelEnrollment,
 ) {
     /**
      * Dispatches the intent to the appropriate handler based on its action.
@@ -47,6 +51,9 @@ class AdbConfigHandler(
         context: Context,
         intent: Intent,
     ) {
+        // The one-time migrations run before this broadcast's writes, so a fresh install configured over
+        // ADB keeps the new default tunnel provider.
+        settingsRepository.ensureAuthModelMigrated()
         Log.i(TAG, "Received ADB configuration broadcast")
         serverLogRepository.log(ServerLogEntry.Type.SETTINGS, "Configuration update received via ADB")
 
@@ -68,14 +75,18 @@ class AdbConfigHandler(
         applyCloudflareTunnelExtraArgs(intent)
         applyNgrokAuthtoken(intent)
         applyNgrokDomain(intent)
+        applyArcTunnelBaseAddress(intent)
+        applyArcTunnelCtCheckEnabled(intent)
         applyFileSizeLimit(intent)
         applyAllowHttpDownloads(intent)
         applyAllowUnverifiedHttpsCerts(intent)
+        applyBlockLocalNetworkDownloads(intent)
         applyDownloadTimeout(intent)
         applyScreenAwakeTimeout(intent)
         applyDeviceSlug(intent)
         applyToolPermissions(intent)
         applyStorageLocationPermissions(intent)
+        applyArcTunnelEnroll(intent)
 
         Log.i(TAG, "ADB configuration applied successfully")
     }
@@ -231,17 +242,15 @@ class AdbConfigHandler(
 
     private suspend fun applyTunnelProvider(intent: Intent) {
         val value = intent.getStringExtra(EXTRA_TUNNEL_PROVIDER) ?: return
-        val provider =
-            try {
-                TunnelProviderType.valueOf(value)
-            } catch (_: IllegalArgumentException) {
-                Log.w(
-                    TAG,
-                    "Ignoring invalid tunnel_provider '$value' " +
-                        "(valid: ${TunnelProviderType.entries.joinToString()})",
-                )
-                return
-            }
+        val provider = TunnelProviderType.fromAdbValue(value)
+        if (provider == null) {
+            Log.w(
+                TAG,
+                "Ignoring invalid tunnel_provider '$value' " +
+                    "(valid: ${TunnelProviderType.entries.joinToString { it.adbValue }})",
+            )
+            return
+        }
         settingsRepository.updateTunnelProvider(provider)
         Log.i(TAG, "Tunnel provider updated to $provider")
     }
@@ -296,6 +305,38 @@ class AdbConfigHandler(
         Log.i(TAG, "ngrok domain updated to '$value'")
     }
 
+    private suspend fun applyArcTunnelBaseAddress(intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_ARC_TUNNEL_BASE_ADDRESS) ?: return
+        if (!ArcTunnelHosts.isValidBaseAddress(value)) {
+            Log.w(TAG, "Ignoring invalid arc_tunnel_base_address '$value'")
+            return
+        }
+        settingsRepository.updateArcTunnelBaseAddress(value)
+        Log.i(TAG, "Free E2E tunnel base address updated to '$value'")
+    }
+
+    private suspend fun applyArcTunnelCtCheckEnabled(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED)) return
+        val value = intent.getBooleanExtra(EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED, true)
+        settingsRepository.updateArcTunnelCtCheckEnabled(value)
+        Log.i(TAG, "Free E2E tunnel certificate check updated to $value")
+    }
+
+    /**
+     * `--ez arc_tunnel_enroll true`: enrolls (or resumes issuance) in the background with the settings just
+     * applied.
+     */
+    private suspend fun applyArcTunnelEnroll(intent: Intent) {
+        if (!intent.getBooleanExtra(EXTRA_ARC_TUNNEL_ENROLL, false)) return
+        if (isServerActive(McpServerService.serverStatus.value)) {
+            Log.w(TAG, "arc_tunnel_enroll ignored: stop the MCP server first")
+            return
+        }
+        val env = ArcTunnelEnv.from(settingsRepository.getServerConfig())
+        arcTunnelEnrollment.requestEnroll(env)
+        Log.i(TAG, "Free E2E tunnel enrollment requested for ${env.baseAddress}")
+    }
+
     private suspend fun applyFileSizeLimit(intent: Intent) {
         if (!intent.hasExtra(EXTRA_FILE_SIZE_LIMIT_MB)) return
         val value = intent.getIntExtra(EXTRA_FILE_SIZE_LIMIT_MB, -1)
@@ -320,6 +361,13 @@ class AdbConfigHandler(
         val value = intent.getBooleanExtra(EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS, false)
         settingsRepository.updateAllowUnverifiedHttpsCerts(value)
         Log.i(TAG, "Allow unverified HTTPS certs updated to $value")
+    }
+
+    private suspend fun applyBlockLocalNetworkDownloads(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS)) return
+        val value = intent.getBooleanExtra(EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, false)
+        settingsRepository.updateBlockLocalNetworkDownloads(value)
+        Log.i(TAG, "Block local network downloads updated to $value")
     }
 
     private suspend fun applyDownloadTimeout(intent: Intent) {
@@ -432,9 +480,13 @@ class AdbConfigHandler(
         internal const val EXTRA_CLOUDFLARE_TUNNEL_EXTRA_ARGS = "cloudflare_tunnel_extra_args"
         internal const val EXTRA_NGROK_AUTHTOKEN = "ngrok_authtoken"
         internal const val EXTRA_NGROK_DOMAIN = "ngrok_domain"
+        internal const val EXTRA_ARC_TUNNEL_BASE_ADDRESS = "arc_tunnel_base_address"
+        internal const val EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED = "arc_tunnel_ct_check_enabled"
+        internal const val EXTRA_ARC_TUNNEL_ENROLL = "arc_tunnel_enroll"
         internal const val EXTRA_FILE_SIZE_LIMIT_MB = "file_size_limit_mb"
         internal const val EXTRA_ALLOW_HTTP_DOWNLOADS = "allow_http_downloads"
         internal const val EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS = "allow_unverified_https_certs"
+        internal const val EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS = "block_local_network_downloads"
         internal const val EXTRA_DOWNLOAD_TIMEOUT_SECONDS = "download_timeout_seconds"
         internal const val EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS = "screen_awake_timeout_seconds"
         internal const val EXTRA_DEVICE_SLUG = "device_slug"

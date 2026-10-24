@@ -6,68 +6,40 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Main-thread lifecycle using the same uptime clock as coroutine delay; zero disables holding. */
+/** Main-thread lifecycle with a fixed startup timeout. Coroutine delay is the only uptime clock. */
 internal class ScreenAwakeController(
     private val scope: CoroutineScope,
-    private val nowMillis: () -> Long,
+    timeoutSeconds: Int,
     private val setAwake: (Boolean) -> Unit,
 ) {
-    private var timeoutSeconds = ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS
+    private val timeoutMillis =
+        (timeoutSeconds.takeIf(ServerConfig::isValidScreenAwakeTimeout) ?: 0) * MILLIS_PER_SECOND
     private var active = false
-    private var finishedAt: Long? = null
     private var releaseJob: Job? = null
 
     fun started() {
         releaseJob?.cancel()
-        active = timeoutSeconds > 0
-        finishedAt = null
+        releaseJob = null
+        active = timeoutMillis > 0
         if (active) setAwake(true)
     }
 
     fun finished() {
-        if (active) {
-            active = false
-            finishedAt = nowMillis()
-            scheduleRelease()
-        }
-    }
-
-    fun updateTimeout(seconds: Int) {
-        val valid =
-            seconds.takeIf(ServerConfig::isValidScreenAwakeTimeout)
-                ?: ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS
-        if (valid != timeoutSeconds) {
-            timeoutSeconds = valid
-            if (valid == 0) {
-                stop()
-            } else if (!active && finishedAt != null) {
-                scheduleRelease()
+        if (!active) return
+        active = false
+        releaseJob =
+            scope.launch {
+                delay(timeoutMillis)
+                releaseJob = null
+                setAwake(false)
             }
-        }
     }
 
     fun stop() {
         releaseJob?.cancel()
         releaseJob = null
         active = false
-        finishedAt = null
         setAwake(false)
-    }
-
-    private fun scheduleRelease() {
-        releaseJob?.cancel()
-        val elapsed = (nowMillis() - (finishedAt ?: return)).coerceAtLeast(0)
-        val remaining = timeoutSeconds * MILLIS_PER_SECOND - elapsed
-        if (remaining <= 0) {
-            stop()
-        } else {
-            releaseJob =
-                scope.launch {
-                    delay(remaining)
-                    finishedAt = null
-                    setAwake(false)
-                }
-        }
     }
 
     private companion object {

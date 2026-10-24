@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.net.URLEncoder
 
 /**
@@ -133,7 +133,7 @@ class OAuthFlowE2ETest {
     }
 
     private fun httpGet(urlStr: String): Pair<Int, String> {
-        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+        val conn = (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             instanceFollowRedirects = false
             connectTimeout = HTTP_TIMEOUT_MS
@@ -147,7 +147,7 @@ class OAuthFlowE2ETest {
         body: String,
         contentType: String,
     ): Pair<Int, String> {
-        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+        val conn = (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             instanceFollowRedirects = false
             doOutput = true

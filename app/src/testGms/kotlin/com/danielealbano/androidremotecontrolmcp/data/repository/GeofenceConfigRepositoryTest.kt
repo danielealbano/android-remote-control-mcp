@@ -170,7 +170,13 @@ class GeofenceConfigRepositoryTest {
             // A main event-channel write rewrites the shared blob WITHOUT the geofence field.
             val changeLogger = SettingsChangeLogger(RecordingServerLogRepository(), Dispatchers.Unconfined, 0L)
             val settingsRepository =
-                SettingsRepositoryImpl(dataStore, changeLogger, EventChannelSettingsImpl(dataStore, changeLogger))
+                SettingsRepositoryImpl(
+                    dataStore,
+                    changeLogger,
+                    EventChannelSettingsImpl(dataStore, changeLogger),
+                    ArcTunnelSettingsImpl(dataStore, changeLogger),
+                    DownloadSettingsImpl(dataStore, changeLogger),
+                )
             settingsRepository.updateNotificationChannelEnabled(true)
 
             // The dedicated geofence key must be untouched — the zone survives.

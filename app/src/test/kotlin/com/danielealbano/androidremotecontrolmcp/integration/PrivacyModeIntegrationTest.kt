@@ -21,9 +21,11 @@ import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerResult
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerSegment
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationData
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.every
@@ -297,6 +299,42 @@ class PrivacyModeIntegrationTest {
         }
 
     @Test
+    fun `node selector reverses the placeholder and redacts the ambiguous candidates`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setPrivacy(deps, deterministicEnabled, PrivacyModeStatus.ReadyDeterministicOnly)
+            deps.setupTree(treeWith("john@example.com"))
+            val placeholder = deps.privacyToolGate.text("john@example.com", "seed")!!
+
+            val valueSlot = slot<String>()
+            val match =
+                ElementInfo(
+                    id = "node_field",
+                    text = "john@example.com",
+                    className = "android.widget.TextView",
+                    bounds = BoundsData(100, 200, 900, 260),
+                    visible = true,
+                )
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), any(), capture(valueSlot), any())
+            } returns listOf(match, match.copy(id = "node_field_2"))
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_click_node",
+                        arguments = mapOf("by" to "text", "value" to placeholder),
+                    )
+                assertEquals(true, result.isError)
+                assertEquals("john@example.com", valueSlot.captured)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("node_field_2"), text)
+                assertTrue(text.contains("EMAIL#"), text)
+                assertFalse(text.contains("john@example.com"), text)
+            }
+        }
+
+    @Test
     fun `type_append_text substitutes placeholder back`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
@@ -412,6 +450,49 @@ class PrivacyModeIntegrationTest {
                 }
                 // The masked copy (not the raw captured bitmap) must be the one annotated/encoded.
                 verify { deps.screenshotAnnotator.annotate(masked, any(), 1080, 2400) }
+            } finally {
+                unmockkConstructor(Canvas::class)
+            }
+        }
+
+    @Test
+    fun `screenshot with annotate false encodes the masked copy`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setPrivacy(deps, deterministicEnabled, PrivacyModeStatus.ReadyDeterministicOnly)
+            deps.setupTree(treeWith("john@example.com"))
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            val resized = mockk<Bitmap>(relaxed = true)
+            val masked = mockk<Bitmap>(relaxed = true)
+            coEvery { deps.screenCaptureProvider.captureScreenshotBitmap(any(), any()) } returns Result.success(resized)
+            every { resized.copy(Bitmap.Config.ARGB_8888, true) } returns masked
+            every { masked.width } returns 1080
+            every { masked.height } returns 2400
+
+            mockkConstructor(Canvas::class)
+            every { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) } just Runs
+
+            every { deps.screenshotEncoder.bitmapToScreenshotData(any(), any()) } returns
+                ScreenshotData(data = "dGVzdA==", width = 700, height = 500)
+
+            try {
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "android_get_screen_state",
+                            arguments = mapOf("include_screenshot" to true, "annotate" to false),
+                        )
+                    assertNotEquals(true, result.isError)
+                }
+                // The masked copy (not the raw captured bitmap) must be the one encoded, without annotation.
+                verify(exactly = 1) {
+                    deps.screenshotEncoder.bitmapToScreenshotData(masked, ScreenCaptureProvider.DEFAULT_QUALITY)
+                }
+                verify(exactly = 0) { deps.screenshotEncoder.bitmapToScreenshotData(resized, any()) }
+                verify(exactly = 0) { deps.screenshotAnnotator.annotate(any(), any(), any(), any()) }
+                verify(exactly = 1) { masked.recycle() }
+                verify(exactly = 1) { resized.recycle() }
             } finally {
                 unmockkConstructor(Canvas::class)
             }

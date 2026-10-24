@@ -23,7 +23,10 @@ import kotlinx.coroutines.flow.Flow
  * and Services must not access DataStore directly.
  */
 @Suppress("TooManyFunctions")
-interface SettingsRepository : EventChannelSettings {
+interface SettingsRepository :
+    EventChannelSettings,
+    ArcTunnelSettings,
+    DownloadSettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.
@@ -96,6 +99,9 @@ interface SettingsRepository : EventChannelSettings {
      *
      * Idempotent; MUST be invoked before the auth model is consumed by the server or the UI so a
      * previously-cleared-token user is not regressed into a token-required state.
+     *
+     * Also runs the one-time tunnel-provider migration (an install that ever wrote a tunnel setting without
+     * choosing a provider keeps Cloudflare).
      */
     suspend fun ensureAuthModelMigrated()
 
@@ -189,12 +195,6 @@ interface SettingsRepository : EventChannelSettings {
      * @return [Result.success] with the validated limit, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateFileSizeLimit(limitMb: Int): Result<Int>
-
-    /** Updates whether HTTP (non-HTTPS) downloads are allowed. */
-    suspend fun updateAllowHttpDownloads(enabled: Boolean)
-
-    /** Updates whether unverified HTTPS certificates are accepted for downloads. */
-    suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean)
 
     /** Updates the download timeout in seconds. */
     suspend fun updateDownloadTimeout(seconds: Int)

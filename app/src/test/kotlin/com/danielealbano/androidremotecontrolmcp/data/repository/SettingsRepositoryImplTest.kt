@@ -82,6 +82,8 @@ class SettingsRepositoryImplTest {
                 dataStore,
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
+                ArcTunnelSettingsImpl(dataStore, changeLogger),
+                DownloadSettingsImpl(dataStore, changeLogger),
             )
     }
 
@@ -146,7 +148,7 @@ class SettingsRepositoryImplTest {
                 assertEquals(CertificateSource.AUTO_GENERATED, config.certificateSource)
                 assertEquals(ServerConfig.DEFAULT_CERTIFICATE_HOSTNAME, config.certificateHostname)
                 assertFalse(config.tunnelEnabled)
-                assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
+                assertEquals(TunnelProviderType.ARC_TUNNEL, config.tunnelProvider)
                 assertEquals("", config.ngrokAuthtoken)
                 assertEquals("", config.ngrokDomain)
                 assertEquals("", config.deviceSlug)
@@ -345,6 +347,33 @@ class SettingsRepositoryImplTest {
                 val config = repository.getServerConfig()
 
                 assertFalse(config.hideFromRecents)
+            }
+    }
+
+    @Nested
+    @DisplayName("updateBlockLocalNetworkDownloads")
+    inner class UpdateBlockLocalNetworkDownloads {
+        @Test
+        fun `is off by default`() =
+            testScope.runTest {
+                assertFalse(repository.getServerConfig().blockLocalNetworkDownloads)
+            }
+
+        @Test
+        fun `enables the block`() =
+            testScope.runTest {
+                repository.updateBlockLocalNetworkDownloads(true)
+
+                assertTrue(repository.getServerConfig().blockLocalNetworkDownloads)
+            }
+
+        @Test
+        fun `disables the block`() =
+            testScope.runTest {
+                repository.updateBlockLocalNetworkDownloads(true)
+                repository.updateBlockLocalNetworkDownloads(false)
+
+                assertFalse(repository.getServerConfig().blockLocalNetworkDownloads)
             }
     }
 
@@ -578,6 +607,74 @@ class SettingsRepositoryImplTest {
                 val config = repository.getServerConfig()
 
                 assertFalse(config.tunnelEnabled)
+            }
+    }
+
+    @Nested
+    @DisplayName("tunnel-provider migration")
+    inner class TunnelProviderMigration {
+        @Test
+        fun `migration keeps Cloudflare for an install that touched tunnel settings`() =
+            testScope.runTest {
+                dataStore.edit { it[booleanPreferencesKey("tunnel_enabled")] = true }
+
+                repository.ensureAuthModelMigrated()
+
+                assertEquals(TunnelProviderType.CLOUDFLARE, repository.serverConfig.first().tunnelProvider)
+            }
+
+        @Test
+        fun `migration keeps an explicitly stored provider`() =
+            testScope.runTest {
+                dataStore.edit {
+                    it[stringPreferencesKey("tunnel_provider")] = TunnelProviderType.NGROK.name
+                    it[booleanPreferencesKey("tunnel_enabled")] = true
+                }
+
+                repository.ensureAuthModelMigrated()
+
+                assertEquals(TunnelProviderType.NGROK, repository.serverConfig.first().tunnelProvider)
+            }
+
+        @Test
+        fun `migration leaves a fresh install on the new default`() =
+            testScope.runTest {
+                repository.ensureAuthModelMigrated()
+
+                assertEquals(TunnelProviderType.ARC_TUNNEL, repository.serverConfig.first().tunnelProvider)
+                assertEquals(null, dataStore.data.first()[stringPreferencesKey("tunnel_provider")])
+            }
+
+        @Test
+        fun `migration runs once`() =
+            testScope.runTest {
+                dataStore.edit {
+                    it[booleanPreferencesKey("tunnel_provider_migrated")] = true
+                    it[booleanPreferencesKey("tunnel_enabled")] = true
+                }
+
+                repository.ensureAuthModelMigrated()
+                repository.ensureAuthModelMigrated()
+
+                assertEquals(TunnelProviderType.ARC_TUNNEL, repository.serverConfig.first().tunnelProvider)
+            }
+
+        @Test
+        fun `serverConfig maps the arc tunnel keys`() =
+            testScope.runTest {
+                dataStore.edit {
+                    it[stringPreferencesKey("arc_tunnel_base_address")] = "tunnel.example.org"
+                    it[booleanPreferencesKey("arc_tunnel_ct_check_enabled")] = false
+                    it[stringPreferencesKey("arc_tunnel_edge_override")] = "10.0.0.1:18443"
+                    it[stringPreferencesKey("arc_tunnel_trusted_ca_pem")] = "pem"
+                }
+
+                val config = repository.serverConfig.first()
+
+                assertEquals("tunnel.example.org", config.arcTunnelBaseAddress)
+                assertFalse(config.arcTunnelCtCheckEnabled)
+                assertEquals("10.0.0.1:18443", config.arcTunnelEdgeOverride)
+                assertEquals("pem", config.arcTunnelTrustedCaPem)
             }
     }
 

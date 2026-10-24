@@ -304,6 +304,7 @@ object McpIntegrationTestHelper {
         registerTextInputTools(
             registrar,
             deps.treeParser,
+            deps.elementFinder,
             deps.actionExecutor,
             deps.accessibilityServiceProvider,
             deps.typeInputController,

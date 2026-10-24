@@ -19,14 +19,18 @@ interface TunnelProvider {
     /**
      * Starts the tunnel, forwarding traffic from a public URL to [localPort] on localhost.
      *
-     * This is a suspend function that returns once the tunnel is established
-     * (status becomes [TunnelStatus.Connected]) or fails (status becomes [TunnelStatus.Error]).
+     * Returns once the tunnel is established (status [TunnelStatus.Connected]) or failed
+     * (status [TunnelStatus.Error]) — or, for a provider that bootstraps asynchronously
+     * (`ArcTunnelProvider`), once the start was accepted with status [TunnelStatus.Connecting].
+     * A second start while running is either ignored (logged) or rejected with
+     * [IllegalStateException], depending on the provider; it never alters a live status.
      *
-     * @param localPort The local port to forward traffic to.
+     * @param localPort The local port to forward traffic to (the free E2E tunnel ignores it: it serves through its
+     *                  own loopback TLS listener).
      * @param config The current server configuration (providers extract their own
      *               relevant fields, e.g. ngrok reads [ServerConfig.ngrokAuthtoken]
      *               and [ServerConfig.ngrokDomain]).
-     * @throws IllegalStateException if the tunnel is already running.
+     * @throws IllegalStateException if a provider rejects a second start while running.
      */
     suspend fun start(
         localPort: Int,

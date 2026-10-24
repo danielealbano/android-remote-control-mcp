@@ -27,8 +27,9 @@ class MediaStoreFileOperationsImpl
         private val storageLocationProvider: StorageLocationProvider,
         private val settingsRepository: SettingsRepository,
         private val permissionChecker: PermissionChecker,
+        downloadHttpClient: DownloadHttpClient,
     ) : MediaStoreFileOperations {
-        private val downloader = MediaStoreDownloader(context)
+        private val downloader = MediaStoreDownloader(context, downloadHttpClient)
 
         // ─── listFiles ──────────────────────────────────────────────────────
 

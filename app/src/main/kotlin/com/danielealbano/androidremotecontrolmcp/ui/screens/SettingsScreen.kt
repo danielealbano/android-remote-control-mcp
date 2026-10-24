@@ -5,7 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.screens
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -24,6 +24,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.StorageSett
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.TunnelSettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.WifiMonitorScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.geofenceDestinations
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
@@ -38,6 +39,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
     channelViewModel: ChannelViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
 
@@ -77,7 +79,11 @@ fun SettingsScreen(
             PrivacySettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoute.Tunnel.route) {
-            TunnelSettingsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
+            TunnelSettingsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = viewModel,
+                arcViewModel = arcTunnelViewModel,
+            )
         }
         composable(SettingsRoute.McpTools.route) {
             McpToolsSettingsScreen(

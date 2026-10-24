@@ -1,29 +1,32 @@
 package com.danielealbano.androidremotecontrolmcp.services.storage
 
 import io.mockk.mockk
-import io.mockk.verify
+import okhttp3.OkHttpClient
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLSocketFactory
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLSession
 
 @DisplayName("SslUtils")
 class SslUtilsTest {
+    private fun trustingClient(): OkHttpClient = OkHttpClient.Builder().also(SslUtils::trustAllCertificates).build()
+
     @Test
-    fun `configurePermissiveSsl sets SSLSocketFactory on connection`() {
-        val connection = mockk<HttpsURLConnection>(relaxed = true)
+    fun `trustAllCertificates accepts any host name`() {
+        val client = trustingClient()
 
-        SslUtils.configurePermissiveSsl(connection)
-
-        verify { connection.sslSocketFactory = any<SSLSocketFactory>() }
+        assertTrue(client.hostnameVerifier.verify("any.example", mockk<SSLSession>(relaxed = true)))
     }
 
     @Test
-    fun `configurePermissiveSsl sets permissive HostnameVerifier`() {
-        val connection = mockk<HttpsURLConnection>(relaxed = true)
+    fun `trustAllCertificates installs a trust manager accepting any chain`() {
+        val trustManager = trustingClient().x509TrustManager
 
-        SslUtils.configurePermissiveSsl(connection)
-
-        verify { connection.hostnameVerifier = any() }
+        assertNotNull(trustManager)
+        trustManager!!.checkServerTrusted(arrayOf<X509Certificate>(mockk(relaxed = true)), "RSA")
+        assertEquals(0, trustManager.acceptedIssuers.size)
     }
 }

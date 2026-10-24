@@ -7,6 +7,7 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,12 +51,16 @@ import javax.inject.Inject
  *   --es certificate_source "AUTO_GENERATED" \
  *   --es certificate_hostname "android-mcp.local" \
  *   --ez tunnel_enabled true \
- *   --es tunnel_provider "CLOUDFLARE" \
+ *   --es tunnel_provider "android-remote-control-mcp-tunneld" \
  *   --es ngrok_authtoken "your-ngrok-token" \
  *   --es ngrok_domain "your-domain.ngrok-free.app" \
+ *   --es arc_tunnel_base_address "arc-tunnel.io" \
+ *   --ez arc_tunnel_ct_check_enabled true \
+ *   --ez arc_tunnel_enroll true \
  *   --ei file_size_limit_mb 50 \
  *   --ez allow_http_downloads false \
  *   --ez allow_unverified_https_certs false \
+ *   --ez block_local_network_downloads false \
  *   --ei download_timeout_seconds 60 \
  *   --es device_slug "my_pixel"
  *
@@ -85,6 +90,9 @@ class AdbConfigReceiver : BroadcastReceiver() {
     @Inject
     lateinit var serverLogRepository: ServerLogRepository
 
+    @Inject
+    lateinit var arcTunnelEnrollment: ArcTunnelEnrollment
+
     // No in-code sender UID check is needed: the manifest gates this exported receiver behind
     // android:permission="android.permission.DUMP", which ActivityManager enforces against the
     // real binder calling UID. DUMP is held by the adb shell UID (com.android.shell) but is not
@@ -99,7 +107,8 @@ class AdbConfigReceiver : BroadcastReceiver() {
     ) {
         Log.i(TAG, "onReceive called with action: ${intent.action}")
 
-        val handler = AdbConfigHandler(settingsRepository, storageLocationProvider, serverLogRepository)
+        val handler =
+            AdbConfigHandler(settingsRepository, storageLocationProvider, serverLogRepository, arcTunnelEnrollment)
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {

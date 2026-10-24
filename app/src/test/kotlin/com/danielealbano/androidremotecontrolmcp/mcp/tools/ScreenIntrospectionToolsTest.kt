@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.PaginationTestTrees
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateFormatOptions
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCacheImpl
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
@@ -454,6 +455,110 @@ class ScreenIntrospectionToolsTest {
                     }
                 assertTrue(exception.message!!.contains("No windows available"))
             }
+
+        private fun stubScreenshot(): Pair<Bitmap, Bitmap> {
+            every { mockScreenCaptureProvider.isScreenCaptureAvailable() } returns true
+            val captured = mockk<Bitmap>(relaxed = true)
+            val annotated = mockk<Bitmap>(relaxed = true)
+            coEvery { mockScreenCaptureProvider.captureScreenshotBitmap(any(), any()) } returns Result.success(captured)
+            every { mockScreenshotAnnotator.annotate(any(), any(), any(), any()) } returns annotated
+            every {
+                mockScreenshotEncoder.bitmapToScreenshotData(any(), any())
+            } returns ScreenshotData(data = "base64data", width = 700, height = 500)
+            return captured to annotated
+        }
+
+        @Test
+        @DisplayName("annotate=false encodes the plain screenshot without annotating it")
+        fun annotateFalseEncodesThePlainScreenshot() =
+            runTest {
+                setupReadyService()
+                val (captured, _) = stubScreenshot()
+
+                val result =
+                    handler.execute(
+                        buildJsonObject {
+                            put("include_screenshot", true)
+                            put("annotate", false)
+                        },
+                    )
+
+                assertEquals(2, result.content.size)
+                verify(exactly = 0) { mockScreenshotAnnotator.annotate(any(), any(), any(), any()) }
+                verify { mockScreenshotEncoder.bitmapToScreenshotData(captured, ScreenCaptureProvider.DEFAULT_QUALITY) }
+            }
+
+        @Test
+        @DisplayName("annotate defaults to true and encodes the annotated screenshot")
+        fun annotateDefaultsToTrue() =
+            runTest {
+                setupReadyService()
+                val (_, annotated) = stubScreenshot()
+
+                handler.execute(buildJsonObject { put("include_screenshot", true) })
+
+                verify {
+                    mockScreenshotEncoder.bitmapToScreenshotData(annotated, ScreenCaptureProvider.DEFAULT_QUALITY)
+                }
+            }
+
+        @Test
+        @DisplayName("rejects non-boolean annotate, include_offscreen and include_hierarchy")
+        fun rejectsNonBooleanOutputParameters() =
+            runTest {
+                setupReadyService()
+
+                for (name in listOf("annotate", "include_offscreen", "include_hierarchy")) {
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(buildJsonObject { put(name, "false") })
+                    }
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(buildJsonObject { put(name, 0) })
+                    }
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(buildJsonObject { putJsonObject(name) { put("value", false) } })
+                    }
+                }
+            }
+
+        @Test
+        @DisplayName("rejects non-boolean annotate, include_offscreen and include_hierarchy with a cursor too")
+        fun rejectsNonBooleanOutputParametersWithACursor() =
+            runTest {
+                setupReadyService()
+
+                for (name in listOf("annotate", "include_offscreen", "include_hierarchy")) {
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(
+                            buildJsonObject {
+                                put("cursor", "snap.2")
+                                put(name, "no")
+                            },
+                        )
+                    }
+                }
+            }
+
+        @Test
+        @DisplayName("passes include_offscreen and include_hierarchy to the formatter")
+        fun passesOutputOptionsToTheFormatter() =
+            runTest {
+                setupReadyService()
+                val options = ScreenStateFormatOptions(includeOffscreen = false, includeHierarchy = false)
+                every {
+                    mockCompactTreeFormatter.formatMultiWindow(any(), eq(sampleScreenInfo), eq(options))
+                } returns "filtered output"
+
+                val result =
+                    handler.execute(
+                        buildJsonObject {
+                            put("include_offscreen", false)
+                            put("include_hierarchy", false)
+                        },
+                    )
+
+                assertEquals("filtered output", stripUntrustedWarning((result.content[0] as TextContent).text))
+            }
     }
 
     @Nested
@@ -514,6 +619,82 @@ class ScreenIntrospectionToolsTest {
         }
 
         private fun snapshotId(text: String): String = Regex("snapshot:(\\S+)").find(text)!!.groupValues[1]
+
+        @Test
+        @DisplayName("include_offscreen=false counts pages over the listed nodes only")
+        fun includeOffscreenFalseCountsPagesOverListedNodesOnly() =
+            runTest {
+                // 150 on-screen + 150 off-screen leaves under a listed box: 301 nodes (2 pages) by default,
+                // 151 (a single page, no cursor) on screen only.
+                val leaves =
+                    (0 until MIXED_LEAF_COUNT).map { i ->
+                        AccessibilityNodeData(
+                            id = "node_leaf_$i",
+                            className = "android.widget.TextView",
+                            text = "leaf$i",
+                            bounds = BoundsData(0, i, 100, i + 1),
+                            enabled = true,
+                            visible = i % 2 == 0,
+                        )
+                    }
+                val box =
+                    AccessibilityNodeData(
+                        id = "node_box",
+                        className = "android.widget.FrameLayout",
+                        resourceId = "com.example.app:id/box",
+                        bounds = BoundsData(0, 0, 100, 100),
+                        enabled = true,
+                        visible = true,
+                        children = leaves,
+                    )
+                stubCaptureWithTree(box)
+
+                val all = freshText()
+                val onScreen =
+                    (handler.execute(buildJsonObject { put("include_offscreen", false) }).content[0] as TextContent)
+                        .text
+
+                assertTrue(all.contains("page:1/2"), all)
+                assertFalse(onScreen.contains("page:"), onScreen)
+                assertNull(realCache.get(snapshotId(all)))
+                val onScreenRows = onScreen.lines().count { '\t' in it && !it.startsWith("node_id\t") }
+                assertEquals(MIXED_LEAF_COUNT / 2 + 1, onScreenRows)
+            }
+
+        @Test
+        @DisplayName("cursor pages keep the output options of the fresh capture")
+        fun cursorPagesKeepTheOutputOptionsOfTheFreshCapture() =
+            runTest {
+                stubCaptureWithTree(largeTree())
+                val fresh =
+                    (
+                        handler
+                            .execute(
+                                buildJsonObject {
+                                    put("include_offscreen", false)
+                                    put("include_hierarchy", false)
+                                },
+                            ).content[0] as TextContent
+                    ).text
+                val id = snapshotId(fresh)
+
+                val page2 =
+                    (
+                        handler
+                            .execute(
+                                buildJsonObject {
+                                    put("cursor", "$id.2")
+                                    put("include_offscreen", true)
+                                    put("include_hierarchy", true)
+                                },
+                            ).content[0] as TextContent
+                    ).text
+
+                for (text in listOf(fresh, page2)) {
+                    assertTrue(text.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_OMITTED), text)
+                    assertFalse(text.lines().contains(CompactTreeFormatter.HIERARCHY_HEADER), text)
+                }
+            }
 
         @Test
         @DisplayName("cursorless small screen returns single page no cursor and clears cache")
@@ -654,5 +835,9 @@ class ScreenIntrospectionToolsTest {
                 assertTrue(text.contains("invalid cursor"))
                 assertTrue(text.contains("screenshot can only be requested on page 1"))
             }
+    }
+
+    private companion object {
+        const val MIXED_LEAF_COUNT = 300
     }
 }

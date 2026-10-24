@@ -18,7 +18,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -26,6 +25,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
@@ -72,6 +72,7 @@ class FindNodesTool
             val value = substitutor.substitute(rawValue)
 
             val exactMatch = arguments["exact_match"]?.jsonPrimitive?.booleanOrNull ?: false
+            val visibleOnly = McpToolUtils.optionalBoolean(arguments, PARAM_VISIBLE_ONLY, false)
 
             val findBy =
                 mapFindBy(byStr)
@@ -83,9 +84,12 @@ class FindNodesTool
             val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
             // Search across all windows
-            val elements = elementFinder.findElements(result.windows, findBy, value, exactMatch)
+            val elements =
+                elementFinder
+                    .findElements(result.windows, findBy, value, exactMatch)
+                    .filter { !visibleOnly || it.visible }
 
-            Log.d(TAG, "find_nodes: by=$byStr, found=${elements.size}")
+            Log.d(TAG, "find_nodes: by=$byStr, visibleOnly=$visibleOnly, found=${elements.size}")
 
             val redactedFields =
                 privacyToolGate.texts(
@@ -150,6 +154,11 @@ class FindNodesTool
                                         "If true, match exactly. If false, match contains (case-insensitive)",
                                     )
                                 }
+                                putJsonObject(PARAM_VISIBLE_ONLY) {
+                                    put("type", "boolean")
+                                    put("default", false)
+                                    put("description", "If true, return only the matches that are on screen")
+                                }
                             },
                         required = listOf("by", "value"),
                     ),
@@ -159,13 +168,14 @@ class FindNodesTool
         companion object {
             private const val TAG = "MCP:FindNodesTool"
             const val TOOL_NAME = "find_nodes"
+            internal const val PARAM_VISIBLE_ONLY = "visible_only"
         }
     }
 
 /**
  * MCP tool: click_node
  *
- * Clicks the accessibility node identified by node_id.
+ * Clicks the accessibility node identified by node_id or by a selector.
  */
 class ClickNodeTool
     @Inject
@@ -174,17 +184,17 @@ class ClickNodeTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId =
-                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
-
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, multiWindowResult.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return resolution.result
+                }
 
             val result = actionExecutor.clickNode(nodeId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, nodeId) }
@@ -201,18 +211,12 @@ class ClickNodeTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Click the specified accessibility node by node ID. " +
-                        "Returns after the click is performed.",
+                    "Click the specified accessibility node, by node ID or by a selector (by + value, the single " +
+                        "on-screen match). Returns after the click is performed.",
                 inputSchema =
                     ToolSchema(
-                        properties =
-                            buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
-                                }
-                            },
-                        required = listOf("node_id"),
+                        properties = buildJsonObject { putNodeTargetProperties(toolNamePrefix) },
+                        required = emptyList(),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -226,7 +230,7 @@ class ClickNodeTool
 /**
  * MCP tool: long_click_node
  *
- * Long-clicks the accessibility node identified by node_id.
+ * Long-clicks the accessibility node identified by node_id or by a selector.
  */
 class LongClickNodeTool
     @Inject
@@ -235,17 +239,17 @@ class LongClickNodeTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId =
-                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
-
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, multiWindowResult.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return resolution.result
+                }
 
             val result = actionExecutor.longClickNode(nodeId, multiWindowResult.windows)
             result.onFailure { e -> mapNodeActionException(e, nodeId) }
@@ -262,18 +266,12 @@ class LongClickNodeTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Long-click the specified accessibility node by node ID. " +
-                        "Returns after the action is performed.",
+                    "Long-click the specified accessibility node, by node ID or by a selector (by + value, the " +
+                        "single on-screen match). Returns after the action is performed.",
                 inputSchema =
                     ToolSchema(
-                        properties =
-                            buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
-                                }
-                            },
-                        required = listOf("node_id"),
+                        properties = buildJsonObject { putNodeTargetProperties(toolNamePrefix) },
+                        required = emptyList(),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -288,7 +286,7 @@ class LongClickNodeTool
  * MCP tool: tap_node
  *
  * Performs a gesture-based tap at a random point within the bounds of the
- * node identified by node_id. Unlike click_node (which uses the
+ * node identified by node_id or by a selector. Unlike click_node (which uses the
  * accessibility ACTION_CLICK), this performs a coordinate-based touch gesture.
  */
 class TapNodeTool
@@ -299,16 +297,10 @@ class TapNodeTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
     ) {
-        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId =
-                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
-
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             val insetPercentage =
                 McpToolUtils.optionalFloat(arguments, "inset_percentage", DEFAULT_INSET_PERCENTAGE)
@@ -320,6 +312,11 @@ class TapNodeTool
             }
 
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, multiWindowResult.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return resolution.result
+                }
 
             val node =
                 elementFinder.findNodeById(multiWindowResult.windows, nodeId)
@@ -370,7 +367,8 @@ class TapNodeTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Performs a gesture-based tap at a random point within the bounds of the " +
-                        "node identified by node_id. Unlike click_node (which uses the " +
+                        "node identified by node_id or by a selector (by + value, the single on-screen match). " +
+                        "Unlike click_node (which uses the " +
                         "accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. " +
                         "The tap point is randomized within the node bounds, inset by a configurable " +
                         "percentage (default 5%) from each edge to avoid hitting borders. " +
@@ -379,10 +377,7 @@ class TapNodeTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
-                                }
+                                putNodeTargetProperties(toolNamePrefix)
                                 putJsonObject("inset_percentage") {
                                     put("type", "number")
                                     put("default", DEFAULT_INSET_PERCENTAGE.toDouble())
@@ -393,7 +388,7 @@ class TapNodeTool
                                     )
                                 }
                             },
-                        required = listOf("node_id"),
+                        required = emptyList(),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -412,8 +407,16 @@ class TapNodeTool
 /**
  * MCP tool: scroll_to_node
  *
- * Scrolls to make the specified node visible by finding its nearest
- * scrollable ancestor and scrolling it. Retries up to [MAX_SCROLL_ATTEMPTS] times.
+ * Scrolls the nearest scrollable container of the specified node in the given direction until the node is
+ * visible, up to [MAX_SCROLL_ATTEMPTS] scrolls; stops early when the container does not scroll any further.
+ *
+ * Node ids hash the node's bounds, so the ids of the target and of its container change as soon as they move.
+ * After each scroll the container is located again by its place in its window, and the target is found again:
+ * when given by id, inside that container by its resource id, class, text and content description; when given
+ * by a selector, by matching the selector again across all windows. The result names the node's current id.
+ *
+ * A target given by id is never confused with a look-alike: its attributes must tell it apart in its container
+ * from the first read, and once it drops out of the container the tool stops instead of taking another node.
  */
 class ScrollToNodeTool
     @Inject
@@ -423,21 +426,88 @@ class ScrollToNodeTool
         private val actionExecutor: ActionExecutor,
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
     ) {
-        @Suppress("ThrowsCount", "LongMethod")
+        /** What identifies a node given by id once it has moved: its id does not, these attributes do. */
+        private data class NodeIdentity(
+            val resourceId: String?,
+            val className: String?,
+            val text: String?,
+            val contentDescription: String?,
+        ) {
+            fun matches(node: AccessibilityNodeData): Boolean =
+                node.resourceId == resourceId &&
+                    node.className == className &&
+                    node.text == text &&
+                    node.contentDescription == contentDescription
+        }
+
+        /**
+         * The scrollable container of the target. Its id changes when it moves (e.g. a collapsing toolbar shifts a
+         * list); its place does not: its window and the child indexes leading to it, checked against its class and
+         * resource id.
+         */
+        private class TrackedContainer(
+            val windowId: Int,
+            val childIndexPath: List<Int>,
+            val resourceId: String?,
+            val className: String?,
+        ) {
+            /** The container in [windows], or null when its place no longer holds a scrollable node like it. */
+            fun locate(windows: List<WindowData>): AccessibilityNodeData? =
+                childIndexPath
+                    .fold(windows.firstOrNull { it.windowId == windowId }?.tree) { node, index ->
+                        node?.children?.getOrNull(index)
+                    }?.takeIf { it.scrollable && it.resourceId == resourceId && it.className == className }
+        }
+
+        /** The target being scrolled to, what finds it again once it has moved, and the container to scroll. */
+        private class TrackedTarget(
+            val target: NodeTarget,
+            val identity: NodeIdentity,
+            val originalNodeId: String,
+            val container: TrackedContainer,
+        )
+
+        /** The target found again after a scroll. */
+        private sealed interface Refound {
+            data class Found(
+                val node: AccessibilityNodeData,
+            ) : Refound
+
+            data object Missing : Refound
+
+            data class Ambiguous(
+                val result: CallToolResult,
+            ) : Refound
+
+            /** The tool cannot go on: [error] says why. */
+            data class Failed(
+                val error: McpToolException,
+            ) : Refound
+        }
+
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId =
-                arguments?.get("node_id")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_id'")
+            val target = targetResolver.parse(arguments)
+            val direction = requireScrollDirection(arguments)
 
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
+            // Parse multi-window trees and find the node (a selector matches on- and off-screen nodes)
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            return when (val resolution = targetResolver.resolve(target, result.windows, onScreenOnly = false)) {
+                is NodeResolution.Ambiguous -> resolution.result
+                is NodeResolution.Resolved -> scrollTo(target, resolution.nodeId, direction, result)
             }
+        }
 
-            // Parse multi-window trees and find the node
-            var result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-            var node =
-                elementFinder.findNodeById(result.windows, nodeId)
+        /** Scrolls the nearest scrollable container of [nodeId] in [direction] until the target is visible. */
+        private suspend fun scrollTo(
+            target: NodeTarget,
+            nodeId: String,
+            direction: ScrollDirection,
+            initial: MultiWindowResult,
+        ): CallToolResult {
+            val node =
+                elementFinder.findNodeById(initial.windows, nodeId)
                     ?: throw McpToolException.NodeNotFound("Node '$nodeId' not found")
 
             // If already visible, return immediately
@@ -446,103 +516,258 @@ class ScrollToNodeTool
                 return McpToolUtils.textResult("Node '$nodeId' is already visible")
             }
 
-            // Find the window tree containing the target node
-            val containingTree =
-                findContainingTree(result.windows, nodeId)
-                    ?: throw McpToolException.ActionFailed(
-                        "Node '$nodeId' not found in any window tree",
-                    )
+            val container =
+                findScrollableContainer(initial.windows, nodeId)
+                    ?: throw McpToolException.ActionFailed("No scrollable container found for node '$nodeId'")
+            val identity = NodeIdentity(node.resourceId, node.className, node.text, node.contentDescription)
+            val tracked = TrackedTarget(target, identity, nodeId, container)
+            if (target is NodeTarget.ById) requireDistinct(tracked, initial.windows)
+            return scrollUntilVisible(tracked, direction, initial)
+        }
 
-            // Find nearest scrollable ancestor within the same window tree
-            val scrollableAncestorId =
-                findScrollableAncestor(containingTree, nodeId)
-                    ?: throw McpToolException.ActionFailed(
-                        "No scrollable container found for node '$nodeId'",
-                    )
+        /**
+         * A target given by id is found again by its attributes after each scroll, so they must tell it apart in its
+         * container from the start: look-alikes fail before any scroll.
+         */
+        private fun requireDistinct(
+            tracked: TrackedTarget,
+            windows: List<WindowData>,
+        ) {
+            val lookAlikes =
+                tracked.container
+                    .locate(windows)
+                    ?.let { lookAlikes(it, tracked.identity) }
+                    .orEmpty()
+            if (lookAlikes.size > 1) throw lookAlikeError(tracked, lookAlikes.size)
+        }
 
-            // Determine initial scroll direction from the node's position relative to
-            // the screen. Nodes above the viewport (bounds.bottom <= 0) need UP scrolling;
-            // nodes below or at unknown positions default to DOWN.
-            val screenInfo = accessibilityServiceProvider.getScreenInfo()
-            val primaryDirection = determineScrollDirection(node, screenInfo)
-            val oppositeDirection =
-                if (primaryDirection == ScrollDirection.DOWN) ScrollDirection.UP else ScrollDirection.DOWN
+        /** Scrolls until the target shows; [scrollContainer] stops early when the container does not scroll. */
+        private suspend fun scrollUntilVisible(
+            tracked: TrackedTarget,
+            direction: ScrollDirection,
+            initial: MultiWindowResult,
+        ): CallToolResult {
+            var result = initial
+            for (attempt in 1..MAX_SCROLL_ATTEMPTS) {
+                scrollContainer(tracked, direction, result.windows, scrollsDone = attempt - 1)
 
-            // Try primary direction first, then opposite if node not found
-            var totalAttempts = 0
-            for (direction in listOf(primaryDirection, oppositeDirection)) {
-                while (totalAttempts < MAX_SCROLL_ATTEMPTS) {
-                    totalAttempts++
-                    val scrollResult =
-                        actionExecutor.scrollNode(scrollableAncestorId, direction, result.windows)
-                    if (scrollResult.isFailure) {
-                        throw McpToolException.ActionFailed(
-                            "Scroll failed on ancestor '$scrollableAncestorId': " +
-                                "${scrollResult.exceptionOrNull()?.message}",
-                        )
+                // Small delay to let UI settle after scroll
+                kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
+
+                // Re-parse and find the target again (its id changed if it moved)
+                result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                when (val refound = refind(tracked, result.windows, attempt, direction)) {
+                    is Refound.Missing -> {
+                        continue
                     }
 
-                    // Small delay to let UI settle after scroll
-                    kotlinx.coroutines.delay(SCROLL_SETTLE_DELAY_MS)
+                    is Refound.Failed -> {
+                        throw refound.error
+                    }
 
-                    // Re-parse and check visibility
-                    result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    node = elementFinder.findNodeById(result.windows, nodeId) ?: continue
+                    is Refound.Ambiguous -> {
+                        return refound.result
+                    }
 
-                    if (node.visible) {
-                        Log.d(
-                            TAG,
-                            "scroll_to_node: node '$nodeId' became visible " +
-                                "after $totalAttempts scroll(s) (direction=$direction)",
-                        )
-                        return McpToolUtils.textResult(
-                            "Scrolled to node '$nodeId' ($totalAttempts scroll(s))",
-                        )
+                    is Refound.Found -> {
+                        if (refound.node.visible) {
+                            Log.d(
+                                TAG,
+                                "scroll_to_node: node '${tracked.originalNodeId}' became visible as " +
+                                    "'${refound.node.id}' after $attempt scroll(s) (direction=$direction)",
+                            )
+                            return McpToolUtils.textResult(
+                                "Scrolled to node '${refound.node.id}' ($attempt scroll(s))",
+                            )
+                        }
                     }
                 }
             }
 
             throw McpToolException.ActionFailed(
-                "Node '$nodeId' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
+                "Node '${tracked.originalNodeId}' not visible after $MAX_SCROLL_ATTEMPTS scroll attempts",
             )
         }
 
         /**
-         * Determines the best initial scroll direction based on the node's position
-         * relative to the screen viewport.
-         *
-         * - If the node's bottom edge is at or above the top of the screen -> UP
-         * - Otherwise (below viewport or unknown) -> DOWN (most common case)
+         * Scrolls the target's container once, located in [windows] by its place. Stops the tool when the container
+         * is not at its place any more or does not scroll (e.g. it reached the end of its content in [direction]).
          */
-        internal fun determineScrollDirection(
-            node: AccessibilityNodeData,
-            screenInfo: ScreenInfo,
-        ): ScrollDirection =
-            when {
-                node.bounds.bottom <= 0 -> ScrollDirection.UP
-                node.bounds.top >= screenInfo.height -> ScrollDirection.DOWN
-                else -> ScrollDirection.DOWN
+        private suspend fun scrollContainer(
+            tracked: TrackedTarget,
+            direction: ScrollDirection,
+            windows: List<WindowData>,
+            scrollsDone: Int,
+        ) {
+            val containerId = tracked.container.locate(windows)?.id ?: throw containerGoneError(tracked)
+            actionExecutor.scrollNode(containerId, direction, windows).onFailure { e ->
+                throw containerScrollError(e, tracked, containerId, direction, scrollsDone)
             }
+        }
 
         /**
-         * Walks up the tree from [targetNodeId] to find the nearest scrollable ancestor.
-         * Returns the ancestor's node ID, or null if none found.
+         * The error for a failed scroll of the container. Only a refused scroll (e.g. the end of its content in
+         * [direction]) is reported as the container not scrolling further.
          */
-        @Suppress("ReturnCount")
-        private fun findScrollableAncestor(
-            tree: AccessibilityNodeData,
-            targetNodeId: String,
-        ): String? {
-            val path = mutableListOf<AccessibilityNodeData>()
-            if (!findPathToNode(tree, targetNodeId, path)) return null
+        private fun containerScrollError(
+            e: Throwable,
+            tracked: TrackedTarget,
+            containerId: String,
+            direction: ScrollDirection,
+            scrollsDone: Int,
+        ): McpToolException {
+            val container = "The scrollable container '$containerId' of node '${tracked.originalNodeId}'"
+            return when {
+                e is IllegalStateException && e.message?.contains("not available") == true -> {
+                    McpToolException.PermissionDenied(e.message ?: "Accessibility service not available")
+                }
 
-            // Walk the path from parent to root (excluding the target itself)
-            for (i in path.size - 2 downTo 0) {
-                if (path[i].scrollable) {
-                    return path[i].id
+                e is IllegalStateException -> {
+                    McpToolException.ActionFailed("$container cannot be scrolled: ${e.message}")
+                }
+
+                e is NoSuchElementException -> {
+                    McpToolException.NodeNotFound("$container is no longer in the accessibility tree")
+                }
+
+                else -> {
+                    McpToolException.ActionFailed(
+                        "Node '${tracked.originalNodeId}' not visible after $scrollsDone scroll(s) " +
+                            "${direction.name.lowercase()}: its container did not scroll further (${e.message})",
+                    )
                 }
             }
-            return null
+        }
+
+        private fun containerGoneError(tracked: TrackedTarget): McpToolException =
+            McpToolException.ActionFailed(
+                "The scrollable container of node '${tracked.originalNodeId}' is no longer at its place in its " +
+                    "window (gone, moved or no longer scrollable)",
+            )
+
+        private fun lookAlikeError(
+            tracked: TrackedTarget,
+            count: Int,
+        ): McpToolException =
+            McpToolException.ActionFailed(
+                "$count nodes in its container look like node '${tracked.originalNodeId}' (same resource id, class, " +
+                    "text and description), so it cannot be told apart (a selector cannot either): scroll with " +
+                    "scroll_node, read the screen again and act on the node ID you pick",
+            )
+
+        /**
+         * Finds the target in [windows] after [scrolls] scroll(s) in [direction]: a selector is matched again (on-
+         * and off-screen, across all windows); a node given by id is looked up by its identity among the
+         * descendants of its container. More than one candidate is an error, never a guess.
+         */
+        private suspend fun refind(
+            tracked: TrackedTarget,
+            windows: List<WindowData>,
+            scrolls: Int,
+            direction: ScrollDirection,
+        ): Refound =
+            when (val target = tracked.target) {
+                is NodeTarget.BySelector -> refindBySelector(target.selector, windows)
+                is NodeTarget.ById -> refindByIdentity(tracked, windows, scrolls, direction)
+            }
+
+        private suspend fun refindBySelector(
+            selector: NodeSelector,
+            windows: List<WindowData>,
+        ): Refound {
+            val matches = targetResolver.matches(selector, windows, onScreenOnly = false)
+            return when (matches.size) {
+                0 -> {
+                    Refound.Missing
+                }
+
+                1 -> {
+                    elementFinder.findNodeById(windows, matches.single().id)?.let { Refound.Found(it) }
+                        ?: Refound.Missing
+                }
+
+                else -> {
+                    Refound.Ambiguous(targetResolver.ambiguousResult(selector, matches, onScreenOnly = false))
+                }
+            }
+        }
+
+        /**
+         * The target given by id, found by its identity in its container. Once it is not there any more it is not
+         * looked for again: scrolling further the same way only moves it farther, and a look-alike that shows up
+         * later is not the target.
+         */
+        private fun refindByIdentity(
+            tracked: TrackedTarget,
+            windows: List<WindowData>,
+            scrolls: Int,
+            direction: ScrollDirection,
+        ): Refound {
+            val container = tracked.container.locate(windows) ?: return Refound.Failed(containerGoneError(tracked))
+            val candidates = lookAlikes(container, tracked.identity)
+            val way = direction.name.lowercase()
+            return when (candidates.size) {
+                0 -> {
+                    Refound.Failed(
+                        McpToolException.ActionFailed(
+                            "Node '${tracked.originalNodeId}' is no longer in its container after $scrolls " +
+                                "scroll(s) $way (it moved out of the loaded content, or changed): scrolling $way " +
+                                "cannot bring it back; scroll the other way, or read the screen again",
+                        ),
+                    )
+                }
+
+                1 -> {
+                    Refound.Found(candidates.single())
+                }
+
+                else -> {
+                    Refound.Failed(lookAlikeError(tracked, candidates.size))
+                }
+            }
+        }
+
+        /** The descendants of [container] that match [identity]. */
+        private fun lookAlikes(
+            container: AccessibilityNodeData,
+            identity: NodeIdentity,
+        ): List<AccessibilityNodeData> {
+            val matches = mutableListOf<AccessibilityNodeData>()
+            collectDescendants(container, identity, matches)
+            return matches
+        }
+
+        private fun collectDescendants(
+            node: AccessibilityNodeData,
+            identity: NodeIdentity,
+            out: MutableList<AccessibilityNodeData>,
+        ) {
+            for (child in node.children) {
+                if (identity.matches(child)) out.add(child)
+                collectDescendants(child, identity, out)
+            }
+        }
+
+        /**
+         * The nearest scrollable ancestor of [nodeId] (the node itself excluded), tracked by its place in its
+         * window; null when the node has none.
+         */
+        private fun findScrollableContainer(
+            windows: List<WindowData>,
+            nodeId: String,
+        ): TrackedContainer? {
+            val window = windows.firstOrNull { elementFinder.findNodeById(it.tree, nodeId) != null } ?: return null
+            val path = mutableListOf<AccessibilityNodeData>()
+            findPathToNode(window.tree, nodeId, path)
+            return (path.size - 2 downTo 0).firstOrNull { path[it].scrollable }?.let { depth ->
+                TrackedContainer(
+                    windowId = window.windowId,
+                    childIndexPath =
+                        (1..depth).map { level -> path[level - 1].children.indexOfFirst { it === path[level] } },
+                    resourceId = path[depth].resourceId,
+                    className = path[depth].className,
+                )
+            }
         }
 
         /**
@@ -564,22 +789,6 @@ class ScrollToNodeTool
             return false
         }
 
-        /**
-         * Finds the window tree that contains the node with [targetNodeId].
-         * Returns the tree's root [AccessibilityNodeData], or null if not found.
-         */
-        private fun findContainingTree(
-            windows: List<WindowData>,
-            targetNodeId: String,
-        ): AccessibilityNodeData? {
-            for (windowData in windows) {
-                if (elementFinder.findNodeById(windowData.tree, targetNodeId) != null) {
-                    return windowData.tree
-                }
-            }
-            return null
-        }
-
         fun register(
             registrar: LoggedToolRegistrar,
             toolNamePrefix: String,
@@ -587,17 +796,23 @@ class ScrollToNodeTool
             registrar.addTool(
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
-                description = "Scroll to make the specified node visible. Returns after the action is performed.",
+                description =
+                    "Scroll the nearest scrollable container of the specified node in the given direction until " +
+                        "the node is visible (up to $MAX_SCROLL_ATTEMPTS scrolls; stops early when the container " +
+                        "does not scroll any further). Target by node ID or by a selector (by + value, the single " +
+                        "matching node on or off screen). Node IDs change when a node moves: the result names the " +
+                        "node's current ID.",
                 inputSchema =
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Node ID from ${toolNamePrefix}find_nodes")
-                                }
+                                putNodeTargetProperties(toolNamePrefix, "node (on or off screen)")
+                                putScrollDirectionProperty(
+                                    "Direction to scroll the node's container: down/right scroll forward, " +
+                                        "up/left backward",
+                                )
                             },
-                        required = listOf("node_id"),
+                        required = listOf(PARAM_SCROLL_DIRECTION),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -610,9 +825,105 @@ class ScrollToNodeTool
         }
     }
 
+/**
+ * MCP tool: scroll_node
+ *
+ * Scrolls the specified scrollable node once in a direction, with the accessibility scroll action on the node
+ * itself (up/left scroll backward, down/right forward). Nothing else is searched or retried: the node must be
+ * scrollable.
+ */
+class ScrollNodeTool
+    @Inject
+    constructor(
+        private val treeParser: AccessibilityTreeParser,
+        private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val target = targetResolver.parse(arguments)
+            val direction = requireScrollDirection(arguments)
+            val directionName = direction.name.lowercase()
+
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, multiWindowResult.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return resolution.result
+                }
+
+            val result = actionExecutor.scrollNode(nodeId, direction, multiWindowResult.windows)
+            result.onFailure { e -> mapNodeActionException(e, nodeId) }
+
+            Log.d(TAG, "scroll_node: nodeId=$nodeId direction=$directionName succeeded")
+            return McpToolUtils.textResult("Scrolled node '$nodeId' $directionName")
+        }
+
+        fun register(
+            registrar: LoggedToolRegistrar,
+            toolNamePrefix: String,
+        ) {
+            registrar.addTool(
+                toolName = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
+                description =
+                    "Scroll a scrollable node (a list, a carousel, a scroll view) once in the given direction, by " +
+                        "node ID or by a selector (by + value, the single on-screen match). Uses the node's own " +
+                        "accessibility scroll action: up/left scroll backward, down/right forward. " +
+                        "Returns once the scroll has started: the content may still be animating, use " +
+                        "${toolNamePrefix}wait_for_idle before reading the screen again if needed.",
+                inputSchema =
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putNodeTargetProperties(toolNamePrefix)
+                                putScrollDirectionProperty("Scroll direction")
+                            },
+                        required = listOf(PARAM_SCROLL_DIRECTION),
+                    ),
+            ) { request -> execute(request.arguments) }
+        }
+
+        companion object {
+            private const val TAG = "MCP:ScrollNodeTool"
+            const val TOOL_NAME = "scroll_node"
+        }
+    }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared Utilities for Node Action Tools
 // ─────────────────────────────────────────────────────────────────────────────
+
+internal const val PARAM_SCROLL_DIRECTION = "direction"
+
+/** The directions of the node scroll tools: up/left scroll the node backward, down/right forward. */
+private val SCROLL_DIRECTIONS =
+    linkedMapOf(
+        "up" to ScrollDirection.UP,
+        "down" to ScrollDirection.DOWN,
+        "left" to ScrollDirection.LEFT,
+        "right" to ScrollDirection.RIGHT,
+    )
+
+/** The required `direction` of the node scroll tools (case-insensitive). */
+internal fun requireScrollDirection(arguments: JsonObject?): ScrollDirection {
+    val raw = McpToolUtils.requireString(arguments, PARAM_SCROLL_DIRECTION)
+    return SCROLL_DIRECTIONS[raw.lowercase()]
+        ?: throw McpToolException.InvalidParams(
+            "Parameter '$PARAM_SCROLL_DIRECTION' must be one of: ${SCROLL_DIRECTIONS.keys.joinToString()}. " +
+                "Got: '$raw'",
+        )
+}
+
+/** Adds the required `direction` property of the node scroll tools. */
+internal fun JsonObjectBuilder.putScrollDirectionProperty(description: String) {
+    putJsonObject(PARAM_SCROLL_DIRECTION) {
+        put("type", "string")
+        put("enum", buildJsonArray { SCROLL_DIRECTIONS.keys.forEach { add(JsonPrimitive(it)) } })
+        put("description", description)
+    }
+}
 
 /**
  * Maps a "by" string parameter to the [FindBy] enum.
@@ -829,24 +1140,35 @@ fun registerNodeActionTools(
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
+    val targetResolver = NodeTargetResolver(elementFinder, privacyToolGate, substitutor)
     if (perms.isToolEnabled(FindNodesTool.TOOL_NAME)) {
         FindNodesTool(treeParser, elementFinder, accessibilityServiceProvider, nodeCache, privacyToolGate, substitutor)
             .register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(ClickNodeTool.TOOL_NAME)) {
-        ClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+        ClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
             .register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(LongClickNodeTool.TOOL_NAME)) {
-        LongClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache)
+        LongClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
             .register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TapNodeTool.TOOL_NAME)) {
-        TapNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
+        TapNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
             .register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(ScrollToNodeTool.TOOL_NAME)) {
-        ScrollToNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache)
+        ScrollToNodeTool(
+            treeParser,
+            elementFinder,
+            actionExecutor,
+            accessibilityServiceProvider,
+            nodeCache,
+            targetResolver,
+        ).register(registrar, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(ScrollNodeTool.TOOL_NAME)) {
+        ScrollNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
             .register(registrar, toolNamePrefix)
     }
 }

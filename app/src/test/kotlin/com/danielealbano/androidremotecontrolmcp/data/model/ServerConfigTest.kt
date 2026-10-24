@@ -79,9 +79,18 @@ class ServerConfigTest {
         }
 
         @Test
-        fun `default tunnelProvider is CLOUDFLARE`() {
+        fun `default tunnelProvider is ARC_TUNNEL`() {
             val config = ServerConfig()
-            assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
+            assertEquals(TunnelProviderType.ARC_TUNNEL, config.tunnelProvider)
+        }
+
+        @Test
+        fun `default arc tunnel settings`() {
+            val config = ServerConfig()
+            assertEquals("arc-tunnel.io", config.arcTunnelBaseAddress)
+            assertTrue(config.arcTunnelCtCheckEnabled)
+            assertEquals("", config.arcTunnelEdgeOverride)
+            assertEquals("", config.arcTunnelTrustedCaPem)
         }
 
         @Test

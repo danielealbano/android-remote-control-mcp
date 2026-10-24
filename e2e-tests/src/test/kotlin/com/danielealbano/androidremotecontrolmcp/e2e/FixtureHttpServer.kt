@@ -57,15 +57,7 @@ class FixtureHttpServer {
      * runtime (Android's resolver does not see the Testcontainers hosts entry), so the
      * container's default-gateway IP — the host on podman's bridge — is used instead.
      */
-    fun containerReachableBaseUrl(): String {
-        // Android uses policy routing, so the main `ip route` table has no `default` line;
-        // `ip route get <external ip>` resolves through the policy tables and prints
-        // "<ip> via <gateway> dev ...".
-        val out = AndroidContainerSetup.execAdb("shell", "ip", "route", "get", "1.1.1.1")
-        val tokens = out.split(Regex("\\s+"))
-        val gateway = tokens[tokens.indexOf("via") + 1]
-        return "http://$gateway:$FIXTURE_HTTP_PORT"
-    }
+    fun containerReachableBaseUrl(): String = "http://${AndroidContainerSetup.containerGatewayIp()}:$FIXTURE_HTTP_PORT"
 
     companion object {
         /** Fixed host port, exposed to the container by SharedAndroidContainer before start. */

@@ -5,6 +5,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,6 +34,7 @@ class TunnelManager
         private val settingsRepository: SettingsRepository,
         private val cloudflareTunnelProviderFactory: Provider<CloudflareTunnelProvider>,
         private val ngrokTunnelProviderFactory: Provider<NgrokTunnelProvider>,
+        private val arcTunnelProviderFactory: Provider<ArcTunnelProvider>,
         private val serverLogRepository: ServerLogRepository,
     ) {
         private val _tunnelStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
@@ -43,18 +45,22 @@ class TunnelManager
         private var activeProvider: TunnelProvider? = null
         private var statusRelayJob: Job? = null
 
-        suspend fun start(localPort: Int) {
+        suspend fun start(
+            localPort: Int,
+            listenerHost: TunnelListenerHost,
+        ) {
             mutex.withLock {
                 val config = settingsRepository.serverConfig.first()
 
                 if (!config.tunnelEnabled) return
 
-                // A tunnel always targets an http://localhost origin, so it MUST NOT run while the
-                // server serves HTTPS. (The McpServerService start path enforces this too.)
-                if (config.httpsEnabled) return
+                // Cloudflare and ngrok forward to an http://localhost origin, so they MUST NOT run while the
+                // server serves HTTPS; the free E2E tunnel terminates TLS on its own loopback listener.
+                if (!tunnelAllowedWithHttps(config)) return
 
                 val provider =
                     when (config.tunnelProvider) {
+                        TunnelProviderType.ARC_TUNNEL -> arcTunnelProviderFactory.get().also { it.bind(listenerHost) }
                         TunnelProviderType.CLOUDFLARE -> cloudflareTunnelProviderFactory.get()
                         TunnelProviderType.NGROK -> ngrokTunnelProviderFactory.get()
                     }

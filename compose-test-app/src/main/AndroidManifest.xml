@@ -22,5 +22,9 @@
             android:exported="true"
             android:launchMode="singleTop" />
 
+        <activity
+            android:name=".LongListActivity"
+            android:exported="true" />
+
     </application>
 </manifest>

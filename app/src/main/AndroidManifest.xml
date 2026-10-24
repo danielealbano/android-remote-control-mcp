@@ -9,6 +9,7 @@
     <!-- Foreground services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Boot receiver -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -96,6 +97,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="MCP server providing remote device control" />
         </service>
+
+        <!-- Free E2E tunnel enrollment (short-lived foreground service, see ArcTunnelEnrollService) -->
+        <service
+            android:name=".services.tunnel.arctunnel.ArcTunnelEnrollService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Accessibility Service -->
         <service

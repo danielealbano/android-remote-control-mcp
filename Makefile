@@ -87,7 +87,14 @@ check-deps: ## Check for required development tools
 	fi; \
 	if command -v cargo >/dev/null 2>&1; then \
 		CARGO_VER=$$(cargo --version); \
-		echo "  [OK] $$CARGO_VER"; \
+		RUSTC_MINOR=$$(rustc --version 2>/dev/null | awk '{split($$2, v, "."); print v[2]}'); \
+		if [ "$${RUSTC_MINOR:-0}" -ge 85 ]; then \
+			echo "  [OK] $$CARGO_VER"; \
+		else \
+			echo "  [MISSING] rustc 1.85+ (required for ngrok-java native; found: $$(rustc --version 2>/dev/null || echo none))"; \
+			echo "            Update: rustup update stable"; \
+			MISSING=1; \
+		fi; \
 	else \
 		echo "  [MISSING] Rust/cargo (required for compiling ngrok-java native)"; \
 		echo "           Install: https://rustup.rs/"; \
@@ -403,6 +410,12 @@ compile-ngrok-native: ## Build ngrok-java native library from source (requires R
 	fi
 	@if ! command -v cargo >/dev/null 2>&1; then \
 		echo "ERROR: Rust/cargo not found. Install: https://rustup.rs/"; \
+		exit 1; \
+	fi
+	@RUSTC_MINOR=$$(rustc --version 2>/dev/null | awk '{split($$2, v, "."); print v[2]}'); \
+	if [ "$${RUSTC_MINOR:-0}" -lt 85 ]; then \
+		echo "ERROR: rustc 1.85+ required for the ngrok-java native build (ngrok 0.19 is Rust edition 2024)."; \
+		echo "       Found: $$(rustc --version 2>/dev/null || echo none). Update: rustup update stable"; \
 		exit 1; \
 	fi
 	@if ! command -v mvn >/dev/null 2>&1; then \

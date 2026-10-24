@@ -180,6 +180,73 @@ class ScreenIntrospectionIntegrationTest {
         }
 
     @Test
+    fun `get_screen_state with annotate false encodes the plain screenshot`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+            val mockBitmap = mockk<Bitmap>(relaxed = true)
+            coEvery {
+                deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+            } returns Result.success(mockBitmap)
+            every {
+                deps.screenshotEncoder.bitmapToScreenshotData(any(), any())
+            } returns ScreenshotData(data = "dGVzdA==", width = 700, height = 500)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_screen_state",
+                        arguments = mapOf("include_screenshot" to true, "annotate" to false),
+                    )
+                assertNotEquals(true, result.isError)
+                assertEquals(2, result.content.size)
+            }
+
+            verify(exactly = 0) { deps.screenshotAnnotator.annotate(any(), any(), any(), any()) }
+            verify { deps.screenshotEncoder.bitmapToScreenshotData(mockBitmap, ScreenCaptureProvider.DEFAULT_QUALITY) }
+        }
+
+    @Test
+    fun `get_screen_state advertises the screenshot and output options`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val tool = client.listTools().tools.single { it.name == "android_get_screen_state" }
+                val properties =
+                    tool.inputSchema.properties
+                        ?.keys
+                        .orEmpty()
+                val expected =
+                    listOf("include_screenshot", "annotate", "cursor", "include_offscreen", "include_hierarchy")
+                for (name in expected) {
+                    assertTrue(name in properties, "missing $name in $properties")
+                }
+            }
+        }
+
+    @Test
+    fun `get_screen_state without hierarchy and offscreen nodes over streamable http`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_screen_state",
+                        arguments = mapOf("include_offscreen" to false, "include_hierarchy" to false),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("note:offscreen nodes are not listed (include_offscreen=false)"), text)
+                assertFalse(text.lines().contains("hierarchy:"), text)
+                assertTrue(text.contains("node_btn"), text)
+            }
+        }
+
+    @Test
     fun `get_screen_state without screenshot does not call captureScreenshot`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
@@ -252,6 +319,42 @@ class ScreenIntrospectionIntegrationTest {
 
             // Verify the resized bitmap was still recycled via the finally block
             // (annotatedBitmap is null because annotate() threw before assignment)
+            verify { mockBitmap.recycle() }
+        }
+
+    @Test
+    fun `get_screen_state with annotate false and an encoding failure returns error`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            val mockBitmap = mockk<Bitmap>(relaxed = true)
+            coEvery {
+                deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+            } returns Result.success(mockBitmap)
+
+            // Simulate an encoding failure of the plain screenshot
+            every {
+                deps.screenshotEncoder.bitmapToScreenshotData(any(), any())
+            } throws RuntimeException("JPEG writer error")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_screen_state",
+                        arguments = mapOf("include_screenshot" to true, "annotate" to false),
+                    )
+                assertEquals(true, result.isError)
+                // The error names the encoding (nothing was annotated) and does not leak the internal details
+                val errorText = (result.content[0] as TextContent).text
+                assertTrue(errorText.contains("Screenshot encoding failed"), errorText)
+                assertFalse(errorText.contains("annotation"), errorText)
+                assertFalse(errorText.contains("JPEG writer error"), errorText)
+            }
+
+            verify(exactly = 0) { deps.screenshotAnnotator.annotate(any(), any(), any(), any()) }
+            // The captured bitmap is still recycled via the finally block
             verify { mockBitmap.recycle() }
         }
 

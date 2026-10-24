@@ -337,6 +337,17 @@ class MainViewModelTest {
         }
 
     @Test
+    fun `updateBlockLocalNetworkDownloads calls repository`() =
+        runTest {
+            advanceUntilIdle()
+
+            viewModel.updateBlockLocalNetworkDownloads(true)
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.updateBlockLocalNetworkDownloads(true) }
+        }
+
+    @Test
     fun `updateHttpsEnabled calls repository`() =
         runTest {
             advanceUntilIdle()

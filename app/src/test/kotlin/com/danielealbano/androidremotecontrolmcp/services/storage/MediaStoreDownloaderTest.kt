@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import io.mockk.MockKMatcherScope
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -24,10 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
+import java.net.InetSocketAddress
 import java.net.URL
-import java.net.URLConnection
-import java.net.URLStreamHandler
 
 @ExtendWith(MockKExtension::class)
 @DisplayName("MediaStoreDownloader")
@@ -38,10 +37,11 @@ class MediaStoreDownloaderTest {
     @MockK(relaxed = true)
     private lateinit var mockContentResolver: ContentResolver
 
-    @MockK(relaxed = true)
-    private lateinit var mockConnection: HttpURLConnection
+    @MockK
+    private lateinit var mockHttpClient: DownloadHttpClient
 
     private val insertUri: Uri = mockk(relaxed = true)
+    private val url = URL("http://example.com/file.bin")
 
     private lateinit var downloader: MediaStoreDownloader
 
@@ -57,7 +57,7 @@ class MediaStoreDownloaderTest {
         every { mockContentResolver.delete(any(), any(), any()) } returns 1
         every { mockContentResolver.update(any(), any(), any(), any()) } returns 1
 
-        downloader = MediaStoreDownloader(mockContext)
+        downloader = MediaStoreDownloader(mockContext, mockHttpClient)
     }
 
     @AfterEach
@@ -65,22 +65,18 @@ class MediaStoreDownloaderTest {
         unmockkStatic(Log::class)
     }
 
-    /** Builds a real URL whose openConnection() returns the given mock (URL is not mockable). */
-    private fun urlFor(connection: HttpURLConnection): URL =
-        URL(
-            "http",
-            "example.com",
-            80,
-            "/file.bin",
-            object : URLStreamHandler() {
-                override fun openConnection(u: URL): URLConnection = connection
-            },
-        )
+    /** Matches [url] by its text: `URL.equals` resolves host names, which a unit test must not do. */
+    private fun MockKMatcherScope.sameUrl(): URL = match { it.toString() == url.toString() }
+
+    private fun respond(response: FakeDownloadResponse): FakeDownloadResponse {
+        every { mockHttpClient.open(sameUrl(), any()) } returns response
+        return response
+    }
 
     private fun download(config: ServerConfig = ServerConfig()): Long =
         downloader.downloadToPendingUri(
             insertUri,
-            urlFor(mockConnection),
+            url,
             "http://example.com/file.bin",
             config,
             "builtin:downloads/file.bin",
@@ -88,9 +84,7 @@ class MediaStoreDownloaderTest {
 
     @Test
     fun `downloadToPendingUri streams bytes and clears IS_PENDING`() {
-        every { mockConnection.responseCode } returns 200
-        every { mockConnection.contentLengthLong } returns 5L
-        every { mockConnection.inputStream } returns ByteArrayInputStream("hello".toByteArray())
+        val response = respond(FakeDownloadResponse(200, 5L, ByteArrayInputStream("hello".toByteArray())))
         val output = ByteArrayOutputStream()
         every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns output
 
@@ -100,25 +94,35 @@ class MediaStoreDownloaderTest {
         assertEquals("hello", output.toString(Charsets.UTF_8.name()))
         verify { mockContentResolver.update(eq(insertUri), any(), any(), any()) }
         verify(exactly = 0) { mockContentResolver.delete(any(), any(), any()) }
-        verify { mockConnection.disconnect() }
+        assertTrue(response.closed)
+    }
+
+    @Test
+    fun `downloadToPendingUri passes the config to the http client`() {
+        respond(FakeDownloadResponse(200, 0L))
+        every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns ByteArrayOutputStream()
+        val config = ServerConfig(blockLocalNetworkDownloads = true, downloadTimeoutSeconds = 42)
+
+        download(config)
+
+        verify { mockHttpClient.open(sameUrl(), config) }
     }
 
     @Test
     fun `downloadToPendingUri deletes entry on http error status`() {
-        every { mockConnection.responseCode } returns 404
+        val response = respond(FakeDownloadResponse(404))
 
         val exception = assertThrows<McpToolException.ActionFailed> { download() }
 
         assertTrue(exception.message!!.contains("HTTP status 404"))
         verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
         verify(exactly = 0) { mockContentResolver.update(any(), any(), any(), any()) }
-        verify { mockConnection.disconnect() }
+        assertTrue(response.closed)
     }
 
     @Test
     fun `downloadToPendingUri rejects oversized reported content length`() {
-        every { mockConnection.responseCode } returns 200
-        every { mockConnection.contentLengthLong } returns 2L * 1024 * 1024
+        val response = respond(FakeDownloadResponse(200, 2L * 1024 * 1024))
 
         val exception =
             assertThrows<McpToolException.ActionFailed> {
@@ -127,14 +131,12 @@ class MediaStoreDownloaderTest {
 
         assertTrue(exception.message!!.contains("exceeds limit"))
         verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
+        assertTrue(response.closed)
     }
 
     @Test
     fun `downloadToPendingUri rejects stream exceeding size limit`() {
-        every { mockConnection.responseCode } returns 200
-        every { mockConnection.contentLengthLong } returns -1L
-        every { mockConnection.inputStream } returns
-            ByteArrayInputStream(ByteArray(1024 * 1024 + 1))
+        respond(FakeDownloadResponse(200, -1L, ByteArrayInputStream(ByteArray(1024 * 1024 + 1))))
         every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns
             ByteArrayOutputStream()
 
@@ -150,8 +152,7 @@ class MediaStoreDownloaderTest {
 
     @Test
     fun `downloadToPendingUri throws when destination cannot be opened`() {
-        every { mockConnection.responseCode } returns 200
-        every { mockConnection.contentLengthLong } returns 5L
+        respond(FakeDownloadResponse(200, 5L))
         every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns null
 
         val exception = assertThrows<McpToolException.ActionFailed> { download() }
@@ -162,13 +163,23 @@ class MediaStoreDownloaderTest {
 
     @Test
     fun `downloadToPendingUri wraps connect failure with cause and deletes entry`() {
-        every { mockConnection.connect() } throws IOException("boom")
+        every { mockHttpClient.open(sameUrl(), any()) } throws IOException("boom")
 
         val exception = assertThrows<McpToolException.ActionFailed> { download() }
 
         assertTrue(exception.message!!.contains("Download failed: boom"))
         assertTrue(exception.cause is IOException)
         verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
-        verify { mockConnection.disconnect() }
+    }
+
+    @Test
+    fun `downloadToPendingUri reports a blocked local network connection`() {
+        every { mockHttpClient.open(sameUrl(), any()) } throws
+            LocalNetworkDownloadBlockedException(InetSocketAddress("127.0.0.1", 80))
+
+        val exception = assertThrows<McpToolException.ActionFailed> { download() }
+
+        assertTrue(exception.message!!.contains("Block Local Network Downloads"))
+        verify { mockContentResolver.delete(eq(insertUri), any(), any()) }
     }
 }

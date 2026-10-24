@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
@@ -53,6 +57,8 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileL
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkServiceImpl
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInboxImpl
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClient
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClientImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.MediaStoreFileOperations
@@ -63,6 +69,14 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocatio
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.AndroidCloudflareBinaryResolver
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.AndroidArcTunnelKeyStore
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlerts
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlertsImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalsImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.AppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.BuildConfigAppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseChecker
@@ -156,6 +170,15 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindEventChannelSettings(impl: EventChannelSettingsImpl): EventChannelSettings
 
+    /** Binds the free E2E tunnel settings slice delegated to by [SettingsRepositoryImpl]. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelSettings(impl: ArcTunnelSettingsImpl): ArcTunnelSettings
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadSettings(impl: DownloadSettingsImpl): DownloadSettings
+
     /** Binds the persisted OAuth client registry. */
     @Binds
     @Singleton
@@ -218,6 +241,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): MediaStoreFileOperations
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadHttpClient(impl: DownloadHttpClientImpl): DownloadHttpClient
 
     @Binds
     @Singleton
@@ -288,4 +315,24 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindUpdateNotifier(impl: UpdateNotifierImpl): UpdateNotifier
+
+    /** Binds the AndroidKeyStore-backed key store of the free E2E tunnel client. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelKeyStore(impl: AndroidArcTunnelKeyStore): ArcTunnelKeyStore
+
+    /** Binds the free E2E tunnel enrollment service. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelEnrollment(impl: ArcTunnelEnrollmentImpl): ArcTunnelEnrollment
+
+    /** Binds the certificate renewals of the free E2E tunnel. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelRenewals(impl: ArcTunnelRenewalsImpl): ArcTunnelRenewals
+
+    /** Binds the Certificate Transparency alert state of the free E2E tunnel. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelCtAlerts(impl: ArcTunnelCtAlertsImpl): ArcTunnelCtAlerts
 }

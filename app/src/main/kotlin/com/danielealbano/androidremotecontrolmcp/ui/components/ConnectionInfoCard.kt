@@ -45,6 +45,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 import com.danielealbano.androidremotecontrolmcp.ui.theme.WarningAmber
 
@@ -72,6 +73,14 @@ internal sealed interface TunnelRowContent {
     data class Failed(
         val message: String,
     ) : TunnelRowContent
+
+    /** The free E2E tunnel renews an expired or missing certificate at start: spinner, text and Cancel. */
+    data object Renewing : TunnelRowContent
+
+    /** That renewal failed: the reason in red with Retry and Cancel. */
+    data class RenewalFailed(
+        val message: String,
+    ) : TunnelRowContent
 }
 
 /**
@@ -80,22 +89,31 @@ internal sealed interface TunnelRowContent {
  *
  * The row becomes visible as soon as the server is Starting or Running and remote
  * access is enabled, showing [TunnelRowContent.Loading] (a spinner) until the tunnel
- * reports [TunnelStatus.Connected] or [TunnelStatus.Error].
+ * reports [TunnelStatus.Connected] or [TunnelStatus.Error]. A tunnel-start certificate renewal of the free
+ * E2E tunnel ([renewal]) takes precedence over the tunnel status.
  */
 internal fun tunnelRowContent(
     tunnelEnabled: Boolean,
     serverStatus: ServerStatus,
     tunnelStatus: TunnelStatus,
+    renewal: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle,
 ): TunnelRowContent? {
     val serverActive =
         serverStatus is ServerStatus.Running || serverStatus is ServerStatus.Starting
     if (!tunnelEnabled || !serverActive) return null
-    return when (tunnelStatus) {
+    return when (renewal) {
+        ArcTunnelRenewalState.Renewing -> TunnelRowContent.Renewing
+        is ArcTunnelRenewalState.Failed -> TunnelRowContent.RenewalFailed(renewal.message)
+        ArcTunnelRenewalState.Idle -> tunnelStatusRowContent(tunnelStatus)
+    }
+}
+
+private fun tunnelStatusRowContent(tunnelStatus: TunnelStatus): TunnelRowContent =
+    when (tunnelStatus) {
         is TunnelStatus.Connected -> TunnelRowContent.Connected(tunnelStatus.endpoints)
         is TunnelStatus.Error -> TunnelRowContent.Failed(tunnelStatus.message)
         TunnelStatus.Connecting, TunnelStatus.Disconnected -> TunnelRowContent.Loading
     }
-}
 
 /**
  * Builds the Copy-all / Share connection string. One tunnel line is included per
@@ -128,6 +146,9 @@ fun ConnectionInfoCard(
     serverStatus: ServerStatus = ServerStatus.Stopped,
     tunnelStatus: TunnelStatus = TunnelStatus.Disconnected,
     onShare: (String) -> Unit = {},
+    renewal: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle,
+    onCancelRenewal: () -> Unit = {},
+    onRetryRenewal: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showToken by remember { mutableStateOf(false) }
@@ -141,7 +162,7 @@ fun ConnectionInfoCard(
     val serverUrl = "$scheme://$displayAddress:$port/mcp"
     val displayToken = if (showToken) bearerToken else TOKEN_MASK
 
-    val rowContent = tunnelRowContent(tunnelEnabled, serverStatus, tunnelStatus)
+    val rowContent = tunnelRowContent(tunnelEnabled, serverStatus, tunnelStatus, renewal)
 
     val labelStyle = MaterialTheme.typography.bodyMedium
     val measurer = rememberTextMeasurer()
@@ -192,7 +213,11 @@ fun ConnectionInfoCard(
             }
             if (rowContent != null) {
                 ConnectionInfoRow(label = publicUrlLabel, labelWidth = labelColumnWidth) {
-                    TunnelRowValue(content = rowContent)
+                    TunnelRowValue(
+                        content = rowContent,
+                        onCancelRenewal = onCancelRenewal,
+                        onRetryRenewal = onRetryRenewal,
+                    )
                 }
             }
 
@@ -259,7 +284,11 @@ fun ConnectionInfoCard(
 }
 
 @Composable
-private fun RowScope.TunnelRowValue(content: TunnelRowContent) {
+private fun RowScope.TunnelRowValue(
+    content: TunnelRowContent,
+    onCancelRenewal: () -> Unit,
+    onRetryRenewal: () -> Unit,
+) {
     when (content) {
         TunnelRowContent.Loading -> {
             val connectingDescription = stringResource(R.string.remote_access_status_connecting)
@@ -318,6 +347,16 @@ private fun RowScope.TunnelRowValue(content: TunnelRowContent) {
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.weight(1f),
             )
+        }
+
+        TunnelRowContent.Renewing, is TunnelRowContent.RenewalFailed -> {
+            Column(modifier = Modifier.weight(1f)) {
+                ArcTunnelRenewalBlock(
+                    failure = (content as? TunnelRowContent.RenewalFailed)?.message,
+                    onCancel = onCancelRenewal,
+                    onRetry = onRetryRenewal,
+                )
+            }
         }
     }
 }

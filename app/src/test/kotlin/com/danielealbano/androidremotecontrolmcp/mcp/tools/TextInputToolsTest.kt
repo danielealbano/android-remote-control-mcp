@@ -13,10 +13,13 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
+import io.mockk.clearMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -49,6 +52,12 @@ class TextInputToolsTest {
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockFocusedNode = mockk<AccessibilityNodeInfo>()
     private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
+    private val targetResolver =
+        NodeTargetResolver(
+            ElementFinder(),
+            PrivacyToolTestDoubles.passthroughGate(),
+            PrivacyToolTestDoubles.identitySubstitutor(),
+        )
 
     private val sampleTree =
         AccessibilityNodeData(
@@ -686,6 +695,7 @@ class TextInputToolsTest {
                 mockNodeCache,
                 PrivacyToolTestDoubles.passthroughGate(),
                 PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
             )
 
         private fun setupDefaultMocks(existingText: String = "existing") {
@@ -933,6 +943,7 @@ class TextInputToolsTest {
                 mockNodeCache,
                 PrivacyToolTestDoubles.passthroughGate(),
                 PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello") {
@@ -1149,6 +1160,7 @@ class TextInputToolsTest {
                 mockNodeCache,
                 PrivacyToolTestDoubles.passthroughGate(),
                 PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
             )
 
         private fun setupDefaultMocks(existingText: String = "Hello World") {
@@ -1448,6 +1460,7 @@ class TextInputToolsTest {
                 mockTypeInputController,
                 mockNodeCache,
                 PrivacyToolTestDoubles.passthroughGate(),
+                targetResolver,
             )
 
         @Test
@@ -1681,6 +1694,258 @@ class TextInputToolsTest {
                 val params = buildJsonObject {}
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+    }
+
+    @Nested
+    @DisplayName("type tools with selectors")
+    inner class TypeToolSelectorTests {
+        private fun editable(
+            id: String,
+            text: String,
+        ) = AccessibilityNodeData(
+            id = id,
+            className = "android.widget.EditText",
+            text = text,
+            bounds = BoundsData(0, 100, 1080, 200),
+            editable = true,
+            enabled = true,
+            visible = true,
+        )
+
+        private fun withFields(vararg fields: AccessibilityNodeData) {
+            every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns
+                sampleTree.copy(children = fields.toList())
+        }
+
+        private fun selector(value: String) =
+            buildJsonObject {
+                put("by", "text")
+                put("value", value)
+                put("exact_match", true)
+            }
+
+        private val appendTool =
+            TypeAppendTextTool(
+                mockTreeParser,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockTypeInputController,
+                mockNodeCache,
+                PrivacyToolTestDoubles.passthroughGate(),
+                PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
+            )
+
+        private val clearTool =
+            TypeClearTextTool(
+                mockTreeParser,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockTypeInputController,
+                mockNodeCache,
+                PrivacyToolTestDoubles.passthroughGate(),
+                targetResolver,
+            )
+
+        private val insertTool =
+            TypeInsertTextTool(
+                mockTreeParser,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockTypeInputController,
+                mockNodeCache,
+                PrivacyToolTestDoubles.passthroughGate(),
+                PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
+            )
+
+        private val replaceTool =
+            TypeReplaceTextTool(
+                mockTreeParser,
+                mockActionExecutor,
+                mockAccessibilityServiceProvider,
+                mockTypeInputController,
+                mockNodeCache,
+                PrivacyToolTestDoubles.passthroughGate(),
+                PrivacyToolTestDoubles.identitySubstitutor(),
+                targetResolver,
+            )
+
+        /** [nodeId] focuses and holds [before]; after the operation it holds [after]. */
+        private fun readyField(
+            nodeId: String,
+            before: String,
+            after: String,
+        ) {
+            coEvery { mockActionExecutor.clickNode(nodeId, any()) } returns Result.success(Unit)
+            every { mockTypeInputController.isReady() } returns true
+            every { mockTypeInputController.setSelection(any(), any()) } returns true
+            every { mockTypeInputController.sendKeyEvent(any()) } returns true
+            every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returnsMany
+                listOf(
+                    createMockSurroundingText(before),
+                    createMockSurroundingText(before),
+                    createMockSurroundingText(after),
+                )
+            setupVerificationMock()
+        }
+
+        private fun selectorWith(
+            value: String,
+            extra: Map<String, Any>,
+        ) = buildJsonObject {
+            put("by", "text")
+            put("value", value)
+            put("exact_match", true)
+            extra.forEach { (key, v) -> if (v is Int) put(key, v) else put(key, v.toString()) }
+        }
+
+        @Test
+        fun `type_append_text types into the field matched by a selector`() =
+            runTest {
+                withFields(editable("node_email", "Email"), editable("node_name", "Name"))
+                coEvery { mockActionExecutor.clickNode("node_email", any()) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.setSelection(any(), any()) } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
+                    createMockSurroundingText("Email")
+                setupVerificationMock()
+
+                val text =
+                    extractTextContent(
+                        appendTool.execute(
+                            buildJsonObject {
+                                put("by", "text")
+                                put("value", "Email")
+                                put("exact_match", true)
+                                put("text", "Hi")
+                            },
+                        ),
+                    )
+
+                assertTrue(text.contains("at end of node 'node_email'"), text)
+                coVerify(exactly = 1) { mockActionExecutor.clickNode("node_email", any()) }
+            }
+
+        @Test
+        fun `type_append_text with an ambiguous selector returns an untrusted error and types nothing`() =
+            runTest {
+                withFields(editable("node_a", "Field"), editable("node_b", "Field"))
+
+                val result =
+                    appendTool.execute(
+                        buildJsonObject {
+                            put("by", "text")
+                            put("value", "Field")
+                            put("exact_match", true)
+                            put("text", "Hi")
+                        },
+                    )
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
+                coVerify(exactly = 0) { mockActionExecutor.clickNode(any(), any()) }
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
+            }
+
+        @Test
+        fun `type_clear_text clears the field matched by a selector`() =
+            runTest {
+                withFields(editable("node_email", "Email"))
+                coEvery { mockActionExecutor.clickNode("node_email", any()) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.performContextMenuAction(any()) } returns true
+                every { mockTypeInputController.sendKeyEvent(any()) } returns true
+                every {
+                    mockTypeInputController.getSurroundingText(any(), any(), any())
+                } returnsMany listOf(createMockSurroundingText("Email"), createMockSurroundingText(""))
+
+                val text = extractTextContent(clearTool.execute(selector("Email")))
+
+                assertEquals(
+                    "${McpToolUtils.UNTRUSTED_CONTENT_WARNING}\nText cleared from node 'node_email'.\nField content: ",
+                    text,
+                )
+            }
+
+        @Test
+        fun `type_clear_text with an ambiguous selector returns an untrusted error and leaves the lock free`() =
+            runTest {
+                withFields(editable("node_a", "Field"), editable("node_b", "Field"))
+
+                val ambiguous = clearTool.execute(selector("Field"))
+
+                assertEquals(true, ambiguous.isError)
+                coVerify(exactly = 0) { mockActionExecutor.clickNode(any(), any()) }
+
+                // The typing lock was released: a following clear on a single match runs.
+                withFields(editable("node_a", "Field"))
+                coEvery { mockActionExecutor.clickNode("node_a", any()) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
+                    createMockSurroundingText("")
+                assertTrue(extractTextContent(clearTool.execute(selector("Field"))).contains("node 'node_a'"))
+            }
+
+        @Test
+        fun `type_insert_text types at the offset of the field matched by a selector`() =
+            runTest {
+                withFields(editable("node_email", "Email"), editable("node_name", "Name"))
+                readyField("node_email", before = "Email", after = "HiEmail")
+
+                val text =
+                    extractTextContent(insertTool.execute(selectorWith("Email", mapOf("text" to "Hi", "offset" to 0))))
+
+                assertTrue(text.contains("at offset 0 in node 'node_email'"), text)
+                coVerify(exactly = 1) { mockActionExecutor.clickNode("node_email", any()) }
+                verify { mockTypeInputController.setSelection(0, 0) }
+            }
+
+        @Test
+        fun `type_replace_text replaces in the field matched by a selector`() =
+            runTest {
+                withFields(editable("node_email", "Email"), editable("node_name", "Name"))
+                readyField("node_email", before = "Email", after = "Mail")
+
+                val text =
+                    extractTextContent(
+                        replaceTool.execute(selectorWith("Email", mapOf("search" to "Em", "new_text" to "M"))),
+                    )
+
+                assertTrue(text.contains("in node 'node_email'"), text)
+                coVerify(exactly = 1) { mockActionExecutor.clickNode("node_email", any()) }
+                verify { mockTypeInputController.setSelection(0, 2) }
+            }
+
+        @Test
+        fun `append, insert and replace with an ambiguous selector return an untrusted error and free the lock`() =
+            runTest {
+                val appendArgs = mapOf<String, Any>("text" to "Hi")
+                val insertArgs = mapOf<String, Any>("text" to "Hi", "offset" to 0)
+                val replaceArgs = mapOf<String, Any>("search" to "Fi", "new_text" to "Ya")
+                val cases =
+                    listOf(
+                        Triple("type_append_text", appendArgs, appendTool::execute),
+                        Triple("type_insert_text", insertArgs, insertTool::execute),
+                        Triple("type_replace_text", replaceArgs, replaceTool::execute),
+                    )
+                for ((name, args, execute) in cases) {
+                    withFields(editable("node_a", "Field"), editable("node_b", "Field"))
+
+                    val ambiguous = execute(selectorWith("Field", args))
+
+                    assertEquals(true, ambiguous.isError, name)
+                    assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, extractTextContent(ambiguous).lines().first())
+                    coVerify(exactly = 0) { mockActionExecutor.clickNode(any(), any()) }
+
+                    // The typing lock was released: the same call on a single match runs.
+                    withFields(editable("node_a", "Field"))
+                    readyField("node_a", before = "Field", after = "HiField")
+                    assertTrue(extractTextContent(execute(selectorWith("Field", args))).contains("node 'node_a'"), name)
+                    clearMocks(mockActionExecutor, answers = false, childMocks = false)
+                }
             }
     }
 }

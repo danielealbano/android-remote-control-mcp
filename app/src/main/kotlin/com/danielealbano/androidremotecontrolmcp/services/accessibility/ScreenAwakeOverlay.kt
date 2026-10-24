@@ -25,13 +25,15 @@ internal class ScreenAwakeOverlay(
     private var requested = false
     private var view: View? = null
 
-    fun setRequested(awake: Boolean) {
+    fun setRequested(awake: Boolean): Boolean {
         requested = awake
-        refresh()
+        return refresh()
     }
 
-    fun refresh() {
-        if (!requested || !powerManager.isInteractive || keyguardManager.isKeyguardLocked) {
+    /** Returns whether the request is still valid; sleep or lock permanently cancels this hold. */
+    fun refresh(): Boolean {
+        if (!powerManager.isInteractive || keyguardManager.isKeyguardLocked) requested = false
+        if (!requested) {
             remove()
         } else if (view == null) {
             val candidate = createView()
@@ -50,6 +52,7 @@ internal class ScreenAwakeOverlay(
                 .onSuccess { view = candidate }
                 .onFailure { Log.w(TAG, "Could not keep the unlocked screen awake", it) }
         }
+        return requested
     }
 
     fun close() {

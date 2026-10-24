@@ -2,6 +2,15 @@
 
 Thank you for your interest in contributing to Android Remote Control MCP!
 
+## Licensing of contributions
+
+By contributing to this project you agree that your contribution is licensed under the GNU General Public License
+v3.0 or later, as stated in [LICENSE.md](LICENSE.md).
+
+If your change adds or removes a dependency that ships in the app (a Gradle dependency, a Rust crate of
+`vendor/ngrok-java/ngrok-java-native`, or a Go module of `vendor/cloudflared`), update
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) in the same pull request.
+
 ## Getting Started
 
 1. Fork the repository
@@ -31,7 +40,8 @@ See [docs/PROJECT.md](docs/PROJECT.md) for the complete project conventions.
 - **Android NDK** (for cross-compiling native binaries; install via SDK Manager: `sdkmanager "ndk;<version>"`)
 - **Gradle** 8.x (wrapper included, no global install needed)
 - **Go** (for compiling cloudflared tunnel binary; install from [go.dev/dl](https://go.dev/dl/))
-- **Rust/cargo** (for compiling ngrok native library; install from [rustup.rs](https://rustup.rs/))
+- **Rust/cargo 1.85 or newer** (for compiling the ngrok native library: ngrok 0.19 uses Rust edition 2024 and a
+  format-4 `Cargo.lock`; install from [rustup.rs](https://rustup.rs/))
 - **Maven** (for compiling ngrok Java library; install from [maven.apache.org](https://maven.apache.org/install.html))
 
 ### For Running
@@ -88,7 +98,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, node finding, screenshot encoding, settings repository, network utilities, and all 57 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, node finding, screenshot encoding, settings repository, network utilities, and all 58 MCP tool handlers.
 
 ### Integration Tests
 
@@ -123,7 +133,7 @@ make test
 make coverage
 ```
 
-Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/html/index.html`. Minimum coverage target: 80%.
+Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/html/index.html`. No minimum coverage is enforced; every change still needs its tests.
 
 ---
 
@@ -158,7 +168,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"57 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"58 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end

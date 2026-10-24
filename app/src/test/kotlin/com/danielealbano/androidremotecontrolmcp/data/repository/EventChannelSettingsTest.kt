@@ -107,6 +107,8 @@ class EventChannelSettingsTest {
                     mockk(relaxed = true),
                     SettingsChangeLogger(RecordingServerLogRepository(), Dispatchers.Unconfined, 0L),
                 ),
+                io.mockk.mockk<ArcTunnelSettings>(relaxed = true),
+                io.mockk.mockk<DownloadSettings>(relaxed = true),
             )
 
         @Test

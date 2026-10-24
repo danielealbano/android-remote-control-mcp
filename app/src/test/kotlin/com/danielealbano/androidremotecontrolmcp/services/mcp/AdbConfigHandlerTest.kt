@@ -9,18 +9,24 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -42,6 +48,7 @@ class AdbConfigHandlerTest {
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var storageLocationProvider: StorageLocationProvider
     private lateinit var handler: AdbConfigHandler
+    private lateinit var arcTunnelEnrollment: ArcTunnelEnrollment
     private lateinit var context: Context
     private val serverLog = RecordingServerLogRepository()
 
@@ -105,7 +112,8 @@ class AdbConfigHandlerTest {
         coEvery { storageLocationProvider.isLocationAuthorized(any()) } returns false
 
         context = mockk(relaxed = true)
-        handler = AdbConfigHandler(settingsRepository, storageLocationProvider, serverLog)
+        arcTunnelEnrollment = mockk(relaxed = true)
+        handler = AdbConfigHandler(settingsRepository, storageLocationProvider, serverLog, arcTunnelEnrollment)
     }
 
     private fun mockScreenAwakeValidation() {
@@ -474,6 +482,81 @@ class AdbConfigHandlerTest {
             }
 
         @Test
+        @DisplayName("tunnel_provider hyphenated value is applied")
+        fun tunnelProviderArcTunnel() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_TUNNEL_PROVIDER, "android-remote-control-mcp-tunneld")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateTunnelProvider(TunnelProviderType.ARC_TUNNEL) }
+            }
+
+        @Test
+        @DisplayName("tunnel_provider enum name ARC_TUNNEL is ignored")
+        fun tunnelProviderEnumNameIgnored() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_TUNNEL_PROVIDER, "ARC_TUNNEL")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateTunnelProvider(any()) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_base_address valid value is applied")
+        fun arcTunnelBaseAddressApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_ARC_TUNNEL_BASE_ADDRESS, "tunnel.example.org")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelBaseAddress("tunnel.example.org") }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_base_address invalid value is ignored")
+        fun arcTunnelBaseAddressInvalid() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_ARC_TUNNEL_BASE_ADDRESS, "not a host")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateArcTunnelBaseAddress(any()) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_ct_check_enabled is applied")
+        fun arcTunnelCtCheckApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelCtCheckEnabled(false) }
+            }
+
+        @Test
+        @DisplayName("handleConfigure runs the migration before any write")
+        fun migrationRunsFirst() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_TUNNEL_ENABLED, true)
+                    }
+                handler.handle(context, intent)
+                coVerifyOrder {
+                    settingsRepository.ensureAuthModelMigrated()
+                    settingsRepository.updateTunnelEnabled(true)
+                }
+            }
+
+        @Test
         @DisplayName("cloudflare_tunnel_mode FREE is applied")
         fun cloudflareTunnelModeFree() =
             runTest {
@@ -637,6 +720,18 @@ class AdbConfigHandlerTest {
             }
 
         @Test
+        @DisplayName("block_local_network_downloads is applied")
+        fun blockLocalNetworkDownloads() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateBlockLocalNetworkDownloads(true) }
+            }
+
+        @Test
         @DisplayName("valid download_timeout_seconds is applied")
         fun validDownloadTimeout() =
             runTest {
@@ -773,6 +868,7 @@ class AdbConfigHandlerTest {
                 coVerify(exactly = 0) { settingsRepository.updateFileSizeLimit(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateAllowHttpDownloads(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateAllowUnverifiedHttpsCerts(any()) }
+                coVerify(exactly = 0) { settingsRepository.updateBlockLocalNetworkDownloads(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDownloadTimeout(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateScreenAwakeTimeout(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
@@ -919,6 +1015,18 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify { settingsRepository.updateAllowUnverifiedHttpsCerts(false) }
+            }
+
+        @Test
+        @DisplayName("block_local_network_downloads false is applied")
+        fun blockLocalNetworkDownloadsFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateBlockLocalNetworkDownloads(false) }
             }
     }
 
@@ -1111,6 +1219,53 @@ class AdbConfigHandlerTest {
                 coVerify(exactly = 0) { settingsRepository.updateOauthEnabled(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateBearerTokenEnabled(any()) }
                 coVerify(exactly = 0) { settingsRepository.updatePublicUrlOverride(any()) }
+            }
+    }
+
+    @Nested
+    @DisplayName("Free E2E tunnel enrollment")
+    inner class ArcTunnelEnrollTests {
+        @Test
+        @DisplayName("arc_tunnel_enroll true requests enrollment with the applied base address")
+        fun enrollRequested() =
+            runTest {
+                coEvery { settingsRepository.getServerConfig() } returns
+                    ServerConfig(arcTunnelBaseAddress = "tunnel.example.org")
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_ARC_TUNNEL_BASE_ADDRESS, "tunnel.example.org")
+                        boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_ENROLL, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelBaseAddress("tunnel.example.org") }
+                verify { arcTunnelEnrollment.requestEnroll(match { it.baseAddress == "tunnel.example.org" }) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_enroll absent does nothing")
+        fun enrollAbsent() =
+            runTest {
+                handler.handle(context, createIntent(AdbConfigReceiver.ACTION_CONFIGURE))
+                verify(exactly = 0) { arcTunnelEnrollment.requestEnroll(any()) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_enroll is ignored while the server runs")
+        fun enrollIgnoredWhileRunning() =
+            runTest {
+                mockkObject(McpServerService.Companion)
+                try {
+                    every { McpServerService.serverStatus } returns
+                        MutableStateFlow(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"))
+                    val intent =
+                        createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                            boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_ENROLL, true)
+                        }
+                    handler.handle(context, intent)
+                    verify(exactly = 0) { arcTunnelEnrollment.requestEnroll(any()) }
+                } finally {
+                    unmockkObject(McpServerService.Companion)
+                }
             }
     }
 

@@ -8,7 +8,9 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy
 import org.testcontainers.utility.DockerImageName
 import java.io.File
+import java.io.IOException
 import java.time.Duration
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 /**
@@ -29,7 +31,7 @@ object AndroidContainerSetup {
     private const val MEMORY_BYTES = 8L * 1024 * 1024 * 1024 // 8 GB
     private const val PIDS_LIMIT = 16_384L
 
-    private const val APP_PACKAGE = "com.danielealbano.androidremotecontrolmcp.gms.debug"
+    internal const val APP_PACKAGE = "com.danielealbano.androidremotecontrolmcp.gms.debug"
 
     // The E2E/OAuth broadcast ACTIONS are hardcoded in E2EConfigReceiver/OAuthApprovalTestReceiver using
     // their source package (com.danielealbano.androidremotecontrolmcp.debug) — NOT the applicationId. They
@@ -46,6 +48,15 @@ object AndroidContainerSetup {
         "com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService"
     private const val MAIN_ACTIVITY_CLASS =
         "com.danielealbano.androidremotecontrolmcp.ui.MainActivity"
+    internal const val E2E_RECEIVER_COMPONENT = "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS"
+    internal const val E2E_CONFIGURE_ACTION = "$E2E_ACTION_BASE.E2E_CONFIGURE"
+    internal const val E2E_START_ACTION = "$E2E_ACTION_BASE.E2E_START_SERVER"
+    internal const val E2E_STOP_ACTION = "$E2E_ACTION_BASE.E2E_STOP_SERVER"
+    internal const val E2E_ARC_ENROLL_ACTION = "$E2E_ACTION_BASE.E2E_ARC_TUNNEL_ENROLL"
+    internal const val E2E_ARC_QUERY_ACTION = "$E2E_ACTION_BASE.E2E_ARC_TUNNEL_QUERY"
+    internal const val MAIN_COMPONENT = "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
+    private const val ARC_POLL_INTERVAL_MS = 1_000L
+    private const val BROADCAST_DATA_PREFIX = "data=\""
 
     private const val DEFAULT_EMULATOR_BOOT_TIMEOUT_MS = 180_000L
     private const val DEFAULT_SERVER_READY_TIMEOUT_MS = 60_000L
@@ -456,6 +467,18 @@ object AndroidContainerSetup {
     }
 
     /**
+     * Launch the long scrollable list test activity (60 rows in a ScrollView) from its top.
+     */
+    fun launchLongListTestApp() {
+        val result = execAdb(
+            "shell", "am", "start", "-W", "-S",
+            "-n", "$COMPOSE_TEST_PACKAGE/.LongListActivity",
+        )
+        println("[E2E Setup] launchLongListTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
      * Launch the WebView test activity using am start.
      */
     fun launchWebViewTestApp() {
@@ -657,17 +680,24 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Ensures binder_linux and fuse kernel modules are loaded.
+     * Ensures binder and fuse are available to redroid.
      *
-     * On CI, modules are pre-loaded by the workflow. On local dev, attempts
-     * `sudo modprobe` and provides a clear error on failure.
+     * On CI, modules are pre-loaded and binderfs mounted by the workflow. When [kernelPrerequisitesSatisfied] reports
+     * them usable (binderfs mounted, fuse loaded or built in) nothing is done; otherwise attempts `sudo modprobe`
+     * plus the binderfs mount and provides a clear error on failure.
      *
      * NOTE: Uses `sudo` — accepted exception to CLAUDE.md no-sudo rule.
      * Kernel module loading is a host-OS operation required by redroid.
      */
     private fun ensureKernelModules() {
-        if (isModuleLoaded("binder_linux") && isModuleLoaded("fuse")) {
-            println("[E2E Setup] Kernel modules already loaded")
+        val satisfied =
+            kernelPrerequisitesSatisfied(
+                procModules = readProcModules(),
+                devFuseExists = File("/dev/fuse").exists(),
+                binderfsMounted = isBinderfsMounted(),
+            )
+        if (satisfied) {
+            println("[E2E Setup] Kernel prerequisites already available (binder, fuse)")
             return
         }
 
@@ -695,22 +725,41 @@ object AndroidContainerSetup {
      * NOTE: Uses `sudo` — same accepted exception as ensureKernelModules.
      */
     private fun ensureBinderfs() {
-        try {
-            runProcess("mountpoint", "-q", "/dev/binderfs")
-            return // Already mounted
-        } catch (_: Exception) {
-            // Not mounted, proceed
-        }
+        if (isBinderfsMounted()) return
 
         println("[E2E Setup] Mounting binderfs at /dev/binderfs/...")
         runProcess("sudo", "mkdir", "-p", "/dev/binderfs")
         runProcess("sudo", "mount", "-t", "binder", "binder", "/dev/binderfs")
     }
 
-    private fun isModuleLoaded(moduleName: String): Boolean =
+    /**
+     * True when binder and fuse are already usable, so the sudo `modprobe` path can be skipped. Binder counts only
+     * when `/dev/binderfs` is mounted, module or built in: [detectBinderDevMajor] reads the device major from that
+     * mount, so a loaded `binder_linux` without it still needs [ensureBinderfs]. Built-in (non-module) fuse never
+     * appears in [procModules], so an existing `/dev/fuse` also counts.
+     */
+    internal fun kernelPrerequisitesSatisfied(
+        procModules: String,
+        devFuseExists: Boolean,
+        binderfsMounted: Boolean,
+    ): Boolean = binderfsMounted && (devFuseExists || procModules.contains("fuse"))
+
+    private fun readProcModules(): String =
         try {
-            File("/proc/modules").readText().contains(moduleName)
-        } catch (_: Exception) {
+            File("/proc/modules").readText()
+        } catch (_: IOException) {
+            ""
+        }
+
+    private fun isBinderfsMounted(): Boolean =
+        try {
+            runProcess("mountpoint", "-q", "/dev/binderfs")
+            true
+        } catch (_: IllegalStateException) {
+            // Non-zero exit (not a mount point) or timeout.
+            false
+        } catch (_: IOException) {
+            // `mountpoint` could not be started.
             false
         }
 
@@ -743,6 +792,135 @@ object AndroidContainerSetup {
             println("[E2E Setup] Fuse device detection failed: ${e.message}, using default 10:229")
             "10:229"
         }
+
+    /**
+     * The address of the HOST as seen from inside the container: its default-gateway IP (podman's bridge).
+     * `host.testcontainers.internal` is not resolvable by Android's resolver; Android uses policy routing, so
+     * `ip route get <external ip>` is used instead of the main table (prints "<ip> via <gateway> dev …").
+     */
+    fun containerGatewayIp(serial: String = adbSerial): String {
+        val out = execAdbOn(serial, "shell", "ip", "route", "get", "1.1.1.1")
+        val tokens = out.split(Regex("\\s+"))
+        return tokens[tokens.indexOf("via") + 1]
+    }
+
+    /**
+     * Stops the MCP server through the debug receiver and waits until nothing answers on [baseUrl]. The main
+     * activity is brought to the front first: the stop is a foreground-service command, refused from the
+     * background on Android 12+.
+     */
+    fun stopMcpServer(
+        baseUrl: String,
+        serial: String = adbSerial,
+        timeoutMs: Long = DEFAULT_SERVER_READY_TIMEOUT_MS,
+    ) {
+        println("[E2E Setup] Stopping MCP server...")
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
+        execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_STOP_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            var conn: java.net.HttpURLConnection? = null
+            try {
+                conn = java.net.URI("$baseUrl/health").toURL().openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 2_000
+                conn.readTimeout = 2_000
+                conn.responseCode
+            } catch (_: java.io.IOException) {
+                println("[E2E Setup] MCP server stopped (${System.currentTimeMillis() - startTime}ms)")
+                return
+            } finally {
+                conn?.disconnect()
+            }
+            Thread.sleep(SERVER_READY_POLL_INTERVAL_MS)
+        }
+        throw IllegalStateException("MCP server still answering ${timeoutMs}ms after the stop broadcast")
+    }
+
+    /** Stops the server on a device without a reachable base URL; awaits `server == "Stopped"` through the query. */
+    fun stopMcpServerOn(serial: String) {
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
+        execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_STOP_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+        awaitArcTunnel(serial = serial, timeoutMs = 30_000L) { it.server == "Stopped" }
+    }
+
+    /** Starts the server on [serial] (activity + debug receiver), like [startMcpServer] but for any device. */
+    fun startMcpServerOn(serial: String) {
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
+        execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_START_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+    }
+
+    /**
+     * Applies the free E2E tunnel settings through the debug receiver and waits until the query echoes them.
+     * Empty override/PEM are sent as `-` (the receiver's clear sentinel: `--es k ""` never arrives).
+     */
+    fun configureArcTunnel(
+        settings: ArcTunnelE2ESettings,
+        serial: String = adbSerial,
+    ) {
+        val pemB64 =
+            if (settings.trustedCaPem.isEmpty()) {
+                "-"
+            } else {
+                Base64.getEncoder().encodeToString(settings.trustedCaPem.toByteArray())
+            }
+        execAdbOn(
+            serial, "shell", "am", "broadcast", "--include-stopped-packages",
+            "-a", E2E_CONFIGURE_ACTION, "-n", E2E_RECEIVER_COMPONENT,
+            "--ez", "tunnel_enabled", settings.tunnelEnabled.toString(),
+            "--es", "tunnel_provider", settings.provider,
+            "--es", "arc_tunnel_base_address", settings.baseAddress,
+            "--ez", "arc_tunnel_ct_check_enabled", settings.ctCheckEnabled.toString(),
+            "--es", "arc_tunnel_edge_override", settings.edgeOverride.ifEmpty { "-" },
+            "--es", "arc_tunnel_trusted_ca_pem_b64", pemB64,
+        )
+        awaitArcTunnel(serial = serial, timeoutMs = 30_000L) { status ->
+            status.tunnelEnabled == settings.tunnelEnabled &&
+                status.tunnelProvider == settings.provider &&
+                status.baseAddress == settings.baseAddress &&
+                status.ctCheckEnabled == settings.ctCheckEnabled &&
+                status.edgeOverride == settings.edgeOverride
+        }
+        println("[E2E Setup] Free E2E tunnel settings applied")
+    }
+
+    /** Brings the app to the foreground first: the enrollment foreground service cannot start from the background. */
+    fun enrollArcTunnel(serial: String = adbSerial) {
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
+        execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_ARC_ENROLL_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+    }
+
+    /** One status query; the receiver answers with Base64 JSON in the broadcast result data. */
+    fun queryArcTunnel(serial: String = adbSerial): E2EArcTunnelStatus {
+        val out =
+            execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_ARC_QUERY_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+        val line =
+            out.lines().firstOrNull { it.contains(BROADCAST_DATA_PREFIX) }
+                ?: throw IllegalStateException("No result data in: $out")
+        val b64 = line.substringAfter(BROADCAST_DATA_PREFIX).substringBefore('"')
+        return E2EArcTunnelStatus.parse(String(Base64.getDecoder().decode(b64)))
+    }
+
+    /** Polls [queryArcTunnel] until [predicate] holds; the last status is in the failure message. */
+    fun awaitArcTunnel(
+        serial: String = adbSerial,
+        timeoutMs: Long,
+        predicate: (E2EArcTunnelStatus) -> Boolean,
+    ): E2EArcTunnelStatus {
+        val startTime = System.currentTimeMillis()
+        var last: E2EArcTunnelStatus? = null
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            last = queryArcTunnel(serial)
+            if (predicate(last)) return last
+            Thread.sleep(ARC_POLL_INTERVAL_MS)
+        }
+        throw IllegalStateException("Free E2E tunnel condition not met within ${timeoutMs}ms; last status: $last")
+    }
+
+    /** [execAdb] for an explicit serial (the device-gated test targets the attached phone, not the container). */
+    internal fun execAdbOn(
+        serial: String,
+        vararg args: String,
+    ): String = runProcess("adb", "-s", serial, *args)
 
     /**
      * Execute an adb command on the host targeting the redroid container.
@@ -834,7 +1012,7 @@ object AndroidContainerSetup {
      * `readText()` would block forever, preventing `waitFor()` from firing.
      * By reading in a thread, `waitFor()` can time out and `destroyForcibly()`.
      */
-    private fun runProcess(
+    internal fun runProcess(
         vararg command: String,
         timeoutSeconds: Long = PROCESS_TIMEOUT_SECONDS,
     ): String {

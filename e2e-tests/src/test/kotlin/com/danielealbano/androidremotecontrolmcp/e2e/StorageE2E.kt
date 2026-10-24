@@ -129,6 +129,17 @@ object StorageE2E {
         Thread.sleep(1_000)
     }
 
+    /** Sets "Block Local Network Downloads" via the E2E config broadcast. */
+    fun configureBlockLocalNetworkDownloads(block: Boolean) {
+        AndroidContainerSetup.execAdb(
+            "shell", "am", "broadcast", "--include-stopped-packages",
+            "-a", "$E2E_ACTION_BASE.E2E_CONFIGURE",
+            "-n", E2E_CONFIG_RECEIVER,
+            "--ez", "block_local_network_downloads", block.toString(),
+        )
+        Thread.sleep(1_000)
+    }
+
     /** Inserts a MediaStore row with IS_PENDING=1 (no backing content written). */
     fun insertPendingRow(displayName: String, relativePathWithSlash: String) {
         AndroidContainerSetup.execAdb(

@@ -63,7 +63,7 @@ class EventChannelService : Service() {
         when (intent?.action) {
             ACTION_START -> handleStart()
             ACTION_STOP -> handleStop()
-            ACTION_GEOFENCE_EVENT -> intent?.let { geofenceController.handleGeofenceIntent(it) }
+            ACTION_GEOFENCE_EVENT -> geofenceController.handleGeofenceIntent(intent)
         }
         return START_STICKY
     }

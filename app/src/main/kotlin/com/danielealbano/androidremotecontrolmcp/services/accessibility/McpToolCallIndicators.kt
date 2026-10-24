@@ -23,6 +23,8 @@ internal class McpToolCallIndicators(
 
     override fun setEnabled(enabled: Boolean) = visual.setEnabled(enabled)
 
+    override fun onActiveToolChanged(toolName: String) = visual.onActiveToolChanged(toolName)
+
     fun close() {
         awake.close()
         visual.close()

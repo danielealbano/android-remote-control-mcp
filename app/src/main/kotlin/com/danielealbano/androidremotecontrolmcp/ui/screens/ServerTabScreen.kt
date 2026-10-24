@@ -4,11 +4,12 @@ package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.ServerRoute
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
 @Composable
@@ -19,6 +20,7 @@ fun ServerTabScreen(
     onOpenPrivacySettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     NavHost(
@@ -34,6 +36,7 @@ fun ServerTabScreen(
                 onNavigateToTunnelSettings = onNavigateToTunnelSettings,
                 onOpenPrivacySettings = onOpenPrivacySettings,
                 viewModel = viewModel,
+                arcTunnelViewModel = arcTunnelViewModel,
             )
         }
         composable(ServerRoute.Logs.route) {

@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
+import android.content.ClipData
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -34,18 +35,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlert
 import com.danielealbano.androidremotecontrolmcp.ui.ApprovalActivity
 import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizationCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
@@ -53,11 +58,14 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCar
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.LogsViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.PrivacyViewModel
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,9 +79,12 @@ fun ServerScreen(
     viewModel: MainViewModel = hiltViewModel(),
     channelViewModel: ChannelViewModel = hiltViewModel(),
     privacyViewModel: PrivacyViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
+    arcTunnelRenewalViewModel: ArcTunnelRenewalViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val logsViewModel: LogsViewModel = hiltViewModel()
 
     val privacyConfig by privacyViewModel.privacyConfig.collectAsStateWithLifecycle()
@@ -89,6 +100,8 @@ fun ServerScreen(
 
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
+    val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
+    val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
@@ -131,14 +144,25 @@ fun ServerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            ArcTunnelCtAlertCard(
+                alert = ctAlert,
+                onChangeName = onNavigateToTunnelSettings,
+                onDismiss = { arcTunnelViewModel.dismissCtAlert() },
+            )
+
             if (serverConfig.bindingAddress == BindingAddress.LOCALHOST && !serverConfig.tunnelEnabled) {
                 NetworkAccessSuggestionCard(
+                    enabled = serverStatus is ServerStatus.Stopped,
+                    onEnableFreeTunnel = {
+                        arcTunnelViewModel.enableFreeTunnel()
+                        onNavigateToTunnelSettings()
+                    },
                     onEnableWifi = {
                         viewModel.updateBindingAddress(BindingAddress.NETWORK)
                         onNavigateToNetworkSettings()
                     },
-                    onSetUpTunnel = {
-                        viewModel.updateTunnelEnabled(true)
+                    onOtherTunnels = {
+                        viewModel.updateTunnelProvider(TunnelProviderType.CLOUDFLARE)
                         onNavigateToTunnelSettings()
                     },
                 )
@@ -181,9 +205,14 @@ fun ServerScreen(
                 tunnelEnabled = serverConfig.tunnelEnabled,
                 serverStatus = serverStatus,
                 tunnelStatus = tunnelStatus,
+                renewal = renewal,
+                onCancelRenewal = { viewModel.stopServer(context) },
+                onRetryRenewal = arcTunnelRenewalViewModel::retry,
                 onCopyAll = { text ->
-                    clipboardManager.setText(AnnotatedString(text))
-                    Toast.makeText(context, copiedToClipboardMessage, Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))
+                        Toast.makeText(context, copiedToClipboardMessage, Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onShare = { text ->
                     val intent =
@@ -228,20 +257,48 @@ private fun NoAuthWarningCard() {
 
 @Composable
 private fun NetworkAccessSuggestionCard(
+    enabled: Boolean,
+    onEnableFreeTunnel: () -> Unit,
     onEnableWifi: () -> Unit,
-    onSetUpTunnel: () -> Unit,
+    onOtherTunnels: () -> Unit,
 ) {
     CalloutCard(
         icon = Icons.Default.Info,
         title = stringResource(R.string.server_network_access_suggestion_title),
     ) {
-        TextButton(onClick = onEnableWifi) {
+        TextButton(onClick = onEnableFreeTunnel, enabled = enabled) {
+            Text(stringResource(R.string.server_network_access_suggestion_arc_tunnel))
+        }
+        TextButton(onClick = onEnableWifi, enabled = enabled) {
             Text(stringResource(R.string.server_network_access_suggestion_wifi))
         }
-        TextButton(onClick = onSetUpTunnel) {
-            Text(stringResource(R.string.server_network_access_suggestion_tunnel))
+        TextButton(onClick = onOtherTunnels, enabled = enabled) {
+            Text(stringResource(R.string.server_network_access_suggestion_other_tunnels))
         }
     }
+}
+
+/** The Certificate Transparency banner; nothing when there is no alert. */
+@Composable
+private fun ArcTunnelCtAlertCard(
+    alert: ArcTunnelCtAlert?,
+    onChangeName: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (alert == null) return
+    CalloutCard(
+        icon = Icons.Default.Warning,
+        title = stringResource(R.string.server_arc_tunnel_ct_alert_title),
+        body = stringResource(R.string.server_arc_tunnel_ct_alert_body, alert.fqdn),
+    ) {
+        TextButton(onClick = onChangeName) {
+            Text(stringResource(R.string.server_arc_tunnel_ct_alert_change_name))
+        }
+        TextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.server_arc_tunnel_ct_alert_dismiss))
+        }
+    }
+    Spacer(Modifier.height(16.dp))
 }
 
 @Composable

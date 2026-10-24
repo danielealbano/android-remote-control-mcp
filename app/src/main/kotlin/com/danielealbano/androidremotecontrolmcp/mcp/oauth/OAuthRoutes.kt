@@ -129,19 +129,15 @@ private suspend fun ApplicationCall.handleAuthorize(
         respondAuthorizeError("Invalid client_id or redirect_uri.")
         return
     }
-    // redirectValid guarantees the following are non-null.
-    val safeClient = client!!
-    val safeClientId = clientId!!
-    val safeRedirectUri = redirectUri!!
     val canonical = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
     val state = params["state"].orEmpty()
     val paramError = authorizeParamError(params, canonical)
     if (paramError != null) {
-        redirectWithError(safeRedirectUri, paramError, state)
+        redirectWithError(redirectUri, paramError, state)
         return
     }
-    val redirectHost = host(safeRedirectUri) ?: "Unknown"
-    val displayName = safeClient.clientName ?: redirectHost
+    val redirectHost = host(redirectUri) ?: "Unknown"
+    val displayName = client.clientName ?: redirectHost
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
@@ -150,7 +146,7 @@ private suspend fun ApplicationCall.handleAuthorize(
             ApprovalRequest(
                 clientName = displayName,
                 redirectHost = redirectHost,
-                logoUri = safeClient.logoUri,
+                logoUri = client.logoUri,
                 clientIp = clientIp,
                 clientGeo = clientGeo,
             ),
@@ -160,8 +156,8 @@ private suspend fun ApplicationCall.handleAuthorize(
     pendingAuthorize.put(
         approval.id,
         PendingAuthorizeRequest(
-            clientId = safeClientId,
-            redirectUri = safeRedirectUri,
+            clientId = clientId,
+            redirectUri = redirectUri,
             codeChallenge = params["code_challenge"].orEmpty(),
             resource = canonical,
             scope = params["scope"].orEmpty().ifEmpty { "mcp" },
@@ -170,7 +166,7 @@ private suspend fun ApplicationCall.handleAuthorize(
         ),
         deps.nowMs(),
     )
-    respondConsentPage(approval, displayName, safeClient.logoUri, redirectHost, deps.nowMs())
+    respondConsentPage(approval, displayName, client.logoUri, redirectHost, deps.nowMs())
 }
 
 /** Logs an OAUTH authorization-request entry annotated with the client's IP and geolocation (never tokens). */

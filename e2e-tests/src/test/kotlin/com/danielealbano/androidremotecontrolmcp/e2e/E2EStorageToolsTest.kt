@@ -508,4 +508,22 @@ class E2EStorageToolsTest {
         StorageE2E.scanPath("Pictures/late.jpg")
         assertTrue(plainFileNames(callListFiles(PICTURES)).contains("late.jpg"))
     }
+
+    @Test
+    @Order(32)
+    fun `download_from_url refuses a local network address when the block is on`() = runBlocking {
+        // The fixture is reached through the container gateway, a private address: blocked with the switch on.
+        StorageE2E.configureBlockLocalNetworkDownloads(true)
+        try {
+            val result = mcpClient.callTool(
+                "${TOOL_PREFIX}download_from_url",
+                mapOf("location_id" to DOWNLOADS, "path" to "e2e-blocked.txt", "url" to "$fixtureBaseUrl/fixture.txt"),
+            )
+            assertEquals(true, result.isError, toolText(result))
+            assertTrue(toolText(result).contains("Block Local Network Downloads"), toolText(result))
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-blocked.txt"))
+        } finally {
+            StorageE2E.configureBlockLocalNetworkDownloads(false)
+        }
+    }
 }

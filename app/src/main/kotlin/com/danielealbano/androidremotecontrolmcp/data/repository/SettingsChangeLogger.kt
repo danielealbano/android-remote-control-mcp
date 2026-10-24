@@ -102,3 +102,17 @@ class SettingsChangeLogger internal constructor(
         const val COALESCE_WINDOW_MS = 2_000L
     }
 }
+
+/** Submits a boolean setting change, rendered as "<subject> <onWord|offWord>" with the final value. */
+internal fun SettingsChangeLogger.submitToggle(
+    key: String,
+    oldValue: Boolean,
+    newValue: Boolean,
+    subject: String,
+    onWord: String = "enabled",
+    offWord: String = "disabled",
+) {
+    submit(key, oldValue.toString(), newValue.toString()) { _, n ->
+        "$subject ${if (n.toBoolean()) onWord else offWord}"
+    }
+}

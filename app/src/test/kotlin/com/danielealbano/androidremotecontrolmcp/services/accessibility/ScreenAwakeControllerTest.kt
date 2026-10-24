@@ -24,8 +24,7 @@ class ScreenAwakeControllerTest {
     fun `cancelled request still finishes through real tool wrapper and releases after grace`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
+            val controller = ScreenAwakeController(backgroundScope, 180) { awake = it }
             val indicator =
                 ReferenceCountedToolCallIndicator(
                     object : ToolCallIndicator {
@@ -49,8 +48,7 @@ class ScreenAwakeControllerTest {
     fun `active action never expires and final completion receives full configured grace`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
+            val controller = ScreenAwakeController(backgroundScope, 180) { awake = it }
             controller.started()
             advanceTimeBy(400_000)
             assertTrue(awake)
@@ -67,8 +65,7 @@ class ScreenAwakeControllerTest {
     fun `new action cancels previous expiry and renews grace after it finishes`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
+            val controller = ScreenAwakeController(backgroundScope, 180) { awake = it }
             controller.started()
             controller.finished()
             runCurrent()
@@ -85,45 +82,10 @@ class ScreenAwakeControllerTest {
         }
 
     @Test
-    fun `shortening live timeout releases immediately when idle grace has elapsed`() =
-        runTest {
-            var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
-            controller.started()
-            controller.finished()
-            runCurrent()
-            advanceTimeBy(90_000)
-            assertTrue(awake)
-            controller.updateTimeout(60)
-            assertFalse(awake)
-        }
-
-    @Test
-    fun `extending timeout keeps original completion as its origin`() =
-        runTest {
-            var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
-            controller.started()
-            controller.finished()
-            runCurrent()
-            advanceTimeBy(100_000)
-            controller.updateTimeout(300)
-            runCurrent()
-            advanceTimeBy(199_999)
-            assertTrue(awake)
-            advanceTimeBy(1)
-            runCurrent()
-            assertFalse(awake)
-        }
-
-    @Test
     fun `stop releases active work and late completion cannot renew it`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
+            val controller = ScreenAwakeController(backgroundScope, 180) { awake = it }
             controller.started()
             assertTrue(awake)
             controller.stop()
@@ -139,8 +101,7 @@ class ScreenAwakeControllerTest {
     fun `overlapping tools retain awake state until final completion`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
-            controller.updateTimeout(180)
+            val controller = ScreenAwakeController(backgroundScope, 180) { awake = it }
             val indicator =
                 ReferenceCountedToolCallIndicator(
                     object : ToolCallIndicator {
@@ -165,16 +126,18 @@ class ScreenAwakeControllerTest {
     fun `disabled default and invalid or excessive timeouts never hold screen`() =
         runTest {
             var awake = false
-            val controller = ScreenAwakeController(backgroundScope, { testScheduler.currentTime }) { awake = it }
             listOf(0, -1, 59, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS + 1, Int.MAX_VALUE).forEach {
-                controller.updateTimeout(it)
+                val controller = ScreenAwakeController(backgroundScope, it) { awake = it }
                 controller.started()
                 assertFalse(awake)
                 controller.finished()
                 runCurrent()
                 assertFalse(awake)
             }
-            controller.updateTimeout(ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS)
+            val controller =
+                ScreenAwakeController(backgroundScope, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS) {
+                    awake = it
+                }
             controller.started()
             assertTrue(awake)
             controller.finished()

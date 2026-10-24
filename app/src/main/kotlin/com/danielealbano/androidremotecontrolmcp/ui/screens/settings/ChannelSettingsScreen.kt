@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.ClipData
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,12 +33,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +63,8 @@ fun ChannelSettingsScreen(
     val endpointUrlError by viewModel.endpointUrlError.collectAsStateWithLifecycle()
     val authTokenInput by viewModel.authTokenInput.collectAsStateWithLifecycle()
     var tokenVisible by rememberSaveable { mutableStateOf(false) }
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -115,7 +119,13 @@ fun ChannelSettingsScreen(
                                 )
                             }
                             IconButton(
-                                onClick = { clipboardManager.setText(AnnotatedString(authTokenInput)) },
+                                onClick = {
+                                    scope.launch {
+                                        clipboard.setClipEntry(
+                                            ClipEntry(ClipData.newPlainText("Auth token", authTokenInput)),
+                                        )
+                                    }
+                                },
                             ) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = "Copy")
                             }

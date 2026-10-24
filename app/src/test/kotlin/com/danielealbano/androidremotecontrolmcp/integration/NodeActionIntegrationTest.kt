@@ -4,14 +4,17 @@ package com.danielealbano.androidremotecontrolmcp.integration
 
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.stripUntrustedWarning
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -22,6 +25,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -126,6 +130,181 @@ class NodeActionIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 assertTrue(result.content.isNotEmpty())
+            }
+        }
+
+    private fun okButton(id: String) =
+        ElementInfo(
+            id = id,
+            text = "OK",
+            className = "android.widget.Button",
+            bounds = BoundsData(50, 800, 250, 1000),
+            clickable = true,
+            enabled = true,
+            visible = true,
+        )
+
+    @Test
+    fun `click_node with a selector clicks the single on-screen match`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.TEXT, "OK", true)
+            } returns listOf(okButton("node_btn"))
+            coEvery {
+                deps.actionExecutor.clickNode("node_btn", any<List<WindowData>>())
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_click_node",
+                        arguments = mapOf("by" to "text", "value" to "OK", "exact_match" to true),
+                    )
+                assertNotEquals(true, result.isError)
+                assertTrue((result.content[0] as TextContent).text.contains("node_btn"))
+            }
+        }
+
+    @Test
+    fun `click_node with an ambiguous selector returns the untrusted candidates as the error`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.TEXT, "OK", true)
+            } returns listOf(okButton("node_ok_1"), okButton("node_ok_2"))
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_click_node",
+                        arguments = mapOf("by" to "text", "value" to "OK", "exact_match" to true),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
+                assertTrue(text.contains("node_ok_1") && text.contains("node_ok_2"), text)
+            }
+            coVerify(exactly = 0) { deps.actionExecutor.clickNode(any(), any()) }
+        }
+
+    @Test
+    fun `node tools accept node_id or a selector, and scroll_node is listed`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val tools = client.listTools().tools.associateBy { it.name }
+                val nodeTools =
+                    listOf(
+                        "click_node",
+                        "long_click_node",
+                        "tap_node",
+                        "scroll_to_node",
+                        "scroll_node",
+                        "type_append_text",
+                        "type_insert_text",
+                        "type_replace_text",
+                        "type_clear_text",
+                    )
+                for (name in nodeTools) {
+                    val tool = tools.getValue("android_$name")
+                    val properties =
+                        tool.inputSchema.properties
+                            ?.keys
+                            .orEmpty()
+                    for (property in listOf("node_id", "by", "value", "exact_match")) {
+                        assertTrue(property in properties, "$name misses $property")
+                    }
+                    assertFalse(
+                        tool.inputSchema.required
+                            .orEmpty()
+                            .contains("node_id"),
+                        "$name requires node_id",
+                    )
+                }
+                assertTrue(
+                    "visible_only" in
+                        tools
+                            .getValue("android_find_nodes")
+                            .inputSchema.properties!!
+                            .keys,
+                )
+                assertEquals(listOf("direction"), tools.getValue("android_scroll_node").inputSchema.required)
+                assertEquals(listOf("direction"), tools.getValue("android_scroll_to_node").inputSchema.required)
+            }
+        }
+
+    @Test
+    fun `scroll_node scrolls the node once in the given direction`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            coEvery {
+                deps.actionExecutor.scrollNode("node_root", ScrollDirection.DOWN, any<List<WindowData>>())
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll_node",
+                        arguments = mapOf("node_id" to "node_root", "direction" to "down"),
+                    )
+                assertNotEquals(true, result.isError)
+                assertEquals("Scrolled node 'node_root' down", (result.content[0] as TextContent).text)
+            }
+            coVerify(exactly = 1) { deps.actionExecutor.scrollNode(any(), any(), any()) }
+        }
+
+    @Test
+    fun `scroll_to_node with a selector resolves the match`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.TEXT, "OK", true)
+            } returns listOf(okButton("node_btn"))
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_btn") } returns
+                sampleTree.children[0]
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_scroll_to_node",
+                        arguments =
+                            mapOf("by" to "text", "value" to "OK", "exact_match" to true, "direction" to "down"),
+                    )
+                assertNotEquals(true, result.isError)
+                assertEquals("Node 'node_btn' is already visible", (result.content[0] as TextContent).text)
+            }
+        }
+
+    @Test
+    fun `find_nodes with visible_only returns only the on-screen matches`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.TEXT, "OK", false)
+            } returns listOf(okButton("node_on"), okButton("node_off").copy(visible = false))
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_find_nodes",
+                        arguments = mapOf("by" to "text", "value" to "OK", "visible_only" to true),
+                    )
+                assertNotEquals(true, result.isError)
+                val text = stripUntrustedWarning((result.content[0] as TextContent).text)
+                val ids =
+                    Json
+                        .parseToJsonElement(text)
+                        .jsonObject["nodes"]!!
+                        .jsonArray
+                        .map { it.jsonObject["node_id"]!!.jsonPrimitive.content }
+                assertEquals(listOf("node_on"), ids)
             }
         }
 

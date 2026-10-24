@@ -133,7 +133,7 @@ class AppIconCache
                 .queryIntentActivities(launchIntent, PackageManager.ResolveInfoFlags.of(0))
                 .mapNotNull { resolveInfo ->
                     val pkgName = resolveInfo.activityInfo?.packageName ?: return@mapNotNull null
-                    val label = resolveInfo.loadLabel(pm)?.toString() ?: return@mapNotNull null
+                    val label = resolveInfo.loadLabel(pm).toString()
                     if (label.isBlank() || label == pkgName) return@mapNotNull null
                     pkgName to label
                 }.distinctBy { it.first }

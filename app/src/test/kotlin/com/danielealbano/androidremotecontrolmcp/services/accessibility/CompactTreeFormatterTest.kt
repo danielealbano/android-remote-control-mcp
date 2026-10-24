@@ -1052,4 +1052,304 @@ class CompactTreeFormatterTest {
             assertEquals(note, formatter.formatMultiWindowPage(snap, 3).lines().first())
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // output options (include_offscreen / include_hierarchy)
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("output options")
+    inner class OutputOptionsTests {
+        private val noOffscreen = ScreenStateFormatOptions(includeOffscreen = false)
+        private val noHierarchy = ScreenStateFormatOptions(includeHierarchy = false)
+
+        /**
+         * list (on) -> row_on (on), row_off (off), wrapper_off (off, kept by resource id) -> child_on (on);
+         * plus a hidden pager page (off) -> hidden_text (off).
+         */
+        private fun mixedResult(): MultiWindowResult {
+            val list =
+                makeNode(
+                    id = "node_list",
+                    resourceId = "app:id/list",
+                    scrollable = true,
+                    visible = true,
+                    children =
+                        listOf(
+                            makeNode(id = "node_row_on", text = "On", visible = true),
+                            makeNode(id = "node_row_off", text = "Off", visible = false),
+                            makeNode(
+                                id = "node_wrapper_off",
+                                resourceId = "app:id/wrapper",
+                                visible = false,
+                                children = listOf(makeNode(id = "node_child_on", text = "Child", visible = true)),
+                            ),
+                        ),
+                )
+            val pager =
+                makeNode(
+                    id = "node_page_off",
+                    resourceId = "app:id/page2",
+                    visible = false,
+                    children = listOf(makeNode(id = "node_hidden_text", text = "Hidden", visible = false)),
+                )
+            val root = makeNode(id = "node_root", visible = true, children = listOf(list, pager))
+            return PaginationTestTrees.result(
+                WindowData(windowId = 1, windowType = "APPLICATION", packageName = "com.example.app", tree = root),
+            )
+        }
+
+        /** The node ids of the TSV rows (the column header line excluded). */
+        private fun rowIds(text: String): List<String> =
+            text
+                .lines()
+                .filter { it.contains('\t') && it != CompactTreeFormatter.HEADER }
+                .map { it.substringBefore('\t') }
+
+        private fun hierarchyOf(text: String): List<String> {
+            val lines = text.lines()
+            val idx = lines.indexOf(CompactTreeFormatter.HIERARCHY_HEADER)
+            if (idx < 0) return emptyList()
+            return lines.subList(idx + 1, lines.size).takeWhile { !it.startsWith("note:") }
+        }
+
+        /** The full default output for [mixedResult], from the window header on (pinned: defaults must not change). */
+        private val mixedDefaultBody =
+            listOf(
+                "--- window:1 type:APPLICATION pkg:com.example.app title:unknown layer:0 focused:false ---",
+                CompactTreeFormatter.HEADER,
+                "node_list\t-\t-\t-\tapp:id/list\t0,0,100,100\ton,scr",
+                "node_row_on\t-\tOn\t-\t-\t0,0,100,100\ton",
+                "node_row_off\t-\tOff\t-\t-\t0,0,100,100\toff",
+                "node_wrapper_off\t-\t-\t-\tapp:id/wrapper\t0,0,100,100\toff",
+                "node_child_on\t-\tChild\t-\t-\t0,0,100,100\ton",
+                "node_page_off\t-\t-\t-\tapp:id/page2\t0,0,100,100\toff",
+                "node_hidden_text\t-\tHidden\t-\t-\t0,0,100,100\toff",
+                CompactTreeFormatter.HIERARCHY_HEADER,
+                "node_list",
+                "  node_row_on",
+                "  node_row_off",
+                "  node_wrapper_off",
+                "    node_child_on",
+                "node_page_off",
+                "  node_hidden_text",
+            )
+
+        private val defaultNotes =
+            listOf(
+                CompactTreeFormatter.NOTE_LINE,
+                CompactTreeFormatter.NOTE_LINE_CUSTOM_ELEMENTS,
+                CompactTreeFormatter.NOTE_LINE_FLAGS_LEGEND,
+                CompactTreeFormatter.NOTE_LINE_OFFSCREEN_HINT,
+                "screen:1080x2400 density:420 orientation:portrait",
+            )
+
+        @Test
+        @DisplayName("default options give the exact full output")
+        fun defaultOptionsGiveTheExactFullOutput() {
+            val expected = (defaultNotes + mixedDefaultBody).joinToString("\n")
+
+            assertEquals(expected, formatter.formatMultiWindow(mixedResult(), defaultScreenInfo))
+            assertEquals(
+                expected,
+                formatter.formatMultiWindow(mixedResult(), defaultScreenInfo, ScreenStateFormatOptions()),
+            )
+        }
+
+        @Test
+        @DisplayName("default options give the exact full page output")
+        fun defaultOptionsGiveTheExactFullPageOutput() {
+            val result = mixedResult()
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, formatter.countKeptNodes(result), 1)
+            val expected =
+                (
+                    defaultNotes +
+                        "page:1/1 snapshot:snap nodes:1-7/7" +
+                        mixedDefaultBody +
+                        (
+                            "note:end of snapshot (page 1/1). You do NOT need to have fetched every page; " +
+                                "stop once you have found what you need."
+                        )
+                ).joinToString("\n")
+
+            assertEquals(expected, formatter.formatMultiWindowPage(snapshot, 1))
+        }
+
+        @Test
+        @DisplayName("a later page's hierarchy keeps the listed ancestor and skips the off-screen one")
+        fun laterPageHierarchyKeepsListedAncestorAndSkipsOffScreenOne() {
+            // box (listed) -> wrapper (off screen, kept by resource id) -> 250 on-screen leaves.
+            val leaves =
+                (0 until PAGED_LEAVES).map { i -> makeNode(id = "node_leaf_$i", text = "leaf$i", visible = true) }
+            val wrapper =
+                makeNode(id = "node_wrapper", resourceId = "app:id/wrapper", visible = false, children = leaves)
+            val box = makeNode(id = "node_box", resourceId = "app:id/box", visible = true, children = listOf(wrapper))
+            val result =
+                PaginationTestTrees.result(
+                    WindowData(windowId = 1, windowType = "APPLICATION", packageName = "com.example.app", tree = box),
+                )
+            val total = formatter.countKeptNodes(result, noOffscreen)
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2, noOffscreen)
+
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertEquals(PAGED_LEAVES + 1, total)
+            val hierarchy = hierarchyOf(page2)
+            assertEquals("node_box", hierarchy.first())
+            assertEquals("  node_leaf_199", hierarchy[1])
+            assertEquals(PAGED_LEAVES - (CompactTreeFormatter.PAGE_SIZE - 1) + 1, hierarchy.size)
+            assertFalse(page2.contains("node_wrapper"), page2)
+        }
+
+        @Test
+        @DisplayName("include_offscreen=false lists on-screen nodes only and swaps the offscreen note")
+        fun includeOffscreenFalseListsOnScreenNodesOnly() {
+            val output = formatter.formatMultiWindow(mixedResult(), defaultScreenInfo, noOffscreen)
+
+            assertEquals(listOf("node_list", "node_row_on", "node_child_on"), rowIds(output))
+            assertTrue(output.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_OMITTED))
+            assertFalse(output.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_HINT))
+        }
+
+        @Test
+        @DisplayName("include_offscreen=false nests an on-screen child under the nearest listed ancestor")
+        fun includeOffscreenFalseNestsUnderNearestListedAncestor() {
+            val output = formatter.formatMultiWindow(mixedResult(), defaultScreenInfo, noOffscreen)
+
+            assertEquals(listOf("node_list", "  node_row_on", "  node_child_on"), hierarchyOf(output))
+        }
+
+        @Test
+        @DisplayName("include_offscreen=true (default) still lists off-screen nodes")
+        fun includeOffscreenDefaultListsOffScreenNodes() {
+            val output = formatter.formatMultiWindow(mixedResult(), defaultScreenInfo)
+
+            assertEquals(
+                listOf(
+                    "node_list",
+                    "node_row_on",
+                    "node_row_off",
+                    "node_wrapper_off",
+                    "node_child_on",
+                    "node_page_off",
+                    "node_hidden_text",
+                ),
+                rowIds(output),
+            )
+            assertTrue(output.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_HINT))
+        }
+
+        @Test
+        @DisplayName("include_hierarchy=false leaves out the hierarchy and keeps the rows")
+        fun includeHierarchyFalseLeavesOutTheHierarchy() {
+            val result = mixedResult()
+
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo, noHierarchy)
+
+            assertFalse(output.lines().contains(CompactTreeFormatter.HIERARCHY_HEADER))
+            assertEquals(rowIds(formatter.formatMultiWindow(result, defaultScreenInfo)), rowIds(output))
+        }
+
+        @Test
+        @DisplayName("include_hierarchy=false leaves out the hierarchy of every window")
+        fun includeHierarchyFalseLeavesOutEveryWindowsHierarchy() {
+            val result =
+                MultiWindowResult(
+                    windows =
+                        listOf(
+                            PaginationTestTrees.keptNodeWindow(3, windowId = 1, packageName = "com.app1"),
+                            PaginationTestTrees.keptNodeWindow(3, windowId = 2, packageName = "com.app2"),
+                        ),
+                )
+
+            val withHierarchy = formatter.formatMultiWindow(result, defaultScreenInfo)
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo, noHierarchy)
+
+            assertEquals(2, withHierarchy.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            assertEquals(0, output.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            assertEquals(rowIds(withHierarchy), rowIds(output))
+        }
+
+        @Test
+        @DisplayName("include_hierarchy=false leaves out the hierarchy of every window on every page")
+        fun includeHierarchyFalseLeavesOutEveryWindowsHierarchyOnPages() {
+            // w1 = 150 kept, w2 = 100 kept: page 1 holds both windows, page 2 the rest of window 2
+            val w1 = PaginationTestTrees.keptNodeWindow(148, windowId = 1, packageName = "com.app1")
+            val w2 = PaginationTestTrees.keptNodeWindow(98, windowId = 2, packageName = "com.app2")
+            val result = MultiWindowResult(windows = listOf(w1, w2))
+            val total = formatter.countKeptNodes(result, noHierarchy)
+            val withHierarchy = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2)
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2, noHierarchy)
+
+            val page1 = formatter.formatMultiWindowPage(snapshot, 1)
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertTrue(page1.contains("window:1 ") && page1.contains("window:2 "), page1)
+            val defaultPage1 = formatter.formatMultiWindowPage(withHierarchy, 1)
+            assertEquals(2, defaultPage1.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            for (page in listOf(page1, page2)) {
+                assertEquals(0, page.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER }, page)
+            }
+        }
+
+        @Test
+        @DisplayName("countKeptNodes counts the listed nodes of the options")
+        fun countKeptNodesCountsListedNodes() {
+            val result = mixedResult()
+
+            assertEquals(7, formatter.countKeptNodes(result))
+            assertEquals(3, formatter.countKeptNodes(result, noOffscreen))
+        }
+
+        @Test
+        @DisplayName("pages follow the snapshot options")
+        fun pagesFollowTheSnapshotOptions() {
+            // 500 leaves under a listed container, every other one off screen: 1 + 250 listed -> 2 pages.
+            val leaves =
+                (0 until MIXED_LEAVES).map { i -> makeNode(id = "node_leaf_$i", text = "leaf$i", visible = i % 2 == 0) }
+            val container = makeNode(id = "node_box", resourceId = "app:id/box", visible = true, children = leaves)
+            val result =
+                PaginationTestTrees.result(
+                    WindowData(
+                        windowId = 1,
+                        windowType = "APPLICATION",
+                        packageName = "com.example.app",
+                        tree = container,
+                    ),
+                )
+            val options = ScreenStateFormatOptions(includeOffscreen = false, includeHierarchy = false)
+            val total = formatter.countKeptNodes(result, options)
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2, options)
+
+            val page1 = formatter.formatMultiWindowPage(snapshot, 1)
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertEquals(MIXED_LEAVES / 2 + 1, total)
+            assertEquals(CompactTreeFormatter.PAGE_SIZE, rowIds(page1).size)
+            assertEquals(total - CompactTreeFormatter.PAGE_SIZE, rowIds(page2).size)
+            val oddLeaves =
+                (rowIds(page1) + rowIds(page2)).filter { it.removePrefix("node_leaf_").toIntOrNull()?.rem(2) == 1 }
+            assertEquals(emptyList<String>(), oddLeaves)
+            assertFalse(page1.lines().contains(CompactTreeFormatter.HIERARCHY_HEADER))
+            assertTrue(page1.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_OMITTED))
+            assertTrue(page2.contains(CompactTreeFormatter.NOTE_LINE_OFFSCREEN_OMITTED))
+        }
+
+        @Test
+        @DisplayName("a page hierarchy closes over listed ancestors only")
+        fun pageHierarchyClosesOverListedAncestors() {
+            val result = mixedResult()
+            val total = formatter.countKeptNodes(result, noOffscreen)
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 1, noOffscreen)
+
+            val page = formatter.formatMultiWindowPage(snapshot, 1)
+
+            assertEquals(listOf("node_list", "  node_row_on", "  node_child_on"), hierarchyOf(page))
+        }
+    }
+
+    private companion object {
+        const val MIXED_LEAVES = 500
+        const val PAGED_LEAVES = 250
+    }
 }

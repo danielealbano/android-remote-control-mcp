@@ -122,7 +122,7 @@ jobs:
             app/src/main/jniLibs/x86_64/libngrok_java.so
             vendor/ngrok-java/ngrok-java/target/ngrok-java-1.2.0-SNAPSHOT.jar
             vendor/ngrok-java/ngrok-java-native/target/ngrok-java-native-classes.jar
-          key: ngrok-android-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'vendor/ngrok-java/**/*.toml', 'vendor/ngrok-java/**/pom.xml', 'vendor/ngrok-java/ngrok-java-native/src/**') }}
+          key: ngrok-android-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'vendor/ngrok-java/**/*.toml', 'vendor/ngrok-java/**/pom.xml', 'vendor/ngrok-java/ngrok-java-native/src/**', 'vendor/ngrok-java/**/Cargo.lock', 'vendor/ngrok-java/ngrok-java-native/build.rs') }}
 
       - name: Set up Go
         if: steps.cache-cloudflared.outputs.cache-hit != 'true'

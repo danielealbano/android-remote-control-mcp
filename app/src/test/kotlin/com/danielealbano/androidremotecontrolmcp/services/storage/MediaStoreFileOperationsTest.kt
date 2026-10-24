@@ -94,6 +94,7 @@ class MediaStoreFileOperationsTest {
                 mockStorageLocationProvider,
                 mockSettingsRepository,
                 mockPermissionChecker,
+                mockk(),
             )
     }
 

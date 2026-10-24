@@ -15,7 +15,7 @@ Replace `<app-id>` with the application ID for your build:
 
 ## Permission categories
 
-- **Normal** — granted automatically at install. No command needed: `INTERNET`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_LOCATION`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES`, `KILL_BACKGROUND_PROCESSES`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE`.
+- **Normal** — granted automatically at install. No command needed: `INTERNET`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_LOCATION`, `FOREGROUND_SERVICE_DATA_SYNC`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES`, `KILL_BACKGROUND_PROCESSES`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE`.
 - **Runtime** — granted with `pm grant`.
 - **Special access** — granted with `settings put secure` / `cmd notification`, **not** `pm grant`.
 

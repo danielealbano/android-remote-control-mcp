@@ -533,6 +533,12 @@ class MainViewModel
             }
         }
 
+        fun updateBlockLocalNetworkDownloads(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateBlockLocalNetworkDownloads(enabled)
+            }
+        }
+
         fun updateDeviceSlug(slug: String) {
             _deviceSlugInput.value = slug
 

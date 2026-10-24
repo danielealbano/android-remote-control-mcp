@@ -672,6 +672,7 @@ class AccessibilityTreeParserTest {
 
         @Test
         @DisplayName("parseNode resolves labeledBy text with contentDescription fallback")
+        @Suppress("DEPRECATION")
         fun parseNodeResolvesLabeledByWithFallback() {
             val labelWithText = mockk<AccessibilityNodeInfo>(relaxed = true)
             every { labelWithText.text } returns "Card number"
@@ -689,6 +690,7 @@ class AccessibilityTreeParserTest {
 
         @Test
         @DisplayName("parseNode labeledBy failure yields null")
+        @Suppress("DEPRECATION")
         fun parseNodeLabeledByFailureYieldsNull() {
             val node = createMockNode()
             every { node.labeledBy } throws IllegalStateException("stale node")

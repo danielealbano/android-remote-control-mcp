@@ -1,6 +1,7 @@
 {
   "name": "android-remote-control-channel",
   "version": "0.0.1",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "dependencies": {

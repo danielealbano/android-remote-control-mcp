@@ -2,6 +2,8 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -44,6 +46,9 @@ class E2EScreenshotTest {
          * Delay between retry attempts in milliseconds.
          */
         private const val RETRY_DELAY_MS = 5_000L
+
+        /** Simultaneous screenshot requests sent at once to check the server spaces them out. */
+        private const val CONCURRENT_SCREENSHOTS = 3
     }
 
     private val mcpClient = SharedAndroidContainer.mcpClient
@@ -131,5 +136,61 @@ class E2EScreenshotTest {
         assertFalse(image.data.isEmpty(), "Screenshot data should not be empty")
 
         println("Screenshot: mimeType=${image.mimeType}, data size=${image.data.length} chars")
+    }
+
+    @Test
+    @Order(2)
+    fun `screenshots requested at the same time all succeed`() = runBlocking {
+        AndroidContainerSetup.launchCalculator()
+        Thread.sleep(1_000)
+
+        // Android rejects takeScreenshot requests 333 ms or less apart: simultaneous requests must be
+        // spaced out by the server, not fail.
+        val results = (1..CONCURRENT_SCREENSHOTS).map {
+            async { mcpClient.callTool("${TOOL_PREFIX}get_screen_state", mapOf("include_screenshot" to true)) }
+        }.awaitAll()
+
+        results.forEachIndexed { index, result ->
+            assertNotEquals(
+                true,
+                result.isError,
+                "request $index failed: ${(result.content.firstOrNull() as? TextContent)?.text}",
+            )
+            assertTrue(
+                result.content.size >= 2 && result.content[1] is ImageContent,
+                "request $index returned no screenshot",
+            )
+        }
+    }
+
+    @Test
+    @Order(3)
+    fun `get_screen_state with annotate false returns the plain screenshot`() = runBlocking {
+        val result = mcpClient.callTool(
+            "${TOOL_PREFIX}get_screen_state",
+            mapOf("include_screenshot" to true, "annotate" to false),
+        )
+
+        assertNotEquals(true, result.isError, (result.content.firstOrNull() as? TextContent)?.text)
+        val image = result.content[1] as ImageContent
+        assertTrue(image.mimeType == "image/jpeg", "MimeType should be 'image/jpeg', got: ${image.mimeType}")
+        assertFalse(image.data.isEmpty(), "Screenshot data should not be empty")
+    }
+
+    @Test
+    @Order(4)
+    fun `get_screen_state without offscreen nodes and hierarchy`() = runBlocking {
+        val result = mcpClient.callTool(
+            "${TOOL_PREFIX}get_screen_state",
+            mapOf("include_offscreen" to false, "include_hierarchy" to false),
+        )
+
+        assertNotEquals(true, result.isError, (result.content.firstOrNull() as? TextContent)?.text)
+        val text = (result.content[0] as TextContent).text
+        val rows = text.lines().filter { it.startsWith("node_") && it.contains('\t') && !it.startsWith("node_id\t") }
+        assertTrue(rows.isNotEmpty(), "expected node rows: $text")
+        assertTrue(rows.none { it.substringAfterLast('\t').startsWith("off") }, "offscreen rows listed: $text")
+        assertTrue(text.contains("note:offscreen nodes are not listed (include_offscreen=false)"), text)
+        assertFalse(text.lines().contains("hierarchy:"), text)
     }
 }

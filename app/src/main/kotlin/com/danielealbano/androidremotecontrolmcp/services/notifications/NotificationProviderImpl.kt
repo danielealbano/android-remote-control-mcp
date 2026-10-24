@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
+import androidx.annotation.RequiresApi
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -181,10 +182,21 @@ private fun buildBalOptions(): Bundle? =
         ActivityOptions
             .makeBasic()
             .apply {
-                setPendingIntentBackgroundActivityStartMode(
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
-                )
+                setPendingIntentBackgroundActivityStartMode(backgroundActivityStartMode())
             }.toBundle()
     } else {
         null
+    }
+
+/**
+ * API 36 deprecated MODE_BACKGROUND_ACTIVITY_START_ALLOWED in favour of the new
+ * MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS; the old constant is the only option on API 34-35.
+ */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private fun backgroundActivityStartMode(): Int =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+    } else {
+        @Suppress("DEPRECATION")
+        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
     }

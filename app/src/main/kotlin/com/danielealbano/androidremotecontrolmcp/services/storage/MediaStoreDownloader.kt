@@ -7,9 +7,7 @@ import android.provider.MediaStore
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
-import java.net.HttpURLConnection
 import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 
 /**
  * Streams an HTTP(S) download into a pending MediaStore entry, clearing IS_PENDING on
@@ -17,6 +15,7 @@ import javax.net.ssl.HttpsURLConnection
  */
 internal class MediaStoreDownloader(
     private val context: Context,
+    private val downloadHttpClient: DownloadHttpClient,
 ) {
     @Suppress("TooGenericExceptionCaught")
     fun downloadToPendingUri(
@@ -26,15 +25,14 @@ internal class MediaStoreDownloader(
         config: ServerConfig,
         logContext: String,
     ): Long {
-        var connection: HttpURLConnection? = null
         try {
-            connection = prepareConnection(parsedUrl, config)
-            connection.connect()
-            validateResponse(connection, url, config)
-            val totalBytesWritten = streamToDestination(connection, insertUri, config)
-            markDownloadComplete(insertUri)
-            Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $logContext")
-            return totalBytesWritten
+            downloadHttpClient.open(parsedUrl, config).use { response ->
+                validateResponse(response, url, config)
+                val totalBytesWritten = streamToDestination(response, insertUri, config)
+                markDownloadComplete(insertUri)
+                Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $logContext")
+                return totalBytesWritten
+            }
         } catch (e: McpToolException) {
             context.contentResolver.delete(insertUri, null, null)
             throw e
@@ -44,35 +42,15 @@ internal class MediaStoreDownloader(
                 "Download failed: ${e.message ?: "Unknown error"}",
                 e,
             )
-        } finally {
-            connection?.disconnect()
         }
-    }
-
-    /** Configures (but does not connect) so a failing connect() can still be disconnected. */
-    private fun prepareConnection(
-        parsedUrl: URL,
-        config: ServerConfig,
-    ): HttpURLConnection {
-        val timeoutMs = (config.downloadTimeoutSeconds * MILLIS_PER_SECOND).toInt()
-        val connection = parsedUrl.openConnection() as HttpURLConnection
-        connection.connectTimeout = timeoutMs
-        connection.readTimeout = timeoutMs
-        connection.instanceFollowRedirects = true
-
-        if (config.allowUnverifiedHttpsCerts && connection is HttpsURLConnection) {
-            SslUtils.configurePermissiveSsl(connection)
-        }
-
-        return connection
     }
 
     private fun validateResponse(
-        connection: HttpURLConnection,
+        response: DownloadResponse,
         url: String,
         config: ServerConfig,
     ) {
-        val responseCode = connection.responseCode
+        val responseCode = response.code
         if (responseCode !in HTTP_SUCCESS_RANGE) {
             throw McpToolException.ActionFailed(
                 "Download failed with HTTP status $responseCode for URL: $url",
@@ -80,7 +58,7 @@ internal class MediaStoreDownloader(
         }
 
         val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
-        val contentLength = connection.contentLengthLong
+        val contentLength = response.contentLength
         if (contentLength > 0 && contentLength > limitBytes) {
             throw McpToolException.ActionFailed(
                 "Server reports file size of $contentLength bytes, exceeds limit of " +
@@ -90,14 +68,14 @@ internal class MediaStoreDownloader(
     }
 
     private fun streamToDestination(
-        connection: HttpURLConnection,
+        response: DownloadResponse,
         insertUri: Uri,
         config: ServerConfig,
     ): Long {
         val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
         var totalBytesWritten = 0L
         context.contentResolver.openOutputStream(insertUri, "wt")?.use { outputStream ->
-            connection.inputStream.use { inputStream ->
+            response.body.use { inputStream ->
                 val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
                 var bytesRead: Int
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
@@ -129,7 +107,6 @@ internal class MediaStoreDownloader(
     companion object {
         private const val TAG = "MCP:MediaStoreDownload"
         private const val BYTES_PER_MB = 1024L * 1024L
-        private const val MILLIS_PER_SECOND = 1000L
         private const val DOWNLOAD_BUFFER_SIZE = 8192
         private val HTTP_SUCCESS_RANGE = 200..299
     }

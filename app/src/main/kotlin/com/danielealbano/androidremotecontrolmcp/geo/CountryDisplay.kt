@@ -21,7 +21,12 @@ object CountryDisplay {
 
     fun name(code: String?): String? {
         val c = normalize(code) ?: return null
-        val name = Locale("", c).getDisplayCountry(Locale.getDefault())
+        val name =
+            Locale
+                .Builder()
+                .setRegion(c)
+                .build()
+                .getDisplayCountry(Locale.getDefault())
         // getDisplayCountry echoes the code back when it is not a known region.
         return name.takeIf { it.isNotEmpty() && !it.equals(c, ignoreCase = true) }
     }

@@ -61,6 +61,8 @@ class SettingsRepositoryLoggingTest {
                 dataStore,
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
+                ArcTunnelSettingsImpl(dataStore, changeLogger),
+                DownloadSettingsImpl(dataStore, changeLogger),
             )
     }
 

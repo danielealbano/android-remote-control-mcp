@@ -1,13 +1,21 @@
-// Note: EventChannelService extends android.app.Service and requires Android
-// framework to instantiate. Full lifecycle tests (ACTION_START/STOP, listener
-// creation, config observer) require Robolectric or instrumented tests. These
-// JVM-only tests verify config validation logic, constants, and contracts.
+// Note: EventChannelService extends android.app.Service. Full lifecycle tests (ACTION_START/STOP,
+// listener creation, config observer) require Robolectric or instrumented tests. These JVM-only
+// tests verify config validation logic, constants, contracts and the onStartCommand dispatch of a
+// geofence intent on a plain instance whose collaborators are set directly.
 package com.danielealbano.androidremotecontrolmcp.services.channel
 
+import android.app.Service
+import android.content.Intent
 import com.danielealbano.androidremotecontrolmcp.data.model.ChannelConnectionStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.EventChannelConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.NotificationChannelConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.WifiChannelConfig
+import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
+import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -153,6 +161,29 @@ class EventChannelServiceTest {
                 "com.danielealbano.androidremotecontrolmcp.channel.GEOFENCE_EVENT",
                 EventChannelService.ACTION_GEOFENCE_EVENT,
             )
+        }
+    }
+
+    @Nested
+    @DisplayName("start command dispatch")
+    inner class StartCommandDispatch {
+        @Test
+        fun `onStartCommand forwards a geofence intent to the geofence controller`() {
+            val geofenceController = mockk<GeofenceChannelController>(relaxed = true)
+            val service =
+                EventChannelService().apply {
+                    settingsRepository = mockk<SettingsRepository>(relaxed = true)
+                    eventDispatcher = mockk<EventDispatcher>(relaxed = true)
+                    this.geofenceController = geofenceController
+                    serverLogRepository = mockk<ServerLogRepository>(relaxed = true)
+                    privacyToolGate = mockk<PrivacyToolGate>(relaxed = true)
+                }
+            val intent = mockk<Intent> { every { action } returns EventChannelService.ACTION_GEOFENCE_EVENT }
+
+            val result = service.onStartCommand(intent, 0, 1)
+
+            verify { geofenceController.handleGeofenceIntent(intent) }
+            assertEquals(Service.START_STICKY, result)
         }
     }
 }

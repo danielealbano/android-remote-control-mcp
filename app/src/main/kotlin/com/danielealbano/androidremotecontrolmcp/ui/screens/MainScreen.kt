@@ -23,12 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.components.UpdateAvailableBanner
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.SettingsRoute
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.TopLevelRoute
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateViewModel
 
@@ -40,6 +41,7 @@ fun MainScreen(
     onRequestLocationPermission: () -> Unit,
     viewModel: MainViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     var selectedTabRoute by rememberSaveable { mutableStateOf(TopLevelRoute.Server.route) }
     var pendingSettingsRoute by rememberSaveable { mutableStateOf<String?>(null) }
@@ -103,6 +105,7 @@ fun MainScreen(
                     },
                     modifier = Modifier.padding(paddingValues),
                     viewModel = viewModel,
+                    arcTunnelViewModel = arcTunnelViewModel,
                 )
             }
 
@@ -116,6 +119,7 @@ fun MainScreen(
                     onPendingRouteConsumed = { pendingSettingsRoute = null },
                     modifier = Modifier.padding(paddingValues),
                     viewModel = viewModel,
+                    arcTunnelViewModel = arcTunnelViewModel,
                 )
             }
 
@@ -143,6 +147,7 @@ fun MainScreen(
                     },
                     modifier = Modifier.padding(paddingValues),
                     viewModel = viewModel,
+                    arcTunnelViewModel = arcTunnelViewModel,
                 )
             }
         }

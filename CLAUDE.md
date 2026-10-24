@@ -623,7 +623,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 - **Release APK**: Build with `make build-release` or `./gradlew assembleRelease`.
   - Application ID: `com.danielealbano.androidremotecontrolmcp`.
   - Debuggable: false.
-  - Minify: false (open source with MIT license, no ProGuard/R8).
+  - Minify: false (open source with GPL-3.0-or-later license, no ProGuard/R8).
   - Signed with release keystore (if configured in `keystore.properties`).
 
 ### Versioning

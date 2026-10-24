@@ -15,6 +15,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeLock
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -388,13 +389,10 @@ class TypeAppendTextTool
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
         private val substitutor: PlaceholderSubstitutor,
+        private val targetResolver: NodeTargetResolver,
     ) {
-        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId = McpToolUtils.requireString(arguments, "node_id")
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             // Reverse any pseudonym placeholder so the real value is typed; length checks use the real length.
             val text = substitutor.substitute(McpToolUtils.requireString(arguments, "text"))
@@ -405,10 +403,15 @@ class TypeAppendTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val fieldContent =
+            val (nodeId, fieldContent) =
                 typeOperationMutex.withLock {
-                    // Click to focus
+                    // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val nodeId =
+                        when (val resolution = targetResolver.resolve(target, result.windows)) {
+                            is NodeResolution.Resolved -> resolution.nodeId
+                            is NodeResolution.Ambiguous -> return resolution.result
+                        }
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
@@ -440,7 +443,7 @@ class TypeAppendTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    readFieldContent(typeInputController)
+                    nodeId to readFieldContent(typeInputController)
                 }
 
             Log.d(TAG, "type_append_text: typed ${text.length} chars on node '$nodeId'")
@@ -469,10 +472,7 @@ class TypeAppendTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Target node ID to type into")
-                                }
+                                putNodeTargetProperties(toolNamePrefix)
                                 putJsonObject("text") {
                                     put("type", "string")
                                     put(
@@ -501,7 +501,7 @@ class TypeAppendTextTool
                                     )
                                 }
                             },
-                        required = listOf("node_id", "text"),
+                        required = listOf("text"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -522,13 +522,11 @@ class TypeInsertTextTool
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
         private val substitutor: PlaceholderSubstitutor,
+        private val targetResolver: NodeTargetResolver,
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId = McpToolUtils.requireString(arguments, "node_id")
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             val text = substitutor.substitute(McpToolUtils.requireString(arguments, "text"))
             if (text.isEmpty()) {
@@ -544,10 +542,15 @@ class TypeInsertTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val fieldContent =
+            val (nodeId, fieldContent) =
                 typeOperationMutex.withLock {
-                    // Click to focus
+                    // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val nodeId =
+                        when (val resolution = targetResolver.resolve(target, result.windows)) {
+                            is NodeResolution.Resolved -> resolution.nodeId
+                            is NodeResolution.Ambiguous -> return resolution.result
+                        }
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
@@ -584,7 +587,7 @@ class TypeInsertTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    readFieldContent(typeInputController)
+                    nodeId to readFieldContent(typeInputController)
                 }
 
             Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$nodeId'")
@@ -611,10 +614,7 @@ class TypeInsertTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Target node ID to type into")
-                                }
+                                putNodeTargetProperties(toolNamePrefix)
                                 putJsonObject("text") {
                                     put("type", "string")
                                     put(
@@ -654,7 +654,7 @@ class TypeInsertTextTool
                                     )
                                 }
                             },
-                        required = listOf("node_id", "text", "offset"),
+                        required = listOf("text", "offset"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -682,7 +682,7 @@ class TypeInsertTextTool
  * without framework-level atomic read-select operations.
  *
  * Flow:
- * 1. Click node_id to focus
+ * 1. Resolve the target (node_id or selector) in a fresh read and click it to focus
  * 2. Get current text via getSurroundingText()
  * 3. Find first occurrence of search text — error if not found
  * 4. setSelection(startIndex, endIndex) to select found text
@@ -699,13 +699,11 @@ class TypeReplaceTextTool
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
         private val substitutor: PlaceholderSubstitutor,
+        private val targetResolver: NodeTargetResolver,
     ) {
         @Suppress("ThrowsCount", "LongMethod")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId = McpToolUtils.requireString(arguments, "node_id")
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
             // Substitute both the search term (to match the real field content) and the replacement value.
             val search = substitutor.substitute(McpToolUtils.requireString(arguments, "search"))
@@ -726,10 +724,15 @@ class TypeReplaceTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val fieldContent =
+            val (nodeId, fieldContent) =
                 typeOperationMutex.withLock {
-                    // Click to focus
+                    // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val nodeId =
+                        when (val resolution = targetResolver.resolve(target, result.windows)) {
+                            is NodeResolution.Resolved -> resolution.nodeId
+                            is NodeResolution.Ambiguous -> return resolution.result
+                        }
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
@@ -789,7 +792,7 @@ class TypeReplaceTextTool
                     }
 
                     // Read field content after operation for verification
-                    readFieldContent(typeInputController)
+                    nodeId to readFieldContent(typeInputController)
                 }
 
             Log.d(
@@ -823,10 +826,7 @@ class TypeReplaceTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Target node ID")
-                                }
+                                putNodeTargetProperties(toolNamePrefix)
                                 putJsonObject("search") {
                                     put("type", "string")
                                     put(
@@ -866,7 +866,7 @@ class TypeReplaceTextTool
                                     )
                                 }
                             },
-                        required = listOf("node_id", "search", "new_text"),
+                        required = listOf("search", "new_text"),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -897,73 +897,99 @@ class TypeClearTextTool
         private val typeInputController: TypeInputController,
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
+        private val targetResolver: NodeTargetResolver,
     ) {
-        @Suppress("ThrowsCount")
+        /** What happened under the typing lock. */
+        private sealed interface ClearOutcome {
+            data class Ambiguous(
+                val result: CallToolResult,
+            ) : ClearOutcome
+
+            data class AlreadyEmpty(
+                val nodeId: String,
+            ) : ClearOutcome
+
+            data class Cleared(
+                val nodeId: String,
+                val fieldContent: String,
+            ) : ClearOutcome
+        }
+
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val nodeId = McpToolUtils.requireString(arguments, "node_id")
-            if (nodeId.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_id' must be non-empty")
-            }
+            val target = targetResolver.parse(arguments)
 
-            val fieldContent =
-                typeOperationMutex.withLock {
-                    // Click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
-                    val clickResult = actionExecutor.clickNode(nodeId, result.windows)
-                    clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
-
-                    // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, nodeId)
-
-                    // Check if field has text — skip clear if already empty
-                    val surroundingText =
-                        typeInputController.getSurroundingText(
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            0,
-                        )
-                    val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
-                    if (textLength == 0) {
-                        Log.d(TAG, "type_clear_text: field already empty on '$nodeId'")
-                        return McpToolUtils.untrustedTextResult(
-                            "Text cleared from node '$nodeId'.\nField content: ",
-                        )
-                    }
-
-                    // Select all text — check return value
-                    if (!typeInputController.performContextMenuAction(android.R.id.selectAll)) {
-                        throw McpToolException.ActionFailed(
-                            "Failed to select all text in node '$nodeId' — input connection lost",
-                        )
-                    }
-
-                    // Delete selection via DELETE key event — check return values
-                    if (!typeInputController.sendKeyEvent(
-                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL),
-                        )
-                    ) {
-                        throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
-                        )
-                    }
-                    if (!typeInputController.sendKeyEvent(
-                            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL),
-                        )
-                    ) {
-                        throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
-                        )
-                    }
-
-                    // Read field content after operation for verification
-                    readFieldContent(typeInputController)
+            return when (val outcome = typeOperationMutex.withLock { clearLocked(target) }) {
+                is ClearOutcome.Ambiguous -> {
+                    outcome.result
                 }
 
-            Log.d(TAG, "type_clear_text: cleared text on node '$nodeId'")
-            val redactedFieldContent = privacyToolGate.text(fieldContent, "field content").orEmpty()
-            return McpToolUtils.untrustedTextResult(
-                "Text cleared from node '$nodeId'.\nField content: $redactedFieldContent",
-            )
+                is ClearOutcome.AlreadyEmpty -> {
+                    McpToolUtils.untrustedTextResult("Text cleared from node '${outcome.nodeId}'.\nField content: ")
+                }
+
+                is ClearOutcome.Cleared -> {
+                    Log.d(TAG, "type_clear_text: cleared text on node '${outcome.nodeId}'")
+                    val redactedFieldContent = privacyToolGate.text(outcome.fieldContent, "field content").orEmpty()
+                    McpToolUtils.untrustedTextResult(
+                        "Text cleared from node '${outcome.nodeId}'.\nField content: $redactedFieldContent",
+                    )
+                }
+            }
+        }
+
+        /** Resolves the target in a fresh read, focuses it and clears it; runs under [typeOperationMutex]. */
+        private suspend fun clearLocked(target: NodeTarget): ClearOutcome {
+            val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, result.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return ClearOutcome.Ambiguous(resolution.result)
+                }
+            val clickResult = actionExecutor.clickNode(nodeId, result.windows)
+            clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
+
+            // Poll-retry for InputConnection readiness
+            awaitInputConnectionReady(typeInputController, nodeId)
+
+            // Check if field has text — skip clear if already empty
+            val surroundingText =
+                typeInputController.getSurroundingText(
+                    MAX_SURROUNDING_TEXT_LENGTH,
+                    MAX_SURROUNDING_TEXT_LENGTH,
+                    0,
+                )
+            val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
+            return if (textLength == 0) {
+                Log.d(TAG, "type_clear_text: field already empty on '$nodeId'")
+                ClearOutcome.AlreadyEmpty(nodeId)
+            } else {
+                // Select all text — check return value
+                requireInputStep(
+                    typeInputController.performContextMenuAction(android.R.id.selectAll),
+                    "Failed to select all text in node '$nodeId' — input connection lost",
+                )
+
+                // Delete selection via DELETE key event — check return values
+                requireInputStep(
+                    typeInputController.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL)),
+                    "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
+                )
+                requireInputStep(
+                    typeInputController.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL)),
+                    "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
+                )
+
+                // Read field content after operation for verification
+                ClearOutcome.Cleared(nodeId, readFieldContent(typeInputController))
+            }
+        }
+
+        /** Fails the tool with [failure] when an input step did not succeed. */
+        private fun requireInputStep(
+            succeeded: Boolean,
+            failure: String,
+        ) {
+            if (!succeeded) throw McpToolException.ActionFailed(failure)
         }
 
         fun register(
@@ -981,12 +1007,9 @@ class TypeClearTextTool
                     ToolSchema(
                         properties =
                             buildJsonObject {
-                                putJsonObject("node_id") {
-                                    put("type", "string")
-                                    put("description", "Target node ID to clear")
-                                }
+                                putNodeTargetProperties(toolNamePrefix)
                             },
-                        required = listOf("node_id"),
+                        required = emptyList(),
                     ),
             ) { request -> execute(request.arguments) }
         }
@@ -1187,6 +1210,7 @@ class PressKeyTool
 fun registerTextInputTools(
     registrar: LoggedToolRegistrar,
     treeParser: AccessibilityTreeParser,
+    elementFinder: ElementFinder,
     actionExecutor: ActionExecutor,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     typeInputController: TypeInputController,
@@ -1196,6 +1220,7 @@ fun registerTextInputTools(
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
+    val targetResolver = NodeTargetResolver(elementFinder, privacyToolGate, substitutor)
     if (perms.isToolEnabled(TypeAppendTextTool.TOOL_NAME)) {
         TypeAppendTextTool(
             treeParser,
@@ -1205,6 +1230,7 @@ fun registerTextInputTools(
             nodeCache,
             privacyToolGate,
             substitutor,
+            targetResolver,
         ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TypeInsertTextTool.TOOL_NAME)) {
@@ -1216,6 +1242,7 @@ fun registerTextInputTools(
             nodeCache,
             privacyToolGate,
             substitutor,
+            targetResolver,
         ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TypeReplaceTextTool.TOOL_NAME)) {
@@ -1227,6 +1254,7 @@ fun registerTextInputTools(
             nodeCache,
             privacyToolGate,
             substitutor,
+            targetResolver,
         ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TypeClearTextTool.TOOL_NAME)) {
@@ -1237,6 +1265,7 @@ fun registerTextInputTools(
             typeInputController,
             nodeCache,
             privacyToolGate,
+            targetResolver,
         ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(PressKeyTool.TOOL_NAME)) {

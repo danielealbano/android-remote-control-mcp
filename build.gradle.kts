@@ -51,8 +51,8 @@ tasks.withType<DependencyUpdatesTask> {
 // AGP-internal tooling configurations, and the forces must apply to :app, :compose-test-app and
 // :e2e-tests alike — so force every affected transitive up to its first patched release across ALL
 // projects and ALL configurations. The shipping runtime is unaffected: Ktor's server engine keeps its
-// netty 4.2.x line (pinned to 4.2.17.Final by :app constraints, which this 4.1.x rule never matches),
-// and the app's direct bouncycastle is already 1.85.
+// netty 4.2.x line (pinned to 4.2.19.Final by :app constraints, which this 4.1.x rule never matches),
+// and the app's direct bouncycastle is 1.86, the version forced here.
 allprojects {
     configurations.configureEach {
         resolutionStrategy.eachDependency {
@@ -67,7 +67,7 @@ allprojects {
                 }
                 group == "org.bouncycastle" &&
                     name in setOf("bcprov-jdk18on", "bcutil-jdk18on", "bcpkix-jdk18on") -> {
-                    useVersion("1.85")
+                    useVersion("1.86")
                     because("CVE-2025-14813; androidLintTool/UTP pull vulnerable bouncycastle 1.79 (tooling only)")
                 }
                 group == "org.apache.httpcomponents" && name in setOf("httpclient", "httpmime") -> {

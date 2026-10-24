@@ -5,9 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 
-/** Idempotent ownership of screen/keyguard change broadcasts for one accessibility service. */
+/** Idempotent ownership of screen/keyguard change broadcasts for one server service. */
 internal class ScreenStateObserver(
     private val context: Context,
+    private val onScreenOff: () -> Unit = {},
     private val onChanged: () -> Unit,
 ) {
     private var registered = false
@@ -16,7 +17,10 @@ internal class ScreenStateObserver(
             override fun onReceive(
                 context: Context?,
                 intent: Intent?,
-            ) = onChanged()
+            ) {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF) onScreenOff()
+                onChanged()
+            }
         }
 
     fun start() {

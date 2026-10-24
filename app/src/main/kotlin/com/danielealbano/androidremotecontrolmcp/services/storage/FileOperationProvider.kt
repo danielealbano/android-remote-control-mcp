@@ -187,6 +187,8 @@ interface FileOperationProvider {
      * Respects user-configured settings:
      * - If the URL is HTTP (not HTTPS) and `allowHttpDownloads` is false, throws ActionFailed.
      * - If `allowUnverifiedHttpsCerts` is true, skips HTTPS certificate verification.
+     * - If `blockLocalNetworkDownloads` is true, refuses connections to local network addresses (every hop,
+     *   redirects included) and throws ActionFailed naming the switch.
      *
      * Uses the user-configured download timeout. Follows HTTP redirects.
      *

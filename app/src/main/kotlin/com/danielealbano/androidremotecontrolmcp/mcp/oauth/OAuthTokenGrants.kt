@@ -93,7 +93,7 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
             client == null ||
             // Stale/rotated refresh token — reject only (do NOT revoke the client).
             claims.jti != client.currentRefreshJti
-    if (rejected || claims == null) {
+    if (rejected) {
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_grant")
         return
     }
@@ -103,7 +103,7 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
     deps.clientRepository.touchLastUsed(claims.clientId, deps.nowMs())
     deps.serverLog.log(
         ServerLogEntry.Type.OAUTH,
-        "OAuth token refreshed for ${client?.clientName ?: claims.clientId}",
+        "OAuth token refreshed for ${client.clientName ?: claims.clientId}",
     )
     respondTokens(
         access = deps.tokenService.issueAccessToken(claims.clientId, resource),

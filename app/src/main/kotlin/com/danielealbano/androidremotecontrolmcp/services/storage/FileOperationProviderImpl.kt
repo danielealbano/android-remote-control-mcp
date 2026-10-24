@@ -9,22 +9,25 @@ import androidx.documentfile.provider.DocumentFile
 import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.FileInfo
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
 import java.nio.channels.FileChannel
 import javax.inject.Inject
-import javax.net.ssl.HttpsURLConnection
 
 /**
  * Default implementation of [FileOperationProvider] using the Storage Access Framework.
  *
  * All file operations work through [android.content.ContentResolver] and
- * [DocumentFile] for SAF compatibility with both local and virtual storage providers.
+ * [DocumentFile] for SAF compatibility with both local and virtual storage providers. Their blocking I/O
+ * (content resolver, network) runs on [ioDispatcher], never on the caller's dispatcher (the MCP request
+ * handling threads); the built-in locations delegate to [MediaStoreFileOperations], which does the same.
  */
 @Suppress("TooGenericExceptionCaught", "SwallowedException")
 class FileOperationProviderImpl
@@ -34,6 +37,8 @@ class FileOperationProviderImpl
         private val storageLocationProvider: StorageLocationProvider,
         private val settingsRepository: SettingsRepository,
         private val mediaStoreFileOperations: MediaStoreFileOperations,
+        private val downloadHttpClient: DownloadHttpClient,
+        @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : FileOperationProvider {
         // ─────────────────────────────────────────────────────────────────────
         // listFiles
@@ -48,52 +53,53 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.listFiles(locationId, path, offset, limit)
             }
-            BuiltinStorageLocation.validatePath(path)
-            val directory =
-                resolveDocumentFile(locationId, path)
-                    ?: throw McpToolException.ActionFailed(
-                        "Directory not found: $path in location '$locationId'",
-                    )
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                val directory =
+                    resolveDocumentFile(locationId, path)
+                        ?: throw McpToolException.ActionFailed(
+                            "Directory not found: $path in location '$locationId'",
+                        )
 
-            if (!directory.isDirectory) {
-                throw McpToolException.ActionFailed(
-                    "Path is not a directory: $path in location '$locationId'",
-                )
-            }
-
-            val children = directory.listFiles()
-            val totalCount = children.size
-            val cappedLimit = limit.coerceAtMost(FileOperationProvider.MAX_LIST_ENTRIES)
-
-            val paginatedChildren =
-                children
-                    .sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name })
-                    .drop(offset)
-                    .take(cappedLimit)
-
-            val files =
-                paginatedChildren.map { child ->
-                    val childName = child.name ?: "unknown"
-                    val relativePath = if (path.isEmpty()) childName else "$path/$childName"
-                    FileInfo(
-                        name = childName,
-                        path = "$locationId/$relativePath",
-                        isDirectory = child.isDirectory,
-                        size = if (child.isFile) child.length() else 0L,
-                        lastModified = child.lastModified().takeIf { it > 0L },
-                        mimeType = child.type,
+                if (!directory.isDirectory) {
+                    throw McpToolException.ActionFailed(
+                        "Path is not a directory: $path in location '$locationId'",
                     )
                 }
 
-            val hasMore = offset + cappedLimit < totalCount
-            return FileListResult(files = files, totalCount = totalCount, hasMore = hasMore)
+                val children = directory.listFiles()
+                val totalCount = children.size
+                val cappedLimit = limit.coerceAtMost(FileOperationProvider.MAX_LIST_ENTRIES)
+
+                val paginatedChildren =
+                    children
+                        .sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name })
+                        .drop(offset)
+                        .take(cappedLimit)
+
+                val files =
+                    paginatedChildren.map { child ->
+                        val childName = child.name ?: "unknown"
+                        val relativePath = if (path.isEmpty()) childName else "$path/$childName"
+                        FileInfo(
+                            name = childName,
+                            path = "$locationId/$relativePath",
+                            isDirectory = child.isDirectory,
+                            size = if (child.isFile) child.length() else 0L,
+                            lastModified = child.lastModified().takeIf { it > 0L },
+                            mimeType = child.type,
+                        )
+                    }
+
+                val hasMore = offset + cappedLimit < totalCount
+                FileListResult(files = files, totalCount = totalCount, hasMore = hasMore)
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
         // readFile
         // ─────────────────────────────────────────────────────────────────────
 
-        @Suppress("NestedBlockDepth")
         override suspend fun readFile(
             locationId: String,
             path: String,
@@ -103,46 +109,48 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.readFile(locationId, path, offset, limit)
             }
-            BuiltinStorageLocation.validatePath(path)
-            require(offset >= 1) { "offset must be >= 1, got $offset" }
-            val documentFile = resolveRegularFileOrThrow(locationId, path)
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                require(offset >= 1) { "offset must be >= 1, got $offset" }
+                val documentFile = resolveRegularFileOrThrow(locationId, path)
 
-            checkFileSize(documentFile)
+                checkFileSize(documentFile)
 
-            val cappedLimit = limit.coerceAtMost(FileOperationProvider.MAX_READ_LINES)
-            val bufferedLines = mutableListOf<String>()
-            var totalLines = 0
-            val startLine = offset
+                val cappedLimit = limit.coerceAtMost(FileOperationProvider.MAX_READ_LINES)
+                val bufferedLines = mutableListOf<String>()
+                var totalLines = 0
+                val startLine = offset
 
-            // Stream line-by-line to avoid loading the entire file into memory
-            val uri = documentFile.uri
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                    var lineNumber = 1
-                    var line: String? = reader.readLine()
-                    while (line != null) {
-                        totalLines = lineNumber
-                        if (lineNumber >= offset && bufferedLines.size < cappedLimit) {
-                            bufferedLines.add(line)
+                // Stream line-by-line to avoid loading the entire file into memory
+                val uri = documentFile.uri
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                        var lineNumber = 1
+                        var line: String? = reader.readLine()
+                        while (line != null) {
+                            totalLines = lineNumber
+                            if (lineNumber >= offset && bufferedLines.size < cappedLimit) {
+                                bufferedLines.add(line)
+                            }
+                            lineNumber++
+                            line = reader.readLine()
                         }
-                        lineNumber++
-                        line = reader.readLine()
                     }
-                }
-            } ?: throw McpToolException.ActionFailed(
-                "Failed to open file for reading: $path in location '$locationId'",
-            )
+                } ?: throw McpToolException.ActionFailed(
+                    "Failed to open file for reading: $path in location '$locationId'",
+                )
 
-            val endLine = if (bufferedLines.isEmpty()) startLine else startLine + bufferedLines.size - 1
-            val hasMore = endLine < totalLines
+                val endLine = if (bufferedLines.isEmpty()) startLine else startLine + bufferedLines.size - 1
+                val hasMore = endLine < totalLines
 
-            return FileReadResult(
-                content = bufferedLines.joinToString("\n"),
-                totalLines = totalLines,
-                hasMore = hasMore,
-                startLine = startLine,
-                endLine = endLine,
-            )
+                FileReadResult(
+                    content = bufferedLines.joinToString("\n"),
+                    totalLines = totalLines,
+                    hasMore = hasMore,
+                    startLine = startLine,
+                    endLine = endLine,
+                )
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -157,17 +165,19 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.readFileBytes(locationId, path, maxBytes)
             }
-            BuiltinStorageLocation.validatePath(path)
-            val documentFile = resolveRegularFileOrThrow(locationId, path)
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                val documentFile = resolveRegularFileOrThrow(locationId, path)
 
-            val fileName = documentFile.name ?: path.substringAfterLast('/')
-            return readFileBytesFromUri(
-                context.contentResolver,
-                documentFile.uri,
-                fileName,
-                documentFile.length(),
-                maxBytes,
-            )
+                val fileName = documentFile.name ?: path.substringAfterLast('/')
+                readFileBytesFromUri(
+                    context.contentResolver,
+                    documentFile.uri,
+                    fileName,
+                    documentFile.length(),
+                    maxBytes,
+                )
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -182,28 +192,30 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.writeFile(locationId, path, content)
             }
-            BuiltinStorageLocation.validatePath(path)
-            val config = settingsRepository.getServerConfig()
-            val contentBytes = content.toByteArray(Charsets.UTF_8)
-            val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
+            withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                val config = settingsRepository.getServerConfig()
+                val contentBytes = content.toByteArray(Charsets.UTF_8)
+                val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
 
-            if (contentBytes.size.toLong() > limitBytes) {
-                throw McpToolException.ActionFailed(
-                    "Content size exceeds the configured file size limit of ${config.fileSizeLimitMb} MB.",
+                if (contentBytes.size.toLong() > limitBytes) {
+                    throw McpToolException.ActionFailed(
+                        "Content size exceeds the configured file size limit of ${config.fileSizeLimitMb} MB.",
+                    )
+                }
+
+                checkAuthorization(locationId)
+                checkWritePermission(locationId)
+                val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
+
+                context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
+                    outputStream.write(contentBytes)
+                } ?: throw McpToolException.ActionFailed(
+                    "Failed to open file for writing: $path in location '$locationId'",
                 )
+
+                Log.d(TAG, "Wrote ${contentBytes.size} bytes to $locationId/$path")
             }
-
-            checkAuthorization(locationId)
-            checkWritePermission(locationId)
-            val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
-
-            context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
-                outputStream.write(contentBytes)
-            } ?: throw McpToolException.ActionFailed(
-                "Failed to open file for writing: $path in location '$locationId'",
-            )
-
-            Log.d(TAG, "Wrote ${contentBytes.size} bytes to $locationId/$path")
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -218,34 +230,35 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.appendFile(locationId, path, content)
             }
-            BuiltinStorageLocation.validatePath(path)
-            checkAuthorization(locationId)
-            checkWritePermission(locationId)
-            val config = settingsRepository.getServerConfig()
-            val documentFile = resolveRegularFileOrThrow(locationId, path)
+            withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                checkAuthorization(locationId)
+                checkWritePermission(locationId)
+                val config = settingsRepository.getServerConfig()
+                val documentFile = resolveRegularFileOrThrow(locationId, path)
 
-            val existingSize = documentFile.length()
-            val newContentBytes = content.toByteArray(Charsets.UTF_8)
-            checkAppendSizeLimit(existingSize, newContentBytes.size, config.fileSizeLimitMb)
+                val existingSize = documentFile.length()
+                val newContentBytes = content.toByteArray(Charsets.UTF_8)
+                checkAppendSizeLimit(existingSize, newContentBytes.size, config.fileSizeLimitMb)
 
-            try {
-                context.contentResolver.openOutputStream(documentFile.uri, "wa")?.use { outputStream ->
-                    outputStream.write(newContentBytes)
-                } ?: throw McpToolException.ActionFailed(
-                    "Failed to open file for appending: $path in location '$locationId'",
-                )
-            } catch (e: Exception) {
-                throw appendFailure(e)
+                try {
+                    context.contentResolver.openOutputStream(documentFile.uri, "wa")?.use { outputStream ->
+                        outputStream.write(newContentBytes)
+                    } ?: throw McpToolException.ActionFailed(
+                        "Failed to open file for appending: $path in location '$locationId'",
+                    )
+                } catch (e: Exception) {
+                    throw appendFailure(e)
+                }
+
+                Log.d(TAG, "Appended ${newContentBytes.size} bytes to $locationId/$path")
             }
-
-            Log.d(TAG, "Appended ${newContentBytes.size} bytes to $locationId/$path")
         }
 
         // ─────────────────────────────────────────────────────────────────────
         // replaceInFile
         // ─────────────────────────────────────────────────────────────────────
 
-        @Suppress("ReturnCount")
         override suspend fun replaceInFile(
             locationId: String,
             path: String,
@@ -256,48 +269,50 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.replaceInFile(locationId, path, oldString, newString, replaceAll)
             }
-            BuiltinStorageLocation.validatePath(path)
-            checkAuthorization(locationId)
-            checkWritePermission(locationId)
-            val documentFile = resolveRegularFileOrThrow(locationId, path)
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                checkAuthorization(locationId)
+                checkWritePermission(locationId)
+                val documentFile = resolveRegularFileOrThrow(locationId, path)
 
-            checkFileSize(documentFile)
+                checkFileSize(documentFile)
 
-            // Read the full content
-            val originalContent =
-                context.contentResolver.openInputStream(documentFile.uri)?.use { inputStream ->
-                    inputStream.bufferedReader(Charsets.UTF_8).readText()
-                } ?: throw McpToolException.ActionFailed(
-                    "Failed to open file for reading: $path in location '$locationId'",
-                )
+                // Read the full content
+                val originalContent =
+                    context.contentResolver.openInputStream(documentFile.uri)?.use { inputStream ->
+                        inputStream.bufferedReader(Charsets.UTF_8).readText()
+                    } ?: throw McpToolException.ActionFailed(
+                        "Failed to open file for reading: $path in location '$locationId'",
+                    )
 
-            // Count occurrences and perform replacement
-            val occurrences = countOccurrences(originalContent, oldString)
-            if (occurrences == 0) {
-                return FileReplaceResult(replacementCount = 0)
-            }
-
-            val modifiedContent =
-                if (replaceAll) {
-                    originalContent.replace(oldString, newString)
-                } else {
-                    originalContent.replaceFirst(oldString, newString)
+                // Count occurrences and perform replacement
+                val occurrences = countOccurrences(originalContent, oldString)
+                if (occurrences == 0) {
+                    return@withContext FileReplaceResult(replacementCount = 0)
                 }
 
-            val replacementCount = if (replaceAll) occurrences else 1
+                val modifiedContent =
+                    if (replaceAll) {
+                        originalContent.replace(oldString, newString)
+                    } else {
+                        originalContent.replaceFirst(oldString, newString)
+                    }
 
-            // Try to acquire advisory lock, then write back
-            writeWithOptionalLock(documentFile.uri, modifiedContent)
+                val replacementCount = if (replaceAll) occurrences else 1
 
-            Log.d(TAG, "Replaced $replacementCount occurrence(s) in $locationId/$path")
-            return FileReplaceResult(replacementCount = replacementCount)
+                // Try to acquire advisory lock, then write back
+                writeWithOptionalLock(documentFile.uri, modifiedContent)
+
+                Log.d(TAG, "Replaced $replacementCount occurrence(s) in $locationId/$path")
+                FileReplaceResult(replacementCount = replacementCount)
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
         // downloadFromUrl
         // ─────────────────────────────────────────────────────────────────────
 
-        @Suppress("LongMethod", "CyclomaticComplexMethod", "ThrowsCount", "NestedBlockDepth")
+        @Suppress("LongMethod", "CyclomaticComplexMethod", "ThrowsCount")
         override suspend fun downloadFromUrl(
             locationId: String,
             path: String,
@@ -306,109 +321,95 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.downloadFromUrl(locationId, path, url)
             }
-            BuiltinStorageLocation.validatePath(path)
-            checkAuthorization(locationId)
-            checkWritePermission(locationId)
-            val config = settingsRepository.getServerConfig()
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                checkAuthorization(locationId)
+                checkWritePermission(locationId)
+                val config = settingsRepository.getServerConfig()
 
-            // Validate URL and open connection
-            val (parsedUrl, rawConnection) = openUrlConnection(url)
+                // Validate URL
+                val parsedUrl = parseDownloadUrl(url)
 
-            // Check HTTP permission
-            if (parsedUrl.protocol == "http" && !config.allowHttpDownloads) {
-                throw McpToolException.ActionFailed(
-                    "HTTP downloads are not allowed. Enable 'Allow HTTP Downloads' in the " +
-                        "app settings, or use an HTTPS URL.",
-                )
-            }
-
-            if (parsedUrl.protocol != "http" && parsedUrl.protocol != "https") {
-                throw McpToolException.ActionFailed(
-                    "Unsupported URL protocol: ${parsedUrl.protocol}. Only HTTP and HTTPS are supported.",
-                )
-            }
-
-            val timeoutMs = config.downloadTimeoutSeconds * MILLIS_PER_SECOND
-            val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
-            var connection: HttpURLConnection? = null
-
-            try {
-                connection = rawConnection
-                connection.connectTimeout = timeoutMs
-                connection.readTimeout = timeoutMs
-                connection.instanceFollowRedirects = true
-
-                // Configure permissive SSL if setting is enabled
-                if (config.allowUnverifiedHttpsCerts && connection is HttpsURLConnection) {
-                    SslUtils.configurePermissiveSsl(connection)
-                }
-
-                connection.connect()
-
-                val responseCode = connection.responseCode
-                if (responseCode !in HTTP_SUCCESS_RANGE) {
+                // Check HTTP permission
+                if (parsedUrl.protocol == "http" && !config.allowHttpDownloads) {
                     throw McpToolException.ActionFailed(
-                        "Download failed with HTTP status $responseCode for URL: $url",
+                        "HTTP downloads are not allowed. Enable 'Allow HTTP Downloads' in the " +
+                            "app settings, or use an HTTPS URL.",
                     )
                 }
 
-                // Pre-check Content-Length header
-                val contentLength = connection.contentLengthLong
-                if (contentLength > 0 && contentLength > limitBytes) {
+                if (parsedUrl.protocol != "http" && parsedUrl.protocol != "https") {
                     throw McpToolException.ActionFailed(
-                        "Server reports file size of $contentLength bytes, which exceeds the " +
-                            "configured limit of ${config.fileSizeLimitMb} MB.",
+                        "Unsupported URL protocol: ${parsedUrl.protocol}. Only HTTP and HTTPS are supported.",
                     )
                 }
 
-                // Ensure parent directories and create the destination file
-                val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
+                val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
 
-                // Stream to file, checking cumulative size.
-                // Wrap in try-catch to clean up the orphan file on any error.
-                var totalBytesWritten = 0L
                 try {
-                    context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
-                        connection.inputStream.use { inputStream ->
-                            val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                            var bytesRead: Int
-                            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                                totalBytesWritten += bytesRead
-                                if (totalBytesWritten > limitBytes) {
-                                    // Clean up partial file
-                                    outputStream.close()
-                                    documentFile.delete()
-                                    throw McpToolException.ActionFailed(
-                                        "Download exceeds the configured file size limit of " +
-                                            "${config.fileSizeLimitMb} MB.",
-                                    )
-                                }
-                                outputStream.write(buffer, 0, bytesRead)
-                            }
+                    downloadHttpClient.open(parsedUrl, config).use { response ->
+                        val responseCode = response.code
+                        if (responseCode !in HTTP_SUCCESS_RANGE) {
+                            throw McpToolException.ActionFailed(
+                                "Download failed with HTTP status $responseCode for URL: $url",
+                            )
                         }
-                    } ?: throw McpToolException.ActionFailed(
-                        "Failed to open file for writing: $path in location '$locationId'",
-                    )
-                } catch (e: McpToolException) {
-                    documentFile.delete()
-                    throw e
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") e: Exception,
-                ) {
-                    documentFile.delete()
-                    throw e
-                }
 
-                Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
-                return totalBytesWritten
-            } catch (e: McpToolException) {
-                throw e
-            } catch (e: Exception) {
-                throw McpToolException.ActionFailed(
-                    "Download failed: ${e.message ?: "Unknown error"}",
-                )
-            } finally {
-                connection?.disconnect()
+                        // Pre-check Content-Length header
+                        val contentLength = response.contentLength
+                        if (contentLength > 0 && contentLength > limitBytes) {
+                            throw McpToolException.ActionFailed(
+                                "Server reports file size of $contentLength bytes, which exceeds the " +
+                                    "configured limit of ${config.fileSizeLimitMb} MB.",
+                            )
+                        }
+
+                        // Ensure parent directories and create the destination file
+                        val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
+
+                        // Stream to file, checking cumulative size.
+                        // Wrap in try-catch to clean up the orphan file on any error.
+                        var totalBytesWritten = 0L
+                        try {
+                            context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
+                                response.body.use { inputStream ->
+                                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                                    var bytesRead: Int
+                                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                        totalBytesWritten += bytesRead
+                                        if (totalBytesWritten > limitBytes) {
+                                            // Clean up partial file
+                                            outputStream.close()
+                                            documentFile.delete()
+                                            throw McpToolException.ActionFailed(
+                                                "Download exceeds the configured file size limit of " +
+                                                    "${config.fileSizeLimitMb} MB.",
+                                            )
+                                        }
+                                        outputStream.write(buffer, 0, bytesRead)
+                                    }
+                                }
+                            } ?: throw McpToolException.ActionFailed(
+                                "Failed to open file for writing: $path in location '$locationId'",
+                            )
+                        } catch (e: McpToolException) {
+                            documentFile.delete()
+                            throw e
+                        } catch (e: Exception) {
+                            documentFile.delete()
+                            throw e
+                        }
+
+                        Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
+                        return@withContext totalBytesWritten
+                    }
+                } catch (e: McpToolException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw McpToolException.ActionFailed(
+                        "Download failed: ${e.message ?: "Unknown error"}",
+                    )
+                }
             }
         }
 
@@ -423,26 +424,28 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.deleteFile(locationId, path)
             }
-            BuiltinStorageLocation.validatePath(path)
-            checkAuthorization(locationId)
-            checkDeletePermission(locationId)
-            val documentFile = resolveFileOrThrow(locationId, path)
+            withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                checkAuthorization(locationId)
+                checkDeletePermission(locationId)
+                val documentFile = resolveFileOrThrow(locationId, path)
 
-            if (documentFile.isDirectory) {
-                throw McpToolException.ActionFailed(
-                    "Cannot delete a directory. Only single files can be deleted. " +
-                        "Path: $path in location '$locationId'",
-                )
+                if (documentFile.isDirectory) {
+                    throw McpToolException.ActionFailed(
+                        "Cannot delete a directory. Only single files can be deleted. " +
+                            "Path: $path in location '$locationId'",
+                    )
+                }
+
+                val deleted = documentFile.delete()
+                if (!deleted) {
+                    throw McpToolException.ActionFailed(
+                        "Failed to delete file: $path in location '$locationId'",
+                    )
+                }
+
+                Log.d(TAG, "Deleted file: $locationId/$path")
             }
-
-            val deleted = documentFile.delete()
-            if (!deleted) {
-                throw McpToolException.ActionFailed(
-                    "Failed to delete file: $path in location '$locationId'",
-                )
-            }
-
-            Log.d(TAG, "Deleted file: $locationId/$path")
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -457,11 +460,13 @@ class FileOperationProviderImpl
             if (BuiltinStorageLocation.isBuiltinId(locationId)) {
                 return mediaStoreFileOperations.createFileUri(locationId, path, mimeType)
             }
-            BuiltinStorageLocation.validatePath(path)
-            checkAuthorization(locationId)
-            checkWritePermission(locationId)
-            val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path, mimeType)
-            return documentFile.uri
+            return withContext(ioDispatcher) {
+                BuiltinStorageLocation.validatePath(path)
+                checkAuthorization(locationId)
+                checkWritePermission(locationId)
+                val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path, mimeType)
+                documentFile.uri
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -767,19 +772,13 @@ class FileOperationProviderImpl
             )
         }
 
-        /**
-         * Parses a URL string and opens an [HttpURLConnection].
-         * Extracted for testability (constructor mocking of [URL] is not supported on JDK 17).
-         */
-        internal fun openUrlConnection(urlString: String): Pair<URL, HttpURLConnection> {
-            val parsedUrl =
-                try {
-                    URL(urlString)
-                } catch (e: MalformedURLException) {
-                    throw McpToolException.ActionFailed("Invalid URL: $urlString")
-                }
-            return parsedUrl to (parsedUrl.openConnection() as HttpURLConnection)
-        }
+        /** Parses a download URL string, failing with [McpToolException.ActionFailed] when it is malformed. */
+        private fun parseDownloadUrl(urlString: String): URL =
+            try {
+                URL(urlString)
+            } catch (e: MalformedURLException) {
+                throw McpToolException.ActionFailed("Invalid URL: $urlString")
+            }
 
         companion object {
             private const val TAG = "MCP:FileOpsProvider"
@@ -790,7 +789,6 @@ class FileOperationProviderImpl
                 locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")
 
             private const val BYTES_PER_MB = 1024L * 1024L
-            private const val MILLIS_PER_SECOND = 1000
             private const val DOWNLOAD_BUFFER_SIZE = 8192
             private val HTTP_SUCCESS_RANGE = 200..299
         }

@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import javax.inject.Inject
 
 /**
@@ -221,16 +222,22 @@ class AccessibilityTreeParser
         fun isNodeVisible(node: AccessibilityNodeInfo): Boolean = node.isVisibleToUser
 
         /**
-         * Resolves the text of the node's label association ([AccessibilityNodeInfo.getLabeledBy]),
-         * preferring the label's text and falling back to its content description. Returns null when
-         * there is no label or it has no text. [getLabeledBy] can throw [IllegalStateException] on
-         * stale nodes, so failures are swallowed to null.
+         * Resolves the text of the node's first label association through
+         * [AccessibilityNodeInfoCompat.getLabeledByList] (the API 36 list getter, or the single-label getter it
+         * replaced on older releases), preferring the label's text and falling back to its content description.
+         * Returns null when there is no label or it has no text. Reading the label can throw
+         * [IllegalStateException] on stale nodes, so failures are swallowed to null.
          */
         private fun readLabeledByText(node: AccessibilityNodeInfo): String? =
             runCatching {
-                node.labeledBy?.let { label ->
-                    (label.text?.toString() ?: label.contentDescription?.toString())?.takeIf { it.isNotEmpty() }
-                }
+                AccessibilityNodeInfoCompat
+                    .wrap(node)
+                    .labeledByList
+                    .firstOrNull()
+                    ?.unwrap()
+                    ?.let { label ->
+                        (label.text?.toString() ?: label.contentDescription?.toString())?.takeIf { it.isNotEmpty() }
+                    }
             }.getOrNull()
 
         /**

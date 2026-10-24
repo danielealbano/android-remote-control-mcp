@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngineConfig
+import io.ktor.client.engine.HttpClientEngineFactory
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.sse.SSE
@@ -25,24 +27,42 @@ import javax.net.ssl.X509TrustManager
 class McpClient(
     private val baseUrl: String,
     private val bearerToken: String,
+    private val httpClient: HttpClient = defaultHttpClient(),
 ) {
-    private val httpClient = HttpClient(CIO) {
-        install(SSE)
-        install(HttpTimeout) {
-            requestTimeoutMillis = CLIENT_TIMEOUT_MS
-            socketTimeoutMillis = CLIENT_TIMEOUT_MS
-        }
-        engine {
-            https {
-                trustManager = TrustAllX509TrustManager()
-            }
-            requestTimeout = CLIENT_TIMEOUT_MS
-        }
-    }
     private var client: Client? = null
 
     companion object {
         private const val CLIENT_TIMEOUT_MS = 90_000L
+
+        /** The historical client: Ktor CIO, trust-all TLS (self-signed HTTPS mode). */
+        fun defaultHttpClient(): HttpClient =
+            HttpClient(CIO) {
+                install(SSE)
+                install(HttpTimeout) {
+                    requestTimeoutMillis = CLIENT_TIMEOUT_MS
+                    socketTimeoutMillis = CLIENT_TIMEOUT_MS
+                }
+                engine {
+                    https {
+                        trustManager = TrustAllX509TrustManager()
+                    }
+                    requestTimeout = CLIENT_TIMEOUT_MS
+                }
+            }
+
+        /** A client on any engine with the SSE + timeout plugins the SDK transport needs. */
+        fun <T : HttpClientEngineConfig> httpClient(
+            engine: HttpClientEngineFactory<T>,
+            configure: T.() -> Unit,
+        ): HttpClient =
+            HttpClient(engine) {
+                install(SSE)
+                install(HttpTimeout) {
+                    requestTimeoutMillis = CLIENT_TIMEOUT_MS
+                    socketTimeoutMillis = CLIENT_TIMEOUT_MS
+                }
+                engine(configure)
+            }
     }
 
     /**

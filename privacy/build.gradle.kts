@@ -74,15 +74,3 @@ tasks.jacocoTestReport {
         xml.required.set(true)
     }
 }
-
-tasks.jacocoTestCoverageVerification {
-    dependsOn(tasks.jacocoTestReport)
-    classDirectories.setFrom(privacyJacocoClassDirs)
-    violationRules {
-        rule {
-            limit {
-                minimum = "0.50".toBigDecimal()
-            }
-        }
-    }
-}

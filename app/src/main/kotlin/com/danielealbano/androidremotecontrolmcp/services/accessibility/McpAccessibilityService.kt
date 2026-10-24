@@ -12,6 +12,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -21,6 +22,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotPacer
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -52,7 +54,9 @@ class McpAccessibilityService : AccessibilityService() {
     private var toolCallIndicatorView: View? = null
 
     private var screenAwakeOverlay: ScreenAwakeOverlay? = null
-    private val screenStateObserver = ScreenStateObserver(this) { screenAwakeOverlay?.refresh() }
+
+    /** One pacer per service connection: the platform's interval is tracked per accessibility service connection. */
+    private val screenshotPacer = ScreenshotPacer(SystemClock::uptimeMillis)
 
     @Volatile
     private var currentPackageName: String? = null
@@ -78,13 +82,12 @@ class McpAccessibilityService : AccessibilityService() {
         val awakeOverlay = ScreenAwakeOverlay(this)
         screenAwakeOverlay = awakeOverlay
         screenAwakeConnection.connect(awakeOverlay)
-        screenStateObserver.start()
 
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        screenAwakeOverlay?.refresh()
+        screenAwakeConnection.refresh()
         if (event == null) return
 
         when (event.eventType) {
@@ -145,7 +148,6 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
-        screenStateObserver.close()
         screenAwakeOverlay?.let(screenAwakeConnection::disconnect)
         screenAwakeOverlay = null
         if (instance === this) instance = null
@@ -343,12 +345,16 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Takes a screenshot using AccessibilityService.takeScreenshot() API.
-     * Does NOT require user consent.
+     * Does NOT require user consent. Captures are spaced out by [screenshotPacer], since the platform
+     * rejects requests that arrive too close together.
      *
-     * @param timeoutMs Maximum time to wait for screenshot capture.
+     * @param timeoutMs Maximum time to wait for screenshot capture (the pacing wait is not included).
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
     suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
+        screenshotPacer.paced { captureScreenshotBitmap(timeoutMs) }
+
+    private suspend fun captureScreenshotBitmap(timeoutMs: Long): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val executor = Executor { it.run() }
@@ -434,7 +440,13 @@ class McpAccessibilityService : AccessibilityService() {
         var inputMethodInstance: McpInputMethod? = null
             private set
 
-        private val screenAwakeConnection = ScreenAwakeConnection(::dispatchAccessibilityAction)
+        private val screenAwakeConnection =
+            ScreenAwakeConnection(
+                ::dispatchAccessibilityAction,
+                canRequest = { false },
+            )
+
+        internal fun observeScreenState(context: Context) = screenAwakeConnection.observeScreenState(context)
 
         fun setScreenAwake(awake: Boolean) = screenAwakeConnection.setRequested(awake)
 

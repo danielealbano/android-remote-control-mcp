@@ -18,7 +18,7 @@ play-services-location = "21.4.0"
 osmdroid = "6.1.20"
 
 # Networking
-ktor = "3.5.2"
+ktor = "3.6.0"
 
 # MCP SDK
 mcp-kotlin-sdk = "0.15.0"
@@ -27,7 +27,7 @@ mcp-kotlin-sdk = "0.15.0"
 java-jwt = "4.6.0"
 
 # Jackson (transitive via java-jwt) — pinned to a patched release to close CVE alerts
-jackson = "2.22.2"
+jackson = "2.22.4"
 
 # Image loading (OAuth client logos)
 coil = "3.5.0"
@@ -36,7 +36,10 @@ coil = "3.5.0"
 slf4j-android = "1.7.36"
 
 # Certificate generation
-bouncy-castle = "1.85"
+bouncy-castle = "1.86"
+
+# Free E2E tunnel client (raw OkHttp: HTTP/2 duplex control stream)
+okhttp = "5.5.0"
 
 # Serialization
 kotlinx-serialization = "1.11.0"
@@ -131,6 +134,11 @@ ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host", ver
 # Certificate generation (Bouncy Castle for self-signed cert with SAN support)
 bouncy-castle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncy-castle" }
 bouncy-castle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncy-castle" }
+
+# Free E2E tunnel client
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp" }
+okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 
 # OAuth (JWT signing/verification)
 java-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "java-jwt" }

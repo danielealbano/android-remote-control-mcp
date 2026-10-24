@@ -27,7 +27,7 @@
     <string name="settings_security_title">Security</string>
     <string name="settings_security_subtitle">HTTPS, certificate</string>
     <string name="settings_tunnel_title">Tunnel</string>
-    <string name="settings_tunnel_subtitle">Cloudflare, ngrok</string>
+    <string name="settings_tunnel_subtitle">Free E2E tunnel, Cloudflare, ngrok</string>
     <string name="settings_mcp_tools_title">MCP Tools</string>
     <string name="settings_mcp_tools_subtitle">Enable or disable tools</string>
     <string name="settings_mcp_tools_placeholder">Tool permissions — available in next update</string>
@@ -41,17 +41,17 @@
     <!-- About Screen -->
     <string name="about_author_section">Author</string>
     <string name="about_author_name">Daniele Salvatore Albano</string>
-    <string name="about_author_email">d.albano@gmail.com</string>
     <string name="about_author_linkedin">linkedin.com/in/danielesalvatorealbano</string>
     <string name="about_author_x">x.com/daniele_dll</string>
     <string name="about_links_section">Links</string>
     <string name="about_link_github">GitHub Repository</string>
-    <string name="about_link_license">MIT License</string>
+    <string name="about_link_license">GNU GPLv3 or later</string>
+    <string name="about_link_third_party_licenses">Third-party licenses</string>
     <string name="about_link_issues">Report an Issue</string>
     <string name="about_attributions_section">Attributions</string>
     <string name="about_attribution_dbip">IP geolocation data by DB-IP (db-ip.com), licensed under CC BY 4.0.</string>
     <string name="about_attribution_privacy_model">Privacy Mode PII detection model by Ai4Privacy (MIT license). Built with Llama.</string>
-    <string name="about_footer">Open Source, MIT License</string>
+    <string name="about_footer">Copyright 2026–2027 Daniele Salvatore Albano. Licensed under GPLv3 or later, without warranty.</string>
 
     <!-- Clipboard -->
     <string name="copied_to_clipboard">Copied to clipboard</string>
@@ -138,7 +138,12 @@
     <!-- Network Access Suggestion (main screen: localhost-only bind with no tunnel) -->
     <string name="server_network_access_suggestion_title">Reachable from this device only</string>
     <string name="server_network_access_suggestion_wifi">Enable Wi-Fi access</string>
-    <string name="server_network_access_suggestion_tunnel">Set up tunnel</string>
+    <string name="server_network_access_suggestion_arc_tunnel">Enable free E2E tunnel</string>
+    <string name="server_network_access_suggestion_other_tunnels">Other tunnels</string>
+    <string name="server_arc_tunnel_ct_alert_title">Certificate issued to another key</string>
+    <string name="server_arc_tunnel_ct_alert_body">A public certificate for %1$s was issued to a key this device does not hold. Someone else could present it to your clients. Consider getting a new name.</string>
+    <string name="server_arc_tunnel_ct_alert_change_name">Change name</string>
+    <string name="server_arc_tunnel_ct_alert_dismiss">Dismiss</string>
 
     <!-- Battery Optimization -->
     <string name="battery_optimization_card_title">Keep the server running</string>
@@ -190,9 +195,32 @@
     <string name="remote_access_cloudflare_extra_args_help">Optional flags passed to cloudflared (e.g. specify --edge to bypass DNS issues)</string>
     <string name="remote_access_cloudflare_service_url_help">In your Cloudflare dashboard, set this tunnel\'s Public Hostname → Service to:</string>
     <string name="remote_access_cloudflare_service_url_copy">Copy service URL</string>
-    <string name="remote_access_https_disabled_warning">Remote access is unavailable while HTTPS is enabled. Disable HTTPS to use a tunnel.</string>
+    <string name="remote_access_https_disabled_warning">Cloudflare and ngrok are unavailable while HTTPS is enabled. Disable HTTPS to use them, or choose the free E2E tunnel.</string>
     <string name="remote_access_no_route_configured">No route configured</string>
     <string name="remote_access_route_misconfigured">Route does not point to this server</string>
+    <string name="remote_access_provider_arc_tunnel">Free E2E tunnel</string>
+    <string name="remote_access_provider_arc_tunnel_desc">End-to-end encrypted, no account. A public certificate (Let\'s Encrypt, Google Trust Services or ZeroSSL) is issued to this device, so the tunnel cannot read your traffic — unlike Cloudflare and ngrok, which see everything.</string>
+    <string name="remote_access_arc_tunnel_base_address_label">Tunnel service base address</string>
+    <string name="remote_access_arc_tunnel_base_address_error">Enter a host name such as arc-tunnel.io</string>
+    <string name="remote_access_arc_tunnel_ct_check_label">Certificate Transparency check</string>
+    <string name="remote_access_arc_tunnel_ct_check_description">Looks up public certificate logs for your tunnel name and warns if a certificate was issued to another key</string>
+    <string name="remote_access_arc_tunnel_url_label">Public URL</string>
+    <string name="remote_access_arc_tunnel_url_refresh">Get a new name</string>
+    <string name="remote_access_arc_tunnel_set_up">Set up tunnel</string>
+    <string name="remote_access_arc_tunnel_url_loading">Loading…</string>
+    <string name="remote_access_arc_tunnel_enroll_dialog_title">Set up the free E2E tunnel?</string>
+    <string name="remote_access_arc_tunnel_enroll_dialog_body">This device gets its own name and public certificate. It takes about 10–30 seconds on average.</string>
+    <string name="remote_access_arc_tunnel_enroll_dialog_continue">Continue</string>
+    <string name="remote_access_arc_tunnel_enroll_dialog_cancel">Cancel</string>
+    <string name="remote_access_arc_tunnel_rotate_dialog_title">Get a new name?</string>
+    <string name="remote_access_arc_tunnel_rotate_dialog_body">The current URL stops working and every client must be updated. New keys and a new certificate are created (10–30 seconds).</string>
+    <string name="remote_access_arc_tunnel_enrolling">Setting up the tunnel…</string>
+    <string name="remote_access_arc_tunnel_enroll_failed">Setup failed: %1$s</string>
+    <string name="remote_access_arc_tunnel_retry">Retry</string>
+    <string name="remote_access_arc_tunnel_renewing">Renewing the tunnel certificate…</string>
+    <string name="remote_access_arc_tunnel_renewal_failed">Certificate renewal failed: %1$s</string>
+    <string name="remote_access_arc_tunnel_renewal_cancel">Cancel and stop server</string>
+    <string name="remote_access_https_note_arc_tunnel">HTTPS stays enabled for local clients; the free E2E tunnel uses its own certificate.</string>
 
     <!-- Connection Info -->
     <string name="connection_info_title">Connection Info</string>
@@ -241,6 +269,8 @@
     <string name="storage_allow_http_downloads_description">Allow downloading files from unencrypted HTTP URLs (less secure)</string>
     <string name="storage_allow_unverified_https_label">Allow Unverified HTTPS</string>
     <string name="storage_allow_unverified_https_description">Accept unverified HTTPS certificates for downloads (less secure)</string>
+    <string name="storage_block_local_network_downloads_label">Block Local Network Downloads</string>
+    <string name="storage_block_local_network_downloads_description">Refuse downloads from this phone, the local network and VPN addresses (e.g. 127.0.0.1, 192.168.x.x, 10.x.x.x, Tailscale)</string>
 
     <!-- Event Channel — start/stop dialogs -->
     <string name="channel_not_configured_dialog_title">Endpoint URL not set</string>
@@ -294,6 +324,11 @@
     <string name="notification_channel_update_name">App updates</string>
     <string name="notification_update_available_title">Update available</string>
     <string name="notification_update_available_body">Version %1$s is available — tap to view the release</string>
+    <string name="notification_channel_arc_tunnel_alert_name">Tunnel certificate alerts</string>
+    <string name="notification_arc_tunnel_ct_title">Tunnel certificate alert</string>
+    <string name="notification_arc_tunnel_ct_body">A certificate for %1$s was issued to another key — tap to review</string>
+    <string name="notification_arc_tunnel_enroll_title">Setting up the free E2E tunnel</string>
+    <string name="notification_arc_tunnel_enroll_body">Getting a name and a certificate for this device…</string>
     <string name="update_banner_text">Update available: v%1$s — tap to view</string>
     <string name="update_banner_open_description">Open the release page</string>
     <string name="about_updates_section">Updates</string>
