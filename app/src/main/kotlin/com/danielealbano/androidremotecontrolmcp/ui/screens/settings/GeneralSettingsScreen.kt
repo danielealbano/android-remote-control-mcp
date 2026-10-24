@@ -42,6 +42,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
@@ -58,6 +59,8 @@ fun GeneralSettingsScreen(
     val portError by viewModel.portError.collectAsStateWithLifecycle()
     val deviceSlugInput by viewModel.deviceSlugInput.collectAsStateWithLifecycle()
     val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
+    val screenAwakeTimeoutInput by viewModel.screenAwakeTimeoutInput.collectAsStateWithLifecycle()
+    val screenAwakeTimeoutError by viewModel.screenAwakeTimeoutError.collectAsStateWithLifecycle()
 
     val isEnabled =
         serverStatus !is ServerStatus.Running &&
@@ -195,6 +198,29 @@ fun GeneralSettingsScreen(
                     enabled = isEnabled,
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = screenAwakeTimeoutInput,
+                onValueChange = viewModel::updateScreenAwakeTimeout,
+                label = { Text(stringResource(R.string.config_screen_awake_timeout_label)) },
+                supportingText = {
+                    Text(
+                        screenAwakeTimeoutError ?: stringResource(
+                            R.string.config_screen_awake_timeout_description,
+                            ServerConfig.DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                            ServerConfig.MIN_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                            ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS,
+                        ),
+                    )
+                },
+                enabled = isEnabled,
+                isError = screenAwakeTimeoutError != null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

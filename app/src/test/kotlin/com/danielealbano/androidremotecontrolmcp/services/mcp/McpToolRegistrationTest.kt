@@ -7,6 +7,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotRedactor
+import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
@@ -71,6 +72,7 @@ class McpToolRegistrationTest {
             perms,
             ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
             toolCallIndicatorEnabled = false,
+            indicators = mockk(relaxed = true),
         ) { McpIntegrationTestHelper.TEST_BASE_URL }
         return server.tools.keys.toSet()
     }

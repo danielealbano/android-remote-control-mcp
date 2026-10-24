@@ -93,6 +93,14 @@ class MainViewModelTest {
 
         settingsRepository = mockk(relaxed = true)
         every { settingsRepository.serverConfig } returns configFlow
+        every { settingsRepository.validateScreenAwakeTimeout(any()) } answers {
+            val seconds = firstArg<Int>()
+            if (ServerConfig.isValidScreenAwakeTimeout(seconds)) {
+                Result.success(seconds)
+            } else {
+                Result.failure(IllegalArgumentException("Invalid screen-awake timeout"))
+            }
+        }
 
         tunnelManager = mockk(relaxed = true)
         every { tunnelManager.tunnelStatus } returns tunnelStatusFlow
@@ -115,6 +123,32 @@ class MainViewModelTest {
                 approvalCoordinator,
             )
     }
+
+    @Test
+    fun `screen awake input validates without writing invalid values`() =
+        runTest {
+            advanceUntilIdle()
+            listOf("", "abc", "-1", "59", "172801", "2147483648").forEach { input ->
+                viewModel.updateScreenAwakeTimeout(input)
+                advanceUntilIdle()
+                assertTrue(viewModel.screenAwakeTimeoutError.value != null)
+            }
+            coVerify(exactly = 0) { settingsRepository.updateScreenAwakeTimeout(any()) }
+            viewModel.updateScreenAwakeTimeout("60")
+            advanceUntilIdle()
+            assertNull(viewModel.screenAwakeTimeoutError.value)
+            coVerify(exactly = 1) { settingsRepository.updateScreenAwakeTimeout(60) }
+        }
+
+    @Test
+    fun `screen awake input follows persisted config updates`() =
+        runTest {
+            advanceUntilIdle()
+            assertEquals("0", viewModel.screenAwakeTimeoutInput.value)
+            configFlow.value = configFlow.value.copy(screenAwakeTimeoutSeconds = 300)
+            advanceUntilIdle()
+            assertEquals("300", viewModel.screenAwakeTimeoutInput.value)
+        }
 
     @AfterEach
     fun tearDown() {

@@ -31,6 +31,8 @@ import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeManager
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeStatus
 import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerCache
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpToolCallIndicators
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
@@ -118,6 +120,8 @@ class McpServerService : Service() {
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
     private var approvalObserverJob: Job? = null
+    private var toolCallIndicators: McpToolCallIndicators? = null
+    private val screenStateObserver by lazy { McpAccessibilityService.observeScreenState(this) }
 
     /**
      * Tracks whether the LAST [onStartCommand] action was an explicit stop. Lets [onDestroy] re-commit
@@ -130,6 +134,7 @@ class McpServerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        screenStateObserver.start()
         instance = this
         Log.i(TAG, "McpServerService created")
     }
@@ -169,7 +174,7 @@ class McpServerService : Service() {
     }
 
     @Suppress("TooGenericExceptionCaught", "LongMethod")
-    private suspend fun startServer() {
+    internal suspend fun startServer() {
         try {
             updateStatus(ServerStatus.Starting)
 
@@ -231,12 +236,15 @@ class McpServerService : Service() {
                 )
             val effectivePerms =
                 OptionalToolPermissions.effectivePermissions(config.toolPermissionsConfig, grantedOptionalPermissions)
+            val indicators = McpToolCallIndicators(coroutineScope, config.screenAwakeTimeoutSeconds)
+            toolCallIndicators = indicators
             toolRegistration.registerAll(
                 sdkServer,
                 toolNamePrefix,
                 effectivePerms,
                 config.fileSizeLimitMb,
                 config.toolCallIndicatorEnabled,
+                indicators,
                 currentBaseUrl,
             )
 
@@ -343,6 +351,9 @@ class McpServerService : Service() {
         } catch (e: Exception) {
             // A start cancelled by a teardown is not a start failure.
             currentCoroutineContext().ensureActive()
+            // Each listener dispatches its cleanup to Main without blocking start cancellation.
+            toolCallIndicators?.close()
+            toolCallIndicators = null
             Log.e(TAG, "Failed to start MCP server", e)
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
             serverActive.set(false)
@@ -374,6 +385,9 @@ class McpServerService : Service() {
         if (!startTracker.cancelAndAwait()) {
             Log.w(TAG, "Server start still running after ${START_JOIN_TIMEOUT_MS}ms; proceeding with shutdown")
         }
+        toolCallIndicators?.close()
+        toolCallIndicators = null
+        screenStateObserver.close()
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
         privacyModeManager.shutdown()

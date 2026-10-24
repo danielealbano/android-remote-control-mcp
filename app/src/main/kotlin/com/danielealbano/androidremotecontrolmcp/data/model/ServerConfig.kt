@@ -12,6 +12,7 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property bearerToken The bearer token for MCP request authentication.
  * @property autoStartOnBoot Whether to start the MCP server on device boot.
  * @property toolCallIndicatorEnabled Whether to show an on-device overlay during MCP tool calls.
+ * @property screenAwakeTimeoutSeconds Idle grace after MCP calls; zero disables keeping the screen awake.
  * @property httpsEnabled Whether HTTPS is enabled (disabled by default).
  * @property certificateSource The source of the HTTPS certificate.
  * @property certificateHostname The hostname for auto-generated certificates.
@@ -50,6 +51,7 @@ data class ServerConfig(
     val bearerToken: String = "",
     val autoStartOnBoot: Boolean = false,
     val toolCallIndicatorEnabled: Boolean = true,
+    val screenAwakeTimeoutSeconds: Int = DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS,
     val httpsEnabled: Boolean = false,
     val certificateSource: CertificateSource = CertificateSource.AUTO_GENERATED,
     val certificateHostname: String = DEFAULT_CERTIFICATE_HOSTNAME,
@@ -110,6 +112,19 @@ data class ServerConfig(
 
         /** Maximum download timeout in seconds. */
         const val MAX_DOWNLOAD_TIMEOUT_SECONDS = 300
+
+        /** Disabled by default; existing screen-lock behavior is preserved on upgrade. */
+        const val DEFAULT_SCREEN_AWAKE_TIMEOUT_SECONDS = 0
+
+        /** Minimum nonzero idle grace after the final MCP action, in seconds. */
+        const val MIN_SCREEN_AWAKE_TIMEOUT_SECONDS = 60
+
+        /** Maximum idle grace, in seconds (48 hours). */
+        const val MAX_SCREEN_AWAKE_TIMEOUT_SECONDS = 172800
+
+        /** Shared range policy for persisted settings, input validation and runtime configuration. */
+        fun isValidScreenAwakeTimeout(seconds: Int): Boolean =
+            seconds == 0 || seconds in MIN_SCREEN_AWAKE_TIMEOUT_SECONDS..MAX_SCREEN_AWAKE_TIMEOUT_SECONDS
 
         /** Maximum length for device slug. */
         const val MAX_DEVICE_SLUG_LENGTH = 20

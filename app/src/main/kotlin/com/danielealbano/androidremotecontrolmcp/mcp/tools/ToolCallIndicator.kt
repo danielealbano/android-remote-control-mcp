@@ -9,6 +9,9 @@ interface ToolCallIndicator {
 
     fun onToolCallFinished(toolName: String)
 
+    /** Changes the displayed label without representing a new tool invocation. */
+    fun onActiveToolChanged(toolName: String) = onToolCallStarted(toolName)
+
     fun setEnabled(enabled: Boolean) = Unit
 
     companion object {

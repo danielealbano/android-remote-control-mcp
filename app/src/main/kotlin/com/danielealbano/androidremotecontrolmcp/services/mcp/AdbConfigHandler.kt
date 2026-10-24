@@ -82,6 +82,7 @@ class AdbConfigHandler(
         applyAllowUnverifiedHttpsCerts(intent)
         applyBlockLocalNetworkDownloads(intent)
         applyDownloadTimeout(intent)
+        applyScreenAwakeTimeout(intent)
         applyDeviceSlug(intent)
         applyToolPermissions(intent)
         applyStorageLocationPermissions(intent)
@@ -381,6 +382,18 @@ class AdbConfigHandler(
         )
     }
 
+    private suspend fun applyScreenAwakeTimeout(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS)) return
+        val value = intent.getIntExtra(EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS, -1)
+        settingsRepository.validateScreenAwakeTimeout(value).fold(
+            onSuccess = {
+                settingsRepository.updateScreenAwakeTimeout(it)
+                Log.i(TAG, "Screen-awake timeout updated to ${it}s")
+            },
+            onFailure = { Log.w(TAG, "Ignoring invalid screen_awake_timeout_seconds $value: ${it.message}") },
+        )
+    }
+
     private suspend fun applyDeviceSlug(intent: Intent) {
         if (!intent.hasExtra(EXTRA_DEVICE_SLUG)) return
         val value = intent.getStringExtra(EXTRA_DEVICE_SLUG) ?: ""
@@ -475,6 +488,7 @@ class AdbConfigHandler(
         internal const val EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS = "allow_unverified_https_certs"
         internal const val EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS = "block_local_network_downloads"
         internal const val EXTRA_DOWNLOAD_TIMEOUT_SECONDS = "download_timeout_seconds"
+        internal const val EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS = "screen_awake_timeout_seconds"
         internal const val EXTRA_DEVICE_SLUG = "device_slug"
         internal const val EXTRA_TOOL_PERMISSIONS = "tool_permissions"
         internal const val EXTRA_STORAGE_LOCATION_ID = "storage_location_id"
