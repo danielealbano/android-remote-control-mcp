@@ -53,6 +53,8 @@ class McpAccessibilityService : AccessibilityService() {
 
     private var toolCallIndicatorView: View? = null
 
+    private var screenAwakeOverlay: ScreenAwakeOverlay? = null
+
     /** One pacer per service connection: the platform's interval is tracked per accessibility service connection. */
     private val screenshotPacer = ScreenshotPacer(SystemClock::uptimeMillis)
 
@@ -77,11 +79,15 @@ class McpAccessibilityService : AccessibilityService() {
             )
 
         configureServiceInfo()
+        val awakeOverlay = ScreenAwakeOverlay(this)
+        screenAwakeOverlay = awakeOverlay
+        screenAwakeConnection.connect(awakeOverlay)
 
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        screenAwakeConnection.refresh()
         if (event == null) return
 
         when (event.eventType) {
@@ -142,7 +148,9 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
-        instance = null
+        screenAwakeOverlay?.let(screenAwakeConnection::disconnect)
+        screenAwakeOverlay = null
+        if (instance === this) instance = null
 
         super.onDestroy()
     }
@@ -432,18 +440,32 @@ class McpAccessibilityService : AccessibilityService() {
         var inputMethodInstance: McpInputMethod? = null
             private set
 
+        private val screenAwakeConnection =
+            ScreenAwakeConnection(
+                ::dispatchAccessibilityAction,
+                canRequest = { false },
+            )
+
+        internal fun observeScreenState(context: Context) = screenAwakeConnection.observeScreenState(context)
+
+        fun setScreenAwake(awake: Boolean) = screenAwakeConnection.setRequested(awake)
+
         fun showToolCallIndicator(toolName: String) {
-            if (instance == null) return
-            Handler(Looper.getMainLooper()).post {
-                instance?.showToolCallIndicatorInternal(toolName)
+            val service = instance ?: return
+            dispatchAccessibilityAction {
+                if (instance === service) {
+                    runCatching { service.showToolCallIndicatorInternal(toolName) }
+                        .onFailure { Log.w(TAG, "Could not show MCP tool-call indicator", it) }
+                }
             }
         }
 
         fun hideToolCallIndicator() {
             val service = instance ?: return
-            Handler(Looper.getMainLooper()).post {
+            dispatchAccessibilityAction {
                 if (instance === service) {
-                    service.removeToolCallIndicator()
+                    runCatching { service.removeToolCallIndicator() }
+                        .onFailure { Log.w(TAG, "Could not hide MCP tool-call indicator", it) }
                 }
             }
         }

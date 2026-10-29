@@ -77,6 +77,7 @@ class AdbConfigHandlerTest {
                 Result.failure(IllegalArgumentException("File size limit out of range"))
             }
         }
+        mockScreenAwakeValidation()
         every { settingsRepository.validateDownloadTimeout(any()) } answers {
             val seconds = firstArg<Int>()
             if (seconds in ServerConfig.MIN_DOWNLOAD_TIMEOUT_SECONDS..ServerConfig.MAX_DOWNLOAD_TIMEOUT_SECONDS) {
@@ -119,6 +120,17 @@ class AdbConfigHandlerTest {
         val isIpLiteral: (String) -> Boolean = { it in IP_LITERALS }
         val locations = storageLocationProvider
         return AdbConfigHandler(settingsRepository, locations, serverLog, arcTunnelEnrollment, isIpLiteral)
+    }
+
+    private fun mockScreenAwakeValidation() {
+        every { settingsRepository.validateScreenAwakeTimeout(any()) } answers {
+            val seconds = firstArg<Int>()
+            if (ServerConfig.isValidScreenAwakeTimeout(seconds)) {
+                Result.success(seconds)
+            } else {
+                Result.failure(IllegalArgumentException("Invalid screen-awake timeout"))
+            }
+        }
     }
 
     @AfterEach
@@ -806,6 +818,32 @@ class AdbConfigHandlerTest {
             }
 
         @Test
+        fun `screen awake extra accepts disabled and range boundaries`() =
+            runTest {
+                listOf(0, 60, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS).forEach { seconds ->
+                    val intent =
+                        createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                            int(AdbConfigHandler.EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS, seconds)
+                        }
+                    handler.handle(context, intent)
+                    coVerify(exactly = 1) { settingsRepository.updateScreenAwakeTimeout(seconds) }
+                }
+            }
+
+        @Test
+        fun `invalid screen awake extra is rejected without updating settings`() =
+            runTest {
+                listOf(-1, 59, ServerConfig.MAX_SCREEN_AWAKE_TIMEOUT_SECONDS + 1, Int.MAX_VALUE).forEach { seconds ->
+                    val intent =
+                        createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                            int(AdbConfigHandler.EXTRA_SCREEN_AWAKE_TIMEOUT_SECONDS, seconds)
+                        }
+                    handler.handle(context, intent)
+                }
+                coVerify(exactly = 0) { settingsRepository.updateScreenAwakeTimeout(any()) }
+            }
+
+        @Test
         @DisplayName("valid device_slug is applied")
         fun validDeviceSlug() =
             runTest {
@@ -894,6 +932,7 @@ class AdbConfigHandlerTest {
                 coVerify(exactly = 0) { settingsRepository.updateAllowUnverifiedHttpsCerts(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateBlockLocalNetworkDownloads(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDownloadTimeout(any()) }
+                coVerify(exactly = 0) { settingsRepository.updateScreenAwakeTimeout(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateToolPermissionsConfig(any()) }
             }

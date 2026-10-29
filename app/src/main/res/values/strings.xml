@@ -187,6 +187,8 @@
     <string name="config_hide_from_recents_description">Exclude the app from Android\'s recent apps overview.</string>
     <string name="config_tool_call_indicator_label">Show tool-call indicator</string>
     <string name="config_tool_call_indicator_description">Display a privacy-safe overlay while the MCP controls this device.</string>
+    <string name="config_screen_awake_timeout_label">Screen-awake timeout (seconds)</string>
+    <string name="config_screen_awake_timeout_description">Default: %1$d (disabled). Enter %2$d-%3$d seconds to keep an already unlocked screen awake during MCP calls and after the last call. Does not wake or unlock the device. Takes effect after server restart.</string>
     <string name="config_https_enabled_label">Enable HTTPS</string>
     <string name="config_certificate_title">HTTPS Certificate</string>
     <string name="config_cert_auto_generated">Auto-generated self-signed</string>
