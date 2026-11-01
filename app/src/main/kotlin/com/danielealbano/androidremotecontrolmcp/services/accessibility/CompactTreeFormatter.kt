@@ -10,7 +10,7 @@ import javax.inject.Inject
  * - Line 1: `note:structural-only nodes are omitted from the tree`
  * - Line 2: `note:certain elements are custom and will not be properly reported, ...`
  * - Line 3: `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable
- *   foc=focusable scr=scrollable edt=editable ena=enabled`
+ *   foc=focusable scr=scrollable edt=editable ena=enabled pwd=password`
  * - Line 4: `note:offscreen items require scroll_to_node before interaction`
  * - Line 5: `app:<package> activity:<activity>`
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
@@ -281,7 +281,7 @@ class CompactTreeFormatter
          * Builds the comma-separated flags string for a node.
          * The first flag is always `on` (onscreen) or `off` (offscreen).
          * Subsequent flags are appended only when `true`.
-         * Order: on/off, clk, lclk, foc, scr, edt, ena
+         * Order: on/off, clk, lclk, foc, scr, edt, ena, pwd
          */
         internal fun buildFlags(node: AccessibilityNodeData): String =
             buildString {
@@ -310,6 +310,10 @@ class CompactTreeFormatter
                     append(FLAG_SEPARATOR)
                     append(FLAG_ENABLED)
                 }
+                if (node.isPassword) {
+                    append(FLAG_SEPARATOR)
+                    append(FLAG_PASSWORD)
+                }
             }
 
         companion object {
@@ -328,7 +332,7 @@ class CompactTreeFormatter
                     "include_screenshot=true to see the screen and take what you see into account"
             const val NOTE_LINE_FLAGS_LEGEND =
                 "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
-                    "foc=focusable scr=scrollable edt=editable ena=enabled"
+                    "foc=focusable scr=scrollable edt=editable ena=enabled pwd=password"
             const val NOTE_LINE_OFFSCREEN_HINT =
                 "note:offscreen items require scroll_to_node before interaction"
             const val NOTE_LINE_OFFSCREEN_OMITTED =
@@ -342,6 +346,7 @@ class CompactTreeFormatter
             const val FLAG_SCROLLABLE = "scr"
             const val FLAG_EDITABLE = "edt"
             const val FLAG_ENABLED = "ena"
+            const val FLAG_PASSWORD = "pwd"
             const val HIERARCHY_HEADER = "hierarchy:"
             internal const val HIERARCHY_INDENT = "  "
             private const val FLAG_SEPARATOR = ","

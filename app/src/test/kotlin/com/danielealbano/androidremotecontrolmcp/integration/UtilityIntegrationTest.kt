@@ -172,9 +172,9 @@ class UtilityIntegrationTest {
 
                 val textContent = (result.content[0] as TextContent).text
                 val lines = stripUntrustedWarning(textContent).split("\n")
-                assertEquals("node_id\ttext\tdesc", lines[0])
-                assertEquals("node_a\tHello World\tA button", lines[1])
-                assertEquals("node_b\t-\t-", lines[2])
+                assertEquals("node_id\ttext\tdesc\tpassword", lines[0])
+                assertEquals("node_a\tHello World\tA button\tfalse", lines[1])
+                assertEquals("node_b\t-\t-\tfalse", lines[2])
             }
         }
 

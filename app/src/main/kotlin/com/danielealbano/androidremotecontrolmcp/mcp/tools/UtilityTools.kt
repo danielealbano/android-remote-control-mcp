@@ -705,7 +705,8 @@ class WaitForIdleTool
 /**
  * MCP tool: get_node_details
  *
- * Retrieves full (untruncated) text and contentDescription for a list of node_ids.
+ * Retrieves full (untruncated) text and contentDescription for a list of node_ids, plus
+ * whether each node is a password field (`true`/`false` in the `password` column).
  * Use after get_screen_state when text or desc columns were truncated.
  */
 class GetNodeDetailsTool
@@ -754,15 +755,15 @@ class GetNodeDetailsTool
 
             // 4. Build TSV output
             val sb = StringBuilder()
-            sb.append("node_id\ttext\tdesc\n")
+            sb.append("node_id\ttext\tdesc\tpassword\n")
 
             nodes.forEachIndexed { index, (id, node) ->
                 if (node != null) {
                     val text = sanitizeForTsv(redacted[index * 2])
                     val desc = sanitizeForTsv(redacted[index * 2 + 1])
-                    sb.append("$id\t$text\t$desc\n")
+                    sb.append("$id\t$text\t$desc\t${node.isPassword}\n")
                 } else {
-                    sb.append("$id\tnot_found\tnot_found\n")
+                    sb.append("$id\tnot_found\tnot_found\tnot_found\n")
                 }
             }
 
@@ -795,7 +796,8 @@ class GetNodeDetailsTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Retrieve full untruncated text and description for nodes by node_id. " +
+                    "Retrieve full untruncated text and description for nodes by node_id, " +
+                        "and whether each node is a password field. " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(

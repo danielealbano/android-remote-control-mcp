@@ -548,5 +548,6 @@ internal object McpToolUtils {
             put("editable", element.editable)
             put("enabled", element.enabled)
             put("visible", element.visible)
+            put("password", element.password)
         }
 }

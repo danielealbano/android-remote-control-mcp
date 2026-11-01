@@ -114,7 +114,7 @@ class ScreenIntrospectionToolsTest {
             "if needed or if tools are not working as expected set " +
             "include_screenshot=true to see the screen and take what you see into account\n" +
             "note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable " +
-            "foc=focusable scr=scrollable edt=editable ena=enabled\n" +
+            "foc=focusable scr=scrollable edt=editable ena=enabled pwd=password\n" +
             "note:offscreen items require scroll_to_node before interaction\n" +
             "screen:1080x2400 density:420 orientation:portrait\n" +
             "--- window:0 type:APPLICATION pkg:com.example title:Test activity:.Main " +
