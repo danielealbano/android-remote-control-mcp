@@ -88,7 +88,8 @@ interface TypeInputController {
 
     /**
      * Sends a key event to the focused text field.
-     * Used for DELETE key after selection.
+     * Not currently used by any tool: the type tools delete through [commitText], since a DEL key event can be lost
+     * by Compose text fields.
      *
      * @param event The KeyEvent to send.
      * @return true if the IC was available and the call was dispatched, false if IC unavailable.

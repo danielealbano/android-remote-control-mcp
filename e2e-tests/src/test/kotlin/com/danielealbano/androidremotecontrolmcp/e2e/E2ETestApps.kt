@@ -4,7 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.e2e.AndroidContainerSetup.execA
 
 /**
  * Drives the helper apps installed in the redroid container for E2E tests: the calculator and the compose test
- * app (Compose screen, long list and WebView activities), plus `uiautomator` node counts and logcat dumps.
+ * app (Compose screen, long list, text field and WebView activities), plus `uiautomator` node counts and logcat dumps.
  */
 object E2ETestApps {
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
@@ -93,6 +93,30 @@ object E2ETestApps {
                 "$COMPOSE_TEST_PACKAGE/.LongListActivity",
             )
         println("[E2E Setup] launchLongListTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the text field test activity in a new task, so its field starts empty: [field] is "compose" for a
+     * Compose text field or "view" for a classic EditText. The previous activity is finished, not its process killed:
+     * killing a process whose field holds an input session can leave the accessibility input method without one for
+     * the next field.
+     */
+    fun launchTextFieldTestApp(field: String) {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "--activity-clear-task",
+                "--es",
+                "field",
+                field,
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.TextFieldActivity",
+            )
+        println("[E2E Setup] launchTextFieldTestApp($field) result: $result")
         Thread.sleep(2_000)
     }
 
