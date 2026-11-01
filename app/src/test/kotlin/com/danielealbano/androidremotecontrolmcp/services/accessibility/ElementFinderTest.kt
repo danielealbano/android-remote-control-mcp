@@ -305,8 +305,8 @@ class ElementFinderTest {
     @DisplayName("ElementInfo mapping")
     inner class ElementInfoMapping {
         @Test
-        @DisplayName("maps every node property, password included")
-        fun mapsEveryNodePropertyPasswordIncluded() {
+        @DisplayName("maps every ElementInfo field, password included")
+        fun mapsEveryElementInfoFieldPasswordIncluded() {
             // Arrange
             val passwordField =
                 createNode(
