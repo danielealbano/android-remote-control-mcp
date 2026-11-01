@@ -52,6 +52,15 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // The real-model tests are skipped without PRIVACY_MODEL_DIR. The environment is not a task input, so without this
+    // a run without it would be reused (UP-TO-DATE / FROM-CACHE) once it is set, and those tests would never run. The
+    // model files are inputs too, so a different model in the same directory runs them again.
+    val privacyModelDir = providers.environmentVariable("PRIVACY_MODEL_DIR").orElse("")
+    inputs.property("privacyModelDir", privacyModelDir)
+    inputs
+        .files(privacyModelDir.map { dir -> if (dir.isEmpty()) files() else files(dir) })
+        .withPropertyName("privacyModelFiles")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 jacoco {
