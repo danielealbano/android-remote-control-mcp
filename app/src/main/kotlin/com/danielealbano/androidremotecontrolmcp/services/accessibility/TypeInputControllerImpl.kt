@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
+import android.text.InputType
 import android.view.KeyEvent
 import android.view.inputmethod.SurroundingText
 import javax.inject.Inject
@@ -79,4 +80,26 @@ class TypeInputControllerImpl
             ic.deleteSurroundingText(beforeLength, afterLength)
             return true
         }
+
+        override fun isPasswordInput(): Boolean =
+            McpAccessibilityService.inputMethodInstance
+                ?.currentInputEditorInfo
+                ?.let { isPasswordInputType(it.inputType) } == true
     }
+
+/** Whether [inputType] (an `EditorInfo.inputType`) is a text or number password input. */
+internal fun isPasswordInputType(inputType: Int): Boolean {
+    val variation = inputType and InputType.TYPE_MASK_VARIATION
+    return when (inputType and InputType.TYPE_MASK_CLASS) {
+        InputType.TYPE_CLASS_TEXT -> variation in TEXT_PASSWORD_VARIATIONS
+        InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        else -> false
+    }
+}
+
+private val TEXT_PASSWORD_VARIATIONS =
+    setOf(
+        InputType.TYPE_TEXT_VARIATION_PASSWORD,
+        InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+        InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+    )

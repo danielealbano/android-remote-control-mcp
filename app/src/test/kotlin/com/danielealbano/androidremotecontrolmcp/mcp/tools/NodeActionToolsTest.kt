@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -1266,6 +1267,37 @@ class NodeActionToolsTest {
                 assertEquals(true, result.isError)
                 assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, extractTextContent(result).lines().first())
                 coVerify(exactly = 0) { mockActionExecutor.scrollNode(any(), any(), any()) }
+            }
+
+        @Test
+        fun `by selector two matches after scrolling list the candidates redacted from the read after the scroll`() =
+            runTest {
+                val twins =
+                    screenWith(
+                        leaf("node_twin_1", "Row 30", visible = true),
+                        leaf("node_twin_2", "Row 30", visible = true, bounds = BoundsData(0, 200, 100, 300)),
+                    )
+                treesInOrder(before, twins)
+                val redactingGate = mockk<PrivacyToolGate>()
+                coEvery { redactingGate.nodeTexts(windowsOf(twins), any()) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { pair -> pair.first?.let { "[REDACTED]" } }
+                }
+                val redactingTool =
+                    ScrollToNodeTool(
+                        mockTreeParser,
+                        realFinder,
+                        mockActionExecutor,
+                        mockAccessibilityServiceProvider,
+                        mockNodeCache,
+                        NodeTargetResolver(realFinder, redactingGate, PrivacyToolTestDoubles.identitySubstitutor()),
+                    )
+
+                val result = redactingTool.execute(bySelector("Row 30"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertTrue(text.contains("node_twin_1") && text.contains("node_twin_2"), text)
+                assertTrue(text.contains("[REDACTED]") && !text.contains("\"Row 30\""), text)
             }
 
         @Test

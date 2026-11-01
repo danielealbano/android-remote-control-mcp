@@ -1034,6 +1034,61 @@ class ActionExecutorImplTest {
             }
 
         @Test
+        @DisplayName("focusNode performs ACTION_FOCUS on the cached node")
+        fun focusNodePerformsActionFocusOnCachedNode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) } returns true
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }
+            }
+
+        @Test
+        @DisplayName("focusNode fails without acting when the node is not focusable")
+        fun focusNodeFailsWhenNodeNotFocusable() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns false
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+                verify(exactly = 0) { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }
+            }
+
+        @Test
+        @DisplayName("focusNode fails when ACTION_FOCUS fails")
+        fun focusNodeFailsWhenActionFocusFails() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) } returns false
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+            }
+
+        @Test
         @DisplayName("clickNode action fails via cached node")
         fun clickNodeActionFailsViaCachedNode() =
             runTest {

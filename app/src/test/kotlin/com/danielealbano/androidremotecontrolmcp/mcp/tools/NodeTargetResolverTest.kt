@@ -276,8 +276,8 @@ class NodeTargetResolverTest {
                         ),
                     )
                 val redactingGate = mockk<PrivacyToolGate>()
-                coEvery { redactingGate.texts(any()) } answers {
-                    firstArg<List<Pair<String?, String>>>().map { pair -> pair.first?.let { "[REDACTED]" } }
+                coEvery { redactingGate.nodeTexts(many, any()) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { pair -> pair.first?.let { "[REDACTED]" } }
                 }
                 val redacting =
                     NodeTargetResolver(ElementFinder(), redactingGate, PrivacyToolTestDoubles.identitySubstitutor())

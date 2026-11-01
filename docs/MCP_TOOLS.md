@@ -339,6 +339,8 @@ Only flags that are `true` are included. The `on`/`off` flag is always first.
 
 Example: `on,clk,ena` means onscreen + clickable + enabled.
 
+`pwd` is the app's own marking of a password field (Android `AccessibilityNodeInfo.isPassword`), reported as is. Any app can set it on any field, and a field without it can still take a password, so it is a hint, not a check that a field is safe to type a credential into. The same flag is the `password` value of `android_find_nodes`, `android_wait_for_node` and `android_get_node_details`.
+
 #### Class Name Simplification
 
 The `class` column shows the simple class name, stripped of the package prefix (e.g., `android.widget.Button` → `Button`). Returns `-` if null or empty.
@@ -1140,11 +1142,14 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "scrollable": false,
       "editable": false,
       "enabled": true,
+      "visible": true,
       "password": false
     }
   ]
 }
 ```
+
+`password` is the app's password-field marking, the `pwd` flag of `android_get_screen_state` (see [Flags Reference](#flags-reference)).
 
 **Example**:
 ```bash
@@ -1374,6 +1379,8 @@ curl -X POST http://localhost:8080/mcp \
 
 Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools take their target as `node_id` or as a selector (`by` + `value`, optional `exact_match`; see [Targeting a node](#targeting-a-node)), click the node to focus it, and return the field content after the operation for verification.
 
+A type tool types into, and reads back, the field that has input focus. After the click it waits (up to 500 ms) until input focus is on the target node or on an editable field inside it (a wrapper that hands focus to an inner field); when another field keeps the focus, it fails without typing anything. The returned field content is that focused field's content, read through the input connection, so a password field returns its real characters: with Privacy Mode on it is redacted with the focused field's own context, and as a password whenever its editor's input type is a password. When the content cannot be read it is `(unable to read field content)`.
+
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
 ### `android_type_append_text`
@@ -1430,7 +1437,7 @@ Type text character by character at the end of a text field. Uses natural InputC
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
-- **Action failed**: Click failed, input connection not ready (node may not be editable), cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready (node may not be editable), input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1490,7 +1497,7 @@ Type text character by character at a specific position in a text field. Uses na
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1550,7 +1557,7 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, text selection failed, deletion failed, typing failed (input connection lost)
 
 ---
 
@@ -1604,7 +1611,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, select-all failed, deletion failed (input connection lost)
 
 ---
 
@@ -1765,10 +1772,17 @@ Wait until a node matching the specified criteria appears in the accessibility t
     "className": "android.widget.TextView",
     "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
     "clickable": false,
-    "enabled": true
+    "longClickable": false,
+    "scrollable": false,
+    "editable": false,
+    "enabled": true,
+    "visible": true,
+    "password": false
   }
 }
 ```
+
+`node` has the same fields as each entry of the `nodes` array of `android_find_nodes`.
 
 **Timeout behavior**: When the timeout expires without finding the node, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
 
@@ -1862,7 +1876,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether each node is a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether the app marks each node as a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1914,7 +1928,7 @@ Retrieves full untruncated text and contentDescription for one or more nodes by 
 - `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
-- `password`: `true` if the node is a password field, `false` otherwise
+- `password`: `true` if the app marks the node as a password field (the `pwd` flag of `android_get_screen_state`, see [Flags Reference](#flags-reference)), `false` otherwise
 
 If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc and password columns.
 

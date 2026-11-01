@@ -266,12 +266,13 @@ class WaitForNodeTool
                             val elapsed = SystemClock.elapsedRealtime() - startTime
                             Log.d(TAG, "wait_for_node: found after ${elapsed}ms ($attemptCount attempts)")
 
-                            val redactedElement =
-                                element.copy(
-                                    text = privacyToolGate.text(element.text, "node text"),
-                                    contentDescription =
-                                        privacyToolGate.text(element.contentDescription, "node description"),
+                            val (redactedText, redactedDesc) =
+                                privacyToolGate.nodeTexts(
+                                    multiWindowResult.windows,
+                                    listOf(element.text to element.id, element.contentDescription to element.id),
                                 )
+                            val redactedElement =
+                                element.copy(text = redactedText, contentDescription = redactedDesc)
                             val resultJson =
                                 buildJsonObject {
                                     put("found", true)
@@ -706,7 +707,7 @@ class WaitForIdleTool
  * MCP tool: get_node_details
  *
  * Retrieves full (untruncated) text and contentDescription for a list of node_ids, plus
- * whether each node is a password field (`true`/`false` in the `password` column).
+ * whether the app marks each node as a password field (`true`/`false` in the `password` column).
  * Use after get_screen_state when text or desc columns were truncated.
  */
 class GetNodeDetailsTool
@@ -744,13 +745,12 @@ class GetNodeDetailsTool
             // 2. Get fresh multi-window snapshot
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
-            // 3. Resolve nodes and batch-redact their text/desc in one model pass.
+            // 3. Resolve nodes and batch-redact their text/desc in one model pass, each with its node's context.
             val nodes = ids.map { id -> id to elementFinder.findNodeById(multiWindowResult.windows, id) }
             val redacted =
-                privacyToolGate.texts(
-                    nodes.flatMap { (_, node) ->
-                        listOf(node?.text to "node text", node?.contentDescription to "node description")
-                    },
+                privacyToolGate.nodeTexts(
+                    multiWindowResult.windows,
+                    nodes.flatMap { (id, node) -> listOf(node?.text to id, node?.contentDescription to id) },
                 )
 
             // 4. Build TSV output
@@ -797,7 +797,7 @@ class GetNodeDetailsTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Retrieve full untruncated text and description for nodes by node_id, " +
-                        "and whether each node is a password field. " +
+                        "and whether the app marks each node as a password field. " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(

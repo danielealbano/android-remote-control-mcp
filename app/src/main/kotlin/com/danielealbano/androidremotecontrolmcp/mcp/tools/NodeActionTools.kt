@@ -92,8 +92,9 @@ class FindNodesTool
             Log.d(TAG, "find_nodes: by=$byStr, visibleOnly=$visibleOnly, found=${elements.size}")
 
             val redactedFields =
-                privacyToolGate.texts(
-                    elements.flatMap { listOf(it.text to "node text", it.contentDescription to "node description") },
+                privacyToolGate.nodeTexts(
+                    result.windows,
+                    elements.flatMap { listOf(it.text to it.id, it.contentDescription to it.id) },
                 )
             val redactedElements =
                 elements.mapIndexed { index, element ->
@@ -687,7 +688,7 @@ class ScrollToNodeTool
                 }
 
                 else -> {
-                    Refound.Ambiguous(targetResolver.ambiguousResult(selector, matches, onScreenOnly = false))
+                    Refound.Ambiguous(targetResolver.ambiguousResult(selector, matches, windows, onScreenOnly = false))
                 }
             }
         }
