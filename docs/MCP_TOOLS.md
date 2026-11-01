@@ -1503,7 +1503,7 @@ Type text character by character at a specific position in a text field. Uses na
 
 ### `android_type_replace_text`
 
-Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it, then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
+Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it (committing empty text over the selection, then checking the field got that much shorter), then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1557,13 +1557,13 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, text selection failed, deletion failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, text selection failed, deletion failed (input connection lost, or the found text still in the field afterwards), typing failed (input connection lost)
 
 ---
 
 ### `android_type_clear_text`
 
-Clear all text from a field naturally using select-all + delete. Uses InputConnection operations (indistinguishable from user action). If the field is already empty, returns success without performing any action.
+Clear all text from a field with select-all and delete through the InputConnection, like an input method, then check that the field reads back empty. If the field is already empty, returns success without performing any action.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1611,7 +1611,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, select-all failed, deletion failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, select-all failed, deletion failed (input connection lost, or the field not empty afterwards)
 
 ---
 

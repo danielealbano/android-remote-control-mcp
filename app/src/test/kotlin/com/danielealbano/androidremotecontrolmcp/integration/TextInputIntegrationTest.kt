@@ -9,6 +9,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementI
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.testutil.FakeTextField
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -203,28 +204,7 @@ class TextInputIntegrationTest {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
-            every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.setSelection(any(), any()) } returns true
-            every { deps.typeInputController.sendKeyEvent(any()) } returns true
-
-            // General getSurroundingText: field-content reads (registered first, lower priority)
-            val beforeText = createMockSurroundingText("Hello World")
-            val afterText = createMockSurroundingText("Goodbye World")
-            every {
-                deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, beforeText, afterText)
-
-            // Verification mocks (registered after, higher priority)
-            var lastCommittedText = ""
-            every { deps.typeInputController.commitText(any(), any()) } answers {
-                lastCommittedText = firstArg<String>()
-                true
-            }
-            every {
-                deps.typeInputController.getSurroundingText(any(), eq(0), eq(0))
-            } answers {
-                createMockSurroundingText(lastCommittedText)
-            }
+            val field = FakeTextField(deps.typeInputController, "Hello World")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -239,11 +219,13 @@ class TextInputIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("Field content:"))
+                assertTrue(text.contains("Field content: Goodbye World"), text)
             }
 
-            // Verify mock interaction: search text "Hello" selected (indices 0..5)
+            // Verify mock interaction: search text "Hello" selected (indices 0..5), then deleted by an empty commit
             verify { deps.typeInputController.setSelection(0, 5) }
+            verify { deps.typeInputController.commitText("", 1) }
+            assertEquals("Goodbye World", field.content)
         }
 
     @Test
@@ -287,15 +269,7 @@ class TextInputIntegrationTest {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
 
-            every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.performContextMenuAction(any()) } returns true
-            every { deps.typeInputController.sendKeyEvent(any()) } returns true
-
-            val beforeText = createMockSurroundingText("Hello")
-            val afterText = createMockSurroundingText("")
-            every {
-                deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, afterText)
+            val field = FakeTextField(deps.typeInputController, "Hello")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -305,11 +279,36 @@ class TextInputIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("Field content:"))
+                assertTrue(text.endsWith("Field content: "), text)
             }
 
-            // Verify mock interaction: select all was called
+            // Verify mock interaction: select all, then an empty commit over the selection
             verify { deps.typeInputController.performContextMenuAction(android.R.id.selectAll) }
+            verify { deps.typeInputController.commitText("", 1) }
+            assertEquals("", field.content)
+        }
+
+    @Test
+    fun `type_clear_text returns an error when the field is not cleared`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
+            coEvery {
+                deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
+            } returns Result.success(Unit)
+            FakeTextField(deps.typeInputController, "Hello", loseDeletions = true)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_type_clear_text",
+                        arguments = mapOf("node_id" to "node_edit"),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("was not deleted"), text)
+            }
         }
 
     @Test
@@ -339,12 +338,7 @@ class TextInputIntegrationTest {
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
-            every { deps.typeInputController.isReady() } returns true
-            every { deps.typeInputController.performContextMenuAction(any()) } returns true
-            every { deps.typeInputController.sendKeyEvent(any()) } returns true
-            every {
-                deps.typeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(createMockSurroundingText("Hello"), createMockSurroundingText(""))
+            FakeTextField(deps.typeInputController, "Hello")
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =

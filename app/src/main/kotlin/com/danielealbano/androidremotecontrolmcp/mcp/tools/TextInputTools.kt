@@ -4,8 +4,8 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
@@ -133,12 +133,9 @@ internal suspend fun typeCharByChar(
 
     // Read initial field length once for pre-retry length validation
     val initialFieldLength =
-        typeInputController
-            .getSurroundingText(
-                MAX_SURROUNDING_TEXT_LENGTH,
-                MAX_SURROUNDING_TEXT_LENGTH,
-                0,
-            )?.let { it.offset + it.text.length } ?: 0
+        fieldLength(
+            typeInputController.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0),
+        )
     val ctx =
         TypingVerifyContext(
             typeInputController,
@@ -256,12 +253,7 @@ private fun preRetryLengthCheckPassed(
     charCount: Int,
 ): Boolean {
     val currentLength =
-        ctx.controller
-            .getSurroundingText(
-                MAX_SURROUNDING_TEXT_LENGTH,
-                MAX_SURROUNDING_TEXT_LENGTH,
-                0,
-            )?.let { it.offset + it.text.length } ?: 0
+        fieldLength(ctx.controller.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0))
     return currentLength >= ctx.initialFieldLength + ctx.committedCodeUnits + charCount
 }
 
@@ -451,6 +443,75 @@ private fun collectIds(
 }
 
 /**
+ * Where the [surroundingText] window starts in the field. An editor that reports no offset (-1: Compose text fields,
+ * whose input connection uses the default `getSurroundingText`) is read from the field start when the text before the
+ * selection is shorter than the MAX_SURROUNDING_TEXT_LENGTH that was asked for, since the window then reaches it.
+ *
+ * @throws McpToolException.ActionFailed when the offset is unknown and the window may not reach the field start.
+ */
+internal fun fieldStart(surroundingText: SurroundingText): Int =
+    when {
+        surroundingText.offset >= 0 -> {
+            surroundingText.offset
+        }
+
+        surroundingText.selectionStart < MAX_SURROUNDING_TEXT_LENGTH -> {
+            0
+        }
+
+        else -> {
+            throw McpToolException.ActionFailed(
+                "The field does not report where its text starts and its cursor is more than " +
+                    "$MAX_SURROUNDING_TEXT_LENGTH characters in, so the text cannot be located",
+            )
+        }
+    }
+
+/** The field length read through [surroundingText] (see [fieldStart]), or 0 when the field could not be read. */
+internal fun fieldLength(surroundingText: SurroundingText?): Int {
+    val window = surroundingText ?: return 0
+    return fieldStart(window) + window.text.length
+}
+
+/**
+ * Deletes the current selection by committing empty text through the input connection, then waits up to
+ * FOCUS_POLL_MAX_MS until the field reads back [expectedLength] characters. A DEL key event is not used: it goes
+ * through the view's key handling instead of the input connection's edit pipeline that set the selection, and Compose
+ * text fields can handle it before that selection and lose the deletion.
+ *
+ * @throws McpToolException.ActionFailed when the input connection is lost or the text was not deleted.
+ */
+internal suspend fun deleteSelection(
+    typeInputController: TypeInputController,
+    expectedLength: Int,
+    nodeId: String,
+) {
+    if (!typeInputController.commitText("", 1)) {
+        throw McpToolException.ActionFailed(
+            "Failed to delete the selected text in node '$nodeId' — input connection lost",
+        )
+    }
+    val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
+    var length = readFieldLength(typeInputController)
+    while (length != expectedLength && System.currentTimeMillis() < deadline) {
+        delay(FOCUS_POLL_INTERVAL_MS)
+        length = readFieldLength(typeInputController)
+    }
+    if (length != expectedLength) {
+        throw McpToolException.ActionFailed(
+            "The selected text in node '$nodeId' was not deleted: the field reads back " +
+                "${length ?: "no"} characters instead of $expectedLength",
+        )
+    }
+}
+
+/** The field length read now (see [fieldStart]), or null when the input connection returns nothing. */
+private fun readFieldLength(typeInputController: TypeInputController): Int? =
+    typeInputController
+        .getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0)
+        ?.let { fieldLength(it) }
+
+/**
  * Reads the current field content after an operation completes.
  * Used to include the field content in the tool response so the model
  * can verify the result.
@@ -549,7 +610,7 @@ class TypeAppendTextTool
                         focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
 
                     // Position cursor at end
-                    // Note: offset + text.length gives the total text length only if
+                    // Note: fieldLength gives the total text length only if
                     // getSurroundingText returns the complete field content. For fields
                     // with >2*MAX_SURROUNDING_TEXT_LENGTH chars, this may undercount.
                     // Given the 2000-char tool limit, this is not a practical concern.
@@ -559,10 +620,7 @@ class TypeAppendTextTool
                             MAX_SURROUNDING_TEXT_LENGTH,
                             0,
                         )
-                    val textLength =
-                        surroundingText?.let {
-                            it.offset + it.text.length
-                        } ?: 0
+                    val textLength = fieldLength(surroundingText)
                     if (!typeInputController.setSelection(textLength, textLength)) {
                         throw McpToolException.ActionFailed(
                             "Failed to position cursor in node '$nodeId' — input connection lost",
@@ -696,10 +754,7 @@ class TypeInsertTextTool
                             MAX_SURROUNDING_TEXT_LENGTH,
                             0,
                         )
-                    val textLength =
-                        surroundingText?.let {
-                            it.offset + it.text.length
-                        } ?: 0
+                    val textLength = fieldLength(surroundingText)
 
                     if (offset > textLength) {
                         throw McpToolException.InvalidParams(
@@ -801,8 +856,8 @@ class TypeInsertTextTool
  * MCP tool: type_replace_text
  *
  * Finds the first occurrence of search text in a field, selects it,
- * deletes it via DELETE key event, then types the replacement text
- * code point by code point using the InputConnection pipeline.
+ * deletes it by committing empty text over the selection (see [deleteSelection]),
+ * then types the replacement text code point by code point using the InputConnection pipeline.
  *
  * **Known limitation (TOCTOU race)**: There is an inherent time-of-check to
  * time-of-use race between `getSurroundingText()` (read) and `setSelection()`
@@ -818,7 +873,7 @@ class TypeInsertTextTool
  * 2. Get current text via getSurroundingText()
  * 3. Find first occurrence of search text — error if not found
  * 4. setSelection(startIndex, endIndex) to select found text
- * 5. Send DELETE key event to remove selection
+ * 5. Commit empty text over the selection and wait until the field is search.length characters shorter
  * 6. Type new_text code point by code point via commitText() (if non-empty)
  */
 class TypeReplaceTextTool
@@ -892,7 +947,7 @@ class TypeReplaceTextTool
                     }
 
                     // Adjust index relative to the actual field (account for surroundingText offset)
-                    val absoluteStart = surroundingText.offset + searchIndex
+                    val absoluteStart = fieldStart(surroundingText) + searchIndex
                     val absoluteEnd = absoluteStart + search.length
 
                     // Select the found text — check return value
@@ -902,23 +957,8 @@ class TypeReplaceTextTool
                         )
                     }
 
-                    // Delete the selection via DELETE key event — check return values
-                    if (!typeInputController.sendKeyEvent(
-                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL),
-                        )
-                    ) {
-                        throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
-                        )
-                    }
-                    if (!typeInputController.sendKeyEvent(
-                            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL),
-                        )
-                    ) {
-                        throw McpToolException.ActionFailed(
-                            "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
-                        )
-                    }
+                    // Delete the selection and wait until the field is that much shorter
+                    deleteSelection(typeInputController, fieldLength(surroundingText) - search.length, nodeId)
 
                     // Type replacement text code point by code point (if non-empty)
                     if (newText.isNotEmpty()) {
@@ -1014,10 +1054,9 @@ class TypeReplaceTextTool
 /**
  * MCP tool: type_clear_text
  *
- * Clears all text from a field naturally using InputConnection operations:
- * select all via context menu + DELETE key event.
- *
- * This is indistinguishable from a user performing select-all + backspace.
+ * Clears all text from a field using InputConnection operations: select all via the context menu action, then
+ * commit empty text over the selection (see [deleteSelection]) and wait until the field reads back empty, failing
+ * when it does not.
  *
  * If the field is already empty, returns success without performing any action.
  * All InputConnection return values are checked for robustness.
@@ -1094,7 +1133,7 @@ class TypeClearTextTool
                     MAX_SURROUNDING_TEXT_LENGTH,
                     0,
                 )
-            val textLength = surroundingText?.let { it.offset + it.text.length } ?: 0
+            val textLength = fieldLength(surroundingText)
             return if (textLength == 0) {
                 Log.d(TAG, "type_clear_text: field already empty on '$nodeId'")
                 ClearOutcome.AlreadyEmpty(nodeId)
@@ -1105,15 +1144,8 @@ class TypeClearTextTool
                     "Failed to select all text in node '$nodeId' — input connection lost",
                 )
 
-                // Delete selection via DELETE key event — check return values
-                requireInputStep(
-                    typeInputController.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL)),
-                    "Failed to send DELETE key (ACTION_DOWN) on node '$nodeId' — input connection lost",
-                )
-                requireInputStep(
-                    typeInputController.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL)),
-                    "Failed to send DELETE key (ACTION_UP) on node '$nodeId' — input connection lost",
-                )
+                // Delete the selection and wait until the field reads back empty
+                deleteSelection(typeInputController, 0, nodeId)
 
                 // Read field content after operation for verification
                 ClearOutcome.Cleared(nodeId, readField(typeInputController, fieldNodeId, result.windows))
@@ -1136,8 +1168,8 @@ class TypeClearTextTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Clear all text from a field naturally using select-all + delete. " +
-                        "Uses InputConnection operations (indistinguishable from user action). " +
+                    "Clear all text from a field with select-all and delete through the InputConnection, " +
+                        "like an input method, then check that the field reads back empty. " +
                         verificationAndKeyboardHint(toolNamePrefix),
                 inputSchema =
                     ToolSchema(

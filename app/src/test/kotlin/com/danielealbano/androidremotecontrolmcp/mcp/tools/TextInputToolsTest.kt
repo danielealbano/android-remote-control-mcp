@@ -18,6 +18,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.testutil.FakeTextField
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
 import io.mockk.clearMocks
 import io.mockk.coEvery
@@ -362,6 +363,32 @@ class TextInputToolsTest {
                     }
                 assertTrue(exception.message!!.contains("Input connection not available"))
             }
+
+        @Test
+        fun `fieldStart is the offset the field reports`() {
+            assertEquals(50, fieldStart(createMockSurroundingText("partial text", offset = 50)))
+        }
+
+        @Test
+        fun `fieldStart is the field start when no offset is reported and the window reaches it`() {
+            val surrounding = createMockSurroundingText("abc", offset = -1)
+
+            assertEquals(0, fieldStart(surrounding))
+            assertEquals(3, fieldLength(surrounding))
+        }
+
+        @Test
+        fun `fieldStart throws when no offset is reported and the cursor is too far in`() {
+            val farIn = "a".repeat(10_000)
+            val surrounding = createMockSurroundingText(farIn, offset = -1)
+
+            assertThrows<McpToolException.ActionFailed> { fieldStart(surrounding) }
+        }
+
+        @Test
+        fun `fieldLength is 0 when the field cannot be read`() {
+            assertEquals(0, fieldLength(null))
+        }
 
         @Test
         fun `readFieldContent returns text when available`() {
@@ -1177,6 +1204,24 @@ class TextInputToolsTest {
                 // textLength defaults to 0, so setSelection(0, 0)
                 verify { mockTypeInputController.setSelection(0, 0) }
             }
+
+        @Test
+        fun `appends at the end of a field that reports no offset`() =
+            runTest {
+                // A Compose text field reports -1: the end is the full text length, not one less
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "de")
+                    }
+
+                tool.execute(params)
+
+                verify { mockTypeInputController.setSelection(3, 3) }
+                assertEquals("abcde", field.content)
+            }
     }
 
     @Nested
@@ -1394,6 +1439,40 @@ class TextInputToolsTest {
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Field content: Hel Worldlo"))
             }
+
+        @Test
+        fun `inserts at the offset of a field that reports no offset`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "X")
+                        put("offset", 1)
+                    }
+
+                tool.execute(params)
+
+                assertEquals("aXbc", field.content)
+            }
+
+        @Test
+        fun `accepts an offset at the end of a field that reports no offset`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "d")
+                        put("offset", 3)
+                    }
+
+                tool.execute(params)
+
+                assertEquals("abcd", field.content)
+            }
     }
 
     @Nested
@@ -1411,41 +1490,42 @@ class TextInputToolsTest {
                 targetResolver,
             )
 
-        private fun setupDefaultMocks(existingText: String = "Hello World") {
+        /** The target field holds [existingText] (see [FakeTextField]) and the click on it succeeds. */
+        private fun fieldWith(
+            existingText: String = "Hello World",
+            reportedOffset: Int = 0,
+            loseDeletions: Boolean = false,
+        ): FakeTextField {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-            every { mockTypeInputController.isReady() } returns true
-            every { mockTypeInputController.setSelection(any(), any()) } returns true
-            every { mockTypeInputController.sendKeyEvent(any()) } returns true
-            // General getSurroundingText: field-content reads
-            val beforeText = createMockSurroundingText(existingText)
-            val afterText = createMockSurroundingText("Goodbye World")
-            every {
-                mockTypeInputController.getSurroundingText(any(), any(), any())
-            } returnsMany listOf(beforeText, beforeText, afterText)
-            // Verification mocks (more specific matchers, registered after general)
-            setupVerificationMock()
+            return FakeTextField(mockTypeInputController, existingText, reportedOffset, loseDeletions)
+        }
+
+        private fun replaceParams(
+            search: String,
+            newText: String,
+        ) = buildJsonObject {
+            put("node_id", "node_edit")
+            put("search", search)
+            put("new_text", newText)
         }
 
         @Test
         fun `replaces first occurrence of search text`() =
             runTest {
-                setupDefaultMocks()
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "Goodbye")
-                    }
+                val field = fieldWith()
 
-                val result = tool.execute(params)
+                val result = tool.execute(replaceParams("Hello", "Goodbye"))
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Replaced 5 characters with 7 characters"))
                 assertTrue(text.contains("Field content:"))
 
-                // Verify selection of the search text
-                verify { mockTypeInputController.setSelection(0, 5) }
-                // Verify DELETE key events (KeyEvent is null in JVM tests, so use any())
-                verify(exactly = 2) { mockTypeInputController.sendKeyEvent(any()) }
+                // The search text is selected and deleted by committing empty text over the selection
+                verifyOrder {
+                    mockTypeInputController.setSelection(0, 5)
+                    mockTypeInputController.commitText("", 1)
+                }
+                verify(exactly = 0) { mockTypeInputController.sendKeyEvent(any()) }
+                assertEquals("Goodbye World", field.content)
             }
 
         @Test
@@ -1458,41 +1538,23 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns beforeText
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "NotFound")
-                        put("new_text", "X")
-                    }
-
-                assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
+                assertThrows<McpToolException.NodeNotFound> { tool.execute(replaceParams("NotFound", "X")) }
             }
 
         @Test
         fun `throws error when search is empty`() =
             runTest {
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "")
-                        put("new_text", "X")
-                    }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(replaceParams("", "X")) }
                 assertTrue(exception.message!!.contains("non-empty"))
             }
 
         @Test
         fun `throws error when search exceeds max length`() =
             runTest {
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "A".repeat(10001))
-                        put("new_text", "X")
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(replaceParams("A".repeat(10001), "X"))
                     }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("10000"))
             }
 
@@ -1505,14 +1567,8 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns null
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "X")
-                    }
-
-                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
                 assertTrue(exception.message!!.contains("Unable to read text"))
             }
 
@@ -1541,124 +1597,97 @@ class TextInputToolsTest {
                 } returns beforeText
                 every { mockTypeInputController.setSelection(any(), any()) } returns false
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "X")
-                    }
-
-                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
                 assertTrue(exception.message!!.contains("Failed to select text"))
             }
 
         @Test
         fun `handles empty new_text (delete only)`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.setSelection(any(), any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                val beforeText = createMockSurroundingText("Hello World")
-                val afterText = createMockSurroundingText(" World")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
+                val field = fieldWith()
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "")
-                    }
-
-                val result = tool.execute(params)
+                val result = tool.execute(replaceParams("Hello", ""))
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Replaced 5 characters with 0 characters"))
-                assertTrue(text.contains("Field content:"))
+                assertTrue(text.endsWith("Field content:  World"), text)
 
-                // No commitText should have been called since new_text is empty
-                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
+                // Only the deletion is committed: nothing is typed
+                verify(exactly = 1) { mockTypeInputController.commitText(any(), any()) }
+                verify { mockTypeInputController.commitText("", 1) }
+                assertEquals(" World", field.content)
             }
 
         @Test
         fun `replaces only first occurrence when multiple exist`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.setSelection(any(), any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                val beforeText = createMockSurroundingText("abcabcabc")
-                val afterText = createMockSurroundingText("Xabcabc")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, beforeText, afterText)
-                setupVerificationMock()
+                val field = fieldWith("abcabcabc")
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "abc")
-                        put("new_text", "X")
-                    }
-
-                tool.execute(params)
+                tool.execute(replaceParams("abc", "X"))
 
                 // First occurrence at index 0, so setSelection(0, 3)
                 verify { mockTypeInputController.setSelection(0, 3) }
+                assertEquals("Xabcabc", field.content)
             }
 
         @Test
         fun `replaces search text at position 0 (start of field)`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.setSelection(any(), any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                val beforeText = createMockSurroundingText("Hello World")
-                val afterText = createMockSurroundingText("Hi World")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, beforeText, afterText)
-                setupVerificationMock()
+                val field = fieldWith()
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "Hi")
-                    }
-
-                tool.execute(params)
+                tool.execute(replaceParams("Hello", "Hi"))
 
                 verify { mockTypeInputController.setSelection(0, 5) }
+                assertEquals("Hi World", field.content)
             }
 
         @Test
         fun `replaces search text at end of field`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.setSelection(any(), any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                val beforeText = createMockSurroundingText("Hello World")
-                val afterText = createMockSurroundingText("Hello Earth")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, beforeText, afterText)
-                setupVerificationMock()
+                val field = fieldWith()
 
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "World")
-                        put("new_text", "Earth")
-                    }
-
-                tool.execute(params)
+                tool.execute(replaceParams("World", "Earth"))
 
                 // "World" starts at index 6, ends at 11
                 verify { mockTypeInputController.setSelection(6, 11) }
+                assertEquals("Hello Earth", field.content)
+            }
+
+        @Test
+        fun `replaces the right text in a field that reports no offset`() =
+            runTest {
+                // A Compose text field reports -1: the window still starts at the field start
+                val field = fieldWith(reportedOffset = -1)
+
+                tool.execute(replaceParams("World", "Earth"))
+
+                verify { mockTypeInputController.setSelection(6, 11) }
+                assertEquals("Hello Earth", field.content)
+            }
+
+        @Test
+        fun `throws and types nothing when the found text is not deleted`() =
+            runTest {
+                val field = fieldWith(loseDeletions = true)
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "Goodbye")) }
+
+                assertTrue(exception.message!!.contains("was not deleted"), exception.message)
+                assertEquals("Hello World", field.content)
+                verify(exactly = 1) { mockTypeInputController.commitText(any(), any()) }
+            }
+
+        @Test
+        fun `throws error when the deletion cannot be committed`() =
+            runTest {
+                fieldWith()
+                every { mockTypeInputController.commitText("", any()) } returns false
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
+
+                assertTrue(exception.message!!.contains("Failed to delete the selected text"), exception.message)
             }
 
         @Test
@@ -1668,30 +1697,18 @@ class TextInputToolsTest {
                 // (only lengths and element IDs, not actual text content).
                 // We verify by checking the implementation uses search.length/newText.length
                 // The actual test is structural — the code's Log.d line uses .length
-                setupDefaultMocks()
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "Goodbye")
-                    }
+                fieldWith()
 
                 // Should complete without error
-                tool.execute(params)
+                tool.execute(replaceParams("Hello", "Goodbye"))
             }
 
         @Test
         fun `returns field content in response`() =
             runTest {
-                setupDefaultMocks()
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("search", "Hello")
-                        put("new_text", "Goodbye")
-                    }
+                fieldWith()
 
-                val result = tool.execute(params)
+                val result = tool.execute(replaceParams("Hello", "Goodbye"))
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Field content: Goodbye World"))
             }
@@ -1711,33 +1728,49 @@ class TextInputToolsTest {
                 targetResolver,
             )
 
+        private val params = buildJsonObject { put("node_id", "node_edit") }
+
+        /** The target field holds [existingText] (see [FakeTextField]) and the click on it succeeds. */
+        private fun fieldWith(
+            existingText: String,
+            reportedOffset: Int = 0,
+            loseDeletions: Boolean = false,
+        ): FakeTextField {
+            coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+            return FakeTextField(mockTypeInputController, existingText, reportedOffset, loseDeletions)
+        }
+
         @Test
         fun `clears text from node`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.performContextMenuAction(any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                val beforeText = createMockSurroundingText("Hello")
-                val afterText = createMockSurroundingText("")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(beforeText, afterText)
-
-                val params = buildJsonObject { put("node_id", "node_edit") }
+                val field = fieldWith("Hello")
 
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Text cleared"))
-                assertTrue(text.contains("Field content:"))
+                assertTrue(text.endsWith("Field content: "), text)
 
-                verify { mockTypeInputController.performContextMenuAction(android.R.id.selectAll) }
-                // Verify DELETE key events (KeyEvent is null in JVM tests, so use any())
-                verify(exactly = 2) { mockTypeInputController.sendKeyEvent(any()) }
+                // Select all, then commit empty text over the selection
+                verifyOrder {
+                    mockTypeInputController.performContextMenuAction(android.R.id.selectAll)
+                    mockTypeInputController.commitText("", 1)
+                }
+                verify(exactly = 0) { mockTypeInputController.sendKeyEvent(any()) }
+                assertEquals("", field.content)
             }
 
         @Test
-        fun `returns success for already empty field without sending keys`() =
+        fun `clears a field that reports no offset`() =
+            runTest {
+                val field = fieldWith("abc", reportedOffset = -1)
+
+                tool.execute(params)
+
+                assertEquals("", field.content)
+            }
+
+        @Test
+        fun `returns success for already empty field without editing it`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
@@ -1746,15 +1779,25 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns emptyText
 
-                val params = buildJsonObject { put("node_id", "node_edit") }
-
                 val result = tool.execute(params)
                 val text = extractTextContent(result)
                 assertTrue(text.contains("Text cleared"))
                 assertTrue(text.contains("Field content: "))
 
                 verify(exactly = 0) { mockTypeInputController.performContextMenuAction(any()) }
-                verify(exactly = 0) { mockTypeInputController.sendKeyEvent(any()) }
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
+            }
+
+        @Test
+        fun `returns success for an already empty field that reports no offset`() =
+            runTest {
+                fieldWith("", reportedOffset = -1)
+
+                val text = extractTextContent(tool.execute(params))
+
+                assertTrue(text.contains("Text cleared"))
+                verify(exactly = 0) { mockTypeInputController.performContextMenuAction(any()) }
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
             }
 
         @Test
@@ -1767,8 +1810,6 @@ class TextInputToolsTest {
                     mockTypeInputController.getSurroundingText(any(), any(), any())
                 } returns emptyText
 
-                val params = buildJsonObject { put("node_id", "node_edit") }
-
                 // First call — early return for empty field
                 tool.execute(params)
 
@@ -1779,17 +1820,16 @@ class TextInputToolsTest {
         @Test
         fun `throws error when node_id is missing`() =
             runTest {
-                val params = buildJsonObject {}
-
-                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(buildJsonObject {}) }
             }
 
         @Test
         fun `throws error when node_id is empty string`() =
             runTest {
-                val params = buildJsonObject { put("node_id", "") }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+                val exception =
+                    assertThrows<McpToolException.InvalidParams> {
+                        tool.execute(buildJsonObject { put("node_id", "") })
+                    }
                 assertTrue(exception.message!!.contains("non-empty"))
             }
 
@@ -1799,8 +1839,6 @@ class TextInputToolsTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns false
 
-                val params = buildJsonObject { put("node_id", "node_edit") }
-
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Input connection not available"))
             }
@@ -1808,36 +1846,34 @@ class TextInputToolsTest {
         @Test
         fun `throws error when performContextMenuAction fails`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                val beforeText = createMockSurroundingText("Hello")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returns beforeText
+                fieldWith("Hello")
                 every { mockTypeInputController.performContextMenuAction(any()) } returns false
-
-                val params = buildJsonObject { put("node_id", "node_edit") }
 
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("Failed to select all text"))
             }
 
         @Test
-        fun `throws error when sendKeyEvent fails`() =
+        fun `throws error when the deletion cannot be committed`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                every { mockTypeInputController.isReady() } returns true
-                val beforeText = createMockSurroundingText("Hello")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returns beforeText
-                every { mockTypeInputController.performContextMenuAction(any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns false
-
-                val params = buildJsonObject { put("node_id", "node_edit") }
+                fieldWith("Hello")
+                every { mockTypeInputController.commitText(any(), any()) } returns false
 
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("Failed to send DELETE key"))
+                assertTrue(exception.message!!.contains("Failed to delete the selected text"), exception.message)
+            }
+
+        @Test
+        fun `throws instead of reporting success when the field is not cleared`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time (the wait for the field to change)
+                val field = fieldWith("Hello", loseDeletions = true)
+
+                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
+
+                assertTrue(exception.message!!.contains("was not deleted"), exception.message)
+                assertTrue(exception.message!!.contains("5 characters instead of 0"), exception.message)
+                assertEquals("Hello", field.content)
             }
     }
 
@@ -2020,24 +2056,14 @@ class TextInputToolsTest {
                 targetResolver,
             )
 
-        /** [nodeId] focuses and holds [before]; after the operation it holds [after]. */
+        /** [nodeId] takes input focus when clicked and holds [before] (see [FakeTextField]). */
         private fun readyField(
             nodeId: String,
             before: String,
-            after: String,
-        ) {
+        ): FakeTextField {
             coEvery { mockActionExecutor.clickNode(nodeId, any()) } returns Result.success(Unit)
             focusInputOn(nodeId)
-            every { mockTypeInputController.isReady() } returns true
-            every { mockTypeInputController.setSelection(any(), any()) } returns true
-            every { mockTypeInputController.sendKeyEvent(any()) } returns true
-            every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returnsMany
-                listOf(
-                    createMockSurroundingText(before),
-                    createMockSurroundingText(before),
-                    createMockSurroundingText(after),
-                )
-            setupVerificationMock()
+            return FakeTextField(mockTypeInputController, before)
         }
 
         private fun selectorWith(
@@ -2104,14 +2130,7 @@ class TextInputToolsTest {
         fun `type_clear_text clears the field matched by a selector`() =
             runTest {
                 withFields(editable("node_email", "Email"))
-                coEvery { mockActionExecutor.clickNode("node_email", any()) } returns Result.success(Unit)
-                focusInputOn("node_email")
-                every { mockTypeInputController.isReady() } returns true
-                every { mockTypeInputController.performContextMenuAction(any()) } returns true
-                every { mockTypeInputController.sendKeyEvent(any()) } returns true
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(createMockSurroundingText("Email"), createMockSurroundingText(""))
+                readyField("node_email", before = "Email")
 
                 val text = extractTextContent(clearTool.execute(selector("Email")))
 
@@ -2145,7 +2164,7 @@ class TextInputToolsTest {
         fun `type_insert_text types at the offset of the field matched by a selector`() =
             runTest {
                 withFields(editable("node_email", "Email"), editable("node_name", "Name"))
-                readyField("node_email", before = "Email", after = "HiEmail")
+                readyField("node_email", before = "Email")
 
                 val text =
                     extractTextContent(insertTool.execute(selectorWith("Email", mapOf("text" to "Hi", "offset" to 0))))
@@ -2159,7 +2178,7 @@ class TextInputToolsTest {
         fun `type_replace_text replaces in the field matched by a selector`() =
             runTest {
                 withFields(editable("node_email", "Email"), editable("node_name", "Name"))
-                readyField("node_email", before = "Email", after = "Mail")
+                readyField("node_email", before = "Email")
 
                 val text =
                     extractTextContent(
@@ -2194,7 +2213,7 @@ class TextInputToolsTest {
 
                     // The typing lock was released: the same call on a single match runs.
                     withFields(editable("node_a", "Field"))
-                    readyField("node_a", before = "Field", after = "HiField")
+                    readyField("node_a", before = "Field")
                     assertTrue(extractTextContent(execute(selectorWith("Field", args))).contains("node 'node_a'"), name)
                     clearMocks(mockActionExecutor, answers = false, childMocks = false)
                 }
