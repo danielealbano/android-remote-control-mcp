@@ -1379,6 +1379,8 @@ curl -X POST http://localhost:8080/mcp \
 
 Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools take their target as `node_id` or as a selector (`by` + `value`, optional `exact_match`; see [Targeting a node](#targeting-a-node)), click the node to focus it, and return the field content after the operation for verification.
 
+A type tool types into, and reads back, the field that has input focus. After the click it waits (up to 500 ms) until input focus is on the target node or on an editable field inside it (a wrapper that hands focus to an inner field); when another field keeps the focus, it fails without typing anything. The returned field content is that focused field's content, read through the input connection, so a password field returns its real characters: with Privacy Mode on it is redacted with the focused field's own context, and as a password whenever its editor's input type is a password. When the content cannot be read it is `(unable to read field content)`.
+
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
 ### `android_type_append_text`
@@ -1435,7 +1437,7 @@ Type text character by character at the end of a text field. Uses natural InputC
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
-- **Action failed**: Click failed, input connection not ready (node may not be editable), cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready (node may not be editable), input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1495,7 +1497,7 @@ Type text character by character at a specific position in a text field. Uses na
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1555,7 +1557,7 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, text selection failed, deletion failed, typing failed (input connection lost)
 
 ---
 
@@ -1609,7 +1611,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, select-all failed, deletion failed (input connection lost)
 
 ---
 

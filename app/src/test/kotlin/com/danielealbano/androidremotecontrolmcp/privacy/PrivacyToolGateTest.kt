@@ -146,6 +146,35 @@ class PrivacyToolGateTest {
         }
 
     @Test
+    fun `nodeText with a password input marks the context as an editable password field`() =
+        runTest {
+            gate.nodeText(listOf(appWindow), "sk-123", "node_label", passwordInput = true)
+
+            val context = sentItems.captured.single().context
+            assertTrue(context.isPassword)
+            assertTrue(context.isEditable)
+        }
+
+    @Test
+    fun `nodeText without a password input keeps the node context`() =
+        runTest {
+            gate.nodeText(listOf(appWindow), "API token", "node_label")
+
+            val context = sentItems.captured.single().context
+            assertFalse(context.isPassword)
+            assertFalse(context.isEditable)
+        }
+
+    @Test
+    fun `nodeText returns null without calling the pipeline for a null text`() =
+        runTest {
+            val result = gate.nodeText(listOf(appWindow), null, "node_pwd", passwordInput = true)
+
+            assertEquals(null, result)
+            coVerify(exactly = 0) { pipeline.processTexts(any()) }
+        }
+
+    @Test
     fun `texts keeps using the field name as the only context`() =
         runTest {
             val result = gate.texts(listOf("a@b.com" to "clipboard", null to "clipboard"))

@@ -30,10 +30,12 @@ class PrivacyToolGate
 
         /**
          * Redacts each `(text, nodeId)` pair in one batch, where the text was read from the node `nodeId` of [windows]
-         * (its text, its content description or the content of its field). Each text gets that node's detection
-         * context (resource id, hint, label, password and editable flags), built like [tree] builds it for
-         * `get_screen_state`, so node text is redacted the same way whichever tool returns it. Null texts stay null and
-         * keep their slot; a node id that is not in [windows] gets an empty context.
+         * (its text or its content description). Each text gets that node's detection context (resource id, hint,
+         * label, content description, password and editable flags) from the same [ContextExtractor] calls [tree] makes
+         * for `get_screen_state`, run over [windows]: the nearest-label pass over the node's window, then the node's
+         * own context. `get_screen_state` runs them over the WebView-merged tree, so web content can get a slightly
+         * different context there. Null texts stay null and keep their slot; a node id that is not in [windows] gets
+         * an empty context.
          */
         suspend fun nodeTexts(
             windows: List<WindowData>,
@@ -46,12 +48,22 @@ class PrivacyToolGate
             }
         }
 
-        /** [nodeTexts] for one [text] read from the node [nodeId] of [windows]. */
+        /**
+         * Redacts one [text] read from the node [nodeId] of [windows] with that node's context, like [nodeTexts]. When
+         * [passwordInput] is true (the text comes from an editor whose input type is a password) the context is also
+         * marked as an editable password field, whatever the node reports.
+         */
         suspend fun nodeText(
             windows: List<WindowData>,
             text: String?,
             nodeId: String,
-        ): String? = nodeTexts(windows, listOf(text to nodeId)).single()
+            passwordInput: Boolean = false,
+        ): String? {
+            if (text == null) return null
+            val context = nodeContexts(windows, setOf(nodeId))[nodeId] ?: DetectionContext.EMPTY
+            val effective = if (passwordInput) context.copy(isPassword = true, isEditable = true) else context
+            return pipeline.processTexts(listOf(TextItem(text, effective))).single()
+        }
 
         suspend fun tree(result: MultiWindowResult): ProcessedTree = pipeline.processTree(result)
 
@@ -59,11 +71,11 @@ class PrivacyToolGate
             texts: List<String?>,
             contextOf: (Int) -> DetectionContext,
         ): List<String?> {
-            val presentIndices = texts.indices.filter { texts[it] != null }
-            if (presentIndices.isEmpty()) return texts.map { null }
-            val processed = pipeline.processTexts(presentIndices.map { TextItem(texts[it]!!, contextOf(it)) })
+            val present = texts.withIndex().mapNotNull { (index, text) -> text?.let { IndexedValue(index, it) } }
+            if (present.isEmpty()) return texts.map { null }
+            val processed = pipeline.processTexts(present.map { (index, text) -> TextItem(text, contextOf(index)) })
             val result = arrayOfNulls<String>(texts.size)
-            presentIndices.forEachIndexed { batchIndex, itemIndex -> result[itemIndex] = processed[batchIndex] }
+            present.forEachIndexed { batchIndex, (itemIndex, _) -> result[itemIndex] = processed[batchIndex] }
             return result.toList()
         }
 

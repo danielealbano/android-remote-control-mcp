@@ -66,6 +66,12 @@ interface ActionExecutor {
         windows: List<WindowData>,
     ): Result<Unit>
 
+    /** Gives input focus to the node [nodeId] (ACTION_FOCUS), for a field a click did not focus. */
+    suspend fun focusNode(
+        nodeId: String,
+        windows: List<WindowData>,
+    ): Result<Unit>
+
     suspend fun setTextOnNode(
         nodeId: String,
         text: String,

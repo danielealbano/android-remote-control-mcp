@@ -7,12 +7,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
@@ -35,6 +37,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -136,6 +139,18 @@ class TextInputToolsTest {
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
         every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
+        // The type tools' usual target holds input focus, in a plain (non-password) editor.
+        focusInputOn("node_edit")
+        every { mockTypeInputController.isPasswordInput() } returns false
+    }
+
+    /** Puts input focus on [nodeId]: the FOCUS_INPUT search finds [mockFocusedNode], the cached node of [nodeId]. */
+    private fun focusInputOn(nodeId: String) {
+        every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns mockFocusedNode
+        every { mockRootNode.recycle() } returns Unit
+        every { mockFocusedNode.isEditable } returns true
+        every { mockFocusedNode.recycle() } returns Unit
+        every { mockNodeCache.get(nodeId) } returns CachedNode(mockFocusedNode, 1, 0, "node_root")
     }
 
     @AfterEach
@@ -360,13 +375,13 @@ class TextInputToolsTest {
         }
 
         @Test
-        fun `readFieldContent returns fallback when unavailable`() {
+        fun `readFieldContent returns null when unavailable`() {
             every {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
             } returns null
 
             val result = readFieldContent(mockTypeInputController)
-            assertEquals("(unable to read field content)", result)
+            assertNull(result)
         }
 
         @Test
@@ -680,6 +695,239 @@ class TextInputToolsTest {
 
                 // Verify CancellationException was the cause (job is cancelled)
                 assertTrue(job.isCancelled)
+            }
+    }
+
+    @Nested
+    @DisplayName("Focused field")
+    inner class FocusedFieldTests {
+        private val otherFocusedNode = mockk<AccessibilityNodeInfo>()
+
+        /** A clickable wrapper "node_wrapper" holding the editable field "node_inner". */
+        private val windowsWithWrapper =
+            listOf(
+                sampleWindows[0].copy(
+                    tree =
+                        sampleTree.copy(
+                            children =
+                                listOf(
+                                    AccessibilityNodeData(
+                                        id = "node_wrapper",
+                                        className = "android.widget.FrameLayout",
+                                        bounds = BoundsData(0, 100, 1080, 200),
+                                        clickable = true,
+                                        children =
+                                            listOf(
+                                                AccessibilityNodeData(
+                                                    id = "node_inner",
+                                                    className = "android.widget.EditText",
+                                                    bounds = BoundsData(0, 100, 1080, 200),
+                                                    editable = true,
+                                                ),
+                                            ),
+                                    ),
+                                ),
+                        ),
+                ),
+            )
+
+        private fun focusOnAnotherField() {
+            every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns otherFocusedNode
+            every { otherFocusedNode.isEditable } returns true
+            every { otherFocusedNode.recycle() } returns Unit
+            // A focus request is accepted but does not move input focus, unless a test says otherwise.
+            coEvery { mockActionExecutor.focusNode(any(), any()) } returns Result.success(Unit)
+        }
+
+        /** Input focus is on another field until [fieldId] is given input focus, then on [fieldId]. */
+        private fun focusMovesOnRequestTo(
+            fieldId: String,
+            windows: List<WindowData>,
+        ) {
+            focusOnAnotherField()
+            var moved = false
+            coEvery { mockActionExecutor.focusNode(fieldId, windows) } answers {
+                moved = true
+                Result.success(Unit)
+            }
+            // focusInputOn makes [mockFocusedNode] the cached node of [fieldId]; the search returns it once moved.
+            focusInputOn(fieldId)
+            every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } answers {
+                if (moved) mockFocusedNode else otherFocusedNode
+            }
+        }
+
+        private suspend fun awaitFocused(
+            windows: List<WindowData>,
+            nodeId: String,
+        ) = focusedField(mockAccessibilityServiceProvider, mockActionExecutor, mockNodeCache, windows, nodeId)
+
+        @Test
+        fun `focusedField returns the target when it has input focus`() =
+            runTest {
+                val focused = awaitFocused(sampleWindows, "node_edit")
+
+                assertEquals("node_edit", focused)
+                coVerify(exactly = 0) { mockActionExecutor.focusNode(any(), any()) }
+            }
+
+        @Test
+        fun `focusedField returns the editable node inside the target that has input focus`() =
+            runTest {
+                focusInputOn("node_inner")
+
+                val focused = awaitFocused(windowsWithWrapper, "node_wrapper")
+
+                assertEquals("node_inner", focused)
+            }
+
+        @Test
+        fun `focusedField waits until input focus moves to the target`() =
+            runTest {
+                focusOnAnotherField()
+                every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returnsMany
+                    listOf(otherFocusedNode, mockFocusedNode)
+
+                val focused = awaitFocused(sampleWindows, "node_edit")
+
+                assertEquals("node_edit", focused)
+            }
+
+        @Test
+        fun `focusedField gives input focus to the target when the click left it on another field`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time (the first wait)
+                focusMovesOnRequestTo("node_edit", sampleWindows)
+
+                val focused = awaitFocused(sampleWindows, "node_edit")
+
+                assertEquals("node_edit", focused)
+                coVerify(exactly = 1) { mockActionExecutor.focusNode("node_edit", sampleWindows) }
+            }
+
+        @Test
+        fun `focusedField gives input focus to the editable field inside a wrapper target`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time (the first wait)
+                focusMovesOnRequestTo("node_inner", windowsWithWrapper)
+
+                val focused = awaitFocused(windowsWithWrapper, "node_wrapper")
+
+                assertEquals("node_inner", focused)
+                coVerify(exactly = 0) { mockActionExecutor.focusNode("node_wrapper", any()) }
+            }
+
+        @Test
+        fun `focusedField throws when another field keeps input focus after the focus request`() =
+            runTest {
+                // Note: this test consumes ~1s real wall-clock time (two waits)
+                focusOnAnotherField()
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        awaitFocused(sampleWindows, "node_edit")
+                    }
+
+                assertTrue(exception.message!!.contains("Input focus is not on node 'node_edit'"), exception.message)
+                coVerify(exactly = 1) { mockActionExecutor.focusNode("node_edit", sampleWindows) }
+            }
+
+        @Test
+        fun `focusedField throws when the focus request fails`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time
+                focusOnAnotherField()
+                coEvery { mockActionExecutor.focusNode(any(), any()) } returns
+                    Result.failure(IllegalStateException("Node 'node_edit' is not focusable"))
+
+                assertThrows<McpToolException.ActionFailed> {
+                    awaitFocused(sampleWindows, "node_edit")
+                }
+            }
+
+        @Test
+        fun `focusedField throws when no editable field has input focus`() =
+            runTest {
+                // Note: this test consumes ~1s real wall-clock time (two waits)
+                every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns null
+                coEvery { mockActionExecutor.focusNode(any(), any()) } returns Result.success(Unit)
+
+                assertThrows<McpToolException.ActionFailed> {
+                    awaitFocused(sampleWindows, "node_edit")
+                }
+            }
+
+        @Test
+        fun `type_append_text types nothing when input focus is not on the target`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", any()) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                focusOnAnotherField()
+                val tool =
+                    TypeAppendTextTool(
+                        mockTreeParser,
+                        mockActionExecutor,
+                        mockAccessibilityServiceProvider,
+                        mockTypeInputController,
+                        mockNodeCache,
+                        PrivacyToolTestDoubles.passthroughGate(),
+                        PrivacyToolTestDoubles.identitySubstitutor(),
+                        targetResolver,
+                    )
+
+                assertThrows<McpToolException.ActionFailed> {
+                    tool.execute(
+                        buildJsonObject {
+                            put("node_id", "node_edit")
+                            put("text", "Hi")
+                        },
+                    )
+                }
+
+                verify(exactly = 0) { mockTypeInputController.setSelection(any(), any()) }
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
+            }
+
+        @Test
+        fun `readField records the content, the focused field and the password input flag`() {
+            every {
+                mockTypeInputController.getSurroundingText(any(), any(), any())
+            } returns createMockSurroundingText("abc")
+            every { mockTypeInputController.isPasswordInput() } returns true
+
+            val read = readField(mockTypeInputController, "node_inner", sampleWindows)
+
+            assertEquals(FieldRead("abc", "node_inner", isPasswordInput = true, windows = sampleWindows), read)
+        }
+
+        @Test
+        fun `responseFieldContent redacts with the focused field and its password input flag`() =
+            runTest {
+                val gate = mockk<PrivacyToolGate>()
+                coEvery { gate.nodeText(sampleWindows, "hunter2", "node_inner", true) } returns "CREDENTIAL#abc12"
+
+                val shown =
+                    responseFieldContent(
+                        gate,
+                        FieldRead("hunter2", "node_inner", isPasswordInput = true, windows = sampleWindows),
+                    )
+
+                assertEquals("CREDENTIAL#abc12", shown)
+            }
+
+        @Test
+        fun `responseFieldContent returns the fallback unredacted when the field could not be read`() =
+            runTest {
+                val gate = mockk<PrivacyToolGate>()
+
+                val shown =
+                    responseFieldContent(
+                        gate,
+                        FieldRead(null, "node_edit", isPasswordInput = true, windows = sampleWindows),
+                    )
+
+                assertEquals(FIELD_CONTENT_UNREADABLE, shown)
+                coVerify(exactly = 0) { gate.nodeText(any(), any(), any(), any()) }
             }
     }
 
@@ -1779,6 +2027,7 @@ class TextInputToolsTest {
             after: String,
         ) {
             coEvery { mockActionExecutor.clickNode(nodeId, any()) } returns Result.success(Unit)
+            focusInputOn(nodeId)
             every { mockTypeInputController.isReady() } returns true
             every { mockTypeInputController.setSelection(any(), any()) } returns true
             every { mockTypeInputController.sendKeyEvent(any()) } returns true
@@ -1806,6 +2055,7 @@ class TextInputToolsTest {
             runTest {
                 withFields(editable("node_email", "Email"), editable("node_name", "Name"))
                 coEvery { mockActionExecutor.clickNode("node_email", any()) } returns Result.success(Unit)
+                focusInputOn("node_email")
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
                 every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
@@ -1855,6 +2105,7 @@ class TextInputToolsTest {
             runTest {
                 withFields(editable("node_email", "Email"))
                 coEvery { mockActionExecutor.clickNode("node_email", any()) } returns Result.success(Unit)
+                focusInputOn("node_email")
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.performContextMenuAction(any()) } returns true
                 every { mockTypeInputController.sendKeyEvent(any()) } returns true
@@ -1883,6 +2134,7 @@ class TextInputToolsTest {
                 // The typing lock was released: a following clear on a single match runs.
                 withFields(editable("node_a", "Field"))
                 coEvery { mockActionExecutor.clickNode("node_a", any()) } returns Result.success(Unit)
+                focusInputOn("node_a")
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
                     createMockSurroundingText("")

@@ -81,7 +81,8 @@ class TextInputIntegrationTest {
     fun `type_append_text with node_id returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
@@ -144,7 +145,8 @@ class TextInputIntegrationTest {
     fun `type_insert_text with valid offset returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
@@ -195,7 +197,8 @@ class TextInputIntegrationTest {
     fun `type_replace_text with found search text returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
@@ -247,7 +250,8 @@ class TextInputIntegrationTest {
     fun `type_replace_text with missing search text returns error`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
@@ -277,7 +281,8 @@ class TextInputIntegrationTest {
     fun `type_clear_text returns success with field content`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             coEvery {
                 deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>())
             } returns Result.success(Unit)
@@ -311,7 +316,8 @@ class TextInputIntegrationTest {
     fun `type_clear_text with a selector clears the matched field`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
-            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val rootNode = McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            McpIntegrationTestHelper.focusInputOn(deps, rootNode, "node_edit")
             every {
                 deps.elementFinder.findElements(
                     any<List<WindowData>>(),

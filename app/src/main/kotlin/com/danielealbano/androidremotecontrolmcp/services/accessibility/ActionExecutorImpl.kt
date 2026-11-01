@@ -95,6 +95,27 @@ class ActionExecutorImpl
         }
 
         /**
+         * Gives input focus to the node identified by [nodeId] (ACTION_FOCUS). A click does not always move input
+         * focus: in Chrome, clicking a web input through accessibility can leave it on the previously focused input.
+         */
+        override suspend fun focusNode(
+            nodeId: String,
+            windows: List<WindowData>,
+        ): Result<Unit> =
+            performNodeAction(nodeId, windows, "focus") { realNode ->
+                if (!realNode.isFocusable) {
+                    return@performNodeAction Result.failure(
+                        IllegalStateException("Node '$nodeId' is not focusable"),
+                    )
+                }
+                if (realNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(RuntimeException("ACTION_FOCUS failed on node '$nodeId'"))
+                }
+            }
+
+        /**
          * Sets [text] on the editable node identified by [nodeId] in the parsed [tree].
          */
         override suspend fun setTextOnNode(

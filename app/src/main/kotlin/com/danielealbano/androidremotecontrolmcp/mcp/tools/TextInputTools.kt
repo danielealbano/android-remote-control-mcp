@@ -11,6 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeLock
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
@@ -358,27 +359,153 @@ internal suspend fun awaitInputConnectionReady(
 }
 
 /**
+ * Waits until input focus is on the target [nodeId] or on an editable node inside it (a wrapper that hands focus to
+ * an inner field) and returns the id of that focused node. A type tool types into, and reads its "Field content"
+ * from, whichever field has input focus, so when focus stays on any other field it throws before anything is typed.
+ *
+ * A click does not always move input focus (in Chrome, clicking a web input through accessibility can leave it on the
+ * previously focused input), so when focus is not there after FOCUS_POLL_MAX_MS the target's editable field (the
+ * target itself, or the first editable node inside it) is given input focus with [ActionExecutor.focusNode] and the
+ * wait runs once more.
+ *
+ * The focused node is matched against the node cache entries of [nodeId] and of its descendants in [windows] (the
+ * read the target was resolved in, which populated the cache). Polls like [awaitInputConnectionReady].
+ *
+ * @throws McpToolException.ActionFailed if focus is still not on the target or inside it after that.
+ */
+internal suspend fun focusedField(
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+    actionExecutor: ActionExecutor,
+    nodeCache: AccessibilityNodeCache,
+    windows: List<WindowData>,
+    nodeId: String,
+): String {
+    val target = windows.firstNotNullOfOrNull { findInTree(it.tree, nodeId) }
+    val candidates = target?.let(::subtreeIds) ?: listOf(nodeId)
+    var focused = pollFocusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+    if (focused == null) {
+        val field = target?.let(::firstEditable)?.id ?: nodeId
+        if (actionExecutor.focusNode(field, windows).isSuccess) {
+            focused = pollFocusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+        }
+    }
+    return focused ?: throw McpToolException.ActionFailed(
+        "Input focus is not on node '$nodeId' or on a field inside it, so nothing was typed. " +
+            "Target the editable field itself.",
+    )
+}
+
+/** Polls up to FOCUS_POLL_MAX_MS for one of [candidates] to hold input focus; see [focusedCandidate]. */
+private suspend fun pollFocusedCandidate(
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
+    candidates: List<String>,
+): String? {
+    val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
+    var focused = focusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+    while (focused == null && System.currentTimeMillis() < deadline) {
+        delay(FOCUS_POLL_INTERVAL_MS)
+        focused = focusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+    }
+    return focused
+}
+
+/** The id among [candidates] whose cached node is the input-focused editable node, or null. */
+private fun focusedCandidate(
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
+    candidates: List<String>,
+): String? {
+    val focusedNode = findFocusedEditableNode(accessibilityServiceProvider) ?: return null
+    val match = candidates.firstOrNull { nodeCache.get(it)?.node == focusedNode }
+    @Suppress("DEPRECATION")
+    focusedNode.recycle()
+    return match
+}
+
+/** The id of [target] followed by the ids of its descendants. */
+private fun subtreeIds(target: AccessibilityNodeData): List<String> {
+    val ids = ArrayList<String>()
+    collectIds(target, ids)
+    return ids
+}
+
+/** [node] when it is editable, else the first editable node inside it (depth first), else null. */
+private fun firstEditable(node: AccessibilityNodeData): AccessibilityNodeData? =
+    if (node.editable) node else node.children.firstNotNullOfOrNull(::firstEditable)
+
+private fun findInTree(
+    node: AccessibilityNodeData,
+    nodeId: String,
+): AccessibilityNodeData? {
+    if (node.id == nodeId) return node
+    return node.children.firstNotNullOfOrNull { findInTree(it, nodeId) }
+}
+
+private fun collectIds(
+    node: AccessibilityNodeData,
+    out: MutableList<String>,
+) {
+    out += node.id
+    node.children.forEach { collectIds(it, out) }
+}
+
+/**
  * Reads the current field content after an operation completes.
  * Used to include the field content in the tool response so the model
  * can verify the result.
  *
- * Returns the field text as a String, or a fallback message if the
- * content could not be read (e.g., input connection lost after the operation).
- * This is best-effort — a read failure does NOT cause the tool to fail,
+ * Returns the field text, or null if the content could not be read (e.g., input connection lost after the
+ * operation). This is best-effort — a read failure does NOT cause the tool to fail,
  * since the operation itself already succeeded.
  *
  * @param typeInputController The controller to read from.
- * @return The field content as a String.
+ * @return The field content, or null when it could not be read.
  */
-internal fun readFieldContent(typeInputController: TypeInputController): String {
-    val surroundingText =
-        typeInputController.getSurroundingText(
+internal fun readFieldContent(typeInputController: TypeInputController): String? =
+    typeInputController
+        .getSurroundingText(
             MAX_SURROUNDING_TEXT_LENGTH,
             MAX_SURROUNDING_TEXT_LENGTH,
             0,
-        ) ?: return "(unable to read field content)"
-    return surroundingText.text.toString()
+        )?.text
+        ?.toString()
+
+/**
+ * What a type tool read back from the field it typed into, kept for the redaction that runs outside the typing lock:
+ * the [content] (null when it could not be read), the focused field [fieldNodeId] and the [windows] its context comes
+ * from, and whether its editor is a password input.
+ */
+internal data class FieldRead(
+    val content: String?,
+    val fieldNodeId: String,
+    val isPasswordInput: Boolean,
+    val windows: List<WindowData>,
+)
+
+/** Reads back the focused field [fieldNodeId] after an operation; see [FieldRead]. */
+internal fun readField(
+    typeInputController: TypeInputController,
+    fieldNodeId: String,
+    windows: List<WindowData>,
+): FieldRead {
+    val content = readFieldContent(typeInputController)
+    return FieldRead(content, fieldNodeId, typeInputController.isPasswordInput(), windows)
 }
+
+/**
+ * The "Field content" of a type tool response: [read]'s content redacted with the focused field's own context, as a
+ * password when its editor is a password input, or [FIELD_CONTENT_UNREADABLE] when the field could not be read (a
+ * server string, never redacted).
+ */
+internal suspend fun responseFieldContent(
+    privacyToolGate: PrivacyToolGate,
+    read: FieldRead,
+): String =
+    read.content?.let { privacyToolGate.nodeText(read.windows, it, read.fieldNodeId, read.isPasswordInput) }
+        ?: FIELD_CONTENT_UNREADABLE
+
+internal const val FIELD_CONTENT_UNREADABLE = "(unable to read field content)"
 
 class TypeAppendTextTool
     @Inject
@@ -404,7 +531,7 @@ class TypeAppendTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent, windows) =
+            val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -418,6 +545,8 @@ class TypeAppendTextTool
 
                     // Poll-retry for InputConnection readiness (max 500ms, 50ms interval)
                     awaitInputConnectionReady(typeInputController, nodeId)
+                    val fieldNodeId =
+                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
 
                     // Position cursor at end
                     // Note: offset + text.length gives the total text length only if
@@ -444,11 +573,11 @@ class TypeAppendTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
                 }
 
             Log.d(TAG, "type_append_text: typed ${text.length} chars on node '$nodeId'")
-            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
+            val redactedFieldContent = responseFieldContent(privacyToolGate, field)
             return McpToolUtils.untrustedTextResult(
                 "Typed ${text.length} characters at end of node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -543,7 +672,7 @@ class TypeInsertTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent, windows) =
+            val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -557,6 +686,8 @@ class TypeInsertTextTool
 
                     // Poll-retry for InputConnection readiness
                     awaitInputConnectionReady(typeInputController, nodeId)
+                    val fieldNodeId =
+                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
 
                     // Validate offset against current text length
                     val surroundingText =
@@ -588,11 +719,11 @@ class TypeInsertTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
                 }
 
             Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$nodeId'")
-            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
+            val redactedFieldContent = responseFieldContent(privacyToolGate, field)
             return McpToolUtils.untrustedTextResult(
                 "Typed ${text.length} characters at offset $offset in node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -725,7 +856,7 @@ class TypeReplaceTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent, windows) =
+            val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -739,6 +870,8 @@ class TypeReplaceTextTool
 
                     // Poll-retry for InputConnection readiness
                     awaitInputConnectionReady(typeInputController, nodeId)
+                    val fieldNodeId =
+                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
 
                     // Get current text and find the search string
                     val surroundingText =
@@ -793,7 +926,7 @@ class TypeReplaceTextTool
                     }
 
                     // Read field content after operation for verification
-                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
                 }
 
             Log.d(
@@ -801,7 +934,7 @@ class TypeReplaceTextTool
                 "type_replace_text: replaced ${search.length} chars " +
                     "with ${newText.length} chars on '$nodeId'",
             )
-            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
+            val redactedFieldContent = responseFieldContent(privacyToolGate, field)
             return McpToolUtils.untrustedTextResult(
                 "Replaced ${search.length} characters with ${newText.length} characters in node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -912,8 +1045,7 @@ class TypeClearTextTool
 
             data class Cleared(
                 val nodeId: String,
-                val fieldContent: String,
-                val windows: List<WindowData>,
+                val field: FieldRead,
             ) : ClearOutcome
         }
 
@@ -931,8 +1063,7 @@ class TypeClearTextTool
 
                 is ClearOutcome.Cleared -> {
                     Log.d(TAG, "type_clear_text: cleared text on node '${outcome.nodeId}'")
-                    val redactedFieldContent =
-                        privacyToolGate.nodeText(outcome.windows, outcome.fieldContent, outcome.nodeId).orEmpty()
+                    val redactedFieldContent = responseFieldContent(privacyToolGate, outcome.field)
                     McpToolUtils.untrustedTextResult(
                         "Text cleared from node '${outcome.nodeId}'.\nField content: $redactedFieldContent",
                     )
@@ -953,6 +1084,8 @@ class TypeClearTextTool
 
             // Poll-retry for InputConnection readiness
             awaitInputConnectionReady(typeInputController, nodeId)
+            val fieldNodeId =
+                focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
 
             // Check if field has text — skip clear if already empty
             val surroundingText =
@@ -983,7 +1116,7 @@ class TypeClearTextTool
                 )
 
                 // Read field content after operation for verification
-                ClearOutcome.Cleared(nodeId, readFieldContent(typeInputController), result.windows)
+                ClearOutcome.Cleared(nodeId, readField(typeInputController, fieldNodeId, result.windows))
             }
         }
 

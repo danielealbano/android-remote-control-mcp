@@ -107,4 +107,12 @@ interface TypeInputController {
         beforeLength: Int,
         afterLength: Int,
     ): Boolean
+
+    /**
+     * Whether the editor of the current input connection is a password input: its `EditorInfo.inputType` is a text
+     * or number password variation. It describes the field [getSurroundingText] reads, whichever node was targeted.
+     *
+     * @return true for a password input, false otherwise or when no input has started.
+     */
+    fun isPasswordInput(): Boolean
 }

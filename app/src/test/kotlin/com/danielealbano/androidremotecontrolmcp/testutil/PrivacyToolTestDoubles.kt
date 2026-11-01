@@ -24,7 +24,7 @@ object PrivacyToolTestDoubles {
         coEvery { gate.nodeTexts(any(), any()) } answers {
             secondArg<List<Pair<String?, String>>>().map { it.first }
         }
-        coEvery { gate.nodeText(any(), any(), any()) } answers { secondArg<String?>() }
+        coEvery { gate.nodeText(any(), any(), any(), any()) } answers { secondArg<String?>() }
         coEvery { gate.tree(any()) } answers { ProcessedTree(firstArg<MultiWindowResult>(), emptyList()) }
         return gate
     }

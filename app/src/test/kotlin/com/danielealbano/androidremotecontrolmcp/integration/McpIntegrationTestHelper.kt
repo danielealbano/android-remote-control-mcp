@@ -63,6 +63,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
@@ -115,6 +116,26 @@ object McpIntegrationTestHelper {
     const val TEST_BASE_URL = "http://localhost:8080"
 
     /**
+     * Puts input focus on the node [nodeId] as the type tools see it: the FOCUS_INPUT search from [rootNode] (returned
+     * by [setupMultiWindowMock], whose Unit functions such as recycle() are no-ops) finds an editable node, and it is
+     * the node cache entry of [nodeId].
+     *
+     * @return The focused node mock.
+     */
+    fun focusInputOn(
+        deps: MockDependencies,
+        rootNode: AccessibilityNodeInfo,
+        nodeId: String,
+    ): AccessibilityNodeInfo {
+        val focusedNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        every { focusedNode.isEditable } returns true
+        every { rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns focusedNode
+        every { deps.nodeCache.get(nodeId) } returns
+            CachedNode(focusedNode, depth = 1, index = 0, parentId = "node_root")
+        return focusedNode
+    }
+
+    /**
      * Configures multi-window mocking on the given [MockDependencies].
      *
      * Sets up [AccessibilityServiceProvider.getAccessibilityWindows] to return
@@ -136,7 +157,8 @@ object McpIntegrationTestHelper {
         activityName: String = ".MainActivity",
         windowId: Int = 0,
     ): AccessibilityNodeInfo {
-        val mockRootNode = mockk<AccessibilityNodeInfo>()
+        // Unit functions (recycle) are no-ops; every value-returning call is still stubbed explicitly below.
+        val mockRootNode = mockk<AccessibilityNodeInfo>(relaxUnitFun = true)
         val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
 
         every { deps.accessibilityServiceProvider.isReady() } returns true
