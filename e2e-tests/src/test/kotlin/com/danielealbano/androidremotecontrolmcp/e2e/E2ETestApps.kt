@@ -97,6 +97,28 @@ object E2ETestApps {
     }
 
     /**
+     * Launch the text field test activity in a fresh process, so its field starts empty: [field] is "compose" for a
+     * Compose text field or "view" for a classic EditText.
+     */
+    fun launchTextFieldTestApp(field: String) {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "--es",
+                "field",
+                field,
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.TextFieldActivity",
+            )
+        println("[E2E Setup] launchTextFieldTestApp($field) result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
      * Launch the WebView test activity using am start.
      */
     fun launchWebViewTestApp() {
