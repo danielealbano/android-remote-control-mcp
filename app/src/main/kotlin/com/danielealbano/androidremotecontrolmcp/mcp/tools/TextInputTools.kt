@@ -17,6 +17,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
@@ -403,7 +404,7 @@ class TypeAppendTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent) =
+            val (nodeId, fieldContent, windows) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -443,11 +444,11 @@ class TypeAppendTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    nodeId to readFieldContent(typeInputController)
+                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
                 }
 
             Log.d(TAG, "type_append_text: typed ${text.length} chars on node '$nodeId'")
-            val redactedFieldContent = privacyToolGate.text(fieldContent, "field content").orEmpty()
+            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
             return McpToolUtils.untrustedTextResult(
                 "Typed ${text.length} characters at end of node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -542,7 +543,7 @@ class TypeInsertTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent) =
+            val (nodeId, fieldContent, windows) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -587,11 +588,11 @@ class TypeInsertTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    nodeId to readFieldContent(typeInputController)
+                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
                 }
 
             Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$nodeId'")
-            val redactedFieldContent = privacyToolGate.text(fieldContent, "field content").orEmpty()
+            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
             return McpToolUtils.untrustedTextResult(
                 "Typed ${text.length} characters at offset $offset in node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -724,7 +725,7 @@ class TypeReplaceTextTool
 
             val (typingSpeed, typingSpeedVariance) = extractTypingParams(arguments)
 
-            val (nodeId, fieldContent) =
+            val (nodeId, fieldContent, windows) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
                     val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
@@ -792,7 +793,7 @@ class TypeReplaceTextTool
                     }
 
                     // Read field content after operation for verification
-                    nodeId to readFieldContent(typeInputController)
+                    Triple(nodeId, readFieldContent(typeInputController), result.windows)
                 }
 
             Log.d(
@@ -800,7 +801,7 @@ class TypeReplaceTextTool
                 "type_replace_text: replaced ${search.length} chars " +
                     "with ${newText.length} chars on '$nodeId'",
             )
-            val redactedFieldContent = privacyToolGate.text(fieldContent, "field content").orEmpty()
+            val redactedFieldContent = privacyToolGate.nodeText(windows, fieldContent, nodeId).orEmpty()
             return McpToolUtils.untrustedTextResult(
                 "Replaced ${search.length} characters with ${newText.length} characters in node '$nodeId'.\n" +
                     "Field content: $redactedFieldContent",
@@ -912,6 +913,7 @@ class TypeClearTextTool
             data class Cleared(
                 val nodeId: String,
                 val fieldContent: String,
+                val windows: List<WindowData>,
             ) : ClearOutcome
         }
 
@@ -929,7 +931,8 @@ class TypeClearTextTool
 
                 is ClearOutcome.Cleared -> {
                     Log.d(TAG, "type_clear_text: cleared text on node '${outcome.nodeId}'")
-                    val redactedFieldContent = privacyToolGate.text(outcome.fieldContent, "field content").orEmpty()
+                    val redactedFieldContent =
+                        privacyToolGate.nodeText(outcome.windows, outcome.fieldContent, outcome.nodeId).orEmpty()
                     McpToolUtils.untrustedTextResult(
                         "Text cleared from node '${outcome.nodeId}'.\nField content: $redactedFieldContent",
                     )
@@ -980,7 +983,7 @@ class TypeClearTextTool
                 )
 
                 // Read field content after operation for verification
-                ClearOutcome.Cleared(nodeId, readFieldContent(typeInputController))
+                ClearOutcome.Cleared(nodeId, readFieldContent(typeInputController), result.windows)
             }
         }
 

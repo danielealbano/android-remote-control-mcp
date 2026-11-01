@@ -266,12 +266,13 @@ class WaitForNodeTool
                             val elapsed = SystemClock.elapsedRealtime() - startTime
                             Log.d(TAG, "wait_for_node: found after ${elapsed}ms ($attemptCount attempts)")
 
-                            val redactedElement =
-                                element.copy(
-                                    text = privacyToolGate.text(element.text, "node text"),
-                                    contentDescription =
-                                        privacyToolGate.text(element.contentDescription, "node description"),
+                            val (redactedText, redactedDesc) =
+                                privacyToolGate.nodeTexts(
+                                    multiWindowResult.windows,
+                                    listOf(element.text to element.id, element.contentDescription to element.id),
                                 )
+                            val redactedElement =
+                                element.copy(text = redactedText, contentDescription = redactedDesc)
                             val resultJson =
                                 buildJsonObject {
                                     put("found", true)
@@ -744,13 +745,12 @@ class GetNodeDetailsTool
             // 2. Get fresh multi-window snapshot
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
-            // 3. Resolve nodes and batch-redact their text/desc in one model pass.
+            // 3. Resolve nodes and batch-redact their text/desc in one model pass, each with its node's context.
             val nodes = ids.map { id -> id to elementFinder.findNodeById(multiWindowResult.windows, id) }
             val redacted =
-                privacyToolGate.texts(
-                    nodes.flatMap { (_, node) ->
-                        listOf(node?.text to "node text", node?.contentDescription to "node description")
-                    },
+                privacyToolGate.nodeTexts(
+                    multiWindowResult.windows,
+                    nodes.flatMap { (id, node) -> listOf(node?.text to id, node?.contentDescription to id) },
                 )
 
             // 4. Build TSV output

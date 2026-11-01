@@ -117,11 +117,12 @@ class NodeTargetResolver
                 }
 
                 is NodeTarget.BySelector -> {
-                    val matches = matches(target.selector, windows, onScreenOnly)
+                    val selector = target.selector
+                    val matches = matches(selector, windows, onScreenOnly)
                     when (matches.size) {
-                        0 -> throw McpToolException.NodeNotFound(noMatchMessage(target.selector, onScreenOnly))
+                        0 -> throw McpToolException.NodeNotFound(noMatchMessage(selector, onScreenOnly))
                         1 -> NodeResolution.Resolved(matches.single().id)
-                        else -> NodeResolution.Ambiguous(ambiguousResult(target.selector, matches, onScreenOnly))
+                        else -> NodeResolution.Ambiguous(ambiguousResult(selector, matches, windows, onScreenOnly))
                     }
                 }
             }
@@ -137,18 +138,20 @@ class NodeTargetResolver
                 .filter { !onScreenOnly || it.visible }
 
         /**
-         * The error listing the first [MAX_CANDIDATES] of [matches], with Privacy Mode applied to their texts and the
-         * texts shortened like in `get_screen_state`.
+         * The error listing the first [MAX_CANDIDATES] of [matches] (found in [windows]), with Privacy Mode applied to
+         * their texts and the texts shortened like in `get_screen_state`.
          */
         suspend fun ambiguousResult(
             selector: NodeSelector,
             matches: List<ElementInfo>,
+            windows: List<WindowData>,
             onScreenOnly: Boolean,
         ): CallToolResult {
             val shown = matches.take(MAX_CANDIDATES)
             val redacted =
-                privacyToolGate.texts(
-                    shown.flatMap { listOf(it.text to "node text", it.contentDescription to "node description") },
+                privacyToolGate.nodeTexts(
+                    windows,
+                    shown.flatMap { listOf(it.text to it.id, it.contentDescription to it.id) },
                 )
             val candidates =
                 buildJsonObject {

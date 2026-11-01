@@ -225,7 +225,7 @@ object McpIntegrationTestHelper {
             privacyModeManager = manager,
             piiModelInference = piiModelInference,
             pseudonymStore = pseudonymStore,
-            privacyToolGate = PrivacyToolGate(pipeline),
+            privacyToolGate = PrivacyToolGate(pipeline, ContextExtractor()),
             placeholderSubstitutor = PlaceholderSubstitutor(pseudonymStore),
             serverLog = RecordingServerLogRepository(),
         )
