@@ -281,7 +281,7 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 | `android_set_clipboard` | Set clipboard content | `text` (string) | — |
 | `android_wait_for_node` | Wait until node appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
 | `android_wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
-| `android_get_node_details` | Get full untruncated text/desc by node_ids | `node_ids` (array of strings) | — |
+| `android_get_node_details` | Get full untruncated text/desc and the password-field flag by node_ids | `node_ids` (array of strings) | — |
 
 **Timeout behavior**: Both `android_wait_for_node` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 

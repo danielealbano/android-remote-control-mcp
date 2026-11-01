@@ -268,7 +268,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena\nhierarchy:\nnode_a1b2\nnode_c3d4"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled pwd=password\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena\nhierarchy:\nnode_a1b2\nnode_c3d4"
       }
     ]
   }
@@ -304,7 +304,7 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
 2. **Note lines** (global):
    - `note:structural-only nodes are omitted from the tree`
    - `note:certain elements are custom and will not be properly reported...`
-   - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+   - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled pwd=password`
    - `note:offscreen items require scroll_to_node before interaction`; with `include_offscreen=false` it is replaced by `note:offscreen nodes are not listed (include_offscreen=false); call without it, or scroll, to see them`
 3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
 4. **Per-window sections** (repeated for each window):
@@ -335,6 +335,7 @@ Only flags that are `true` are included. The `on`/`off` flag is always first.
 | `scr`  | scrollable    |
 | `edt`  | editable      |
 | `ena`  | enabled       |
+| `pwd`  | password      |
 
 Example: `on,clk,ena` means onscreen + clickable + enabled.
 
@@ -1138,7 +1139,8 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "longClickable": false,
       "scrollable": false,
       "editable": false,
-      "enabled": true
+      "enabled": true,
+      "password": false
     }
   ]
 }
@@ -1860,7 +1862,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether each node is a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1901,19 +1903,20 @@ Retrieves full untruncated text and contentDescription for one or more nodes by 
     "content": [
       {
         "type": "text",
-        "text": "node_id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this node"
+        "text": "node_id\ttext\tdesc\tpassword\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\tfalse\nnode_2\t-\tFull content description for this node\tfalse"
       }
     ]
   }
 }
 ```
 
-**Output Format**: TSV with three columns:
+**Output Format**: TSV with four columns:
 - `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
+- `password`: `true` if the node is a password field, `false` otherwise
 
-If a node ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
+If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc and password columns.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `node_ids` parameter, `node_ids` is not an array, array is empty, or contains non-string values

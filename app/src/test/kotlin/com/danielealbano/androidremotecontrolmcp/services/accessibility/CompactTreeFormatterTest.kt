@@ -34,6 +34,7 @@ class CompactTreeFormatterTest {
         editable: Boolean = false,
         enabled: Boolean = false,
         visible: Boolean = false,
+        isPassword: Boolean = false,
         children: List<AccessibilityNodeData> = emptyList(),
     ) = AccessibilityNodeData(
         id = id,
@@ -49,6 +50,7 @@ class CompactTreeFormatterTest {
         editable = editable,
         enabled = enabled,
         visible = visible,
+        isPassword = isPassword,
         children = children,
     )
 
@@ -594,6 +596,32 @@ class CompactTreeFormatterTest {
                     enabled = true,
                 )
             assertEquals("on,clk,lclk,foc,scr,edt,ena", formatter.buildFlags(node))
+        }
+
+        @Test
+        @DisplayName("includes pwd flag last for password fields")
+        fun includesPwdFlagLastForPasswordFields() {
+            val node =
+                makeNode(
+                    visible = true,
+                    focusable = true,
+                    editable = true,
+                    enabled = true,
+                    isPassword = true,
+                )
+            assertEquals("on,foc,edt,ena,pwd", formatter.buildFlags(node))
+        }
+
+        @Test
+        @DisplayName("omits pwd flag for non-password fields")
+        fun omitsPwdFlagForNonPasswordFields() {
+            val node =
+                makeNode(
+                    visible = true,
+                    editable = true,
+                    enabled = true,
+                )
+            assertEquals("on,edt,ena", formatter.buildFlags(node))
         }
 
         @Test

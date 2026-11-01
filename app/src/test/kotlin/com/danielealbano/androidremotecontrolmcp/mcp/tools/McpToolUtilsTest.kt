@@ -1,9 +1,13 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -692,6 +696,37 @@ class McpToolUtilsTest {
         @DisplayName("handles slug with underscores")
         fun handlesSlugWithUnderscores() {
             assertEquals("android-remote-control-mcp-work_phone", McpToolUtils.buildServerName("work_phone"))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // buildNodeJson
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("buildNodeJson")
+    inner class BuildNodeJsonTests {
+        private fun element(password: Boolean) =
+            ElementInfo(
+                id = "node_pwd",
+                className = "android.widget.EditText",
+                bounds = BoundsData(0, 0, 100, 50),
+                editable = true,
+                password = password,
+            )
+
+        @Test
+        @DisplayName("reports password true for a password field")
+        fun reportsPasswordTrueForPasswordField() {
+            val json = McpToolUtils.buildNodeJson(element(password = true))
+            assertEquals(true, json["password"]?.jsonPrimitive?.boolean)
+        }
+
+        @Test
+        @DisplayName("reports password false for a regular field")
+        fun reportsPasswordFalseForRegularField() {
+            val json = McpToolUtils.buildNodeJson(element(password = false))
+            assertEquals(false, json["password"]?.jsonPrimitive?.boolean)
         }
     }
 }

@@ -138,9 +138,9 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_id\ttext\tdesc", lines[0])
-            assertEquals("node_a\tHello World\tA button", lines[1])
-            assertEquals("node_b\t-\t-", lines[2])
+            assertEquals("node_id\ttext\tdesc\tpassword", lines[0])
+            assertEquals("node_a\tHello World\tA button\tfalse", lines[1])
+            assertEquals("node_b\t-\t-\tfalse", lines[2])
         }
 
     @Test
@@ -164,8 +164,8 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_a\tHello World\tA button", lines[1])
-            assertEquals("node_missing\tnot_found\tnot_found", lines[2])
+            assertEquals("node_a\tHello World\tA button\tfalse", lines[1])
+            assertEquals("node_missing\tnot_found\tnot_found\tnot_found", lines[2])
         }
 
     @Test
@@ -182,7 +182,7 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_b\t-\t-", lines[1])
+            assertEquals("node_b\t-\t-\tfalse", lines[1])
         }
 
     @Test
@@ -207,7 +207,32 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_special\tline1 line2 line3\tdesc with tabs", lines[1])
+            assertEquals("node_special\tline1 line2 line3\tdesc with tabs\tfalse", lines[1])
+        }
+
+    @Test
+    @DisplayName("reports true in the password column for a password field")
+    fun reportsTrueInPasswordColumnForPasswordField() =
+        runTest {
+            val passwordNode =
+                AccessibilityNodeData(
+                    id = "node_pwd",
+                    className = "android.widget.EditText",
+                    bounds = BoundsData(0, 0, 100, 100),
+                    editable = true,
+                    isPassword = true,
+                )
+            every { mockElementFinder.findNodeById(sampleWindows, "node_pwd") } returns passwordNode
+
+            val params =
+                buildJsonObject {
+                    put("node_ids", buildJsonArray { add(JsonPrimitive("node_pwd")) })
+                }
+            val result = tool.execute(params)
+            val text = (result.content[0] as TextContent).text
+
+            val lines = stripUntrustedWarning(text).lines()
+            assertEquals("node_pwd\t-\t-\ttrue", lines[1])
         }
 
     @Test

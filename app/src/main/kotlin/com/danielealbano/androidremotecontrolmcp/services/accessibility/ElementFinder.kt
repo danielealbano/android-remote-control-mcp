@@ -35,6 +35,7 @@ enum class FindBy {
  * @property editable Whether the element is an editable text field.
  * @property enabled Whether the element is enabled.
  * @property visible Whether the element is visible to the user.
+ * @property password Whether the element is a password field.
  */
 @Serializable
 data class ElementInfo(
@@ -50,6 +51,7 @@ data class ElementInfo(
     val editable: Boolean = false,
     val enabled: Boolean = false,
     val visible: Boolean = false,
+    val password: Boolean = false,
 )
 
 /**
@@ -206,5 +208,6 @@ class ElementFinder
                 editable = node.editable,
                 enabled = node.enabled,
                 visible = node.visible,
+                password = node.isPassword,
             )
     }
