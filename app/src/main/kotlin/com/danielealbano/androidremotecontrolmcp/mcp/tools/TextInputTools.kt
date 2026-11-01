@@ -394,7 +394,10 @@ internal suspend fun awaitInputConnectionReady(
  * The focused node is matched against the nodes of [nodeId] and of its descendants in [readNodes], the node references
  * of the read [windows] come from (the one the target was resolved in; a target missing from it matches nothing), not
  * against the node cache: the cache is dropped once the window transition a click can start (the soft keyboard
- * showing) settles, which can happen during the wait. Polls like [awaitInputConnectionReady].
+ * showing) settles, which can happen during the wait. Before each search the editable ones among them are read again
+ * ([AccessibilityNodeInfo.refresh]): Compose answers an input-focus search with the last node it built while that node
+ * held focus, so a field the click focused after Compose last built its node is found only once that node is built
+ * again. Polls like [awaitInputConnectionReady].
  *
  * @throws McpToolException.ActionFailed if focus is still not on the target or inside it after that.
  */
@@ -420,10 +423,15 @@ internal suspend fun focusedField(
     )
 }
 
-/** A node that can hold the input focus [focusedField] waits for: its [id] and its [node] from the read. */
+/**
+ * A node that can hold the input focus [focusedField] waits for: its [id] and its [node] from the read. When [field] is
+ * true (the node was editable in the read; [findFocusedEditableNode] returns only editable nodes), [node] is read again
+ * ([AccessibilityNodeInfo.refresh]) before each search.
+ */
 private class FocusCandidate(
     val id: String,
     val node: AccessibilityNodeInfo,
+    val field: Boolean,
 )
 
 /** The candidates for input focus, in tree order: [target] and its descendants, with their nodes from [readNodes]. */
@@ -432,7 +440,7 @@ private fun focusCandidates(
     readNodes: Map<String, CachedNode>,
 ): List<FocusCandidate> =
     subtreeNodes(target).mapNotNull { data ->
-        readNodes[data.id]?.let { FocusCandidate(data.id, it.node) }
+        readNodes[data.id]?.let { FocusCandidate(data.id, it.node, field = data.editable) }
     }
 
 /** Polls up to FOCUS_POLL_MAX_MS for one of [candidates] to hold input focus; see [focusedCandidate]. */
@@ -454,6 +462,9 @@ private fun focusedCandidate(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     candidates: List<FocusCandidate>,
 ): String? {
+    // Build the fields' nodes again first: Compose answers an input-focus search only with a node it built while that
+    // node held focus
+    candidates.filter { it.field }.forEach { it.node.refresh() }
     val focusedNode = findFocusedEditableNode(accessibilityServiceProvider) ?: return null
     val match = candidates.firstOrNull { it.node == focusedNode }?.id
     @Suppress("DEPRECATION")

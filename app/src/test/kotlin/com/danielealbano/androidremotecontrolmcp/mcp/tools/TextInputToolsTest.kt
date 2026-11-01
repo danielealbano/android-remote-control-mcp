@@ -176,6 +176,7 @@ class TextInputToolsTest {
         every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns mockFocusedNode
         every { mockRootNode.recycle() } returns Unit
         every { mockFocusedNode.isEditable } returns true
+        every { mockFocusedNode.refresh() } returns true
         every { mockFocusedNode.recycle() } returns Unit
         readNodes[nodeId] = CachedNode(mockFocusedNode, 1, 0, "node_root")
     }
@@ -980,6 +981,28 @@ class TextInputToolsTest {
             }
 
         @Test
+        fun `focusedField finds a Compose field that reports input focus only once it is built again`() =
+            runTest {
+                // Like Compose: until the focused field's node is built again, the search returns the host view's node
+                val hostNode = mockk<AccessibilityNodeInfo>()
+                every { hostNode.isEditable } returns false
+                every { hostNode.recycle() } returns Unit
+                var builtAgain = false
+                every { mockFocusedNode.refresh() } answers {
+                    builtAgain = true
+                    true
+                }
+                every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } answers {
+                    if (builtAgain) mockFocusedNode else hostNode
+                }
+
+                val focused = awaitFocused(sampleWindows, "node_edit")
+
+                assertEquals("node_edit", focused)
+                coVerify(exactly = 0) { mockActionExecutor.focusNode(any(), any()) }
+            }
+
+        @Test
         fun `focusedField throws when the target is not in the read`() =
             runTest {
                 // Note: this test consumes ~1s real wall-clock time (two waits)
@@ -991,6 +1014,21 @@ class TextInputToolsTest {
                     }
 
                 assertTrue(exception.message!!.contains("Input focus is not on node 'node_missing'"), exception.message)
+                verify(exactly = 0) { mockFocusedNode.refresh() }
+            }
+
+        @Test
+        fun `focusedField builds again only the editable nodes of the target`() =
+            runTest {
+                val wrapperNode = mockk<AccessibilityNodeInfo>()
+                readNodes["node_wrapper"] = CachedNode(wrapperNode, 1, 0, "node_root")
+                focusInputOn("node_inner")
+
+                val focused = awaitFocused(windowsWithWrapper, "node_wrapper")
+
+                assertEquals("node_inner", focused)
+                verify(exactly = 1) { mockFocusedNode.refresh() }
+                verify(exactly = 0) { wrapperNode.refresh() }
             }
 
         @Test
