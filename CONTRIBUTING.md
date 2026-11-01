@@ -108,7 +108,7 @@ make test-integration
 
 Runs JVM-based integration tests using Ktor `testApplication` (no device or emulator required). Tests the full HTTP stack: authentication, JSON-RPC protocol, tool dispatch for all 12 tool categories, and error handling.
 
-> **Note**: Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables. Copy `.env.example` to `.env` and fill in the required values. The Makefile sources `.env` automatically.
+> **Note**: `NgrokTunnelIntegrationTest` needs `NGROK_AUTHTOKEN` and is skipped when it is not set or empty. To run it, copy `.env.example` to `.env` and set the token. The Makefile sources `.env` automatically.
 
 ### E2E Tests
 

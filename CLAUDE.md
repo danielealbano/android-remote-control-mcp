@@ -546,8 +546,8 @@ fun `tap with valid coordinates calls actionExecutor and returns success`() = ru
 - E2E tests are slow (container startup, emulator boot); run selectively.
 
 ### Environment variables for tests
-- Some integration tests (e.g., `NgrokTunnelIntegrationTest`) require environment variables.
-- Environment variables are stored in `.env` (gitignored). See `.env.example` for required variables.
+- Some tests (e.g., `NgrokTunnelIntegrationTest`) need environment variables to run and are skipped when they are not set or empty.
+- Environment variables are stored in `.env` (gitignored). See `.env.example` for the variables.
 - **When running tests via Makefile** (`make test-unit`, `make test-integration`, `make test`): `.env` is sourced automatically if it exists.
 - **When running tests manually** via `./gradlew`: source `.env` first: `set -a && source .env && set +a && ./gradlew :app:test`
 - To run a single integration test: `set -a && source .env && set +a && ./gradlew :app:testDebugUnitTest --tests "com.danielealbano.androidremotecontrolmcp.integration.NgrokTunnelIntegrationTest"`
