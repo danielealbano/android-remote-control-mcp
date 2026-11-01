@@ -4,7 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.e2e.AndroidContainerSetup.execA
 
 /**
  * Drives the helper apps installed in the redroid container for E2E tests: the calculator and the compose test
- * app (Compose screen, long list and WebView activities), plus `uiautomator` node counts and logcat dumps.
+ * app (Compose screen, long list, text field and WebView activities), plus `uiautomator` node counts and logcat dumps.
  */
 object E2ETestApps {
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"

@@ -1379,7 +1379,7 @@ curl -X POST http://localhost:8080/mcp \
 
 Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools take their target as `node_id` or as a selector (`by` + `value`, optional `exact_match`; see [Targeting a node](#targeting-a-node)), click the node to focus it, and return the field content after the operation for verification.
 
-A type tool types into, and reads back, the field that has input focus. After the click it waits (up to 500 ms) until input focus is on the target node or on an editable field inside it (a wrapper that hands focus to an inner field); when another field keeps the focus, it fails without typing anything. The returned field content is that focused field's content, read through the input connection, so a password field returns its real characters: with Privacy Mode on it is redacted with the focused field's own context, and as a password whenever its editor's input type is a password. When the content cannot be read it is `(unable to read field content)`.
+A type tool types into, and reads back, the field that has input focus. After the click it waits (up to 500 ms) until input focus is on the target node or on an editable field inside it (a wrapper that hands focus to an inner field); when it is not there, it gives that field input focus and waits again, and when another field still has the focus, it fails without typing anything. It then waits until the field's input connection answers. The tools read the whole field, in 10,000-character pieces when it is longer, so positions are right on fields of any length, including Compose text fields, which do not report where their text starts. The returned field content is that focused field's content, read through the input connection, so a password field returns its real characters: with Privacy Mode on it is redacted with the focused field's own context, and as a password whenever its editor's input type is a password. When the content cannot be read it is `(unable to read field content)`.
 
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
@@ -1437,7 +1437,7 @@ Type text character by character at the end of a text field. Uses natural InputC
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
-- **Action failed**: Click failed, input connection not ready (node may not be editable), input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready (node may not be editable), input focus not on the target node or a field inside it, unable to read text from the node, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1497,13 +1497,13 @@ Type text character by character at a specific position in a text field. Uses na
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
 ### `android_type_replace_text`
 
-Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it (committing empty text over the selection, then checking the field got that much shorter), then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
+Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it (committing empty text over the selection, then checking that the field changed), then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1557,13 +1557,13 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, text selection failed, deletion failed (input connection lost, or the found text still in the field afterwards), typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, text selection failed, deletion failed (input connection lost, or the field reads back unchanged), cursor positioning failed, typing failed (input connection lost)
 
 ---
 
 ### `android_type_clear_text`
 
-Clear all text from a field with select-all and delete through the InputConnection, like an input method, then check that the field reads back empty. If the field is already empty, returns success without performing any action.
+Clear all text from a field with select-all and delete through the InputConnection, like an input method, then check that the text is gone (a field that reformats its text can read back non-empty; the field content shows it). If the field is already empty, returns success without performing any action.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1611,7 +1611,7 @@ Clear all text from a field with select-all and delete through the InputConnecti
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, select-all failed, deletion failed (input connection lost, or the field not empty afterwards)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, select-all failed, deletion failed (input connection lost, or the field reads back unchanged)
 
 ---
 

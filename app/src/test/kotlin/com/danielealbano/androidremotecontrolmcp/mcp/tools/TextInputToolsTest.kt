@@ -337,6 +337,8 @@ class TextInputToolsTest {
         fun `awaitInputConnectionReady succeeds when ready immediately`() =
             runTest {
                 every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
+                    createMockSurroundingText("")
 
                 // Should not throw
                 awaitInputConnectionReady(mockTypeInputController, "test_element")
@@ -346,9 +348,24 @@ class TextInputToolsTest {
         fun `awaitInputConnectionReady succeeds after retry`() =
             runTest {
                 every { mockTypeInputController.isReady() } returnsMany listOf(false, false, true)
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
+                    createMockSurroundingText("")
 
                 // Should not throw
                 awaitInputConnectionReady(mockTypeInputController, "test_element")
+            }
+
+        @Test
+        fun `awaitInputConnectionReady waits until the input connection answers a read`() =
+            runTest {
+                // Ready, but still the connection of the field that had focus before: it answers nothing at first
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returnsMany
+                    listOf(null, null, createMockSurroundingText(""))
+
+                awaitInputConnectionReady(mockTypeInputController, "test_element")
+
+                verify(exactly = 3) { mockTypeInputController.getSurroundingText(any(), any(), any()) }
             }
 
         @Test
@@ -365,29 +382,62 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `fieldStart is the offset the field reports`() {
-            assertEquals(50, fieldStart(createMockSurroundingText("partial text", offset = 50)))
+        fun `awaitInputConnectionReady fails when the input connection never answers`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+
+                assertThrows<McpToolException.ActionFailed> {
+                    awaitInputConnectionReady(mockTypeInputController, "test_element")
+                }
+            }
+
+        @Test
+        fun `readWholeField takes a short field from one read, without moving the cursor`() {
+            FakeTextField(mockTypeInputController, "Hello")
+
+            assertEquals("Hello", readWholeField(mockTypeInputController))
+            verify(exactly = 0) { mockTypeInputController.setSelection(any(), any()) }
         }
 
         @Test
-        fun `fieldStart is the field start when no offset is reported and the window reaches it`() {
-            val surrounding = createMockSurroundingText("abc", offset = -1)
+        fun `readWholeField takes a short field that reports no offset from one read`() {
+            FakeTextField(mockTypeInputController, "abc", reportsOffset = false)
 
-            assertEquals(0, fieldStart(surrounding))
-            assertEquals(3, fieldLength(surrounding))
+            assertEquals("abc", readWholeField(mockTypeInputController))
         }
 
         @Test
-        fun `fieldStart throws when no offset is reported and the cursor is too far in`() {
-            val farIn = "a".repeat(10_000)
-            val surrounding = createMockSurroundingText(farIn, offset = -1)
+        fun `readWholeField reads a long field window by window and puts the cursor back`() {
+            val long = "a".repeat(12_000) + "b".repeat(13_000)
+            FakeTextField(mockTypeInputController, long, cursor = 0)
 
-            assertThrows<McpToolException.ActionFailed> { fieldStart(surrounding) }
+            assertEquals(long, readWholeField(mockTypeInputController, restoreCursor = 7))
+            verify { mockTypeInputController.setSelection(7, 7) }
         }
 
         @Test
-        fun `fieldLength is 0 when the field cannot be read`() {
-            assertEquals(0, fieldLength(null))
+        fun `readWholeField reads a long field that reports no offset`() {
+            val long = "a".repeat(12_000) + "b".repeat(13_000)
+            FakeTextField(mockTypeInputController, long, reportsOffset = false)
+
+            assertEquals(long, readWholeField(mockTypeInputController))
+        }
+
+        @Test
+        fun `readWholeField returns null when the input connection answers nothing`() {
+            every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+
+            assertNull(readWholeField(mockTypeInputController))
+        }
+
+        @Test
+        fun `readWholeField returns null when the cursor does not move where it is put`() {
+            FakeTextField(mockTypeInputController, "a".repeat(25_000), cursor = 20_000)
+            every { mockTypeInputController.setSelection(any(), any()) } returns true
+
+            assertNull(readWholeField(mockTypeInputController))
         }
 
         @Test
@@ -397,7 +447,7 @@ class TextInputToolsTest {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
             } returns mockSurroundingText
 
-            val result = readFieldContent(mockTypeInputController)
+            val result = readFieldContent(mockTypeInputController, 5)
             assertEquals("Hello", result)
         }
 
@@ -407,7 +457,7 @@ class TextInputToolsTest {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
             } returns null
 
-            val result = readFieldContent(mockTypeInputController)
+            val result = readFieldContent(mockTypeInputController, 0)
             assertNull(result)
         }
 
@@ -418,9 +468,28 @@ class TextInputToolsTest {
                 mockTypeInputController.getSurroundingText(any(), any(), any())
             } returns mockSurroundingText
 
-            val result = readFieldContent(mockTypeInputController)
+            val result = readFieldContent(mockTypeInputController, 62)
             assertEquals("partial text", result)
         }
+
+        @Test
+        fun `typeCharByChar fails instead of retrying when the growth of the field cannot be measured`() =
+            runTest {
+                // A field that reports no offset, with the cursor 10000 characters in: its length cannot be read
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns
+                    createMockSurroundingText("a".repeat(10_000), offset = -1)
+                every { mockTypeInputController.getSurroundingText(1, 0, 0) } returns createMockSurroundingText("x")
+                every { mockTypeInputController.commitText(any(), any()) } returns true
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        typeCharByChar("b", 10, 0, mockTypeInputController)
+                    }
+
+                val message = exception.message.orEmpty()
+                assertTrue(message.contains("Could not check whether a character landed"), message)
+                verify(exactly = 1) { mockTypeInputController.commitText(any(), any()) }
+            }
 
         @Test
         fun `typeCharByChar retries on verification miss and succeeds`() =
@@ -922,7 +991,7 @@ class TextInputToolsTest {
             } returns createMockSurroundingText("abc")
             every { mockTypeInputController.isPasswordInput() } returns true
 
-            val read = readField(mockTypeInputController, "node_inner", sampleWindows)
+            val read = readField(mockTypeInputController, "node_inner", sampleWindows, 3)
 
             assertEquals(FieldRead("abc", "node_inner", isPasswordInput = true, windows = sampleWindows), read)
         }
@@ -1182,27 +1251,24 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `defaults textLength to 0 when getSurroundingText returns null`() =
+        fun `throws error when the field text cannot be read`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
-                val afterText = createMockSurroundingText("Hello")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, null, afterText)
-                setupVerificationMock()
-
+                // The connection answers the readiness check, then nothing: no position is guessed
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+                every { mockTypeInputController.getSurroundingText(1, 1, 0) } returns createMockSurroundingText("")
                 val params =
                     buildJsonObject {
                         put("node_id", "node_edit")
-                        put("text", "Hello")
+                        put("text", "Hi")
                     }
 
-                tool.execute(params)
+                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
 
-                // textLength defaults to 0, so setSelection(0, 0)
-                verify { mockTypeInputController.setSelection(0, 0) }
+                assertTrue(exception.message!!.contains("Unable to read text"), exception.message)
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
             }
 
         @Test
@@ -1210,7 +1276,7 @@ class TextInputToolsTest {
             runTest {
                 // A Compose text field reports -1: the end is the full text length, not one less
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val field = FakeTextField(mockTypeInputController, "abc", reportsOffset = false)
                 val params =
                     buildJsonObject {
                         put("node_id", "node_edit")
@@ -1221,6 +1287,24 @@ class TextInputToolsTest {
 
                 verify { mockTypeInputController.setSelection(3, 3) }
                 assertEquals("abcde", field.content)
+            }
+
+        @Test
+        fun `appends at the end of a long field with the cursor at its start`() =
+            runTest {
+                // More than 10000 characters after the cursor: one read around it does not reach the end
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val long = "a".repeat(15_000)
+                val field = FakeTextField(mockTypeInputController, long, cursor = 0)
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "de")
+                    }
+
+                tool.execute(params)
+
+                assertEquals(long + "de", field.content)
             }
     }
 
@@ -1385,43 +1469,25 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `defaults textLength to 0 when getSurroundingText returns null`() =
+        fun `throws error when the field text cannot be read`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every { mockTypeInputController.setSelection(any(), any()) } returns true
-                val afterText = createMockSurroundingText("Hello")
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, null, afterText)
-                setupVerificationMock()
-
-                // offset 0 should succeed when textLength defaults to 0
+                // The connection answers the readiness check, then nothing: no position is guessed
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+                every { mockTypeInputController.getSurroundingText(1, 1, 0) } returns createMockSurroundingText("")
                 val params =
                     buildJsonObject {
                         put("node_id", "node_edit")
-                        put("text", "Hello")
+                        put("text", "Hi")
                         put("offset", 0)
                     }
 
-                tool.execute(params)
-                verify { mockTypeInputController.setSelection(0, 0) }
+                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
 
-                // offset > 0 should fail when textLength defaults to 0
-                every {
-                    mockTypeInputController.getSurroundingText(any(), any(), any())
-                } returnsMany listOf(null, null, afterText)
-                setupVerificationMock()
-
-                val params2 =
-                    buildJsonObject {
-                        put("node_id", "node_edit")
-                        put("text", "Hello")
-                        put("offset", 1)
-                    }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params2) }
-                assertTrue(exception.message!!.contains("offset"))
+                assertTrue(exception.message!!.contains("Unable to read text"), exception.message)
+                verify(exactly = 0) { mockTypeInputController.commitText(any(), any()) }
             }
 
         @Test
@@ -1444,7 +1510,7 @@ class TextInputToolsTest {
         fun `inserts at the offset of a field that reports no offset`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val field = FakeTextField(mockTypeInputController, "abc", reportsOffset = false)
                 val params =
                     buildJsonObject {
                         put("node_id", "node_edit")
@@ -1461,7 +1527,7 @@ class TextInputToolsTest {
         fun `accepts an offset at the end of a field that reports no offset`() =
             runTest {
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-                val field = FakeTextField(mockTypeInputController, "abc", reportedOffset = -1)
+                val field = FakeTextField(mockTypeInputController, "abc", reportsOffset = false)
                 val params =
                     buildJsonObject {
                         put("node_id", "node_edit")
@@ -1472,6 +1538,23 @@ class TextInputToolsTest {
                 tool.execute(params)
 
                 assertEquals("abcd", field.content)
+            }
+
+        @Test
+        fun `inserts past the first window of a long field`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val field = FakeTextField(mockTypeInputController, "a".repeat(15_000), cursor = 0)
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "X")
+                        put("offset", 12_000)
+                    }
+
+                tool.execute(params)
+
+                assertEquals("a".repeat(12_000) + "X" + "a".repeat(3_000), field.content)
             }
     }
 
@@ -1493,11 +1576,16 @@ class TextInputToolsTest {
         /** The target field holds [existingText] (see [FakeTextField]) and the click on it succeeds. */
         private fun fieldWith(
             existingText: String = "Hello World",
-            reportedOffset: Int = 0,
+            reportsOffset: Boolean = true,
             loseDeletions: Boolean = false,
         ): FakeTextField {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-            return FakeTextField(mockTypeInputController, existingText, reportedOffset, loseDeletions)
+            return FakeTextField(
+                mockTypeInputController,
+                existingText,
+                reportsOffset = reportsOffset,
+                loseDeletions = loseDeletions,
+            )
         }
 
         private fun replaceParams(
@@ -1559,8 +1647,9 @@ class TextInputToolsTest {
             }
 
         @Test
-        fun `throws error when getSurroundingText returns null`() =
+        fun `throws error when the input connection never answers a read`() =
             runTest {
+                // Note: this test consumes ~500ms real wall-clock time
                 coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
                 every { mockTypeInputController.isReady() } returns true
                 every {
@@ -1569,7 +1658,20 @@ class TextInputToolsTest {
 
                 val exception =
                     assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
-                assertTrue(exception.message!!.contains("Unable to read text"))
+                assertTrue(exception.message!!.contains("Input connection not available"), exception.message)
+            }
+
+        @Test
+        fun `throws error when the field text cannot be read`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+                every { mockTypeInputController.getSurroundingText(1, 1, 0) } returns createMockSurroundingText("")
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
+                assertTrue(exception.message!!.contains("Unable to read text"), exception.message)
             }
 
         @Test
@@ -1657,7 +1759,7 @@ class TextInputToolsTest {
         fun `replaces the right text in a field that reports no offset`() =
             runTest {
                 // A Compose text field reports -1: the window still starts at the field start
-                val field = fieldWith(reportedOffset = -1)
+                val field = fieldWith(reportsOffset = false)
 
                 tool.execute(replaceParams("World", "Earth"))
 
@@ -1688,6 +1790,62 @@ class TextInputToolsTest {
                     assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "X")) }
 
                 assertTrue(exception.message!!.contains("Failed to delete the selected text"), exception.message)
+            }
+
+        @Test
+        fun `replaces text past the first window of a long field that reports no offset`() =
+            runTest {
+                val long = "a".repeat(12_000) + "needle" + "a".repeat(3_000)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                val field = FakeTextField(mockTypeInputController, long, cursor = 0, reportsOffset = false)
+
+                tool.execute(replaceParams("needle", "X"))
+
+                assertEquals("a".repeat(12_000) + "X" + "a".repeat(3_000), field.content)
+            }
+
+        @Test
+        fun `replaces in a field that reformats its text after the deletion`() =
+            runTest {
+                val field = fieldWith("ab cd")
+                field.reformat = { it.replace(" ", "") }
+
+                tool.execute(replaceParams("cd", "X"))
+
+                assertEquals("abX", field.content)
+            }
+
+        @Test
+        fun `waits for a deletion that the field shows late`() =
+            runTest {
+                val field = fieldWith()
+                field.staleReads = 3
+
+                tool.execute(replaceParams("Hello", "Hi"))
+
+                assertEquals("Hi World", field.content)
+            }
+
+        @Test
+        fun `throws when the field cannot be read back after the deletion`() =
+            runTest {
+                // Note: this test consumes ~500ms real wall-clock time (the wait for the field to change)
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                var deleted = false
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.setSelection(any(), any()) } returns true
+                every { mockTypeInputController.commitText(any(), any()) } answers {
+                    deleted = true
+                    true
+                }
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } answers {
+                    if (deleted) null else createMockSurroundingText("Hello World")
+                }
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> { tool.execute(replaceParams("Hello", "Hi")) }
+
+                assertTrue(exception.message!!.contains("Could not read node 'node_edit' back"), exception.message)
             }
 
         @Test
@@ -1733,11 +1891,16 @@ class TextInputToolsTest {
         /** The target field holds [existingText] (see [FakeTextField]) and the click on it succeeds. */
         private fun fieldWith(
             existingText: String,
-            reportedOffset: Int = 0,
+            reportsOffset: Boolean = true,
             loseDeletions: Boolean = false,
         ): FakeTextField {
             coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
-            return FakeTextField(mockTypeInputController, existingText, reportedOffset, loseDeletions)
+            return FakeTextField(
+                mockTypeInputController,
+                existingText,
+                reportsOffset = reportsOffset,
+                loseDeletions = loseDeletions,
+            )
         }
 
         @Test
@@ -1762,7 +1925,7 @@ class TextInputToolsTest {
         @Test
         fun `clears a field that reports no offset`() =
             runTest {
-                val field = fieldWith("abc", reportedOffset = -1)
+                val field = fieldWith("abc", reportsOffset = false)
 
                 tool.execute(params)
 
@@ -1791,7 +1954,7 @@ class TextInputToolsTest {
         @Test
         fun `returns success for an already empty field that reports no offset`() =
             runTest {
-                fieldWith("", reportedOffset = -1)
+                fieldWith("", reportsOffset = false)
 
                 val text = extractTextContent(tool.execute(params))
 
@@ -1864,6 +2027,41 @@ class TextInputToolsTest {
             }
 
         @Test
+        fun `clears a long field that reports no offset`() =
+            runTest {
+                val field = fieldWith("a".repeat(15_000), reportsOffset = false)
+
+                tool.execute(params)
+
+                assertEquals("", field.content)
+            }
+
+        @Test
+        fun `reports what a field that refills itself reads back after the clear`() =
+            runTest {
+                val field = fieldWith("Hello")
+                field.reformat = { it.ifEmpty { "0" } }
+
+                val text = extractTextContent(tool.execute(params))
+
+                assertTrue(text.endsWith("Field content: 0"), text)
+            }
+
+        @Test
+        fun `throws error when the field text cannot be read`() =
+            runTest {
+                coEvery { mockActionExecutor.clickNode("node_edit", sampleWindows) } returns Result.success(Unit)
+                every { mockTypeInputController.isReady() } returns true
+                every { mockTypeInputController.getSurroundingText(any(), any(), any()) } returns null
+                every { mockTypeInputController.getSurroundingText(1, 1, 0) } returns createMockSurroundingText("")
+
+                val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
+
+                assertTrue(exception.message!!.contains("Unable to read text"), exception.message)
+                verify(exactly = 0) { mockTypeInputController.performContextMenuAction(any()) }
+            }
+
+        @Test
         fun `throws instead of reporting success when the field is not cleared`() =
             runTest {
                 // Note: this test consumes ~500ms real wall-clock time (the wait for the field to change)
@@ -1872,7 +2070,7 @@ class TextInputToolsTest {
                 val exception = assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
 
                 assertTrue(exception.message!!.contains("was not deleted"), exception.message)
-                assertTrue(exception.message!!.contains("5 characters instead of 0"), exception.message)
+                assertTrue(exception.message!!.contains("reads back unchanged"), exception.message)
                 assertEquals("Hello", field.content)
             }
     }

@@ -360,6 +360,20 @@ class PrivacyModeNodeContextIntegrationTest {
         }
 
     @Test
+    fun `type_clear_text redacts what a password field reads back after the clear`() =
+        runTest {
+            val deps = privacyDeps(treeOf(passwordField(text = null)), focusedNodeId = "node_pwd")
+            // The field fills itself again right after the clear, with the real characters of a password
+            val field = deps.inputFieldWith("hunter2secret")
+            field.reformat = { it.ifEmpty { "hunter2refill" } }
+
+            val text = typeToolResult(deps, "android_type_clear_text", mapOf("node_id" to "node_pwd"))
+
+            assertEquals("hunter2refill", field.content)
+            assertCredentialRedacted(text, secret = "hunter2refill")
+        }
+
+    @Test
     fun `type tools redact as a password when the focused editor is a password input`() =
         runTest {
             // The node does not report isPassword (and has no credential context): only the editor's input type does.

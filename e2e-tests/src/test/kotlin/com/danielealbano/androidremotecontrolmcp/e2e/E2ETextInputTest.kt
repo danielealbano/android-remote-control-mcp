@@ -101,9 +101,14 @@ class E2ETextInputTest {
                 "${TOOL_PREFIX}find_nodes",
                 mapOf("by" to "class_name", "value" to EDIT_TEXT_CLASS, "exact_match" to true),
             )
-        val nodes = Json.parseToJsonElement(stripUntrustedWarning(textOf(result))).jsonObject["nodes"]?.jsonArray
-        val node = nodes?.singleOrNull()?.jsonObject ?: return null
-        return node.textOrEmpty()
+        // A transient tool error is read as "not there yet", so the caller keeps polling
+        val nodes =
+            if (result.isError == true) {
+                null
+            } else {
+                Json.parseToJsonElement(stripUntrustedWarning(textOf(result))).jsonObject["nodes"]?.jsonArray
+            }
+        return nodes?.singleOrNull()?.jsonObject?.textOrEmpty()
     }
 
     private fun JsonObject.textOrEmpty(): String = get("text")?.jsonPrimitive?.contentOrNull.orEmpty()

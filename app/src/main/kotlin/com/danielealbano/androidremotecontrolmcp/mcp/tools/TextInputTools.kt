@@ -44,6 +44,9 @@ private const val MAX_TYPING_SPEED_MS = 5000
 private const val MAX_SURROUNDING_TEXT_LENGTH = 10000
 private const val FOCUS_POLL_INTERVAL_MS = 50L
 private const val FOCUS_POLL_MAX_MS = 500L
+private const val FIELD_UPDATE_POLL_MS = 50L
+private const val FIELD_UPDATE_MAX_MS = 500L
+private const val MAX_FIELD_READ_WINDOWS = 100
 private const val COMMIT_VERIFY_RETRY_DELAY_MS = 50L
 private const val COMMIT_MAX_RETRIES = 3
 private const val ADAPTIVE_DELAY_INCREASE_MS = 50
@@ -133,9 +136,7 @@ internal suspend fun typeCharByChar(
 
     // Read initial field length once for pre-retry length validation
     val initialFieldLength =
-        fieldLength(
-            typeInputController.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0),
-        )
+        typedLength(typeInputController.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0))
     val ctx =
         TypingVerifyContext(
             typeInputController,
@@ -175,7 +176,7 @@ private class TypingVerifyContext(
     val controller: TypeInputController,
     val codePointCount: Int,
     val minDelay: Int,
-    val initialFieldLength: Int,
+    val initialFieldLength: Int?,
     var committedCodeUnits: Int = 0,
 )
 
@@ -248,14 +249,41 @@ private fun verifyCommittedChar(
     return surrounding.text.toString().endsWith(codePointStr)
 }
 
+/**
+ * Whether the field grew by the character that failed the endsWith check, so it did land (an app moved the cursor).
+ *
+ * @throws McpToolException.ActionFailed when the growth cannot be measured (see [typedLength]): retrying could type
+ *   the character twice.
+ */
 private fun preRetryLengthCheckPassed(
     ctx: TypingVerifyContext,
     charCount: Int,
 ): Boolean {
     val currentLength =
-        fieldLength(ctx.controller.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0))
-    return currentLength >= ctx.initialFieldLength + ctx.committedCodeUnits + charCount
+        typedLength(ctx.controller.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0))
+    val initialLength = ctx.initialFieldLength
+    if (currentLength == null || initialLength == null) {
+        throw McpToolException.ActionFailed(
+            "Could not check whether a character landed: the field does not report where its text starts and its " +
+                "cursor is too far in to measure it.",
+        )
+    }
+    return currentLength >= initialLength + ctx.committedCodeUnits + charCount
 }
+
+/**
+ * A length that grows by one for each character committed at the cursor, from a read around it: the window end when
+ * the field reports where the window starts (an EditText), the window length when the window reaches the field start
+ * (fewer than MAX_SURROUNDING_TEXT_LENGTH characters before the cursor), or null when neither holds (a field that
+ * reports no offset, like a Compose text field, with the cursor further in) or the read failed.
+ */
+private fun typedLength(window: SurroundingText?): Int? =
+    when {
+        window == null -> null
+        window.offset >= 0 -> window.offset + window.text.length
+        window.selectionStart < MAX_SURROUNDING_TEXT_LENGTH -> window.text.length
+        else -> null
+    }
 
 private fun computeInterCharDelay(
     effectiveDelay: Int,
@@ -319,7 +347,9 @@ internal fun validateTextLength(
 }
 
 /**
- * Polls for TypeInputController readiness after clicking a node to focus it.
+ * Polls until the input connection of the focused field answers, after the click and the focus check. Being ready
+ * ([TypeInputController.isReady]) is not enough: right after input focus moves, the connection can still be the one
+ * of the field that had focus before, which answers no read, so a read must succeed too.
  * Uses a poll-retry loop instead of a fixed delay to minimize unnecessary waiting
  * while still giving the framework time to establish the InputConnection.
  *
@@ -341,7 +371,7 @@ internal suspend fun awaitInputConnectionReady(
 ) {
     val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
     while (System.currentTimeMillis() < deadline) {
-        if (typeInputController.isReady()) return
+        if (typeInputController.isReady() && typeInputController.getSurroundingText(1, 1, 0) != null) return
         delay(FOCUS_POLL_INTERVAL_MS)
     }
     throw McpToolException.ActionFailed(
@@ -443,47 +473,138 @@ private fun collectIds(
 }
 
 /**
- * Where the [surroundingText] window starts in the field. An editor that reports no offset (-1: Compose text fields,
- * whose input connection uses the default `getSurroundingText`) is read from the field start when the text before the
- * selection is shorter than the MAX_SURROUNDING_TEXT_LENGTH that was asked for, since the window then reaches it.
+ * The whole text of the focused field. When one read around the cursor covers the field (fewer than
+ * MAX_SURROUNDING_TEXT_LENGTH characters on each side of it, the usual case) that read is the text, whether or not the
+ * field reports offsets (a Compose text field reports none). A longer field is read window by window from positions the
+ * tool sets itself, which moves the cursor: it is put back at [restoreCursor] when given.
  *
- * @throws McpToolException.ActionFailed when the offset is unknown and the window may not reach the field start.
+ * @return the text, or null when the input connection does not answer.
  */
-internal fun fieldStart(surroundingText: SurroundingText): Int =
-    when {
-        surroundingText.offset >= 0 -> {
-            surroundingText.offset
+internal fun readWholeField(
+    typeInputController: TypeInputController,
+    restoreCursor: Int? = null,
+): String? {
+    val window = typeInputController.getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0)
+    return when {
+        window == null -> {
+            null
         }
 
-        surroundingText.selectionStart < MAX_SURROUNDING_TEXT_LENGTH -> {
-            0
+        coversField(window) -> {
+            window.text.toString()
         }
 
         else -> {
-            throw McpToolException.ActionFailed(
-                "The field does not report where its text starts and its cursor is more than " +
-                    "$MAX_SURROUNDING_TEXT_LENGTH characters in, so the text cannot be located",
-            )
+            readFieldByWindows(typeInputController)?.takeIf {
+                restoreCursor == null || typeInputController.setSelection(restoreCursor, restoreCursor)
+            }
         }
     }
+}
 
-/** The field length read through [surroundingText] (see [fieldStart]), or 0 when the field could not be read. */
-internal fun fieldLength(surroundingText: SurroundingText?): Int {
-    val window = surroundingText ?: return 0
-    return fieldStart(window) + window.text.length
+/** Whether [window], read with MAX_SURROUNDING_TEXT_LENGTH asked on each side of the cursor, holds the whole field. */
+private fun coversField(window: SurroundingText): Boolean =
+    window.selectionStart < MAX_SURROUNDING_TEXT_LENGTH &&
+        window.text.length - window.selectionEnd < MAX_SURROUNDING_TEXT_LENGTH
+
+/**
+ * The whole text of the focused field (see [readWholeField]).
+ *
+ * @throws McpToolException.ActionFailed when the input connection does not answer.
+ */
+internal fun readFieldText(
+    typeInputController: TypeInputController,
+    nodeId: String,
+): String =
+    readWholeField(typeInputController)
+        ?: throw McpToolException.ActionFailed("Unable to read text from node '$nodeId'")
+
+/**
+ * Reads the field from its start: puts the cursor at each position and takes the MAX_SURROUNDING_TEXT_LENGTH
+ * characters after it, until a shorter piece. Null when the connection does not answer, does not put the cursor where
+ * it was asked to, or the field is longer than MAX_FIELD_READ_WINDOWS windows.
+ */
+private fun readFieldByWindows(typeInputController: TypeInputController): String? {
+    val text = StringBuilder()
+    var complete = false
+    var failed = false
+    var windows = 0
+    while (!complete && !failed && windows < MAX_FIELD_READ_WINDOWS) {
+        val piece = readPieceAt(typeInputController, text.length)
+        if (piece == null) {
+            failed = true
+        } else {
+            text.append(piece)
+            complete = piece.length < MAX_SURROUNDING_TEXT_LENGTH
+        }
+        windows++
+    }
+    return if (complete) text.toString() else null
+}
+
+/**
+ * The up to MAX_SURROUNDING_TEXT_LENGTH characters after [position], read with the cursor put there; null when the
+ * connection does not answer, or a field that reports offsets shows the cursor somewhere else.
+ */
+private fun readPieceAt(
+    typeInputController: TypeInputController,
+    position: Int,
+): String? {
+    val window =
+        if (typeInputController.setSelection(position, position)) {
+            typeInputController.getSurroundingText(0, MAX_SURROUNDING_TEXT_LENGTH, 0)
+        } else {
+            null
+        }
+    return window
+        ?.takeIf { it.offset < 0 || it.offset + it.selectionStart == position }
+        ?.let { it.text.substring(it.selectionEnd) }
 }
 
 /**
  * Deletes the current selection by committing empty text through the input connection, then waits up to
- * FOCUS_POLL_MAX_MS until the field reads back [expectedLength] characters. A DEL key event is not used: it goes
- * through the view's key handling instead of the input connection's edit pipeline that set the selection, and Compose
- * text fields can handle it before that selection and lose the deletion.
+ * FIELD_UPDATE_MAX_MS until the field reads back different from [before], its text when the selection was made. A DEL
+ * key event is not used: it goes through the view's key handling instead of the input connection's edit pipeline that
+ * set the selection, and Compose text fields can handle it before that selection and lose the deletion. Any change
+ * counts, so a field that reformats its text after the deletion is not taken for a lost one.
  *
- * @throws McpToolException.ActionFailed when the input connection is lost or the text was not deleted.
+ * @return the field text after the deletion. It can move the cursor (see [readWholeField]).
+ * @throws McpToolException.ActionFailed when the input connection is lost or the field reads back unchanged.
  */
 internal suspend fun deleteSelection(
     typeInputController: TypeInputController,
-    expectedLength: Int,
+    before: String,
+    nodeId: String,
+): String {
+    commitEmptyText(typeInputController, nodeId)
+    val deadline = System.currentTimeMillis() + FIELD_UPDATE_MAX_MS
+    var after = readWholeField(typeInputController)
+    while ((after == null || after == before) && System.currentTimeMillis() < deadline) {
+        delay(FIELD_UPDATE_POLL_MS)
+        after = readWholeField(typeInputController)
+    }
+    return when (after) {
+        null -> {
+            throw McpToolException.ActionFailed(
+                "Could not read node '$nodeId' back after deleting the selected text — input connection lost",
+            )
+        }
+
+        before -> {
+            throw McpToolException.ActionFailed(
+                "The selected text in node '$nodeId' was not deleted: the field reads back unchanged",
+            )
+        }
+
+        else -> {
+            after
+        }
+    }
+}
+
+/** Commits empty text over the selection, which deletes it. */
+private fun commitEmptyText(
+    typeInputController: TypeInputController,
     nodeId: String,
 ) {
     if (!typeInputController.commitText("", 1)) {
@@ -491,30 +612,11 @@ internal suspend fun deleteSelection(
             "Failed to delete the selected text in node '$nodeId' — input connection lost",
         )
     }
-    val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
-    var length = readFieldLength(typeInputController)
-    while (length != expectedLength && System.currentTimeMillis() < deadline) {
-        delay(FOCUS_POLL_INTERVAL_MS)
-        length = readFieldLength(typeInputController)
-    }
-    if (length != expectedLength) {
-        throw McpToolException.ActionFailed(
-            "The selected text in node '$nodeId' was not deleted: the field reads back " +
-                "${length ?: "no"} characters instead of $expectedLength",
-        )
-    }
 }
 
-/** The field length read now (see [fieldStart]), or null when the input connection returns nothing. */
-private fun readFieldLength(typeInputController: TypeInputController): Int? =
-    typeInputController
-        .getSurroundingText(MAX_SURROUNDING_TEXT_LENGTH, MAX_SURROUNDING_TEXT_LENGTH, 0)
-        ?.let { fieldLength(it) }
-
 /**
- * Reads the current field content after an operation completes.
- * Used to include the field content in the tool response so the model
- * can verify the result.
+ * Reads the field content after an operation completes, to include it in the tool response so the model can verify
+ * the result; [cursor] is where the operation left the cursor (see [readWholeField]).
  *
  * Returns the field text, or null if the content could not be read (e.g., input connection lost after the
  * operation). This is best-effort — a read failure does NOT cause the tool to fail,
@@ -523,14 +625,10 @@ private fun readFieldLength(typeInputController: TypeInputController): Int? =
  * @param typeInputController The controller to read from.
  * @return The field content, or null when it could not be read.
  */
-internal fun readFieldContent(typeInputController: TypeInputController): String? =
-    typeInputController
-        .getSurroundingText(
-            MAX_SURROUNDING_TEXT_LENGTH,
-            MAX_SURROUNDING_TEXT_LENGTH,
-            0,
-        )?.text
-        ?.toString()
+internal fun readFieldContent(
+    typeInputController: TypeInputController,
+    cursor: Int,
+): String? = readWholeField(typeInputController, restoreCursor = cursor)
 
 /**
  * What a type tool read back from the field it typed into, kept for the redaction that runs outside the typing lock:
@@ -544,13 +642,14 @@ internal data class FieldRead(
     val windows: List<WindowData>,
 )
 
-/** Reads back the focused field [fieldNodeId] after an operation; see [FieldRead]. */
+/** Reads back the focused field [fieldNodeId] after an operation that left the cursor at [cursor]; see [FieldRead]. */
 internal fun readField(
     typeInputController: TypeInputController,
     fieldNodeId: String,
     windows: List<WindowData>,
+    cursor: Int,
 ): FieldRead {
-    val content = readFieldContent(typeInputController)
+    val content = readFieldContent(typeInputController, cursor)
     return FieldRead(content, fieldNodeId, typeInputController.isPasswordInput(), windows)
 }
 
@@ -604,23 +703,13 @@ class TypeAppendTextTool
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-                    // Poll-retry for InputConnection readiness (max 500ms, 50ms interval)
-                    awaitInputConnectionReady(typeInputController, nodeId)
+                    // Wait for input focus on the target, then for its InputConnection (max 500ms each, 50ms interval)
                     val fieldNodeId =
                         focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Position cursor at end
-                    // Note: fieldLength gives the total text length only if
-                    // getSurroundingText returns the complete field content. For fields
-                    // with >2*MAX_SURROUNDING_TEXT_LENGTH chars, this may undercount.
-                    // Given the 2000-char tool limit, this is not a practical concern.
-                    val surroundingText =
-                        typeInputController.getSurroundingText(
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            0,
-                        )
-                    val textLength = fieldLength(surroundingText)
+                    val textLength = readFieldText(typeInputController, nodeId).length
                     if (!typeInputController.setSelection(textLength, textLength)) {
                         throw McpToolException.ActionFailed(
                             "Failed to position cursor in node '$nodeId' — input connection lost",
@@ -631,7 +720,7 @@ class TypeAppendTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows, textLength + text.length)
                 }
 
             Log.d(TAG, "type_append_text: typed ${text.length} chars on node '$nodeId'")
@@ -742,20 +831,13 @@ class TypeInsertTextTool
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-                    // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, nodeId)
+                    // Wait for input focus on the target, then for its InputConnection
                     val fieldNodeId =
                         focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Validate offset against current text length
-                    val surroundingText =
-                        typeInputController.getSurroundingText(
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            0,
-                        )
-                    val textLength = fieldLength(surroundingText)
-
+                    val textLength = readFieldText(typeInputController, nodeId).length
                     if (offset > textLength) {
                         throw McpToolException.InvalidParams(
                             "offset ($offset) exceeds text length ($textLength) in node '$nodeId'",
@@ -774,7 +856,7 @@ class TypeInsertTextTool
                     typeCharByChar(text, typingSpeed, typingSpeedVariance, typeInputController)
 
                     // Read field content after operation for verification
-                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows, offset + text.length)
                 }
 
             Log.d(TAG, "type_insert_text: typed ${text.length} chars at offset $offset on '$nodeId'")
@@ -870,10 +952,10 @@ class TypeInsertTextTool
  *
  * Flow:
  * 1. Resolve the target (node_id or selector) in a fresh read and click it to focus
- * 2. Get current text via getSurroundingText()
+ * 2. Get the whole field text (see [readWholeField])
  * 3. Find first occurrence of search text — error if not found
  * 4. setSelection(startIndex, endIndex) to select found text
- * 5. Commit empty text over the selection and wait until the field is search.length characters shorter
+ * 5. Commit empty text over the selection and wait until the field reads back changed
  * 6. Type new_text code point by code point via commitText() (if non-empty)
  */
 class TypeReplaceTextTool
@@ -923,22 +1005,13 @@ class TypeReplaceTextTool
                     val clickResult = actionExecutor.clickNode(nodeId, result.windows)
                     clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-                    // Poll-retry for InputConnection readiness
-                    awaitInputConnectionReady(typeInputController, nodeId)
+                    // Wait for input focus on the target, then for its InputConnection
                     val fieldNodeId =
                         focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                    awaitInputConnectionReady(typeInputController, nodeId)
 
-                    // Get current text and find the search string
-                    val surroundingText =
-                        typeInputController.getSurroundingText(
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            MAX_SURROUNDING_TEXT_LENGTH,
-                            0,
-                        ) ?: throw McpToolException.ActionFailed(
-                            "Unable to read text from node '$nodeId'",
-                        )
-
-                    val fullText = surroundingText.text.toString()
+                    // Get the whole text and find the search string
+                    val fullText = readFieldText(typeInputController, nodeId)
                     val searchIndex = fullText.indexOf(search)
                     if (searchIndex == -1) {
                         throw McpToolException.NodeNotFound(
@@ -946,19 +1019,22 @@ class TypeReplaceTextTool
                         )
                     }
 
-                    // Adjust index relative to the actual field (account for surroundingText offset)
-                    val absoluteStart = fieldStart(surroundingText) + searchIndex
-                    val absoluteEnd = absoluteStart + search.length
-
                     // Select the found text — check return value
-                    if (!typeInputController.setSelection(absoluteStart, absoluteEnd)) {
+                    if (!typeInputController.setSelection(searchIndex, searchIndex + search.length)) {
                         throw McpToolException.ActionFailed(
                             "Failed to select text in node '$nodeId' — input connection lost",
                         )
                     }
 
-                    // Delete the selection and wait until the field is that much shorter
-                    deleteSelection(typeInputController, fieldLength(surroundingText) - search.length, nodeId)
+                    // Delete the selection, then put the cursor where it was: the read-back can move it, and a field
+                    // that reformats its text after the deletion can be shorter than the found position
+                    val afterDeletion = deleteSelection(typeInputController, fullText, nodeId)
+                    val cursor = minOf(searchIndex, afterDeletion.length)
+                    if (!typeInputController.setSelection(cursor, cursor)) {
+                        throw McpToolException.ActionFailed(
+                            "Failed to position cursor in node '$nodeId' — input connection lost",
+                        )
+                    }
 
                     // Type replacement text code point by code point (if non-empty)
                     if (newText.isNotEmpty()) {
@@ -966,7 +1042,7 @@ class TypeReplaceTextTool
                     }
 
                     // Read field content after operation for verification
-                    nodeId to readField(typeInputController, fieldNodeId, result.windows)
+                    nodeId to readField(typeInputController, fieldNodeId, result.windows, cursor + newText.length)
                 }
 
             Log.d(
@@ -1055,7 +1131,7 @@ class TypeReplaceTextTool
  * MCP tool: type_clear_text
  *
  * Clears all text from a field using InputConnection operations: select all via the context menu action, then
- * commit empty text over the selection (see [deleteSelection]) and wait until the field reads back empty, failing
+ * commit empty text over the selection (see [deleteSelection]) and wait until the field reads back changed, failing
  * when it does not.
  *
  * If the field is already empty, returns success without performing any action.
@@ -1121,20 +1197,14 @@ class TypeClearTextTool
             val clickResult = actionExecutor.clickNode(nodeId, result.windows)
             clickResult.onFailure { e -> mapNodeActionException(e, nodeId) }
 
-            // Poll-retry for InputConnection readiness
-            awaitInputConnectionReady(typeInputController, nodeId)
+            // Wait for input focus on the target, then for its InputConnection
             val fieldNodeId =
                 focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+            awaitInputConnectionReady(typeInputController, nodeId)
 
             // Check if field has text — skip clear if already empty
-            val surroundingText =
-                typeInputController.getSurroundingText(
-                    MAX_SURROUNDING_TEXT_LENGTH,
-                    MAX_SURROUNDING_TEXT_LENGTH,
-                    0,
-                )
-            val textLength = fieldLength(surroundingText)
-            return if (textLength == 0) {
+            val text = readFieldText(typeInputController, nodeId)
+            return if (text.isEmpty()) {
                 Log.d(TAG, "type_clear_text: field already empty on '$nodeId'")
                 ClearOutcome.AlreadyEmpty(nodeId)
             } else {
@@ -1144,11 +1214,11 @@ class TypeClearTextTool
                     "Failed to select all text in node '$nodeId' — input connection lost",
                 )
 
-                // Delete the selection and wait until the field reads back empty
-                deleteSelection(typeInputController, 0, nodeId)
+                // Delete the selection and wait until the field reads back changed
+                deleteSelection(typeInputController, text, nodeId)
 
                 // Read field content after operation for verification
-                ClearOutcome.Cleared(nodeId, readField(typeInputController, fieldNodeId, result.windows))
+                ClearOutcome.Cleared(nodeId, readField(typeInputController, fieldNodeId, result.windows, 0))
             }
         }
 
@@ -1169,7 +1239,7 @@ class TypeClearTextTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Clear all text from a field with select-all and delete through the InputConnection, " +
-                        "like an input method, then check that the field reads back empty. " +
+                        "like an input method, then check that the text is gone. " +
                         verificationAndKeyboardHint(toolNamePrefix),
                 inputSchema =
                     ToolSchema(
