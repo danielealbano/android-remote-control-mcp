@@ -707,7 +707,7 @@ class WaitForIdleTool
  * MCP tool: get_node_details
  *
  * Retrieves full (untruncated) text and contentDescription for a list of node_ids, plus
- * whether each node is a password field (`true`/`false` in the `password` column).
+ * whether the app marks each node as a password field (`true`/`false` in the `password` column).
  * Use after get_screen_state when text or desc columns were truncated.
  */
 class GetNodeDetailsTool
@@ -797,7 +797,7 @@ class GetNodeDetailsTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Retrieve full untruncated text and description for nodes by node_id, " +
-                        "and whether each node is a password field. " +
+                        "and whether the app marks each node as a password field. " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(

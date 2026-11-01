@@ -35,7 +35,7 @@ enum class FindBy {
  * @property editable Whether the element is an editable text field.
  * @property enabled Whether the element is enabled.
  * @property visible Whether the element is visible to the user.
- * @property password Whether the element is a password field.
+ * @property password Whether the app marks the element as a password field ([AccessibilityNodeData.isPassword]).
  */
 @Serializable
 data class ElementInfo(

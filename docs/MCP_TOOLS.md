@@ -339,6 +339,8 @@ Only flags that are `true` are included. The `on`/`off` flag is always first.
 
 Example: `on,clk,ena` means onscreen + clickable + enabled.
 
+`pwd` is the app's own marking of a password field (Android `AccessibilityNodeInfo.isPassword`), reported as is. Any app can set it on any field, and a field without it can still take a password, so it is a hint, not a check that a field is safe to type a credential into. The same flag is the `password` value of `android_find_nodes`, `android_wait_for_node` and `android_get_node_details`.
+
 #### Class Name Simplification
 
 The `class` column shows the simple class name, stripped of the package prefix (e.g., `android.widget.Button` → `Button`). Returns `-` if null or empty.
@@ -1140,11 +1142,14 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "scrollable": false,
       "editable": false,
       "enabled": true,
+      "visible": true,
       "password": false
     }
   ]
 }
 ```
+
+`password` is the app's password-field marking, the `pwd` flag of `android_get_screen_state` (see [Flags Reference](#flags-reference)).
 
 **Example**:
 ```bash
@@ -1765,10 +1770,17 @@ Wait until a node matching the specified criteria appears in the accessibility t
     "className": "android.widget.TextView",
     "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
     "clickable": false,
-    "enabled": true
+    "longClickable": false,
+    "scrollable": false,
+    "editable": false,
+    "enabled": true,
+    "visible": true,
+    "password": false
   }
 }
 ```
+
+`node` has the same fields as a `android_find_nodes` result.
 
 **Timeout behavior**: When the timeout expires without finding the node, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
 
@@ -1862,7 +1874,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether each node is a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether the app marks each node as a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1914,7 +1926,7 @@ Retrieves full untruncated text and contentDescription for one or more nodes by 
 - `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
-- `password`: `true` if the node is a password field, `false` otherwise
+- `password`: `true` if the app marks the node as a password field (the `pwd` flag of `android_get_screen_state`, see [Flags Reference](#flags-reference)), `false` otherwise
 
 If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc and password columns.
 
