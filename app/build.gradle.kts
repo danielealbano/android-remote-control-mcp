@@ -518,6 +518,13 @@ tasks.withType<Test> {
             file("src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/screens/AboutScreen.kt"),
         ).withPropertyName("legalNoticeFiles")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // NgrokTunnelIntegrationTest is skipped without NGROK_AUTHTOKEN. The environment is not a task input, so without
+    // this a run without the token would be reused (UP-TO-DATE / FROM-CACHE) once the token is set, and the test would
+    // never run. Only whether the token is set is tracked, never its value.
+    inputs.property(
+        "ngrokAuthtokenSet",
+        providers.environmentVariable("NGROK_AUTHTOKEN").map { it.isNotEmpty() }.orElse(false),
+    )
     maxHeapSize = "3g"
     // Distribute tests across all available CPU cores for faster execution.
     maxParallelForks = (Runtime.getRuntime().availableProcessors()).coerceAtLeast(1)
