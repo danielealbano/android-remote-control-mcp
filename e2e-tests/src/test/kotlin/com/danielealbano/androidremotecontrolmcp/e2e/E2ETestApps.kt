@@ -97,8 +97,10 @@ object E2ETestApps {
     }
 
     /**
-     * Launch the text field test activity in a fresh process, so its field starts empty: [field] is "compose" for a
-     * Compose text field or "view" for a classic EditText.
+     * Launch the text field test activity in a new task, so its field starts empty: [field] is "compose" for a
+     * Compose text field or "view" for a classic EditText. The previous activity is finished, not its process killed:
+     * killing a process whose field holds an input session can leave the accessibility input method without one for
+     * the next field.
      */
     fun launchTextFieldTestApp(field: String) {
         val result =
@@ -107,7 +109,7 @@ object E2ETestApps {
                 "am",
                 "start",
                 "-W",
-                "-S",
+                "--activity-clear-task",
                 "--es",
                 "field",
                 field,

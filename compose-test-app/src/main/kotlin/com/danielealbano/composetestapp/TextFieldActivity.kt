@@ -21,7 +21,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * One empty single-line text field, for E2E tests of the type tools:
- *   adb shell am start -S -n com.danielealbano.composetestapp/.TextFieldActivity --es field compose
+ *   adb shell am start --activity-clear-task -n com.danielealbano.composetestapp/.TextFieldActivity --es field compose
  *
  * - `--es field compose` (the default): a Compose [OutlinedTextField] over a String state, like the app's own settings
  *   fields. Its input connection reports no text offset and can lose a DEL key event sent right after a selection.
