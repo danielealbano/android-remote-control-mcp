@@ -29,6 +29,9 @@ object DeviceAdb {
                 serial,
                 "install",
                 "-r",
+                // The version code comes from the git history, so a build of a branch with fewer commits than the one
+                // installed on the phone is older: -d lets the (debuggable) test build replace it anyway.
+                "-d",
                 apkPath,
                 timeoutSeconds = INSTALL_TIMEOUT_S,
             )
