@@ -1780,7 +1780,7 @@ Wait until a node matching the specified criteria appears in the accessibility t
 }
 ```
 
-`node` has the same fields as a `android_find_nodes` result.
+`node` has the same fields as each entry of the `nodes` array of `android_find_nodes`.
 
 **Timeout behavior**: When the timeout expires without finding the node, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
 
