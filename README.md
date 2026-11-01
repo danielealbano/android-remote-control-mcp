@@ -570,6 +570,10 @@ The app declares the permissions below. **Normal** permissions are granted autom
 
 The application runs entirely within Android's standard permission model. No root access, no unlocked bootloader, no custom ROM required.
 
+### Trust Model
+
+The accessibility service is the trust boundary. Once you grant it, an authenticated client controls the device as you do: it reads the screen and taps any control, including the app's own settings and the OAuth approval screen. The in-app toggles (per-location read/write/delete, per-tool enable/disable, and OAuth approval) express intent and prevent mistakes. They are not a sandbox around a client that already holds accessibility, which can change them the same way you would, through the UI or an intent.
+
 ### Authentication
 
 Authentication is combined (dual-accept): a `/mcp` request is authorized by a valid static bearer token OR a valid issued OAuth access token. Enforcement is controlled by two independent toggles in **Settings → Access** — `bearer_token_enabled` (default on) and `oauth_enabled` (default on) — not by the token value. The bearer token is auto-generated once on first launch (UUID, preserved across app upgrades) and can be viewed, copied, or regenerated in the app. Clearing the value while bearer is enabled makes the server fail CLOSED (401). The server accepts unauthenticated requests only when BOTH toggles are off (the app shows a warning and a confirmation before that happens) — see the security note in the Connect section.
