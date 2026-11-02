@@ -953,26 +953,48 @@ internal fun mapFindBy(by: String): FindBy? =
  * [ActionExecutorImpl.performNodeAction]. The cache is replaced atomically on each call.
  *
  * @throws McpToolException.PermissionDenied if accessibility service is not connected.
- * @throws McpToolException.ActionFailed if no windows and no root node are available.
+ * @throws McpToolException.ActionFailed if no window has a root node, or there are no windows and no active window
+ *   root node.
  */
 internal fun getFreshWindows(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     nodeCache: AccessibilityNodeCache,
-): MultiWindowResult =
+): MultiWindowResult = getFreshRead(treeParser, accessibilityServiceProvider, nodeCache).result
+
+/** A fresh read: its [result] and the node references it put in the node cache, by node id. See [getFreshRead]. */
+internal data class FreshRead(
+    val result: MultiWindowResult,
+    val nodes: Map<String, CachedNode>,
+)
+
+/**
+ * [getFreshWindows], also returning the node references the read put in [nodeCache]. A caller that still needs those
+ * nodes after the read takes them from here: the node cache is dropped at any moment after a settled window transition
+ * (such as the soft keyboard showing), which would lose them.
+ *
+ * @throws McpToolException.PermissionDenied if accessibility service is not connected.
+ * @throws McpToolException.ActionFailed if no window has a root node, or there are no windows and no active window
+ *   root node.
+ */
+internal fun getFreshRead(
+    treeParser: AccessibilityTreeParser,
+    accessibilityServiceProvider: AccessibilityServiceProvider,
+    nodeCache: AccessibilityNodeCache,
+): FreshRead =
     // Serialize the entire clear+read+populate critical section against concurrent MCP requests:
     // clearing the shared framework node cache mid-traversal of another request would yield a torn
     // tree and flaky node-id resolution. See AccessibilityTreeLock.
     synchronized(AccessibilityTreeLock.monitor) {
-        getFreshWindowsLocked(treeParser, accessibilityServiceProvider, nodeCache)
+        getFreshReadLocked(treeParser, accessibilityServiceProvider, nodeCache)
     }
 
 @Suppress("LongMethod", "NestedBlockDepth", "ThrowsCount")
-private fun getFreshWindowsLocked(
+private fun getFreshReadLocked(
     treeParser: AccessibilityTreeParser,
     accessibilityServiceProvider: AccessibilityServiceProvider,
     nodeCache: AccessibilityNodeCache,
-): MultiWindowResult {
+): FreshRead {
     if (!accessibilityServiceProvider.isReady()) {
         throw McpToolException.PermissionDenied(
             "Accessibility service not enabled or not ready. " +
@@ -1061,7 +1083,7 @@ private fun getFreshWindowsLocked(
             // Populate cache with ALL windows' nodes in a single atomic swap
             nodeCache.populate(accumulatedNodeMap)
 
-            return MultiWindowResult(windows = windowDataList, degraded = false)
+            return FreshRead(MultiWindowResult(windows = windowDataList, degraded = false), accumulatedNodeMap)
         } finally {
             // Recycle all AccessibilityWindowInfo objects for consistency
             // (no-op on API 34+, but follows the codebase's recycling convention)
@@ -1107,21 +1129,24 @@ private fun getFreshWindowsLocked(
     val currentPackageName = accessibilityServiceProvider.getCurrentPackageName()
     val currentActivityName = accessibilityServiceProvider.getCurrentActivityName()
 
-    return MultiWindowResult(
-        windows =
-            listOf(
-                WindowData(
-                    windowId = fallbackWindowId,
-                    windowType = fallbackWindowType,
-                    packageName = currentPackageName,
-                    title = "unknown",
-                    activityName = currentActivityName,
-                    layer = 0,
-                    focused = true,
-                    tree = tree,
+    return FreshRead(
+        MultiWindowResult(
+            windows =
+                listOf(
+                    WindowData(
+                        windowId = fallbackWindowId,
+                        windowType = fallbackWindowType,
+                        packageName = currentPackageName,
+                        title = "unknown",
+                        activityName = currentActivityName,
+                        layer = 0,
+                        focused = true,
+                        tree = tree,
+                    ),
                 ),
-            ),
-        degraded = true,
+            degraded = true,
+        ),
+        accumulatedNodeMap,
     )
 }
 

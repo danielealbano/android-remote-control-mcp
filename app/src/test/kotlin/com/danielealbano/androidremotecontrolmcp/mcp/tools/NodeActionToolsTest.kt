@@ -12,6 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
@@ -23,6 +24,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verifyOrder
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -181,6 +183,46 @@ class NodeActionToolsTest {
             maxObserved.get(),
             "concurrent getFreshWindows reads overlapped the framework-cache critical section",
         )
+    }
+
+    @Test
+    @DisplayName("getFreshRead returns the node references it populated the node cache with")
+    fun getFreshReadReturnsTheNodesItPopulatedTheCacheWith() {
+        val node = CachedNode(mockk(), depth = 1, index = 0, parentId = "node_root")
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>()["node_abc"] = node
+            sampleTree
+        }
+        val populated = slot<Map<String, CachedNode>>()
+        every { mockNodeCache.populate(capture(populated)) } returns Unit
+
+        val read = getFreshRead(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+
+        assertEquals(mapOf("node_abc" to node), read.nodes)
+        assertEquals(populated.captured, read.nodes)
+        assertEquals(sampleWindows, read.result.windows)
+    }
+
+    @Test
+    @DisplayName("getFreshRead fallback path returns the node references of the active window root")
+    fun getFreshReadFallbackPathReturnsTheNodesOfTheActiveWindowRoot() {
+        every { mockAccessibilityServiceProvider.getAccessibilityWindows() } returns emptyList()
+        val fallbackRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        every { mockAccessibilityServiceProvider.getRootNode() } returns fallbackRootNode
+        every { fallbackRootNode.windowId } returns 42
+        val node = CachedNode(mockk(), depth = 1, index = 0, parentId = "node_root")
+        every { mockTreeParser.parseTree(fallbackRootNode, "root_w42", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>()["node_abc"] = node
+            sampleTree
+        }
+        val populated = slot<Map<String, CachedNode>>()
+        every { mockNodeCache.populate(capture(populated)) } returns Unit
+
+        val read = getFreshRead(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+
+        assertTrue(read.result.degraded)
+        assertEquals(mapOf("node_abc" to node), read.nodes)
+        assertEquals(populated.captured, read.nodes)
     }
 
     @Nested

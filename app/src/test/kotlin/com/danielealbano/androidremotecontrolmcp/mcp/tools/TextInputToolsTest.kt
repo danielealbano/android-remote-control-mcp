@@ -20,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInpu
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.FakeTextField
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
+import com.danielealbano.androidremotecontrolmcp.testutil.readNodesOf
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -56,6 +57,9 @@ class TextInputToolsTest {
     private val mockRootNode = mockk<AccessibilityNodeInfo>()
     private val mockFocusedNode = mockk<AccessibilityNodeInfo>()
     private val mockWindowInfo = mockk<AccessibilityWindowInfo>()
+
+    /** The node references, by id, that every tree read returns with its tree (see [readsTree]). */
+    private val readNodes = mutableMapOf<String, CachedNode>()
     private val targetResolver =
         NodeTargetResolver(
             ElementFinder(),
@@ -63,12 +67,23 @@ class TextInputToolsTest {
             PrivacyToolTestDoubles.identitySubstitutor(),
         )
 
+    /** A screen holding the type tools' usual target, the editable field "node_edit". */
     private val sampleTree =
         AccessibilityNodeData(
             id = "node_root",
             className = "android.widget.FrameLayout",
             bounds = BoundsData(0, 0, 1080, 2400),
             visible = true,
+            children =
+                listOf(
+                    AccessibilityNodeData(
+                        id = "node_edit",
+                        className = "android.widget.EditText",
+                        bounds = BoundsData(0, 100, 1080, 200),
+                        editable = true,
+                        visible = true,
+                    ),
+                ),
         )
 
     private val sampleWindows =
@@ -139,19 +154,31 @@ class TextInputToolsTest {
         } returns listOf(mockWindowInfo)
         every { mockAccessibilityServiceProvider.getCurrentPackageName() } returns "com.example"
         every { mockAccessibilityServiceProvider.getCurrentActivityName() } returns ".Main"
-        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns sampleTree
+        readsTree(sampleTree)
         // The type tools' usual target holds input focus, in a plain (non-password) editor.
         focusInputOn("node_edit")
         every { mockTypeInputController.isPasswordInput() } returns false
     }
 
-    /** Puts input focus on [nodeId]: the FOCUS_INPUT search finds [mockFocusedNode], the cached node of [nodeId]. */
+    /** Every tree read parses to [tree] and returns the [readNodes] of the nodes in it as its node references. */
+    private fun readsTree(tree: AccessibilityNodeData) {
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>().putAll(readNodesOf(tree, readNodes))
+            tree
+        }
+    }
+
+    /**
+     * Puts input focus on [nodeId]: the FOCUS_INPUT search finds [mockFocusedNode], the node of [nodeId] in the tree
+     * reads ([readNodes]).
+     */
     private fun focusInputOn(nodeId: String) {
         every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns mockFocusedNode
         every { mockRootNode.recycle() } returns Unit
         every { mockFocusedNode.isEditable } returns true
+        every { mockFocusedNode.refresh() } returns true
         every { mockFocusedNode.recycle() } returns Unit
-        every { mockNodeCache.get(nodeId) } returns CachedNode(mockFocusedNode, 1, 0, "node_root")
+        readNodes[nodeId] = CachedNode(mockFocusedNode, 1, 0, "node_root")
     }
 
     @AfterEach
@@ -846,7 +873,7 @@ class TextInputToolsTest {
                 moved = true
                 Result.success(Unit)
             }
-            // focusInputOn makes [mockFocusedNode] the cached node of [fieldId]; the search returns it once moved.
+            // focusInputOn makes [mockFocusedNode] the read node of [fieldId]; the search returns it once moved.
             focusInputOn(fieldId)
             every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } answers {
                 if (moved) mockFocusedNode else otherFocusedNode
@@ -856,7 +883,7 @@ class TextInputToolsTest {
         private suspend fun awaitFocused(
             windows: List<WindowData>,
             nodeId: String,
-        ) = focusedField(mockAccessibilityServiceProvider, mockActionExecutor, mockNodeCache, windows, nodeId)
+        ) = focusedField(mockAccessibilityServiceProvider, mockActionExecutor, readNodes, windows, nodeId)
 
         @Test
         fun `focusedField returns the target when it has input focus`() =
@@ -951,6 +978,57 @@ class TextInputToolsTest {
                 assertThrows<McpToolException.ActionFailed> {
                     awaitFocused(sampleWindows, "node_edit")
                 }
+            }
+
+        @Test
+        fun `focusedField finds a Compose field that reports input focus only once it is built again`() =
+            runTest {
+                // Like Compose: until the focused field's node is built again, the search returns the host view's node
+                val hostNode = mockk<AccessibilityNodeInfo>()
+                every { hostNode.isEditable } returns false
+                every { hostNode.recycle() } returns Unit
+                var builtAgain = false
+                every { mockFocusedNode.refresh() } answers {
+                    builtAgain = true
+                    true
+                }
+                every { mockRootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } answers {
+                    if (builtAgain) mockFocusedNode else hostNode
+                }
+
+                val focused = awaitFocused(sampleWindows, "node_edit")
+
+                assertEquals("node_edit", focused)
+                coVerify(exactly = 0) { mockActionExecutor.focusNode(any(), any()) }
+            }
+
+        @Test
+        fun `focusedField throws when the target is not in the read`() =
+            runTest {
+                // Note: this test consumes ~1s real wall-clock time (two waits)
+                coEvery { mockActionExecutor.focusNode(any(), any()) } returns Result.success(Unit)
+
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        awaitFocused(sampleWindows, "node_missing")
+                    }
+
+                assertTrue(exception.message!!.contains("Input focus is not on node 'node_missing'"), exception.message)
+                verify(exactly = 0) { mockFocusedNode.refresh() }
+            }
+
+        @Test
+        fun `focusedField builds again only the editable nodes of the target`() =
+            runTest {
+                val wrapperNode = mockk<AccessibilityNodeInfo>()
+                readNodes["node_wrapper"] = CachedNode(wrapperNode, 1, 0, "node_root")
+                focusInputOn("node_inner")
+
+                val focused = awaitFocused(windowsWithWrapper, "node_wrapper")
+
+                assertEquals("node_inner", focused)
+                verify(exactly = 1) { mockFocusedNode.refresh() }
+                verify(exactly = 0) { wrapperNode.refresh() }
             }
 
         @Test
@@ -1073,6 +1151,24 @@ class TextInputToolsTest {
                 assertTrue(text.contains("Field content:"))
 
                 verify { mockTypeInputController.setSelection(8, 8) }
+                verify(exactly = 5) { mockTypeInputController.commitText(any(), 1) }
+            }
+
+        @Test
+        fun `appends text when the node cache is cleared after the read`() =
+            runTest {
+                setupDefaultMocks()
+                // The cache is dropped once the window transition the click starts (the keyboard showing) settles
+                every { mockNodeCache.get(any()) } returns null
+                val params =
+                    buildJsonObject {
+                        put("node_id", "node_edit")
+                        put("text", "Hello")
+                    }
+
+                val text = extractTextContent(tool.execute(params))
+
+                assertTrue(text.contains("Typed 5 characters"), text)
                 verify(exactly = 5) { mockTypeInputController.commitText(any(), 1) }
             }
 
@@ -2196,8 +2292,7 @@ class TextInputToolsTest {
         )
 
         private fun withFields(vararg fields: AccessibilityNodeData) {
-            every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } returns
-                sampleTree.copy(children = fields.toList())
+            readsTree(sampleTree.copy(children = fields.toList()))
         }
 
         private fun selector(value: String) =

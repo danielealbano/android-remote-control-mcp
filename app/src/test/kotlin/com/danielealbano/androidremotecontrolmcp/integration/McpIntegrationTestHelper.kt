@@ -85,6 +85,7 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentI
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
+import com.danielealbano.androidremotecontrolmcp.testutil.readNodesOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -118,7 +119,7 @@ object McpIntegrationTestHelper {
     /**
      * Puts input focus on the node [nodeId] as the type tools see it: the FOCUS_INPUT search from [rootNode] (returned
      * by [setupMultiWindowMock], whose Unit functions such as recycle() are no-ops) finds an editable node, and it is
-     * the node cache entry of [nodeId].
+     * the node of [nodeId] in the tree reads ([MockDependencies.readNodes]).
      *
      * @return The focused node mock.
      */
@@ -130,8 +131,7 @@ object McpIntegrationTestHelper {
         val focusedNode = mockk<AccessibilityNodeInfo>(relaxed = true)
         every { focusedNode.isEditable } returns true
         every { rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns focusedNode
-        every { deps.nodeCache.get(nodeId) } returns
-            CachedNode(focusedNode, depth = 1, index = 0, parentId = "node_root")
+        deps.readNodes[nodeId] = CachedNode(focusedNode, depth = 1, index = 0, parentId = "node_root")
         return focusedNode
     }
 
@@ -186,7 +186,10 @@ object McpIntegrationTestHelper {
         every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns packageName
         every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns activityName
         every { deps.accessibilityServiceProvider.getScreenInfo() } returns screenInfo
-        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId", any()) } returns tree
+        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>().putAll(readNodesOf(tree, deps.readNodes))
+            tree
+        }
         return mockRootNode
     }
 
@@ -644,6 +647,12 @@ data class MockDependencies(
     val pseudonymStore: PseudonymStore,
     val privacyToolGate: PrivacyToolGate,
     val placeholderSubstitutor: PlaceholderSubstitutor,
+    /**
+     * The node references, by id, that every tree read set up by [McpIntegrationTestHelper.setupMultiWindowMock]
+     * returns with its tree (those of the nodes in it); [McpIntegrationTestHelper.focusInputOn] adds the focused
+     * field's.
+     */
+    val readNodes: MutableMap<String, CachedNode> = mutableMapOf(),
     val serverLog: RecordingServerLogRepository = RecordingServerLogRepository(),
     /** The running tool calls, shared by the tool registration and the transport as in production. */
     val inFlightToolCalls: InFlightToolCalls = InFlightToolCalls(),

@@ -16,6 +16,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeLock
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
@@ -390,25 +391,30 @@ internal suspend fun awaitInputConnectionReady(
  * target itself, or the first editable node inside it) is given input focus with [ActionExecutor.focusNode] and the
  * wait runs once more.
  *
- * The focused node is matched against the node cache entries of [nodeId] and of its descendants in [windows] (the
- * read the target was resolved in, which populated the cache). Polls like [awaitInputConnectionReady].
+ * The focused node is matched against the nodes of [nodeId] and of its descendants in [readNodes], the node references
+ * of the read [windows] come from (the one the target was resolved in; a target missing from it matches nothing), not
+ * against the node cache: the cache is dropped once the window transition a click can start (the soft keyboard
+ * showing) settles, which can happen during the wait. Before each search the editable ones among them are read again
+ * ([AccessibilityNodeInfo.refresh]): Compose answers an input-focus search with the last node it built while that node
+ * held focus, so a field the click focused after Compose last built its node is found only once that node is built
+ * again. Polls like [awaitInputConnectionReady].
  *
  * @throws McpToolException.ActionFailed if focus is still not on the target or inside it after that.
  */
 internal suspend fun focusedField(
     accessibilityServiceProvider: AccessibilityServiceProvider,
     actionExecutor: ActionExecutor,
-    nodeCache: AccessibilityNodeCache,
+    readNodes: Map<String, CachedNode>,
     windows: List<WindowData>,
     nodeId: String,
 ): String {
     val target = windows.firstNotNullOfOrNull { findInTree(it.tree, nodeId) }
-    val candidates = target?.let(::subtreeIds) ?: listOf(nodeId)
-    var focused = pollFocusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+    val candidates = target?.let { focusCandidates(it, readNodes) }.orEmpty()
+    var focused = pollFocusedCandidate(accessibilityServiceProvider, candidates)
     if (focused == null) {
         val field = target?.let(::firstEditable)?.id ?: nodeId
         if (actionExecutor.focusNode(field, windows).isSuccess) {
-            focused = pollFocusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+            focused = pollFocusedCandidate(accessibilityServiceProvider, candidates)
         }
     }
     return focused ?: throw McpToolException.ActionFailed(
@@ -417,39 +423,60 @@ internal suspend fun focusedField(
     )
 }
 
+/**
+ * A node that can hold the input focus [focusedField] waits for: its [id] and its [node] from the read. When [field] is
+ * true (the node was editable in the read; [findFocusedEditableNode] returns only editable nodes), [node] is read again
+ * ([AccessibilityNodeInfo.refresh]) before each search.
+ */
+private class FocusCandidate(
+    val id: String,
+    val node: AccessibilityNodeInfo,
+    val field: Boolean,
+)
+
+/** The candidates for input focus, in tree order: [target] and its descendants, with their nodes from [readNodes]. */
+private fun focusCandidates(
+    target: AccessibilityNodeData,
+    readNodes: Map<String, CachedNode>,
+): List<FocusCandidate> =
+    subtreeNodes(target).mapNotNull { data ->
+        readNodes[data.id]?.let { FocusCandidate(data.id, it.node, field = data.editable) }
+    }
+
 /** Polls up to FOCUS_POLL_MAX_MS for one of [candidates] to hold input focus; see [focusedCandidate]. */
 private suspend fun pollFocusedCandidate(
     accessibilityServiceProvider: AccessibilityServiceProvider,
-    nodeCache: AccessibilityNodeCache,
-    candidates: List<String>,
+    candidates: List<FocusCandidate>,
 ): String? {
     val deadline = System.currentTimeMillis() + FOCUS_POLL_MAX_MS
-    var focused = focusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+    var focused = focusedCandidate(accessibilityServiceProvider, candidates)
     while (focused == null && System.currentTimeMillis() < deadline) {
         delay(FOCUS_POLL_INTERVAL_MS)
-        focused = focusedCandidate(accessibilityServiceProvider, nodeCache, candidates)
+        focused = focusedCandidate(accessibilityServiceProvider, candidates)
     }
     return focused
 }
 
-/** The id among [candidates] whose cached node is the input-focused editable node, or null. */
+/** The id of the candidate that is the input-focused editable node, or null. */
 private fun focusedCandidate(
     accessibilityServiceProvider: AccessibilityServiceProvider,
-    nodeCache: AccessibilityNodeCache,
-    candidates: List<String>,
+    candidates: List<FocusCandidate>,
 ): String? {
+    // Build the fields' nodes again first: Compose answers an input-focus search only with a node it built while that
+    // node held focus
+    candidates.filter { it.field }.forEach { it.node.refresh() }
     val focusedNode = findFocusedEditableNode(accessibilityServiceProvider) ?: return null
-    val match = candidates.firstOrNull { nodeCache.get(it)?.node == focusedNode }
+    val match = candidates.firstOrNull { it.node == focusedNode }?.id
     @Suppress("DEPRECATION")
     focusedNode.recycle()
     return match
 }
 
-/** The id of [target] followed by the ids of its descendants. */
-private fun subtreeIds(target: AccessibilityNodeData): List<String> {
-    val ids = ArrayList<String>()
-    collectIds(target, ids)
-    return ids
+/** [target] followed by its descendants, depth first. */
+private fun subtreeNodes(target: AccessibilityNodeData): List<AccessibilityNodeData> {
+    val nodes = ArrayList<AccessibilityNodeData>()
+    collectNodes(target, nodes)
+    return nodes
 }
 
 /** [node] when it is editable, else the first editable node inside it (depth first), else null. */
@@ -464,12 +491,12 @@ private fun findInTree(
     return node.children.firstNotNullOfOrNull { findInTree(it, nodeId) }
 }
 
-private fun collectIds(
+private fun collectNodes(
     node: AccessibilityNodeData,
-    out: MutableList<String>,
+    out: MutableList<AccessibilityNodeData>,
 ) {
-    out += node.id
-    node.children.forEach { collectIds(it, out) }
+    out += node
+    node.children.forEach { collectNodes(it, out) }
 }
 
 /**
@@ -694,7 +721,7 @@ class TypeAppendTextTool
             val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val (result, readNodes) = getFreshRead(treeParser, accessibilityServiceProvider, nodeCache)
                     val nodeId =
                         when (val resolution = targetResolver.resolve(target, result.windows)) {
                             is NodeResolution.Resolved -> resolution.nodeId
@@ -705,7 +732,7 @@ class TypeAppendTextTool
 
                     // Wait for input focus on the target, then for its InputConnection (max 500ms each, 50ms interval)
                     val fieldNodeId =
-                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                        focusedField(accessibilityServiceProvider, actionExecutor, readNodes, result.windows, nodeId)
                     awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Position cursor at end
@@ -822,7 +849,7 @@ class TypeInsertTextTool
             val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val (result, readNodes) = getFreshRead(treeParser, accessibilityServiceProvider, nodeCache)
                     val nodeId =
                         when (val resolution = targetResolver.resolve(target, result.windows)) {
                             is NodeResolution.Resolved -> resolution.nodeId
@@ -833,7 +860,7 @@ class TypeInsertTextTool
 
                     // Wait for input focus on the target, then for its InputConnection
                     val fieldNodeId =
-                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                        focusedField(accessibilityServiceProvider, actionExecutor, readNodes, result.windows, nodeId)
                     awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Validate offset against current text length
@@ -996,7 +1023,7 @@ class TypeReplaceTextTool
             val (nodeId, field) =
                 typeOperationMutex.withLock {
                     // Resolve the target in a fresh read, then click to focus
-                    val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+                    val (result, readNodes) = getFreshRead(treeParser, accessibilityServiceProvider, nodeCache)
                     val nodeId =
                         when (val resolution = targetResolver.resolve(target, result.windows)) {
                             is NodeResolution.Resolved -> resolution.nodeId
@@ -1007,7 +1034,7 @@ class TypeReplaceTextTool
 
                     // Wait for input focus on the target, then for its InputConnection
                     val fieldNodeId =
-                        focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                        focusedField(accessibilityServiceProvider, actionExecutor, readNodes, result.windows, nodeId)
                     awaitInputConnectionReady(typeInputController, nodeId)
 
                     // Get the whole text and find the search string
@@ -1188,7 +1215,7 @@ class TypeClearTextTool
 
         /** Resolves the target in a fresh read, focuses it and clears it; runs under [typeOperationMutex]. */
         private suspend fun clearLocked(target: NodeTarget): ClearOutcome {
-            val result = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val (result, readNodes) = getFreshRead(treeParser, accessibilityServiceProvider, nodeCache)
             val nodeId =
                 when (val resolution = targetResolver.resolve(target, result.windows)) {
                     is NodeResolution.Resolved -> resolution.nodeId
@@ -1199,7 +1226,7 @@ class TypeClearTextTool
 
             // Wait for input focus on the target, then for its InputConnection
             val fieldNodeId =
-                focusedField(accessibilityServiceProvider, actionExecutor, nodeCache, result.windows, nodeId)
+                focusedField(accessibilityServiceProvider, actionExecutor, readNodes, result.windows, nodeId)
             awaitInputConnectionReady(typeInputController, nodeId)
 
             // Check if field has text — skip clear if already empty
