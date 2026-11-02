@@ -21,7 +21,8 @@ import javax.net.ssl.X509TrustManager
  * HTTP clients and TLS contexts of the tunnel client. With [edgeOverride] every service host resolves to the
  * override address and carries its port in the URL (SNI and `Host` stay the real names); [trustedCaPem] (empty
  * = system CAs) is the trust anchor set. One shared [OkHttpClient] backs every derived client (one pool);
- * [close] evicts its idle connections, so a shared instance stays usable afterwards.
+ * [close] evicts its idle connections, so a shared instance stays usable afterwards. Each control connection derives
+ * a pool of its own and evicts it itself ([ArcTunnelControl]).
  */
 class ArcTunnelNet(
     trustedCaPem: String?,

@@ -23,6 +23,17 @@ class ArcTunnelWireTest {
     }
 
     @Test
+    fun `MovePayload decodes its addresses in order`() {
+        val payload =
+            ArcTunnelJson.decodeFromString(
+                ArcTunnelMovePayload.serializer(),
+                """{"addrs":["203.0.113.11:443","[2001:db8::1]:443"],"extra":1}""",
+            )
+
+        assertEquals(listOf("203.0.113.11:443", "[2001:db8::1]:443"), payload.addrs)
+    }
+
+    @Test
     fun `ApiErrorBody defaults`() {
         val body = ArcTunnelJson.decodeFromString(ArcTunnelApiErrorBody.serializer(), "{}")
 

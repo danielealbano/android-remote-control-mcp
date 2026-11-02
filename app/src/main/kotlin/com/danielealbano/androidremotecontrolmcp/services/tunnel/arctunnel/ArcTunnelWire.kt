@@ -67,6 +67,11 @@ data class ArcTunnelRenewNudgePayload(
     val nonce: String = "",
 )
 
+@Serializable
+data class ArcTunnelMovePayload(
+    val addrs: List<String> = emptyList(),
+)
+
 /** Structured server error (PROTOCOL.md §2–§3): `{reason, retryable, retry_after_seconds}` + HTTP status. */
 class ArcTunnelApiException(
     val reason: String,
