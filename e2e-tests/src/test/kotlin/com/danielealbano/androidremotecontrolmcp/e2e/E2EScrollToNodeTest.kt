@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import com.danielealbano.androidremotecontrolmcp.e2e.AndroidContainerSetup.execAdb
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
@@ -9,10 +10,12 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -29,6 +32,33 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EScrollToNodeTest {
     private val mcpClient = SharedAndroidContainer.mcpClient
+
+    /** The container's window and transition animation scales before this class turned them off. */
+    private var savedAnimationScales: Map<String, String> = emptyMap()
+
+    /**
+     * Turns the container's window and transition animations off while this class runs: a launch transition
+     * transforms the window, which moves the rows' bounds, and so their ids, back and forth, and reads some time apart
+     * can miss such a change (see [launchListAndFindTarget]).
+     */
+    @BeforeAll
+    fun turnOffWindowAnimations() {
+        savedAnimationScales =
+            ANIMATION_SCALES.associateWith { execAdb("shell", "settings", "get", "global", it).trim() }
+        ANIMATION_SCALES.forEach { execAdb("shell", "settings", "put", "global", it, "0") }
+    }
+
+    /** Restores the scales [turnOffWindowAnimations] saved; one that was not set ("null") is deleted again. */
+    @AfterAll
+    fun restoreWindowAnimations() {
+        savedAnimationScales.forEach { (name, value) ->
+            if (value == "null") {
+                execAdb("shell", "settings", "delete", "global", name)
+            } else {
+                execAdb("shell", "settings", "put", "global", name, value)
+            }
+        }
+    }
 
     @BeforeEach
     fun ensureAccessibility() {
@@ -48,20 +78,40 @@ class E2EScrollToNodeTest {
         return nodes?.firstOrNull()?.jsonObject
     }
 
-    /** Waits for the list to be on screen with its first row, then returns the off-screen target row. */
+    /**
+     * Waits for the list to be on screen and settled, then returns the off-screen target row. Node ids hash the bounds
+     * and the ancestors: after a launch, even with the window animations off, the list keeps moving (by tens of pixels)
+     * and its ancestors change for a while, longer than the launch helper's wait on a slow machine. It settles in one
+     * direction and then stays, so a row's id is usable once the ids of the first row and of the target are the same in
+     * STABLE_READS reads in a row.
+     */
     private suspend fun launchListAndFindTarget(): JsonObject {
         E2ETestApps.launchLongListTestApp()
         val deadline = System.currentTimeMillis() + LAUNCH_TIMEOUT_MS
+        var previousIds: Pair<String, String>? = null
+        var stableReads = 0
+        var lastRead = "none"
         while (System.currentTimeMillis() < deadline) {
             val first = findRow("Row 0")
             val target = findRow(TARGET_TEXT)
-            if (first != null && target != null) return target
+            lastRead = "Row 0: $first, $TARGET_TEXT: $target"
+            if (first != null && target != null) {
+                val ids = first.nodeId() to target.nodeId()
+                stableReads = if (ids == previousIds) stableReads + 1 else 1
+                previousIds = ids
+                if (stableReads == STABLE_READS) return target
+            } else {
+                stableReads = 0
+                previousIds = null
+            }
             Thread.sleep(POLL_MS)
         }
-        error("the long list did not show up within ${LAUNCH_TIMEOUT_MS}ms")
+        error("the long list did not settle within ${LAUNCH_TIMEOUT_MS}ms, last read: $lastRead")
     }
 
     private fun JsonObject.isVisible(): Boolean = getValue("visible").jsonPrimitive.boolean
+
+    private fun JsonObject.nodeId(): String = getValue("node_id").jsonPrimitive.content
 
     /** Polls until the row's on-screen state is [visible]: a scroll is a smooth animation that ends after the call. */
     private suspend fun waitForRowVisibility(
@@ -87,7 +137,7 @@ class E2EScrollToNodeTest {
             val result =
                 mcpClient.callTool(
                     "${TOOL_PREFIX}scroll_to_node",
-                    mapOf("node_id" to target.getValue("node_id").jsonPrimitive.content, "direction" to "down"),
+                    mapOf("node_id" to target.nodeId(), "direction" to "down"),
                 )
 
             assertNotEquals(true, result.isError, textOf(result))
@@ -95,7 +145,7 @@ class E2EScrollToNodeTest {
             assertNotNull(after, "$TARGET_TEXT must still be in the tree")
             assertEquals(true, after!!.isVisible(), "$TARGET_TEXT must be on screen after scroll_to_node: $after")
             // Node ids hash the bounds: the result names the row's id after it moved.
-            val currentId = after.getValue("node_id").jsonPrimitive.content
+            val currentId = after.nodeId()
             assertTrue(
                 textOf(result).contains("'$currentId'"),
                 "result must name the current id $currentId: ${textOf(result)}",
@@ -123,7 +173,7 @@ class E2EScrollToNodeTest {
             val after = findRow(SELECTOR_TARGET_TEXT)
             assertNotNull(after, "$SELECTOR_TARGET_TEXT must still be in the tree")
             assertEquals(true, after!!.isVisible(), "$SELECTOR_TARGET_TEXT must be on screen: $after")
-            assertTrue(textOf(result).contains("'${after.getValue("node_id").jsonPrimitive.content}'"), textOf(result))
+            assertTrue(textOf(result).contains("'${after.nodeId()}'"), textOf(result))
         }
 
     @Test
@@ -156,7 +206,7 @@ class E2EScrollToNodeTest {
     fun `tap_node by selector taps the single on-screen match`() =
         runBlocking {
             launchListAndFindTarget()
-            val rowOneId = findRow("Row 1")!!.getValue("node_id").jsonPrimitive.content
+            val rowOneId = findRow("Row 1")!!.nodeId()
 
             val result =
                 mcpClient.callTool(
@@ -211,5 +261,11 @@ class E2EScrollToNodeTest {
         const val LAUNCH_TIMEOUT_MS = 30_000L
         const val SETTLE_TIMEOUT_MS = 5_000L
         const val POLL_MS = 500L
+
+        /** Reads in a row, each at least POLL_MS after the previous one (over a second in all), with the same ids. */
+        const val STABLE_READS = 3
+
+        /** The global settings [E2EScrollToNodeTest.turnOffWindowAnimations] sets to 0. */
+        val ANIMATION_SCALES = listOf("window_animation_scale", "transition_animation_scale")
     }
 }
