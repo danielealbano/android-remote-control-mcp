@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
 import com.github.dockerjava.api.model.Network.Ipam
+import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.InternetProtocol
 import org.testcontainers.containers.Network
@@ -42,15 +43,25 @@ class UdpPortContainer(
  * ACME CA, `tls-alpn-01` validated against the server's own edge), and the server itself from the `latest`
  * ghcr image (NEVER pinned, always pulled, NEVER built locally). The server has a static IP on the stack
  * network so challtestsrv can answer Pebble's validation lookups with it before the server exists. The
- * server's edge (`:443`) is mapped to a random host port, which [ArcTunnelHostRelay] exposes on
- * `0.0.0.0:[EDGE_HOST_PORT]` for the phone (through its gateway) and for the JVM (`127.0.0.1`).
+ * server's edge is mapped to a random host port, which [ArcTunnelHostRelay] exposes on the SAME port number as the
+ * server listens on (the server derives the addresses it gives the phone from `--public-ip` and its `--listen` port)
+ * on `0.0.0.0:[EDGE_HOST_PORT]`, for the phone (through its gateway) and for the JVM (`127.0.0.1`).
+ * [startSecondReplica] adds a second node on [SECOND_EDGE_HOST_PORT], for the node drain.
  */
 class ArcTunnelStack(
-    /** Address the phone dials back to: the host gateway as seen from redroid, with [EDGE_HOST_PORT]. */
-    private val dialBackAdvertise: String,
+    /** The address the phone reaches the relays at: the host gateway as seen from redroid. */
+    private val publicIp: String,
 ) : AutoCloseable {
+    /** One tunnel server node: its name and static IP on the stack network, and its edge port. */
+    private class Replica(
+        val alias: String,
+        val ip: String,
+        val edgePort: Int,
+    )
+
     private val subnetOctets = "10.${Random.nextInt(100, 200)}.${Random.nextInt(0, 256)}"
-    private val serverIp = "$subnetOctets.10"
+    private val firstReplica = Replica(SERVER_ALIAS, "$subnetOctets.10", EDGE_HOST_PORT)
+    private val secondReplica = Replica("$SERVER_ALIAS-2", "$subnetOctets.11", SECOND_EDGE_HOST_PORT)
     private val network: Network =
         Network
             .builder()
@@ -59,7 +70,11 @@ class ArcTunnelStack(
                 cmd.withIpam(Ipam().withConfig(ipam))
             }.build()
     private val containers = ArrayDeque<GenericContainer<*>>()
-    private var relay: ArcTunnelHostRelay? = null
+    private val ca = ArcTunnelTestCa.generate()
+    private lateinit var minicaPem: String
+    private lateinit var firstServer: GenericContainer<*>
+    private var firstRelay: ArcTunnelHostRelay? = null
+    private var secondRelay: ArcTunnelHostRelay? = null
 
     /** Pebble's per-run issuing root (PEM): the trust anchor the phone and the JVM use for tunnel certs. */
     lateinit var issuingRootPem: String
@@ -95,7 +110,7 @@ class ArcTunnelStack(
                     .withFixedUdpPort(dnsHostPort, CHAL_DNS_PORT)
                     .withNetwork(network)
                     .withNetworkAliases("challtestsrv")
-                    .withCommand("-defaultIPv6", "", "-defaultIPv4", serverIp)
+                    .withCommand("-defaultIPv6", "", "-defaultIPv4", firstReplica.ip)
                     .withExposedPorts(CHAL_MGMT_PORT)
                     // The image is FROM scratch (no shell for a port check) and the management API answers 400
                     // to a body-less probe: readiness = any HTTP answer on the management port plus a real DNS
@@ -109,11 +124,50 @@ class ArcTunnelStack(
         val minica = File.createTempFile("pebble-minica", ".pem").apply { deleteOnExit() }
         pebble.copyFileFromContainer("/test/certs/pebble.minica.pem", minica.absolutePath)
         issuingRootPem = httpsGet("https://${pebble.host}:${pebble.getMappedPort(PEBBLE_MGMT_PORT)}/roots/0")
+        minicaPem = minica.readText()
 
-        val server = start(serverContainer(ArcTunnelTestCa.generate(), minica.readText()))
-        relay = ArcTunnelHostRelay(EDGE_HOST_PORT, server.getMappedPort(EDGE_PORT)).also { it.start() }
-        waitForReservedCert(ENROLL_HOST)
-        waitForReservedCert(CONTROL_HOST)
+        firstServer = start(serverContainer(firstReplica))
+        firstRelay = relayTo(firstServer, firstReplica)
+        waitForReservedCert(ENROLL_HOST, EDGE_HOST_PORT)
+        waitForReservedCert(CONTROL_HOST, EDGE_HOST_PORT)
+    }
+
+    /**
+     * Starts a second node on [SECOND_EDGE_HOST_PORT]. Pebble validates on one port only, so this node never issues:
+     * it adopts the reserved certificates the first node published to the shared store.
+     */
+    fun startSecondReplica() {
+        secondRelay = relayTo(start(serverContainer(secondReplica)), secondReplica)
+        waitForReservedCert(CONTROL_HOST, SECOND_EDGE_HOST_PORT)
+    }
+
+    /** Connections the second node's relay accepted so far: with no public traffic there, the phone's. */
+    fun secondReplicaConnections(): Int = requireNotNull(secondRelay).accepted
+
+    /** Cuts the phone's connections to the second node; new ones are still accepted. */
+    fun dropSecondReplicaConnections() {
+        requireNotNull(secondRelay).dropConnections()
+    }
+
+    /** Tells the first node to stop, as a service manager does: it goes through its drain and exits. */
+    fun stopFirstReplicaGracefully() {
+        DockerClientFactory
+            .instance()
+            .client()
+            .killContainerCmd(firstServer.containerId)
+            .withSignal("SIGTERM")
+            .exec()
+    }
+
+    fun firstReplicaRunning(): Boolean = firstServer.isRunning
+
+    private fun relayTo(
+        server: GenericContainer<*>,
+        replica: Replica,
+    ): ArcTunnelHostRelay {
+        val relay = ArcTunnelHostRelay(replica.edgePort, server.getMappedPort(replica.edgePort))
+        relay.start()
+        return relay
     }
 
     private fun pebbleContainer(): GenericContainer<*> =
@@ -134,16 +188,13 @@ class ArcTunnelStack(
                     .forStatusCode(200),
             )
 
-    private fun serverContainer(
-        ca: ArcTunnelTestCa.Material,
-        minicaPem: String,
-    ): GenericContainer<*> =
+    private fun serverContainer(replica: Replica): GenericContainer<*> =
         GenericContainer(DockerImageName.parse(SERVER_IMAGE))
             .withImagePullPolicy(PullPolicy.alwaysPull())
             .withNetwork(network)
-            .withNetworkAliases(SERVER_ALIAS)
+            .withNetworkAliases(replica.alias)
             .withCreateContainerCmdModifier { cmd ->
-                cmd.withIpv4Address(serverIp)
+                cmd.withIpv4Address(replica.ip)
                 // distroless `nonroot` cannot write the copied-in dirs: root inside this throw-away container.
                 cmd.withUser("0:0")
             }.withCopyToContainer(Transferable.of(ca.certPem), "/ca/ca.pem")
@@ -152,17 +203,20 @@ class ArcTunnelStack(
             .withCopyToContainer(Transferable.of(""), "/attest/signers.txt")
             .withCopyToContainer(Transferable.of(""), "/acme/.keep")
             .withCopyToContainer(Transferable.of(""), "/conn-logs/.keep")
-            .withEnv(serverEnv())
-            .withExposedPorts(EDGE_PORT, INTERNAL_PORT)
+            .withEnv(serverEnv(replica))
+            .withExposedPorts(replica.edgePort, INTERNAL_PORT)
             .waitingFor(Wait.forHttp("/healthz").forPort(INTERNAL_PORT).forStatusCode(200))
 
     /** Phone-side edge override (`host:port`), from the host gateway address redroid routes through. */
     fun edgeOverride(gatewayIp: String): String = "$gatewayIp:$EDGE_HOST_PORT"
 
-    /** Opens a TLS connection to the edge (via the relay) with [sni] as server name, trusting the Pebble root. */
-    fun connectTls(sni: String): SSLSocket {
-        val raw = Socket("127.0.0.1", EDGE_HOST_PORT).apply { soTimeout = TLS_TIMEOUT_MS }
-        val socket = pebbleSslContext().socketFactory.createSocket(raw, sni, EDGE_HOST_PORT, true) as SSLSocket
+    /** Opens a TLS connection to an edge (via its relay) with [sni] as server name, trusting the Pebble root. */
+    fun connectTls(
+        sni: String,
+        edgePort: Int = EDGE_HOST_PORT,
+    ): SSLSocket {
+        val raw = Socket("127.0.0.1", edgePort).apply { soTimeout = TLS_TIMEOUT_MS }
+        val socket = pebbleSslContext().socketFactory.createSocket(raw, sni, edgePort, true) as SSLSocket
         socket.sslParameters = socket.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
         socket.startHandshake()
         return socket
@@ -179,7 +233,8 @@ class ArcTunnelStack(
     }
 
     override fun close() {
-        relay?.close()
+        firstRelay?.close()
+        secondRelay?.close()
         while (containers.isNotEmpty()) containers.removeLast().stop()
         network.close()
     }
@@ -195,13 +250,16 @@ class ArcTunnelStack(
         SSLContext.getInstance("TLS").apply { init(null, arrayOf<TrustManager>(pebbleTrustManager()), null) }
 
     /** The reserved hosts serve an ACME cert only once the server issued it: wait for a verified handshake. */
-    private fun waitForReservedCert(host: String) {
+    private fun waitForReservedCert(
+        host: String,
+        edgePort: Int,
+    ) {
         val deadline = System.currentTimeMillis() + RESERVED_CERT_TIMEOUT_MS
         var last: String? = null
         while (System.currentTimeMillis() < deadline) {
             try {
-                connectTls(host).close()
-                println("[ArcTunnelStack] $host serves a trusted certificate")
+                connectTls(host, edgePort).close()
+                println("[ArcTunnelStack] $host serves a trusted certificate on $edgePort")
                 return
             } catch (e: java.io.IOException) {
                 last = "${e::class.simpleName}: ${e.message}"
@@ -264,7 +322,7 @@ class ArcTunnelStack(
           "certificate": "test/certs/localhost/cert.pem",
           "privateKey": "test/certs/localhost/key.pem",
           "httpPort": $ACME_HTTP_PORT,
-          "tlsPort": $EDGE_PORT,
+          "tlsPort": $EDGE_HOST_PORT,
           "ocspResponderURL": "",
           "externalAccountBindingRequired": false,
           "retryAfter": {"authz": 3, "order": 5},
@@ -280,16 +338,16 @@ class ArcTunnelStack(
      * `TUNNELD_*` env twins of the flags the server e2e sets (`runReplicaOnce` + `LooseACMEBudgets`), LE via
      * Pebble.
      */
-    private fun serverEnv(): Map<String, String> =
+    private fun serverEnv(replica: Replica): Map<String, String> =
         mapOf(
-            "TUNNELD_LISTEN" to ":$EDGE_PORT",
+            "TUNNELD_LISTEN" to ":${replica.edgePort}",
             "TUNNELD_INTERNAL_LISTEN" to ":$INTERNAL_PORT",
             "TUNNELD_MESH_LISTEN" to ":$MESH_PORT",
-            "TUNNELD_MESH_ADVERTISE" to "$SERVER_ALIAS:$MESH_PORT",
+            "TUNNELD_MESH_ADVERTISE" to "${replica.alias}:$MESH_PORT",
             "TUNNELD_TUNNEL_DOMAIN" to TUNNEL_DOMAIN,
             "TUNNELD_ENROLL_HOST" to ENROLL_HOST,
             "TUNNELD_CONTROL_HOST" to CONTROL_HOST,
-            "TUNNELD_DIALBACK_ADVERTISE" to dialBackAdvertise,
+            "TUNNELD_PUBLIC_IP" to publicIp,
             "TUNNELD_REDIS_URL" to "redis://valkey:$VALKEY_PORT/0",
             "TUNNELD_CA_CERT" to "/ca/ca.pem",
             "TUNNELD_CA_KEY" to "/ca/ca-key.pem",
@@ -326,6 +384,7 @@ class ArcTunnelStack(
             "TUNNELD_LIMIT_CONCURRENT" to "8",
             "TUNNELD_LIMIT_PACKETS" to "100000",
             "TUNNELD_LIMIT_BANDWIDTH" to "10mbit",
+            "TUNNELD_LIMIT_CONN_IDLE" to "20s",
             "TUNNELD_LIMIT_CONN_EVICT_IDLE" to "1s",
             "TUNNELD_LIMIT_CONN_MIN_RATE" to "1kb",
             "TUNNELD_LIMIT_CONN_PROTECT_RATE" to "1mb",
@@ -346,8 +405,11 @@ class ArcTunnelStack(
         const val ENROLL_HOST = "enroll.$BASE_ADDRESS"
         const val CONTROL_HOST = "connect.$BASE_ADDRESS"
 
-        /** Fixed host port of the relay (like `FixtureHttpServer.FIXTURE_HTTP_PORT`); the phone dials back to it. */
+        /** Fixed port of the first node's edge and relay (like `FixtureHttpServer.FIXTURE_HTTP_PORT`). */
         const val EDGE_HOST_PORT = 18443
+
+        /** Fixed port of the second node's edge and relay. */
+        const val SECOND_EDGE_HOST_PORT = 18444
         private const val SERVER_ALIAS = "arc-tunnel-server"
         private const val BUCKET = "arc-tunnel-e2e"
         private const val MINIO_ACCESS = "test-access"
@@ -359,7 +421,6 @@ class ArcTunnelStack(
         private const val PEBBLE_CONFIG_PATH = "/test/config/pebble-host-validation.json"
         private const val CHAL_DNS_PORT = 8053
         private const val CHAL_MGMT_PORT = 8055
-        private const val EDGE_PORT = 443
         private const val ACME_HTTP_PORT = 80
         private const val INTERNAL_PORT = 9090
         private const val MESH_PORT = 9443

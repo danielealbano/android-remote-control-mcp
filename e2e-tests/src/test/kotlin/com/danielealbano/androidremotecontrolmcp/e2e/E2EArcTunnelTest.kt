@@ -7,18 +7,22 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.MethodOrderer
+import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.TestMethodOrder
 
 /**
  * E2E: the free E2E tunnel against a local tunnel server stack ([ArcTunnelStack]). The redroid phone enrolls
  * (attestation optional on the server: redroid's AndroidKeyStore is a software KeyMint), the MCP server starts
  * with the tunnel, and the JVM reaches `/health` (HTTP/2 over ALPN, and HTTP/1.1 from a client without ALPN), the
  * OAuth metadata (which must name the `https` URL over HTTP/1.1 too) and `tools/list` THROUGH the tunnel with the
- * Pebble root as trust anchor. The shared container is restored (tunnel off, server restarted, client refreshed)
- * afterwards.
+ * Pebble root as trust anchor. The node drain runs last, because it stops the stack's first node. The shared
+ * container is restored (tunnel off, server restarted, client refreshed) afterwards.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EArcTunnelTest {
     private lateinit var stack: ArcTunnelStack
     private lateinit var status: E2EArcTunnelStatus
@@ -28,7 +32,7 @@ class E2EArcTunnelTest {
     fun startStackAndTunnel() {
         SharedAndroidContainer.ensureAccessibilityService()
         val gateway = AndroidContainerSetup.containerGatewayIp()
-        stack = ArcTunnelStack(dialBackAdvertise = "$gateway:${ArcTunnelStack.EDGE_HOST_PORT}")
+        stack = ArcTunnelStack(publicIp = gateway)
         stack.start()
 
         // Enrollment is refused while the MCP server runs.
@@ -126,11 +130,69 @@ class E2EArcTunnelTest {
         assertEquals("Connected", AndroidContainerSetup.queryArcTunnel().tunnel)
     }
 
+    /**
+     * The phone's edge override points at the first node only, so the second node can only reach it through a MOVE:
+     * it must still serve through the second node once the first one is gone.
+     */
+    @Test
+    @Order(Int.MAX_VALUE)
+    fun `a draining node moves the phone to the other node and its connections finish`() {
+        stack.startSecondReplica()
+        val second = ArcTunnelStack.SECOND_EDGE_HOST_PORT
+        ArcTunnelPublicClient.KeepAlive(stack, fqdn(), ArcTunnelStack.EDGE_HOST_PORT).use { inFlight ->
+            assertOk(inFlight.get(HEALTH))
+            val phoneConnections = stack.secondReplicaConnections()
+
+            stack.stopFirstReplicaGracefully()
+
+            awaitTrue("the phone to open a connection to the second node on MOVE") {
+                stack.secondReplicaConnections() > phoneConnections
+            }
+            assertOk(inFlight.get(HEALTH))
+            assertOk(ArcTunnelPublicClient.get(stack, fqdn(), HEALTH))
+            assertOk(healthThrough(second))
+
+            val beforeDrop = stack.secondReplicaConnections()
+            stack.dropSecondReplicaConnections()
+            awaitTrue("the phone, reconnecting to the draining node, to move to the second node again") {
+                stack.secondReplicaConnections() > beforeDrop
+            }
+            awaitTrue("the tunnel to serve through the second node after the second move") {
+                healthThrough(second).startsWith(HTTP_OK)
+            }
+        }
+
+        awaitTrue("the first node to finish its drain and exit") { !stack.firstReplicaRunning() }
+        assertOk(healthThrough(second))
+        assertEquals("Connected", AndroidContainerSetup.queryArcTunnel().tunnel)
+    }
+
+    private fun healthThrough(edgePort: Int): String =
+        runCatching { ArcTunnelPublicClient.get(stack, fqdn(), HEALTH, edgePort) }.getOrElse { it.toString() }
+
+    private fun assertOk(response: String) {
+        assertTrue(response.startsWith(HTTP_OK), response)
+    }
+
+    private fun awaitTrue(
+        what: String,
+        condition: () -> Boolean,
+    ) {
+        val deadline = System.currentTimeMillis() + DRAIN_STEP_TIMEOUT_MS
+        while (!condition()) {
+            assertTrue(System.currentTimeMillis() < deadline, "timed out waiting for $what")
+            Thread.sleep(POLL_MS)
+        }
+    }
+
     private fun fqdn(): String = requireNotNull(status.url).removePrefix("https://")
 
     companion object {
         private const val ENROLL_TIMEOUT_MS = 180_000L
         private const val CONNECT_TIMEOUT_MS = 120_000L
+        private const val DRAIN_STEP_TIMEOUT_MS = 60_000L
+        private const val POLL_MS = 250L
+        private const val HTTP_OK = "HTTP/1.1 200"
         private const val HEALTH = "/health"
         private const val PROTECTED_RESOURCE = "/.well-known/oauth-protected-resource"
     }

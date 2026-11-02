@@ -21,13 +21,54 @@ object ArcTunnelPublicClient {
         stack: ArcTunnelStack,
         fqdn: String,
         path: String,
+        edgePort: Int = ArcTunnelStack.EDGE_HOST_PORT,
     ): String {
-        val socket: SSLSocket = stack.connectTls(fqdn)
+        val socket: SSLSocket = stack.connectTls(fqdn, edgePort)
         socket.use {
             it.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\nConnection: close\r\n\r\n".toByteArray())
             it.outputStream.flush()
             return it.inputStream.readNBytes(READ_LIMIT).decodeToString()
         }
+    }
+
+    /**
+     * One public connection that stays open between requests, through the edge on [edgePort]: it stays spliced to
+     * the phone through the control connection that was serving when it opened.
+     */
+    class KeepAlive(
+        stack: ArcTunnelStack,
+        private val fqdn: String,
+        edgePort: Int,
+    ) : AutoCloseable {
+        private val socket: SSLSocket = stack.connectTls(fqdn, edgePort)
+        private val input = socket.inputStream.buffered()
+
+        /** `GET [path]`: the response's status line. */
+        fun get(path: String): String {
+            socket.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\n\r\n".toByteArray())
+            socket.outputStream.flush()
+            val status = readLine()
+            var contentLength = 0
+            var header = readLine()
+            while (header.isNotEmpty()) {
+                val (name, value) = header.split(':', limit = 2)
+                if (name.equals("Content-Length", ignoreCase = true)) contentLength = value.trim().toInt()
+                header = readLine()
+            }
+            input.readNBytes(contentLength)
+            return status
+        }
+
+        override fun close() {
+            socket.close()
+        }
+
+        private fun readLine(): String =
+            generateSequence { input.read() }
+                .takeWhile { it >= 0 && it != '\n'.code }
+                .map { it.toChar() }
+                .joinToString("")
+                .removeSuffix("\r")
     }
 
     /** The public URL of [fqdn] on the local relay port. */
