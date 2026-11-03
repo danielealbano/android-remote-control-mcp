@@ -399,7 +399,24 @@ class ArcTunnelEnrollerTest {
         }
 
     @Test
-    fun `a failing save never issues again`() =
+    fun `a stale key that cannot be deleted does not fail the renewal`() =
+        runBlocking {
+            val spiedKeys = spyk(FakeArcTunnelKeyStore())
+            every { spiedKeys.deleteKey("${prefix}identity-0") } throws KeyStoreException("busy")
+            val spiedEnroller = ArcTunnelEnroller(spiedKeys, serverLog)
+            val identity = ArcTunnelTestIdentity.create(spiedKeys, net, withPublicChain = false)
+            val saves = AtomicInteger()
+
+            spiedEnroller.issue(identity, "0c01") { saves.incrementAndGet() }
+            spiedEnroller.issue(identity, "0c02") { saves.incrementAndGet() }
+
+            assertEquals(2, identity.state().generation)
+            assertEquals(2, saves.get())
+            assertEquals(2, service.count(ISSUE_PATH))
+        }
+
+    @Test
+    fun `a failing save does not make issue retry`() =
         runBlocking {
             val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
 

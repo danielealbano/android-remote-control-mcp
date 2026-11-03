@@ -40,6 +40,10 @@ class ArcTunnelPemTest {
     private fun corrupted(certificate: X509Certificate): String =
         ArcTunnelPem.encode("CERTIFICATE", certificate.encoded.copyOf(CORRUPTED_LENGTH))
 
+    /** The start of a certificate block: whole Base64 lines, no END. */
+    private fun cutShort(certificate: X509Certificate): String =
+        pem(certificate).lines().take(CUT_SHORT_LINES).joinToString("\n", postfix = "\n")
+
     @Test
     fun `encode wraps at 64 chars`() {
         val pem = ArcTunnelPem.encode("TEST", ByteArray(200) { it.toByte() })
@@ -103,6 +107,27 @@ class ArcTunnelPemTest {
     }
 
     @Test
+    fun `parseChain skips a block cut short and keeps the certificate after it`() {
+        val bundle = pem(chain[0]) + cutShort(chain[1]) + pem(chain[2])
+
+        assertEquals(listOf(chain[0], chain[2]), ArcTunnelPem.parseChain(bundle))
+    }
+
+    @Test
+    fun `parseChain skips a last block cut short`() {
+        val bundle = pem(chain[0]) + pem(chain[1]) + cutShort(chain[2])
+
+        assertEquals(listOf(chain[0], chain[1]), ArcTunnelPem.parseChain(bundle))
+    }
+
+    @Test
+    fun `parseChain throws on a leaf cut short`() {
+        val bundle = cutShort(chain[0]) + pem(chain[1])
+
+        assertThrows<CertificateException> { ArcTunnelPem.parseChain(bundle) }
+    }
+
+    @Test
     fun `parseChain throws on a corrupted leaf`() {
         val bundle = corrupted(chain[0]) + pem(chain[1])
 
@@ -148,5 +173,6 @@ class ArcTunnelPemTest {
 
     private companion object {
         const val CORRUPTED_LENGTH = 16
+        const val CUT_SHORT_LINES = 3
     }
 }

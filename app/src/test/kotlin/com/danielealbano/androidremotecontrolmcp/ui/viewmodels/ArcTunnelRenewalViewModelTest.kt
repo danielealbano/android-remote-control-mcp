@@ -82,6 +82,17 @@ class ArcTunnelRenewalViewModelTest {
     }
 
     @Test
+    fun `hiding the modal after the renewal ended does not hide the next one`() {
+        renewal.value = ArcTunnelRenewalState.Renewing
+        renewal.value = ArcTunnelRenewalState.Idle
+
+        viewModel.hideModal()
+        renewal.value = ArcTunnelRenewalState.Renewing
+
+        assertTrue(viewModel.modalVisible.value)
+    }
+
+    @Test
     fun `a retry after a failed renewal shows the modal even if it was hidden`() {
         renewal.value = ArcTunnelRenewalState.Renewing
         viewModel.hideModal()

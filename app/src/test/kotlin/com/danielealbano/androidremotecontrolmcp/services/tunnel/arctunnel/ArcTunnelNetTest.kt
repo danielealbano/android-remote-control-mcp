@@ -50,7 +50,7 @@ class ArcTunnelNetTest {
             .use { it.code }
     }
 
-    /** root -> intermediate -> leaf, with [trusted] as the only trust anchor. */
+    /** root -> intermediate -> leaf; [trusted] has [root] as its only trust anchor. */
     private class TrustFixture {
         val root: HeldCertificate =
             HeldCertificate

@@ -14,8 +14,8 @@ object ArcTunnelPem {
     private const val LINE_LENGTH = 64
     private const val HEX_RADIX = 16
     private const val HEX_SHIFT = 4
-    private val CERTIFICATE_BLOCK =
-        Regex("-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", RegexOption.DOT_MATCHES_ALL)
+    private const val BEGIN_CERTIFICATE = "-----BEGIN CERTIFICATE-----"
+    private const val END_CERTIFICATE = "-----END CERTIFICATE-----"
 
     fun encode(
         type: String,
@@ -38,11 +38,15 @@ object ArcTunnelPem {
      * Conscrypt, and Let's Encrypt writes one between its certificates, so those phones got the leaf alone.
      *
      * A blank [pem] is an empty chain. No certificate at all, or a first one that does not parse, throws; a later one
-     * that does not parse is logged and skipped. Only complete BEGIN to END blocks count, the rest of [pem] is ignored.
+     * that does not parse is logged and skipped. A block that lost its END gets one and is judged the same way, so a
+     * body cut short does not parse and a whole one is kept. Text outside the blocks is ignored.
      */
     fun parseChain(pem: String): List<X509Certificate> {
         if (pem.isBlank()) return emptyList()
-        val blocks = CERTIFICATE_BLOCK.findAll(pem).map { it.value }.toList()
+        val blocks =
+            pem.split(BEGIN_CERTIFICATE).drop(1).map {
+                BEGIN_CERTIFICATE + it.substringBefore(END_CERTIFICATE) + END_CERTIFICATE
+            }
         if (blocks.isEmpty()) throw CertificateException("no PEM certificate found")
         val factory = CertificateFactory.getInstance("X.509")
         val rest =

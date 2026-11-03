@@ -33,11 +33,8 @@ class ArcTunnelRenewalsImpl
             // A Retry pressed before this attempt started is stale.
             retries.tryReceive()
             _state.value = ArcTunnelRenewalState.Renewing
-            val result = runCatching { enrollment.renew(identity, null, ::showInstalling) }
-            result.onSuccess {
-                _state.value = ArcTunnelRenewalState.Idle
-                serverLog.log(ServerLogEntry.Type.TUNNEL, "Free E2E tunnel certificate renewed at start")
-            }
+            val result = runCatching { enrollment.renew(identity, null) { certificateReceived(RENEWED_AT_START) } }
+            result.onSuccess { _state.value = ArcTunnelRenewalState.Idle }
             result.onFailure {
                 if (it is CancellationException) {
                     _state.value = ArcTunnelRenewalState.Idle
@@ -86,7 +83,7 @@ class ArcTunnelRenewalsImpl
                     withTimeoutOrNull(chainRenewalTimeoutMs) {
                         enrollment.renew(identity, null) {
                             received.set(true)
-                            showInstalling()
+                            certificateReceived(CHAIN_RENEWED)
                         }
                     }
                 check(renewed != null || received.get()) {
@@ -95,12 +92,13 @@ class ArcTunnelRenewalsImpl
             } finally {
                 _state.value = ArcTunnelRenewalState.Idle
             }
-            Log.i(TAG, CHAIN_RENEWED)
-            serverLog.log(ServerLogEntry.Type.TUNNEL, CHAIN_RENEWED)
         }
 
-        private fun showInstalling() {
+        /** Logged here: the certificate is installed and saved from now on, and a stop would skip anything later. */
+        private fun certificateReceived(message: String) {
             _state.value = ArcTunnelRenewalState.Installing
+            Log.i(TAG, message)
+            serverLog.log(ServerLogEntry.Type.TUNNEL, message)
         }
 
         override fun retry() {
@@ -121,6 +119,7 @@ class ArcTunnelRenewalsImpl
 
             /** Above the 400 s PROTOCOL.md §3 asks a phone to allow for one `/issue` request. */
             const val CHAIN_RENEWAL_TIMEOUT_MS = 480_000L
+            const val RENEWED_AT_START = "Free E2E tunnel certificate renewed at start"
             const val CHAIN_COMPLETE = "Free E2E tunnel certificate chain checked: complete"
             const val CHAIN_INCOMPLETE = "Free E2E tunnel certificate chain is incomplete: renewing the certificate"
             const val CHAIN_RENEWED = "Free E2E tunnel certificate renewed to replace the incomplete chain"

@@ -27,7 +27,7 @@ class ArcTunnelRenewalViewModel
         val renewal: StateFlow<ArcTunnelRenewalState> = renewals.state
         private val modalHidden = MutableStateFlow(false)
 
-        /** While a renewal runs, until the user hides the modal for that renewal. */
+        /** While a renewal runs, until the user hides the modal; a new renewal or a new app start shows it again. */
         val modalVisible: StateFlow<Boolean> =
             combine(renewals.state, modalHidden) { state, hidden ->
                 state.inProgress && !hidden
@@ -40,7 +40,7 @@ class ArcTunnelRenewalViewModel
         }
 
         fun hideModal() {
-            modalHidden.value = true
+            if (renewals.state.value.inProgress) modalHidden.value = true
         }
 
         fun retry() {

@@ -118,14 +118,34 @@ class ArcTunnelEnrollmentImpl
             mutex.withLock {
                 val store = store(ArcTunnelEnv(identity.hosts.baseAddress))
                 check(store.holds(identity)) { "identity ${identity.name} was forgotten; renewal skipped" }
-                enroller.issue(identity, nonce, onCertificateReceived) {
-                    if (store.holds(identity)) store.save(identity)
+                enroller.issue(identity, nonce, onCertificateReceived) { saveRenewed(store, identity) }
+            }
+        }
+
+        /**
+         * Runs whatever happened to the caller. A failing save does not fail the renewal: the new certificate is in use
+         * and a retry would spend another. The next tunnel start works from the record as it was.
+         */
+        private fun saveRenewed(
+            store: ArcTunnelIdentityStore,
+            identity: ArcTunnelIdentity,
+        ) {
+            val saved =
+                runCatching {
+                    store.holds(identity).also { holds -> if (holds) store.save(identity) }
                 }
-                if (store.holds(identity)) {
-                    // The saved name has a certificate now: a setup failure still shown for it is over.
-                    val failed = _state.value as? ArcTunnelEnrollmentState.Failed
-                    if (failed != null) _state.compareAndSet(failed, ArcTunnelEnrollmentState.Idle)
-                }
+            saved.onFailure {
+                val reason = it.message ?: it.javaClass.simpleName
+                Log.e(TAG, "the renewed certificate could not be saved", it)
+                serverLog.log(
+                    ServerLogEntry.Type.TUNNEL,
+                    "Free E2E tunnel certificate renewed but could not be saved, in use until the next start: $reason",
+                )
+            }
+            if (saved.getOrDefault(false)) {
+                // The saved name has a certificate now: a setup failure still shown for it is over.
+                val failed = _state.value as? ArcTunnelEnrollmentState.Failed
+                if (failed != null) _state.compareAndSet(failed, ArcTunnelEnrollmentState.Idle)
             }
         }
 

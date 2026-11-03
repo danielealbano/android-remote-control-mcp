@@ -33,7 +33,7 @@ class ArcTunnelEnroller(
      *
      * A received certificate is spent, and losing it would cost another against the issuance cap: from
      * [onCertificateReceived] on it is installed and [save]d whatever happens to the caller, a cancellation included.
-     * [save] runs outside the retries, so a failing save never issues again.
+     * [save] runs outside the retries, so a failing save does not issue again here.
      */
     suspend fun issue(
         identity: ArcTunnelIdentity,
@@ -123,7 +123,11 @@ class ArcTunnelEnroller(
                 keys.deleteKey(nextIdentityAlias)
                 throw it
             }
-        if (stale.isNotEmpty() && stale != nextIdentityAlias) keys.deleteKey(stale)
+        // The new chain is in place: a leftover old key must not turn the renewal into a failure.
+        if (stale.isNotEmpty() && stale != nextIdentityAlias) {
+            runCatching { keys.deleteKey(stale) }
+                .onFailure { Log.w(TAG, "could not delete the old identity key $stale", it) }
+        }
     }
 
     private suspend fun postIssueAndInstall(
@@ -178,10 +182,10 @@ class ArcTunnelEnroller(
                 .getOrDefault(true)
         if (complete) return
         val count = publicChain.size
-        Log.w(TAG, "the issued chain of ${identity.name} ($count certificates) does not reach a trusted root")
+        Log.w(TAG, "the issued chain of ${identity.name} (certificates: $count) does not reach a trusted root")
         serverLog.log(
             ServerLogEntry.Type.TUNNEL,
-            "Free E2E tunnel certificate chain is incomplete ($count certificates): clients that do not fetch " +
+            "Free E2E tunnel certificate chain is incomplete (certificates: $count): clients that do not fetch " +
                 "intermediates may refuse it until the next renewal",
         )
     }

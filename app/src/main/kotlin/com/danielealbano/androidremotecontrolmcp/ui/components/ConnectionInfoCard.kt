@@ -76,7 +76,7 @@ internal sealed interface TunnelRowContent {
         val message: String,
     ) : TunnelRowContent
 
-    /** The free E2E tunnel renews an expired or missing certificate at start: spinner, text and Cancel. */
+    /** The free E2E tunnel renews a certificate at start: spinner, text and Cancel. */
     data object Renewing : TunnelRowContent
 
     /** That renewal received the certificate and is installing it: the same, with Cancel disabled. */
