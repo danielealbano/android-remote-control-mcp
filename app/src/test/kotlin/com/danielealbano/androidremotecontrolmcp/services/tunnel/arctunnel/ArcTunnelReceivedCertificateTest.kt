@@ -44,6 +44,7 @@ class ArcTunnelReceivedCertificateTest {
     private val hosts = ArcTunnelTestServer.hosts
     private val issues = AtomicInteger()
     private val issueGate = AtomicReference<CountDownLatch>()
+    private val issueRefusal = AtomicReference<MockResponse>()
     private lateinit var enrollAnswer: () -> MockResponse
     private lateinit var server: MockWebServer
     private lateinit var env: ArcTunnelEnv
@@ -66,7 +67,7 @@ class ArcTunnelReceivedCertificateTest {
                         issueGate.get()?.await(BUDGET_MS, TimeUnit.MILLISECONDS)
                         val identityCert = quote(pem("id"))
                         val publicCert = quote(pem("pub"))
-                        ArcTunnelTestServer.json(
+                        issueRefusal.get() ?: ArcTunnelTestServer.json(
                             """{"identity_cert":$identityCert,"public_cert":$publicCert,"ca":"letsencrypt"}""",
                         )
                     }
@@ -158,6 +159,17 @@ class ArcTunnelReceivedCertificateTest {
         assertEquals(ARC_TUNNEL_CERT_CHECK, saved.certCheck)
     }
 
+    /** A net that cancels the caller when an `/issue` answer has just been read in full. */
+    private fun netCancellingAtEndOfBody(caller: AtomicReference<Job>): ArcTunnelNet =
+        spyk(impl.net(env)).also {
+            every { it.mtlsClient(any()) } answers {
+                callOriginal()
+                    .newBuilder()
+                    .addInterceptor(ArcTunnelTestServer.atEndOfBody { caller.get().cancel() })
+                    .build()
+            }
+        }
+
     /** A net that cancels the caller right after the install, which is when this net is asked about the new chain. */
     private fun netCancellingAfterInstall(caller: AtomicReference<Job>): ArcTunnelNet =
         spyk(impl.net(env)).also {
@@ -180,17 +192,36 @@ class ArcTunnelReceivedCertificateTest {
         }
 
     @Test
+    fun `a renew cancelled right after a retryable refusal was read ends at once and saves nothing`() =
+        runBlocking {
+            issueRefusal.set(
+                MockResponse
+                    .Builder()
+                    .code(503)
+                    .body("""{"reason":"acme_transient","retryable":true,"retry_after_seconds":3600}""")
+                    .build(),
+            )
+            val caller = AtomicReference<Job>()
+            val identity = ArcTunnelTestIdentity.create(keys, netCancellingAtEndOfBody(caller), withPublicChain = false)
+            impl.store(env).save(identity)
+            val before = impl.store(env).load()
+            val job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) { impl.renew(identity, null) }
+            caller.set(job)
+
+            job.start()
+            withTimeout(BUDGET_MS) { job.join() }
+
+            assertTrue(job.isCancelled)
+            assertEquals(1, issues.get())
+            assertEquals(0, identity.state().generation)
+            assertEquals(before, impl.store(env).load())
+        }
+
+    @Test
     fun `a renew cancelled right after the answer was read installs and saves it, issuing once`() =
         runBlocking {
             val caller = AtomicReference<Job>()
-            val net = spyk(impl.net(env))
-            every { net.mtlsClient(any()) } answers {
-                callOriginal()
-                    .newBuilder()
-                    .addInterceptor(ArcTunnelTestServer.atEndOfBody { caller.get().cancel() })
-                    .build()
-            }
-            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            val identity = ArcTunnelTestIdentity.create(keys, netCancellingAtEndOfBody(caller), withPublicChain = false)
             impl.store(env).save(identity)
             val job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) { impl.renew(identity, null) }
             caller.set(job)

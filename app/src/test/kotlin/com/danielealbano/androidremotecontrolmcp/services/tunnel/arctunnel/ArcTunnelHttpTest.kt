@@ -176,11 +176,7 @@ class ArcTunnelHttpTest {
 
     @Test
     fun `an answer read in full is returned even if a cancellation lands right after it`() {
-        val answer = ArcTunnelTestServer.json("""{"nonce":"kept"}""")
-        server.dispatcher =
-            object : Dispatcher() {
-                override fun dispatch(request: RecordedRequest): MockResponse = answer
-            }
+        server.enqueue(ArcTunnelTestServer.json("""{"nonce":"kept"}"""))
         val caller = AtomicReference<Job>()
         val client =
             net
@@ -194,7 +190,7 @@ class ArcTunnelHttpTest {
             val job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) { nonce.set(getNonce(client).nonce) }
             caller.set(job)
             job.start()
-            withTimeout(CANCEL_BUDGET_MS) { job.join() }
+            withTimeout(TimeUnit.SECONDS.toMillis(BLOCK_S)) { job.join() }
 
             assertTrue(job.isCancelled)
         }
