@@ -196,6 +196,7 @@ fun ArcTunnelSettingsContent(
                 failure = (state.renewal as? ArcTunnelRenewalState.Failed)?.message,
                 onCancel = actions.onCancelRenewal,
                 onRetry = actions.onRetryRenewal,
+                cancelEnabled = state.renewal != ArcTunnelRenewalState.Installing,
             )
         }
     }

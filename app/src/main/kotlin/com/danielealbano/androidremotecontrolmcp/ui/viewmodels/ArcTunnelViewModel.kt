@@ -108,7 +108,7 @@ class ArcTunnelViewModel
                 var previous: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle
                 renewals.state.collect { state ->
                     // A tunnel-start renewal that ended may have saved the certificate (and so the URL).
-                    if (previous is ArcTunnelRenewalState.Renewing) refreshUrl()
+                    if (previous.inProgress && !state.inProgress) refreshUrl()
                     previous = state
                 }
             }

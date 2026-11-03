@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,7 +33,7 @@ class ArcTunnelRenewalsImpl
             // A Retry pressed before this attempt started is stale.
             retries.tryReceive()
             _state.value = ArcTunnelRenewalState.Renewing
-            val result = runCatching { enrollment.renew(identity, null) }
+            val result = runCatching { enrollment.renew(identity, null, ::showInstalling) }
             result.onSuccess {
                 _state.value = ArcTunnelRenewalState.Idle
                 serverLog.log(ServerLogEntry.Type.TUNNEL, "Free E2E tunnel certificate renewed at start")
@@ -80,13 +81,26 @@ class ArcTunnelRenewalsImpl
             serverLog.log(ServerLogEntry.Type.TUNNEL, CHAIN_INCOMPLETE)
             _state.value = ArcTunnelRenewalState.Renewing
             try {
-                withTimeoutOrNull(chainRenewalTimeoutMs) { enrollment.renew(identity, null) }
-                    ?: error("no certificate within ${chainRenewalTimeoutMs / MS_PER_S} s")
+                val received = AtomicBoolean(false)
+                val renewed =
+                    withTimeoutOrNull(chainRenewalTimeoutMs) {
+                        enrollment.renew(identity, null) {
+                            received.set(true)
+                            showInstalling()
+                        }
+                    }
+                check(renewed != null || received.get()) {
+                    "no certificate within ${chainRenewalTimeoutMs / MS_PER_S} s"
+                }
             } finally {
                 _state.value = ArcTunnelRenewalState.Idle
             }
             Log.i(TAG, CHAIN_RENEWED)
             serverLog.log(ServerLogEntry.Type.TUNNEL, CHAIN_RENEWED)
+        }
+
+        private fun showInstalling() {
+            _state.value = ArcTunnelRenewalState.Installing
         }
 
         override fun retry() {

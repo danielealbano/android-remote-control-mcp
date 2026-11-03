@@ -30,12 +30,12 @@ class ArcTunnelRenewalViewModel
         /** While a renewal runs, until the user hides the modal for that renewal. */
         val modalVisible: StateFlow<Boolean> =
             combine(renewals.state, modalHidden) { state, hidden ->
-                state is ArcTunnelRenewalState.Renewing && !hidden
+                state.inProgress && !hidden
             }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
         init {
             viewModelScope.launch {
-                renewals.state.collect { if (it !is ArcTunnelRenewalState.Renewing) modalHidden.value = false }
+                renewals.state.collect { if (!it.inProgress) modalHidden.value = false }
             }
         }
 

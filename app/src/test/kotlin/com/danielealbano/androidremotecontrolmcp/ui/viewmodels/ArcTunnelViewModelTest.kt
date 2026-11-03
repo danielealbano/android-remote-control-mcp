@@ -332,6 +332,23 @@ class ArcTunnelViewModelTest {
         }
 
     @Test
+    fun `url refreshes when a renewal ends after installing the certificate`() =
+        runTest(dispatcher) {
+            createViewModel()
+            renewal.value = ArcTunnelRenewalState.Renewing
+            advanceUntilIdle()
+            savedUrl = URL
+            renewal.value = ArcTunnelRenewalState.Installing
+            advanceUntilIdle()
+            assertEquals(ArcTunnelUrlState.NotEnrolled, viewModel.url.value)
+
+            renewal.value = ArcTunnelRenewalState.Idle
+            advanceUntilIdle()
+
+            assertEquals(ArcTunnelUrlState.Enrolled(URL), viewModel.url.value)
+        }
+
+    @Test
     fun `cancelEnrollment clears the request and disables remote access`() =
         runTest(dispatcher) {
             createViewModel()

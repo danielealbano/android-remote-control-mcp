@@ -8,9 +8,16 @@ sealed class ArcTunnelRenewalState {
 
     data object Renewing : ArcTunnelRenewalState()
 
+    /** The certificate is received and being installed and saved, which finishes whatever happens: no Cancel. */
+    data object Installing : ArcTunnelRenewalState()
+
     data class Failed(
         val message: String,
     ) : ArcTunnelRenewalState()
+
+    /** A renewal is running. */
+    val inProgress: Boolean
+        get() = this is Renewing || this is Installing
 }
 
 /**
@@ -18,7 +25,7 @@ sealed class ArcTunnelRenewalState {
  * a request in flight included) and mirrored into [state] for the UI.
  */
 interface ArcTunnelRenewals {
-    /** Idle → Renewing → Idle | Failed. */
+    /** Idle → Renewing, then Installing once the certificate is received → Idle | Failed. */
     val state: StateFlow<ArcTunnelRenewalState>
 
     /** Issues the missing or expired public certificate and saves it; throws the failure (shown as [state]). */
@@ -31,7 +38,7 @@ interface ArcTunnelRenewals {
      *
      * Never fails the tunnel start, unlike [renewForStart], because the certificate it holds is still valid: a failure,
      * or no certificate within the time limit, is logged, the certificate stays, and the next tunnel start checks
-     * again.
+     * again. A certificate received before the limit is still installed and saved, so that counts as renewed.
      */
     suspend fun checkSavedChain(identity: ArcTunnelIdentity)
 

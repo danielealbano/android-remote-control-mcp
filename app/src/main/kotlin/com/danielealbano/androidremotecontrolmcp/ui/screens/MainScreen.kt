@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalDialog
 import com.danielealbano.androidremotecontrolmcp.ui.components.UpdateAvailableBanner
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.SettingsRoute
@@ -49,6 +50,7 @@ fun MainScreen(
     var selectedTabRoute by rememberSaveable { mutableStateOf(TopLevelRoute.Server.route) }
     var pendingSettingsRoute by rememberSaveable { mutableStateOf<String?>(null) }
     val availableUpdate by updateViewModel.availableUpdate.collectAsStateWithLifecycle()
+    val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
     val renewalModalVisible by arcTunnelRenewalViewModel.modalVisible.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -160,6 +162,7 @@ fun MainScreen(
 
     ArcTunnelRenewalDialog(
         visible = renewalModalVisible,
+        cancelEnabled = renewal != ArcTunnelRenewalState.Installing,
         onHide = arcTunnelRenewalViewModel::hideModal,
         onCancel = { viewModel.stopServer(context) },
     )

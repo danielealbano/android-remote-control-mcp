@@ -9,8 +9,11 @@ import io.mockk.mockk
 import io.mockk.mockkConstructor
 import io.mockk.unmockkConstructor
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -39,6 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("ArcTunnelEnrollmentImpl")
 class ArcTunnelEnrollmentImplTest {
@@ -368,6 +372,44 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
+    fun `a renew cancelled once the certificate is received is saved all the same`() =
+        runBlocking {
+            val identity = saveIdentity(withPublicChain = false)
+            val caller = AtomicReference<Job>()
+            val job =
+                launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                    impl.renew(identity, null) { caller.get().cancel() }
+                }
+            caller.set(job)
+
+            job.start()
+            withTimeout(BUDGET_MS) { job.join() }
+
+            assertTrue(job.isCancelled)
+            val saved = requireNotNull(impl.store(env).load())
+            assertEquals(1, saved.generation)
+            assertTrue(saved.publicChain.isNotEmpty())
+            assertEquals(ARC_TUNNEL_CERT_CHECK, saved.certCheck)
+        }
+
+    @Test
+    fun `a renew cancelled before the certificate is received saves nothing`() =
+        runBlocking {
+            val identity = saveIdentity(withPublicChain = false)
+            val before = impl.store(env).load()
+            val gate = CountDownLatch(1)
+            service.issueGate = gate
+            val job = launch(Dispatchers.IO) { impl.renew(identity, null) }
+            awaitRequest(ISSUE_PATH)
+
+            job.cancelAndJoin()
+            gate.countDown()
+
+            assertEquals(before, impl.store(env).load())
+            assertEquals(0, identity.state().generation)
+        }
+
+    @Test
     fun `renew clears a setup failure once the certificate is saved`() =
         runBlocking {
             service.enrollAnswer =
@@ -548,6 +590,7 @@ class ArcTunnelEnrollmentImplTest {
         const val ISSUE_PATH = "/api/v1/issue"
         const val NONCE_BASE = 0x0a00
         const val GATE_S = 10L
+        const val BUDGET_MS = 10_000L
         const val MS_PER_S = 1_000L
         const val POLL_MS = 20L
         const val QUICK_MS = 1_000L

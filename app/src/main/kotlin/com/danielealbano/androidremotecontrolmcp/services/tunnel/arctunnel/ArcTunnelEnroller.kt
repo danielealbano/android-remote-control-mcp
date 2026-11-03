@@ -4,6 +4,7 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.cert.X509Certificate
@@ -29,17 +30,30 @@ class ArcTunnelEnroller(
     /**
      * Phase 2 / renewal: [nonce] is the Phase-1 issue nonce or the RENEW_NUDGE nonce (null = fetch a fresh one).
      * Serialized per identity; retries per PROTOCOL.md §3.
+     *
+     * A received certificate is spent, and losing it would cost another against the issuance cap: from
+     * [onCertificateReceived] on it is installed and [save]d whatever happens to the caller, a cancellation included.
+     * [save] runs outside the retries, so a failing save never issues again.
      */
     suspend fun issue(
         identity: ArcTunnelIdentity,
         nonce: String?,
+        onCertificateReceived: () -> Unit = {},
+        save: () -> Unit = {},
     ) {
         identity.issueMutex.withLock {
-            ArcTunnelIssueRetry.run(
-                nonce = nonce,
-                issue = { n -> withContext(Dispatchers.IO) { issueOnce(identity, n) } },
-                freshNonce = { freshNonce(identity.net, identity.hosts) },
-            ) { n, wait, t -> Log.w(TAG, "issuance failed; retry $n in ${wait}ms", t) }
+            val generation = identity.state().generation
+            try {
+                ArcTunnelIssueRetry.run(
+                    nonce = nonce,
+                    issue = { n -> withContext(Dispatchers.IO) { issueOnce(identity, n, onCertificateReceived) } },
+                    freshNonce = { freshNonce(identity.net, identity.hosts) },
+                ) { n, wait, t -> Log.w(TAG, "issuance failed; retry $n in ${wait}ms", t) }
+            } finally {
+                if (identity.state().generation != generation) {
+                    withContext(NonCancellable + Dispatchers.IO) { save() }
+                }
+            }
         }
     }
 
@@ -89,10 +103,10 @@ class ArcTunnelEnroller(
     private suspend fun issueOnce(
         identity: ArcTunnelIdentity,
         nonce: String,
+        onCertificateReceived: () -> Unit,
     ) {
         val base = identity.state()
-        val generation = base.generation + 1
-        val nextIdentityAlias = "${aliasPrefix(identity.hosts)}identity-$generation"
+        val nextIdentityAlias = "${aliasPrefix(identity.hosts)}identity-${base.generation + 1}"
         // The TLS key is created with the first issuance of a name and never again; a later loss means
         // the name is unusable (the UI offers a new name).
         if (base.generation == 0) {
@@ -101,7 +115,8 @@ class ArcTunnelEnroller(
             check(keys.hasKey(base.tlsAlias)) { "the TLS key of ${identity.name} is missing; get a new name" }
         }
         keys.generateEcKey(nextIdentityAlias, ArcTunnelPem.hexToBytes(nonce))
-        val installed = runCatching { postIssueAndInstall(identity, base, nonce, nextIdentityAlias, generation) }
+        val installed =
+            runCatching { postIssueAndInstall(identity, base, nonce, nextIdentityAlias, onCertificateReceived) }
         // Any failure before install (HTTP error, network, malformed response/chain) drops the staged key.
         val stale =
             installed.getOrElse {
@@ -116,7 +131,7 @@ class ArcTunnelEnroller(
         base: ArcTunnelIdentity.State,
         nonce: String,
         nextIdentityAlias: String,
-        generation: Int,
+        onCertificateReceived: () -> Unit,
     ): String {
         val identityKey = keys.privateKey(nextIdentityAlias)
         val tlsKey = keys.privateKey(base.tlsAlias)
@@ -134,14 +149,16 @@ class ArcTunnelEnroller(
                 identity.net.url(identity.hosts.controlHost, ISSUE_PATH),
                 ArcTunnelJson.encodeToString(ArcTunnelIssueRequest.serializer(), request),
             )
+        val identityChain = ArcTunnelPem.parseChain(response.identityCert)
         val publicChain = ArcTunnelPem.parseChain(response.publicCert)
+        onCertificateReceived()
         val stale =
             identity.install(
                 nextIdentityAlias,
-                ArcTunnelPem.parseChain(response.identityCert),
+                identityChain,
                 publicChain,
                 response.ca.ifEmpty { base.caId },
-                generation,
+                base.generation + 1,
             )
         reportIfIncomplete(identity, publicChain)
         return stale

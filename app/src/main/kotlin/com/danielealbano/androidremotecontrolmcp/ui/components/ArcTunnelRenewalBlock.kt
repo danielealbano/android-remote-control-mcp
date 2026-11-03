@@ -23,13 +23,15 @@ private const val PROGRESS_SIZE_DP = 16
 
 /**
  * A free E2E tunnel certificate renewal at tunnel start, while it runs and whoever started the server, over the whole
- * app. Cancel aborts the renewal and stops the MCP server; Back or a tap outside only hides this ([onHide]), because a
- * renewal can wait a long time and the app stays usable meanwhile. A failure is not shown here but in
- * [ArcTunnelRenewalBlock], since resolving it can need another screen.
+ * app. Cancel aborts the renewal and stops the MCP server, until [cancelEnabled] says the certificate is received and
+ * must be installed; Back or a tap outside only hides this ([onHide]), because a renewal can wait a long time and the
+ * app stays usable meanwhile. A failure is not shown here but in [ArcTunnelRenewalBlock], since resolving it can need
+ * another screen.
  */
 @Composable
 fun ArcTunnelRenewalDialog(
     visible: Boolean,
+    cancelEnabled: Boolean,
     onHide: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -38,7 +40,7 @@ fun ArcTunnelRenewalDialog(
         onDismissRequest = onHide,
         text = { ArcTunnelRenewalProgress() },
         confirmButton = {
-            TextButton(onClick = onCancel) {
+            TextButton(onClick = onCancel, enabled = cancelEnabled) {
                 Text(stringResource(R.string.remote_access_arc_tunnel_renewal_cancel))
             }
         },
@@ -47,7 +49,8 @@ fun ArcTunnelRenewalDialog(
 
 /**
  * The free E2E tunnel's tunnel-start certificate renewal: in progress (spinner + Cancel) or failed ([failure],
- * with Retry + Cancel). Cancel aborts the renewal and stops the MCP server.
+ * with Retry + Cancel). Cancel aborts the renewal and stops the MCP server, until [cancelEnabled] says the certificate
+ * is received and must be installed.
  */
 @Composable
 fun ArcTunnelRenewalBlock(
@@ -55,6 +58,7 @@ fun ArcTunnelRenewalBlock(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    cancelEnabled: Boolean = true,
 ) {
     Column(modifier = modifier) {
         if (failure == null) {
@@ -72,7 +76,7 @@ fun ArcTunnelRenewalBlock(
                     Text(stringResource(R.string.remote_access_arc_tunnel_retry))
                 }
             }
-            TextButton(onClick = onCancel) {
+            TextButton(onClick = onCancel, enabled = cancelEnabled) {
                 Text(stringResource(R.string.remote_access_arc_tunnel_renewal_cancel))
             }
         }

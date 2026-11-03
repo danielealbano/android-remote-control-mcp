@@ -3,7 +3,12 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.every
 import io.mockk.spyk
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -20,12 +25,14 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import java.security.KeyStoreException
 import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("ArcTunnelEnroller")
 class ArcTunnelEnrollerTest {
@@ -319,6 +326,95 @@ class ArcTunnelEnrollerTest {
         }
 
     @Test
+    fun `a received certificate is announced once, then installed, then saved once`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            val steps = CopyOnWriteArrayList<String>()
+
+            enroller.issue(
+                identity,
+                "0c01",
+                onCertificateReceived = { steps += "received at generation ${identity.state().generation}" },
+                save = { steps += "saved at generation ${identity.state().generation}" },
+            )
+
+            assertEquals(listOf("received at generation 0", "saved at generation 1"), steps)
+        }
+
+    @Test
+    fun `a refused issue announces nothing and saves nothing`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            val steps = AtomicInteger()
+            service.issueAnswers += apiError(400, retryable = false)
+
+            val error =
+                runCatching {
+                    enroller.issue(identity, "0c01", { steps.incrementAndGet() }) { steps.incrementAndGet() }
+                }.exceptionOrNull()
+
+            assertTrue(error is ArcTunnelApiException, "error $error")
+            assertEquals(0, steps.get())
+        }
+
+    @Test
+    fun `a malformed answer announces nothing and saves nothing`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            val steps = AtomicInteger()
+            service.issueAnswers += ArcTunnelTestServer.json(issueBody("garbage"))
+
+            val error =
+                runCatching {
+                    enroller.issue(identity, "0c01", { steps.incrementAndGet() }) { steps.incrementAndGet() }
+                }.exceptionOrNull()
+
+            assertTrue(error != null)
+            assertEquals(0, steps.get())
+            assertEquals(0, identity.state().generation)
+        }
+
+    @Test
+    fun `a cancellation once the certificate is received still installs and saves it`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            val saved = AtomicReference<Int>()
+            val caller = AtomicReference<Job>()
+            val job =
+                launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                    enroller.issue(identity, "0c01", { caller.get().cancel() }) {
+                        saved.set(identity.state().generation)
+                    }
+                }
+            caller.set(job)
+
+            job.start()
+            withTimeout(BUDGET_MS) { job.join() }
+
+            assertTrue(job.isCancelled)
+            assertEquals(1, saved.get())
+            assertEquals(1, identity.state().generation)
+            assertTrue(identity.state().publicChain.isNotEmpty())
+            assertEquals(1, service.count(ISSUE_PATH))
+        }
+
+    @Test
+    fun `a failing save never issues again`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+
+            val error =
+                runCatching {
+                    enroller.issue(identity, "0c01") { throw IOException("disk full") }
+                }.exceptionOrNull()
+
+            assertTrue(error is IOException, "error $error")
+            assertEquals(1, service.count(ISSUE_PATH))
+            assertEquals(1, identity.state().generation)
+            assertTrue(keys.hasKey(identity.state().identityAlias), "the installed identity must keep its key")
+        }
+
+    @Test
     fun `issue retries once over a fresh nonce`() =
         runBlocking {
             val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
@@ -341,5 +437,6 @@ class ArcTunnelEnrollerTest {
         const val ENROLL_PATH = "/api/v1/enroll"
         const val ISSUE_PATH = "/api/v1/issue"
         const val NONCE_BASE = 0x0a00
+        const val BUDGET_MS = 10_000L
     }
 }

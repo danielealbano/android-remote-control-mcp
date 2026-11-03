@@ -38,7 +38,7 @@ class ArcTunnelRenewalsImplTest {
     fun `a start renewal shows Renewing then Idle and logs it`() =
         runBlocking {
             val seen = AtomicReference<ArcTunnelRenewalState>()
-            coEvery { enrollment.renew(identity, null) } coAnswers { seen.set(renewals.state.value) }
+            coEvery { enrollment.renew(identity, null, any()) } coAnswers { seen.set(renewals.state.value) }
 
             renewals.renewForStart(identity)
 
@@ -51,7 +51,7 @@ class ArcTunnelRenewalsImplTest {
     fun `a failed start renewal shows the reason and throws it`() =
         runBlocking {
             val failure = ArcTunnelApiException("acme_rate_limited", true, 300, 503)
-            coEvery { enrollment.renew(identity, null) } throws failure
+            coEvery { enrollment.renew(identity, null, any()) } throws failure
 
             val error = runCatching { renewals.renewForStart(identity) }.exceptionOrNull()
 
@@ -65,7 +65,7 @@ class ArcTunnelRenewalsImplTest {
         runBlocking {
             val entered = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
-            coEvery { enrollment.renew(identity, null) } coAnswers {
+            coEvery { enrollment.renew(identity, null, any()) } coAnswers {
                 entered.complete(Unit)
                 try {
                     awaitCancellation()
@@ -97,7 +97,7 @@ class ArcTunnelRenewalsImplTest {
         val file = File(root, "${saved.hosts.envKey}.json")
         file.writeText(file.readText().replace(Regex(""","cert_check":\d+"""), ""))
         every { enrollment.store(any()) } returns store
-        coEvery { enrollment.renew(saved, null) } coAnswers { store.save(saved) }
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers { store.save(saved) }
         return saved to store
     }
 
@@ -111,7 +111,7 @@ class ArcTunnelRenewalsImplTest {
 
         renewals.checkSavedChain(saved)
 
-        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        coVerify(exactly = 0) { enrollment.renew(any(), any(), any()) }
         assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
         assertEquals(1, logged("chain checked: complete"))
     }
@@ -122,14 +122,14 @@ class ArcTunnelRenewalsImplTest {
     ) = runBlocking {
         val (saved, store) = savedChain(root, complete = false)
         val seen = AtomicReference<ArcTunnelRenewalState>()
-        coEvery { enrollment.renew(saved, null) } coAnswers {
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers {
             seen.set(renewals.state.value)
             store.save(saved)
         }
 
         renewals.checkSavedChain(saved)
 
-        coVerify(exactly = 1) { enrollment.renew(saved, null) }
+        coVerify(exactly = 1) { enrollment.renew(saved, null, any()) }
         assertEquals(ArcTunnelRenewalState.Renewing, seen.get())
         assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
         assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
@@ -146,7 +146,7 @@ class ArcTunnelRenewalsImplTest {
 
         renewals.checkSavedChain(saved)
 
-        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        coVerify(exactly = 0) { enrollment.renew(any(), any(), any()) }
         verify(exactly = 0) { saved.net.reachesTrustedRoot(any()) }
         assertTrue(serverLog.entries.isEmpty())
     }
@@ -160,7 +160,7 @@ class ArcTunnelRenewalsImplTest {
         renewals.checkSavedChain(saved)
         renewals.checkSavedChain(saved)
 
-        coVerify(exactly = 1) { enrollment.renew(saved, null) }
+        coVerify(exactly = 1) { enrollment.renew(saved, null, any()) }
     }
 
     @Test
@@ -169,7 +169,7 @@ class ArcTunnelRenewalsImplTest {
     ) = runBlocking {
         val (saved, store) = savedChain(root, complete = false)
         val failure = ArcTunnelApiException("acme_rate_limited", true, 300, 503)
-        coEvery { enrollment.renew(saved, null) } throws failure
+        coEvery { enrollment.renew(saved, null, any()) } throws failure
 
         renewals.checkSavedChain(saved)
 
@@ -188,7 +188,7 @@ class ArcTunnelRenewalsImplTest {
 
         renewals.checkSavedChain(saved)
 
-        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        coVerify(exactly = 0) { enrollment.renew(any(), any(), any()) }
         assertEquals(0, store.load()?.certCheck)
         assertEquals(1, logged("check failed, starting with the current certificate: no roots"))
     }
@@ -199,7 +199,7 @@ class ArcTunnelRenewalsImplTest {
     ) = runBlocking {
         val (saved, store) = savedChain(root, complete = false)
         renewals.chainRenewalTimeoutMs = NOTHING_MS
-        coEvery { enrollment.renew(saved, null) } coAnswers { awaitCancellation() }
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers { awaitCancellation() }
 
         withTimeout(BUDGET_MS) { renewals.checkSavedChain(saved) }
 
@@ -214,7 +214,7 @@ class ArcTunnelRenewalsImplTest {
     ) = runBlocking {
         val (saved, store) = savedChain(root, complete = false)
         val entered = CompletableDeferred<Unit>()
-        coEvery { enrollment.renew(saved, null) } coAnswers {
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers {
             entered.complete(Unit)
             awaitCancellation()
         }
@@ -235,6 +235,59 @@ class ArcTunnelRenewalsImplTest {
         assertTrue(thrown.get() is CancellationException, "the cancellation must reach the caller")
         assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
         assertEquals(0, store.load()?.certCheck)
+        assertEquals(0, logged("check failed"))
+    }
+
+    @Test
+    fun `a start renewal shows Installing once the certificate is received`() =
+        runBlocking {
+            val seen = AtomicReference<ArcTunnelRenewalState>()
+            coEvery { enrollment.renew(identity, null, any()) } coAnswers {
+                thirdArg<() -> Unit>().invoke()
+                seen.set(renewals.state.value)
+            }
+
+            renewals.renewForStart(identity)
+
+            assertEquals(ArcTunnelRenewalState.Installing, seen.get())
+            assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        }
+
+    @Test
+    fun `a chain renewal shows Installing once the certificate is received`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        val seen = AtomicReference<ArcTunnelRenewalState>()
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers {
+            thirdArg<() -> Unit>().invoke()
+            seen.set(renewals.state.value)
+            store.save(saved)
+        }
+
+        renewals.checkSavedChain(saved)
+
+        assertEquals(ArcTunnelRenewalState.Installing, seen.get())
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+    }
+
+    @Test
+    fun `a time limit landing after the certificate was received counts as renewed`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        renewals.chainRenewalTimeoutMs = NOTHING_MS
+        coEvery { enrollment.renew(saved, null, any()) } coAnswers {
+            thirdArg<() -> Unit>().invoke()
+            store.save(saved)
+            awaitCancellation()
+        }
+
+        withTimeout(BUDGET_MS) { renewals.checkSavedChain(saved) }
+
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
+        assertEquals(1, logged("replace the incomplete chain"))
         assertEquals(0, logged("check failed"))
     }
 
@@ -261,7 +314,7 @@ class ArcTunnelRenewalsImplTest {
     @Test
     fun `clear hides a failure`() =
         runBlocking {
-            coEvery { enrollment.renew(identity, null) } throws IllegalStateException("refused")
+            coEvery { enrollment.renew(identity, null, any()) } throws IllegalStateException("refused")
             runCatching { renewals.renewForStart(identity) }
 
             renewals.clear()

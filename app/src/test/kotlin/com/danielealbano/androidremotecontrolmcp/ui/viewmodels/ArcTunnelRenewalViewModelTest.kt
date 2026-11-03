@@ -69,6 +69,19 @@ class ArcTunnelRenewalViewModelTest {
     }
 
     @Test
+    fun `the modal stays while the certificate is installed, and hidden if it was`() {
+        renewal.value = ArcTunnelRenewalState.Renewing
+
+        renewal.value = ArcTunnelRenewalState.Installing
+        assertTrue(viewModel.modalVisible.value)
+
+        renewal.value = ArcTunnelRenewalState.Renewing
+        viewModel.hideModal()
+        renewal.value = ArcTunnelRenewalState.Installing
+        assertFalse(viewModel.modalVisible.value)
+    }
+
+    @Test
     fun `a retry after a failed renewal shows the modal even if it was hidden`() {
         renewal.value = ArcTunnelRenewalState.Renewing
         viewModel.hideModal()

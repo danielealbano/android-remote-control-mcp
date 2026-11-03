@@ -113,13 +113,15 @@ class ArcTunnelEnrollmentImpl
         override suspend fun renew(
             identity: ArcTunnelIdentity,
             nonce: String?,
+            onCertificateReceived: () -> Unit,
         ) {
             mutex.withLock {
                 val store = store(ArcTunnelEnv(identity.hosts.baseAddress))
                 check(store.holds(identity)) { "identity ${identity.name} was forgotten; renewal skipped" }
-                enroller.issue(identity, nonce)
+                enroller.issue(identity, nonce, onCertificateReceived) {
+                    if (store.holds(identity)) store.save(identity)
+                }
                 if (store.holds(identity)) {
-                    withContext(Dispatchers.IO) { store.save(identity) }
                     // The saved name has a certificate now: a setup failure still shown for it is over.
                     val failed = _state.value as? ArcTunnelEnrollmentState.Failed
                     if (failed != null) _state.compareAndSet(failed, ArcTunnelEnrollmentState.Idle)
