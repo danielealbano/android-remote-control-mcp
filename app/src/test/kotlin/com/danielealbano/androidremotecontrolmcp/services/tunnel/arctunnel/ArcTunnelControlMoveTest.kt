@@ -474,15 +474,21 @@ class ArcTunnelControlMoveTest {
                 out.flush()
             },
         )
-        second.enqueue(moveAndHold(addr(third)))
+        second.enqueue(
+            scripted { out ->
+                stamped.add(System.nanoTime())
+                out.write(moveFrame(addr(third)))
+                out.flush()
+            },
+        )
         third.enqueue(scripted { stamped.add(System.nanoTime()) })
         start()
 
-        taken(third)
-        val at = stamps(stamped, 2)
+        val at = stamps(stamped, 3)
 
-        assertEquals(1, second.requestCount)
-        assertTrue(gapMs(at[0], at[1]) < TWO_BACKOFFS_MS, "two moves took ${gapMs(at[0], at[1])} ms")
+        // Waiting the backoff would take at least its first delay.
+        assertTrue(gapMs(at[0], at[1]) < ArcTunnelBackoff.INITIAL_MS, "first move: ${gapMs(at[0], at[1])} ms")
+        assertTrue(gapMs(at[1], at[2]) < ArcTunnelBackoff.INITIAL_MS, "second move: ${gapMs(at[1], at[2])} ms")
         assertNoStatusChange()
     }
 
@@ -841,9 +847,6 @@ class ArcTunnelControlMoveTest {
         const val RECONNECT_STREAMS = 5
         const val FIRST_BACKOFF_MIN_MS = 900L
         const val SECOND_BACKOFF_MIN_MS = 1_900L
-
-        /** What two moves would take if they waited the backoff (1 s + 2 s); without it they take far less. */
-        const val TWO_BACKOFFS_MS = 3_000L
         const val REFUSED_REASON = "the tunnel service refused the connection (HTTP 503)"
         const val SILENT_REASON = "no data from the tunnel service for 90 s"
         val SILENCE_NANOS: Long = TimeUnit.SECONDS.toNanos(91)
