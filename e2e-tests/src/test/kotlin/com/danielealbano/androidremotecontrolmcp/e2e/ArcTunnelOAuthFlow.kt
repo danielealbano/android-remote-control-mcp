@@ -1,5 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.APPROVAL_ID_REGEX
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CHALLENGE
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CODE_REGEX
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.VERIFIER
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -11,7 +15,6 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import java.net.URLEncoder
 
@@ -42,6 +45,7 @@ class ArcTunnelOAuthFlow(
         val body: String,
         val protocol: Protocol,
         val challenge: String?,
+        val location: String?,
     )
 
     private fun send(
@@ -60,7 +64,7 @@ class ArcTunnelOAuthFlow(
                 .apply { post?.let { post(it) } }
                 .build()
         return http.newCall(request).execute().use {
-            Answer(it.code, it.body.string(), it.protocol, it.header("WWW-Authenticate"))
+            Answer(it.code, it.body.string(), it.protocol, it.header("WWW-Authenticate"), it.header("Location"))
         }
     }
 
@@ -120,22 +124,27 @@ class ArcTunnelOAuthFlow(
                 "&resource=${enc(resource)}"
         val answer = send(http2, "/authorize?$query")
         assertEquals(Protocol.HTTP_2, answer.protocol)
-        assertFalse(answer.code == REDIRECTED, "authorize refused the advertised resource: ${answer.body}")
-        assertEquals(OK, answer.code, answer.body)
-        return requireNotNull(APPROVAL_ID.find(answer.body)?.groupValues?.get(1)) { "no approval id: ${answer.body}" }
+        // A refusal such as invalid_target is a redirect with the error in its location.
+        assertEquals(OK, answer.code, "location: ${answer.location}, body: ${answer.body}")
+        return requireNotNull(APPROVAL_ID_REGEX.find(answer.body)?.groupValues?.get(1)) {
+            "no approval id: ${answer.body}"
+        }
     }
 
     private fun awaitCode(approvalId: String): String {
         val deadline = System.currentTimeMillis() + APPROVAL_TIMEOUT_MS
+        var state = "not read"
         while (System.currentTimeMillis() < deadline) {
             val status = send(http2, "/authorize/status?id=${enc(approvalId)}")
-            if (status.code == OK && field(status.body, "state") == "approved") {
+            state = if (status.code == OK) field(status.body, "state") else "HTTP ${status.code}"
+            if (state == "approved") {
                 val redirect = field(status.body, "redirect")
-                return requireNotNull(CODE.find(redirect)?.groupValues?.get(1)) { "no code in $redirect" }
+                return requireNotNull(CODE_REGEX.find(redirect)?.groupValues?.get(1)) { "no code in $redirect" }
             }
+            check(state != "denied" && state != "expired") { "the authorization ended as $state" }
             Thread.sleep(POLL_MS)
         }
-        error("the authorization was not approved within $APPROVAL_TIMEOUT_MS ms")
+        error("the authorization did not settle within $APPROVAL_TIMEOUT_MS ms, last state: $state")
     }
 
     private fun redeem(
@@ -168,15 +177,10 @@ class ArcTunnelOAuthFlow(
 
     private companion object {
         const val REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
-        const val VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-        const val CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         const val OK = 200
         const val CREATED = 201
-        const val REDIRECTED = 302
         const val UNAUTHORIZED = 401
         const val APPROVAL_TIMEOUT_MS = 30_000L
         const val POLL_MS = 500L
-        val APPROVAL_ID = Regex("""var id = "([^"]+)"""")
-        val CODE = Regex("""[?&]code=([^&]+)""")
     }
 }

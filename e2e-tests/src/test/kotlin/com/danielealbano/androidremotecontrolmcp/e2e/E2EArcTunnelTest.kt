@@ -20,10 +20,10 @@ import org.junit.jupiter.api.TestMethodOrder
  * E2E: the free E2E tunnel against a local tunnel server stack ([ArcTunnelStack]). The redroid phone enrolls
  * (attestation optional on the server: redroid's AndroidKeyStore is a software KeyMint), the MCP server starts
  * with the tunnel, and the JVM reaches `/health` (HTTP/2 over ALPN, and HTTP/1.1 from a client without ALPN), the
- * OAuth metadata (which must name the `https` URL over HTTP/1.1 too) and `tools/list` THROUGH the tunnel with the
- * Pebble root as trust anchor. It also runs the certificate chain handling on redroid's own Conscrypt. The node drain
- * runs last, because it stops the stack's first node. The shared container is restored (tunnel off, server restarted,
- * client refreshed) afterwards.
+ * OAuth metadata (which must name the `https` URL over HTTP/1.1 too), the whole OAuth flow on a mix of HTTP versions
+ * and `tools/list` THROUGH the tunnel with the Pebble root as trust anchor. It also runs the certificate chain handling
+ * on redroid's own Conscrypt. The node drain runs last, because it stops the stack's first node. The shared container
+ * is restored (tunnel off, server restarted, client refreshed) afterwards.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
