@@ -13,10 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,20 +22,20 @@ import com.danielealbano.androidremotecontrolmcp.R
 private const val PROGRESS_SIZE_DP = 16
 
 /**
- * A free E2E tunnel certificate renewal at tunnel start, while it runs and whoever started the server: whenever the
- * app is open it shows. Cancel aborts the renewal and stops the MCP server; Back or a tap outside only hides this for
- * the current renewal, because one can wait a long time and the app stays usable meanwhile. A failure is not shown here
- * but in [ArcTunnelRenewalBlock], since resolving it can need another screen.
+ * A free E2E tunnel certificate renewal at tunnel start, while it runs and whoever started the server, over the whole
+ * app. Cancel aborts the renewal and stops the MCP server; Back or a tap outside only hides this ([onHide]), because a
+ * renewal can wait a long time and the app stays usable meanwhile. A failure is not shown here but in
+ * [ArcTunnelRenewalBlock], since resolving it can need another screen.
  */
 @Composable
 fun ArcTunnelRenewalDialog(
-    renewing: Boolean,
+    visible: Boolean,
+    onHide: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    var hidden by rememberSaveable(renewing) { mutableStateOf(false) }
-    if (!renewing || hidden) return
+    if (!visible) return
     AlertDialog(
-        onDismissRequest = { hidden = true },
+        onDismissRequest = onHide,
         text = { ArcTunnelRenewalProgress() },
         confirmButton = {
             TextButton(onClick = onCancel) {

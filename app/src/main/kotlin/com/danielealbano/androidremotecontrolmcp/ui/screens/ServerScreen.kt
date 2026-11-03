@@ -53,7 +53,6 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlert
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.ui.ApprovalActivity
-import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalDialog
 import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizationCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
@@ -243,11 +242,6 @@ fun ServerScreen(
             )
         }
     }
-
-    ArcTunnelRenewalDialog(
-        renewing = renewal is ArcTunnelRenewalState.Renewing,
-        onCancel = { viewModel.stopServer(context) },
-    )
 
     if (showChannelNotConfiguredDialog) {
         AlertDialog(
