@@ -95,6 +95,19 @@ class ArcTunnelControlMoveTest : ArcTunnelControlMoveFixture() {
     }
 
     @Test
+    fun `MOVE skips an invalid address and dials the next`() {
+        val target = otherServer()
+        server.enqueue(moveAndHold("not-an-address", addr(target)))
+        target.enqueue(ArcTunnelTestServer.hold())
+        start()
+
+        taken(target)
+
+        assertEquals(1, server.requestCount)
+        assertNoStatusChange()
+    }
+
+    @Test
     fun `MOVE tries the next address on a refusal`() {
         val refuser = otherServer()
         val target = otherServer()
