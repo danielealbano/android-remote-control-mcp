@@ -2,7 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -18,6 +21,9 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+import java.security.KeyStoreException
 import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("ArcTunnelRenewalsImpl")
@@ -75,6 +81,151 @@ class ArcTunnelRenewalsImplTest {
             assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
             assertFalse(serverLog.entries.any { it.message.contains("renewal failed") })
         }
+
+    /** A saved identity whose chain [complete] says reaches a trusted root, as an app from before the check left it. */
+    private fun savedChain(
+        root: File,
+        complete: Boolean,
+    ): Pair<ArcTunnelIdentity, ArcTunnelIdentityStore> {
+        val keys = FakeArcTunnelKeyStore()
+        val net = mockk<ArcTunnelNet>()
+        every { net.reachesTrustedRoot(any()) } returns complete
+        val saved = ArcTunnelTestIdentity.create(keys, net)
+        val store = ArcTunnelIdentityStore(root, saved.hosts, keys)
+        store.save(saved)
+        val file = File(root, "${saved.hosts.envKey}.json")
+        file.writeText(file.readText().replace(Regex(""","cert_check":\d+"""), ""))
+        every { enrollment.store(any()) } returns store
+        coEvery { enrollment.renew(saved, null) } coAnswers { store.save(saved) }
+        return saved to store
+    }
+
+    private fun logged(text: String): Int = serverLog.entries.count { it.message.contains(text) }
+
+    @Test
+    fun `a complete saved chain is marked without a renewal and logged`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = true)
+
+        renewals.checkSavedChain(saved)
+
+        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
+        assertEquals(1, logged("chain checked: complete"))
+    }
+
+    @Test
+    fun `an incomplete saved chain is renewed showing Renewing, and logged`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        val seen = AtomicReference<ArcTunnelRenewalState>()
+        coEvery { enrollment.renew(saved, null) } coAnswers {
+            seen.set(renewals.state.value)
+            store.save(saved)
+        }
+
+        renewals.checkSavedChain(saved)
+
+        coVerify(exactly = 1) { enrollment.renew(saved, null) }
+        assertEquals(ArcTunnelRenewalState.Renewing, seen.get())
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
+        assertEquals(1, logged("chain is incomplete"))
+        assertEquals(1, logged("replace the incomplete chain"))
+    }
+
+    @Test
+    fun `a marked certificate is not checked or renewed again`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        store.markCertChecked()
+
+        renewals.checkSavedChain(saved)
+
+        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        verify(exactly = 0) { saved.net.reachesTrustedRoot(any()) }
+        assertTrue(serverLog.entries.isEmpty())
+    }
+
+    @Test
+    fun `a chain still incomplete after the renewal is not renewed at the next check`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, _) = savedChain(root, complete = false)
+
+        renewals.checkSavedChain(saved)
+        renewals.checkSavedChain(saved)
+
+        coVerify(exactly = 1) { enrollment.renew(saved, null) }
+    }
+
+    @Test
+    fun `a failed renewal does not throw, stays unmarked for the next start, and never asks for Retry`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        val failure = ArcTunnelApiException("acme_rate_limited", true, 300, 503)
+        coEvery { enrollment.renew(saved, null) } throws failure
+
+        renewals.checkSavedChain(saved)
+
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        assertEquals(0, store.load()?.certCheck)
+        assertEquals(1, logged("check failed, starting with the current certificate: ${failure.message}"))
+        assertEquals(0, logged("replace the incomplete chain"))
+    }
+
+    @Test
+    fun `a check that cannot run does not throw and stays unmarked`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        every { saved.net.reachesTrustedRoot(any()) } throws KeyStoreException("no roots")
+
+        renewals.checkSavedChain(saved)
+
+        coVerify(exactly = 0) { enrollment.renew(any(), any()) }
+        assertEquals(0, store.load()?.certCheck)
+        assertEquals(1, logged("check failed, starting with the current certificate: no roots"))
+    }
+
+    @Test
+    fun `a renewal over the time limit is given up without throwing`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        renewals.chainRenewalTimeoutMs = NOTHING_MS
+        coEvery { enrollment.renew(saved, null) } coAnswers { awaitCancellation() }
+
+        withTimeout(BUDGET_MS) { renewals.checkSavedChain(saved) }
+
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        assertEquals(0, store.load()?.certCheck)
+        assertEquals(1, logged("no certificate within"))
+    }
+
+    @Test
+    fun `cancelling the caller cancels the chain renewal, throws and stays unmarked`(
+        @TempDir root: File,
+    ) = runBlocking {
+        val (saved, store) = savedChain(root, complete = false)
+        val entered = CompletableDeferred<Unit>()
+        coEvery { enrollment.renew(saved, null) } coAnswers {
+            entered.complete(Unit)
+            awaitCancellation()
+        }
+        val caller = launch(Dispatchers.IO) { renewals.checkSavedChain(saved) }
+        withTimeout(BUDGET_MS) { entered.await() }
+
+        caller.cancelAndJoin()
+
+        assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
+        assertEquals(0, store.load()?.certCheck)
+        assertEquals(0, logged("check failed"))
+    }
 
     @Test
     fun `retry releases awaitRetry`() =
