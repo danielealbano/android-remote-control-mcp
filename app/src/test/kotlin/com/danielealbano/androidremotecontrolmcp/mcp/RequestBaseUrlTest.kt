@@ -117,6 +117,26 @@ class RequestBaseUrlTest {
     }
 
     @Test
+    @DisplayName("an HTTP/2 authority listing several hosts gives the first, as Host does")
+    fun http2AuthorityListingSeveralHosts() {
+        val fromAuthority = mockCall(http2Authority = "a.example, b.example")
+        val fromHost = mockCall(hostHeader = "a.example, b.example")
+        assertEquals("http://a.example", deriveBaseUrl(fromAuthority))
+        assertEquals(deriveBaseUrl(fromHost), deriveBaseUrl(fromAuthority))
+    }
+
+    @Test
+    @DisplayName("an empty HTTP/2 authority falls back to the connection point")
+    fun emptyHttp2Authority() {
+        val call =
+            mockCall(
+                http2Authority = "",
+                listener = Listener(host = "192.168.1.5", port = 8443, scheme = "https"),
+            )
+        assertEquals("https://192.168.1.5:8443", deriveBaseUrl(call))
+    }
+
+    @Test
     @DisplayName("X-Forwarded-Host and Host win over an HTTP/2 authority")
     fun headersWinOverHttp2Authority() {
         val forwarded = mockCall(forwardedHost = "forwarded.example:1234", http2Authority = "authority.example")

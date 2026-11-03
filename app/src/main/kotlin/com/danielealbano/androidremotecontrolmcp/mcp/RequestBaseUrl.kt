@@ -22,9 +22,9 @@ import kotlin.coroutines.coroutineContext
  * **Security rationale (forwarded-header trust) — by design:** the derivation trusts the client-settable
  * `X-Forwarded-*` headers, but the response is PER-CONNECTION, so a spoofed host only changes the
  * response sent back to the spoofer (no cross-client/cached poisoning): a token minted with a spoofed
- * `aud` is rejected at the real `/mcp` (aud-binding), the OAuth path requires a trusted tunnel, and
- * share links are returned to the calling agent over the same connection. A non-empty
- * `publicUrlOverride` pins the host and ignores forwarded headers entirely.
+ * `aud` is rejected at the real `/mcp` (aud-binding), and share links are returned to the calling
+ * agent over the same connection. A non-empty `publicUrlOverride` pins the host and ignores forwarded
+ * headers entirely.
  */
 
 private const val HTTP_DEFAULT_PORT = 80
@@ -46,35 +46,25 @@ fun Application.captureHttp2Authority() {
     }
 }
 
-/** Returns a normalized `scheme://host[:port]` from forwarded/Host headers. */
+/** Returns a normalized `scheme://host[:port]` from the forwarded/Host headers or the HTTP/2 `:authority`. */
 fun deriveBaseUrl(call: ApplicationCall): String {
-    val scheme =
-        call.request.headers["X-Forwarded-Proto"]
-            ?.substringBefore(',')
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: call.request.origin.scheme
-    val forwardedHost =
-        call.request.headers["X-Forwarded-Host"]
-            ?.substringBefore(',')
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+    val scheme = firstValue(call.request.headers["X-Forwarded-Proto"]) ?: call.request.origin.scheme
+    val forwardedHost = firstValue(call.request.headers["X-Forwarded-Host"])
     // Use the raw Host header authority verbatim: it carries a port ONLY when the client actually
     // sent one. Reconstructing via host():port() would synthesize the local connection's scheme-default
     // port (e.g. http→80) when Host has none, producing a bogus `https://host:80` behind an HTTPS tunnel
     // (cloudflared/ngrok terminate TLS and forward plaintext, so the local scheme is http).
-    val rawHost =
-        call.request.headers["Host"]
-            ?.substringBefore(',')
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+    val rawHost = firstValue(call.request.headers["Host"])
     val hostPort =
         forwardedHost
             ?: rawHost
-            ?: call.attributes.getOrNull(Http2Authority)
+            ?: firstValue(call.attributes.getOrNull(Http2Authority))
             ?: "${call.request.host()}:${call.request.port()}"
     return normalizeBaseUrl("$scheme://$hostPort")
 }
+
+/** The first of a possibly comma-separated value, or `null` when there is none. */
+private fun firstValue(value: String?): String? = value?.substringBefore(',')?.trim()?.takeIf { it.isNotEmpty() }
 
 /**
  * Lowercases scheme + host, strips a trailing `/`, and omits the port when it equals the scheme default

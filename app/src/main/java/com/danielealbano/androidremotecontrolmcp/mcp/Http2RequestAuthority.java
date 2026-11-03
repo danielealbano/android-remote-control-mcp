@@ -19,6 +19,6 @@ final class Http2RequestAuthority {
             return null;
         }
         CharSequence authority = ((NettyHttp2ApplicationRequest) request).getNettyHeaders().authority();
-        return authority == null || authority.length() == 0 ? null : authority.toString();
+        return authority == null ? null : authority.toString();
     }
 }
