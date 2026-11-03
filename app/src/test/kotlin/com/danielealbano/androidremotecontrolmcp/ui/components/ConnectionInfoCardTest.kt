@@ -341,6 +341,14 @@ class ConnectionInfoCardTest {
     }
 
     @Test
+    fun `tunnelRowContent shows a received certificate being installed`() {
+        assertEquals(
+            TunnelRowContent.Installing,
+            tunnelRowContent(true, running, TunnelStatus.Connecting, ArcTunnelRenewalState.Installing),
+        )
+    }
+
+    @Test
     fun `tunnelRowContent hides the start renewal while the server is stopped`() {
         val renewing = ArcTunnelRenewalState.Renewing
         assertNull(tunnelRowContent(true, ServerStatus.Stopped, TunnelStatus.Connecting, renewing))

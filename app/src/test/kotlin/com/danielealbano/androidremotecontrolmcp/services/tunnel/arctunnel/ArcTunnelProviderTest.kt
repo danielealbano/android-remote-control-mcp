@@ -430,6 +430,56 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `a valid certificate has its saved chain checked before the listener starts`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.hold())
+
+            startBound()
+
+            coVerifyOrder {
+                renewals.checkSavedChain(identity)
+                host.startTlsListener(any(), null, any())
+            }
+        }
+
+    @Test
+    fun `a certificate renewed at start is not checked again`() =
+        runBlocking {
+            val expired = expiredIdentity()
+            coEvery { enrollment.readyIdentity(any()) } returns expired
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            coVerify(exactly = 0) { renewals.checkSavedChain(any()) }
+        }
+
+    @Test
+    fun `a stop during the saved chain check cancels it and no listener starts`() =
+        runBlocking {
+            val checking = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            coEvery { renewals.checkSavedChain(any()) } coAnswers {
+                checking.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            withTimeout(BUDGET_MS) { checking.await() }
+            provider.stop()
+
+            assertTrue(cancelled.isCompleted)
+            verify(exactly = 0) { host.startTlsListener(any(), any(), any()) }
+        }
+
+    @Test
     fun `a failed start renewal shows the reason and runs again on Retry`() =
         runBlocking {
             val bare = ArcTunnelTestIdentity.create(FakeArcTunnelKeyStore(), identity.net, withPublicChain = false)

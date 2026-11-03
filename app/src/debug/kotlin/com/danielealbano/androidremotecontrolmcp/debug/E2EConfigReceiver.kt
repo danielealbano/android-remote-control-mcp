@@ -79,6 +79,9 @@ import javax.inject.Inject
  *   --es arc_tunnel_edge_override 10.88.0.1:18443 --es arc_tunnel_trusted_ca_pem_b64 <base64 of the PEM>
  * adb shell am broadcast -a ....E2E_ARC_TUNNEL_ENROLL -n ...
  * adb shell am broadcast -a ....E2E_ARC_TUNNEL_QUERY -n ...
+ *
+ * # Free E2E tunnel: the chain handling on this device, over the saved chain (Base64 JSON in the result data)
+ * adb shell am broadcast -a ....E2E_ARC_TUNNEL_CHAIN_PROBE -n ...
  * ```
  *
  * Where `<app-id>` is `com.danielealbano.androidremotecontrolmcp.gms.debug` (gms flavor) or
@@ -116,6 +119,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 ACTION_E2E_STOP_SERVER -> handleStopServer(context)
                 ACTION_E2E_ARC_TUNNEL_ENROLL -> handleArcTunnelEnroll()
                 ACTION_E2E_ARC_TUNNEL_QUERY -> handleArcTunnelQuery()
+                ACTION_E2E_ARC_TUNNEL_CHAIN_PROBE -> handleArcTunnelChainProbe()
                 else -> Log.w(TAG, "Ignoring unexpected action: ${intent.action}")
             }
         } catch (e: Exception) {
@@ -324,31 +328,46 @@ class E2EConfigReceiver : BroadcastReceiver() {
         }
     }
 
-    /** Answers in the broadcast result data (`am broadcast` prints `data="…"`); [goAsync] keeps the result open. */
     private fun handleArcTunnelQuery() {
+        answerInResultData {
+            val config = settingsRepository.getServerConfig()
+            val env = ArcTunnelEnv.from(config)
+            val tunnel = tunnelManager.tunnelStatus.value
+            val status =
+                E2EArcTunnelStatus(
+                    enrolled = arcTunnelEnrollment.savedUrl(env) != null,
+                    url = arcTunnelEnrollment.savedUrl(env),
+                    enrollment = enrollmentLabel(arcTunnelEnrollment.state.value),
+                    tunnel = tunnelLabel(tunnel),
+                    tunnelUrl = (tunnel as? TunnelStatus.Connected)?.endpoints?.firstOrNull()?.url,
+                    server = serverLabel(McpServerService.serverStatus.value),
+                    baseAddress = config.arcTunnelBaseAddress,
+                    edgeOverride = config.arcTunnelEdgeOverride,
+                    ctCheckEnabled = config.arcTunnelCtCheckEnabled,
+                    tunnelEnabled = config.tunnelEnabled,
+                    tunnelProvider = config.tunnelProvider.adbValue,
+                    bearerTokenEnabled = config.bearerTokenEnabled,
+                )
+            Json.encodeToString(E2EArcTunnelStatus.serializer(), status)
+        }
+    }
+
+    private fun handleArcTunnelChainProbe() {
+        answerInResultData {
+            val env = ArcTunnelEnv.from(settingsRepository.getServerConfig())
+            val saved = arcTunnelEnrollment.store(env).load()
+            val savedChain = saved?.publicChain.orEmpty()
+            val probe = E2EArcTunnelChainProbe.of(savedChain, arcTunnelEnrollment.net(env))
+            Json.encodeToString(E2EArcTunnelChainProbe.serializer(), probe)
+        }
+    }
+
+    /** Answers in the broadcast result data (`am broadcast` prints `data="…"`); [goAsync] keeps the result open. */
+    private fun answerInResultData(json: suspend () -> String) {
         val pending = goAsync()
         scope.launch {
             try {
-                val config = settingsRepository.getServerConfig()
-                val env = ArcTunnelEnv.from(config)
-                val tunnel = tunnelManager.tunnelStatus.value
-                val status =
-                    E2EArcTunnelStatus(
-                        enrolled = arcTunnelEnrollment.savedUrl(env) != null,
-                        url = arcTunnelEnrollment.savedUrl(env),
-                        enrollment = enrollmentLabel(arcTunnelEnrollment.state.value),
-                        tunnel = tunnelLabel(tunnel),
-                        tunnelUrl = (tunnel as? TunnelStatus.Connected)?.endpoints?.firstOrNull()?.url,
-                        server = serverLabel(McpServerService.serverStatus.value),
-                        baseAddress = config.arcTunnelBaseAddress,
-                        edgeOverride = config.arcTunnelEdgeOverride,
-                        ctCheckEnabled = config.arcTunnelCtCheckEnabled,
-                        tunnelEnabled = config.tunnelEnabled,
-                        tunnelProvider = config.tunnelProvider.adbValue,
-                        bearerTokenEnabled = config.bearerTokenEnabled,
-                    )
-                val json = Json.encodeToString(E2EArcTunnelStatus.serializer(), status)
-                pending.setResultData(Base64.encodeToString(json.toByteArray(), Base64.NO_WRAP))
+                pending.setResultData(Base64.encodeToString(json().toByteArray(), Base64.NO_WRAP))
             } finally {
                 pending.finish()
             }
@@ -362,6 +381,8 @@ class E2EConfigReceiver : BroadcastReceiver() {
         const val ACTION_E2E_STOP_SERVER = "com.danielealbano.androidremotecontrolmcp.debug.E2E_STOP_SERVER"
         const val ACTION_E2E_ARC_TUNNEL_ENROLL = "com.danielealbano.androidremotecontrolmcp.debug.E2E_ARC_TUNNEL_ENROLL"
         const val ACTION_E2E_ARC_TUNNEL_QUERY = "com.danielealbano.androidremotecontrolmcp.debug.E2E_ARC_TUNNEL_QUERY"
+        const val ACTION_E2E_ARC_TUNNEL_CHAIN_PROBE =
+            "com.danielealbano.androidremotecontrolmcp.debug.E2E_ARC_TUNNEL_CHAIN_PROBE"
         private const val CLEAR = "-"
         private const val EXTRA_TUNNEL_ENABLED = "tunnel_enabled"
         private const val EXTRA_TUNNEL_LOCAL_PORT = "tunnel_local_port"

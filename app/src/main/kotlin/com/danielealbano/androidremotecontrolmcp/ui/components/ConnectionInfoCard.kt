@@ -76,8 +76,11 @@ internal sealed interface TunnelRowContent {
         val message: String,
     ) : TunnelRowContent
 
-    /** The free E2E tunnel renews an expired or missing certificate at start: spinner, text and Cancel. */
+    /** The free E2E tunnel renews a certificate at start: spinner, text and Cancel. */
     data object Renewing : TunnelRowContent
+
+    /** That renewal received the certificate and is installing it: the same, with Cancel disabled. */
+    data object Installing : TunnelRowContent
 
     /** That renewal failed: the reason in red with Retry and Cancel. */
     data class RenewalFailed(
@@ -105,6 +108,7 @@ internal fun tunnelRowContent(
     if (!tunnelEnabled || !serverActive) return null
     return when (renewal) {
         ArcTunnelRenewalState.Renewing -> TunnelRowContent.Renewing
+        ArcTunnelRenewalState.Installing -> TunnelRowContent.Installing
         is ArcTunnelRenewalState.Failed -> TunnelRowContent.RenewalFailed(renewal.message)
         ArcTunnelRenewalState.Idle -> tunnelStatusRowContent(tunnelStatus)
     }
@@ -375,12 +379,13 @@ private fun RowScope.TunnelRowValue(
             )
         }
 
-        TunnelRowContent.Renewing, is TunnelRowContent.RenewalFailed -> {
+        TunnelRowContent.Renewing, TunnelRowContent.Installing, is TunnelRowContent.RenewalFailed -> {
             Column(modifier = Modifier.weight(1f)) {
                 ArcTunnelRenewalBlock(
                     failure = (content as? TunnelRowContent.RenewalFailed)?.message,
                     onCancel = onCancelRenewal,
                     onRetry = onRetryRenewal,
+                    cancelEnabled = content != TunnelRowContent.Installing,
                 )
             }
         }

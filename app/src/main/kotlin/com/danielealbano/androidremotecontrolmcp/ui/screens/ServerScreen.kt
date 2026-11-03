@@ -198,6 +198,7 @@ fun ServerScreen(
                 onChannelStopClick = { channelViewModel.stopChannel() },
                 startEnabled = isAccessibilityEnabled,
                 mcpStartBlockedMessage = listenerCheck.startError,
+                mcpBusy = renewal.inProgress,
             )
 
             Spacer(Modifier.height(16.dp))

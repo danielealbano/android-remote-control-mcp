@@ -1,6 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
@@ -90,6 +93,28 @@ class ArcTunnelIssueRetryTest {
 
             assertSame(failure, thrown)
             assertEquals(1, attempts.size)
+        }
+
+    @Test
+    fun `a refusal arriving with a cancellation announces no retry`() =
+        runTest {
+            var announced = 0
+            val job =
+                launch {
+                    ArcTunnelIssueRetry.run(
+                        nonce = "n",
+                        issue = {
+                            currentCoroutineContext().cancel()
+                            throw refusal(retryable = true, retryAfterSec = 3600)
+                        },
+                        freshNonce = { "f" },
+                    ) { _, _, _ -> announced++ }
+                }
+
+            job.join()
+
+            assertTrue(job.isCancelled)
+            assertEquals(0, announced)
         }
 
     @Test

@@ -1,10 +1,13 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 import okhttp3.Protocol
 import okhttp3.Request
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.MethodOrderer
@@ -18,8 +21,9 @@ import org.junit.jupiter.api.TestMethodOrder
  * (attestation optional on the server: redroid's AndroidKeyStore is a software KeyMint), the MCP server starts
  * with the tunnel, and the JVM reaches `/health` (HTTP/2 over ALPN, and HTTP/1.1 from a client without ALPN), the
  * OAuth metadata (which must name the `https` URL over HTTP/1.1 too) and `tools/list` THROUGH the tunnel with the
- * Pebble root as trust anchor. The node drain runs last, because it stops the stack's first node. The shared
- * container is restored (tunnel off, server restarted, client refreshed) afterwards.
+ * Pebble root as trust anchor. It also runs the certificate chain handling on redroid's own Conscrypt. The node drain
+ * runs last, because it stops the stack's first node. The shared container is restored (tunnel off, server restarted,
+ * client refreshed) afterwards.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
@@ -128,6 +132,59 @@ class E2EArcTunnelTest {
         val second = ArcTunnelPublicClient.get(stack, fqdn(), HEALTH)
         assertTrue(first.startsWith("HTTP/1.1 200") && second.startsWith("HTTP/1.1 200"), "$first\n$second")
         assertEquals("Connected", AndroidContainerSetup.queryArcTunnel().tunnel)
+    }
+
+    /** Redroid's own Conscrypt has the bug, and nothing else in this stack sends it a blank line. */
+    @Test
+    fun `the real parser keeps a bundle with blank lines whole and the real trust manager needs the intermediates`() {
+        val probe = AndroidContainerSetup.probeArcTunnelChain()
+
+        assertTrue(probe.savedCertificates >= 2, "$probe")
+        assertTrue(
+            probe.factoryCertificates < probe.savedCertificates,
+            "this Conscrypt no longer cuts a bundle at a blank line, so this test no longer covers that bug: $probe",
+        )
+        assertEquals(probe.savedCertificates, probe.parsedCertificates, "$probe")
+        assertTrue(probe.wholeReachesRoot, "$probe")
+        assertFalse(probe.leafReachesRoot, "a leaf must not pass after its intermediates did: $probe")
+    }
+
+    /**
+     * What a phone updated from an older app meets at its next tunnel start: the marker missing and, on the phones
+     * affected, the chain cut to the leaf. Runs before the node drain, which stops the stack's first node.
+     */
+    @Test
+    @Order(Int.MAX_VALUE - 1)
+    fun `a saved chain cut to the leaf is renewed once at tunnel start, then not again, and a whole one only marked`() {
+        val whole = ArcTunnelPublicClient.servedChain(stack, fqdn())
+        assertTrue(whole.size >= 2, "the stack must issue a chain to cut: ${whole.size} certificates")
+
+        restartTunnel { ArcTunnelSavedRecord.withoutCertCheck(ArcTunnelSavedRecord.withLeafOnly(it)) }
+
+        val renewed = ArcTunnelPublicClient.servedChain(stack, fqdn())
+        assertEquals(whole.size, renewed.size)
+        assertNotEquals(whole.first(), renewed.first(), "the chain must come from a new certificate")
+        val renewedRecord = ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)
+        assertTrue(ArcTunnelSavedRecord.certCheck(renewedRecord) > 0)
+
+        restartTunnel { ArcTunnelSavedRecord.withLeafOnly(it) }
+        assertEquals(
+            ArcTunnelSavedRecord.generation(renewedRecord),
+            ArcTunnelSavedRecord.generation(ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)),
+            "a marked certificate must not be renewed, even with its chain cut",
+        )
+
+        restartTunnel { ArcTunnelSavedRecord.withoutCertCheck(renewedRecord) }
+        assertEquals(renewed.first(), ArcTunnelPublicClient.servedChain(stack, fqdn()).first(), "whole: no renewal")
+        assertTrue(ArcTunnelSavedRecord.certCheck(ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)) > 0)
+    }
+
+    private fun restartTunnel(editSavedRecord: (JsonObject) -> JsonObject) {
+        AndroidContainerSetup.stopMcpServer(baseUrl)
+        ArcTunnelSavedRecord.edit(ArcTunnelStack.BASE_ADDRESS, editSavedRecord)
+        AndroidContainerSetup.startMcpServer()
+        AndroidContainerSetup.waitForServerReady(baseUrl)
+        AndroidContainerSetup.awaitArcTunnel(timeoutMs = CONNECT_TIMEOUT_MS) { it.tunnel == "Connected" }
     }
 
     /**

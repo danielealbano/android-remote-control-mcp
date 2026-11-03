@@ -65,11 +65,14 @@ interface ArcTunnelEnrollment {
 
     /**
      * One renewal (nudge nonce or fresh nonce), saved only while [identity] is still the saved one; a saved
-     * certificate also clears a `Failed` [state].
+     * certificate also clears a `Failed` [state]. From [onCertificateReceived] on, the certificate is installed and
+     * saved whatever happens to the caller, a cancellation included; a save that fails is logged and the certificate
+     * stays in use, so the renewal still succeeds.
      */
     suspend fun renew(
         identity: ArcTunnelIdentity,
         nonce: String?,
+        onCertificateReceived: () -> Unit = {},
     )
 
     /** Clears the persisted undismissed CT alert of the environment (the UI dismissed it). */
