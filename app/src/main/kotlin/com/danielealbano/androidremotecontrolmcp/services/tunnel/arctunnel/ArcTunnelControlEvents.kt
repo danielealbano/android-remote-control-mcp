@@ -11,6 +11,9 @@ interface ArcTunnelControlEvents {
 
     fun onDialBackFailed(message: String)
 
-    /** A control stream attempt failed or ended on an error (bound or not); [reason] is user-facing. */
+    /**
+     * A round of the control loop failed or its stream ended on an error (bound or not); [reason] is user-facing. A
+     * MOVE address that refuses or fails and the end of a moved-away connection are not reported.
+     */
     fun onAttemptFailed(reason: String)
 }

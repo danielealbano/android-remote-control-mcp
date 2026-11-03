@@ -21,7 +21,8 @@ import javax.net.ssl.X509TrustManager
  * HTTP clients and TLS contexts of the tunnel client. With [edgeOverride] every service host resolves to the
  * override address and carries its port in the URL (SNI and `Host` stay the real names); [trustedCaPem] (empty
  * = system CAs) is the trust anchor set. One shared [OkHttpClient] backs every derived client (one pool);
- * [close] evicts its idle connections, so a shared instance stays usable afterwards.
+ * [close] evicts its idle connections, so a shared instance stays usable afterwards. Each control connection derives
+ * a pool of its own and evicts it itself ([ArcTunnelControl]).
  */
 class ArcTunnelNet(
     trustedCaPem: String?,
@@ -41,7 +42,10 @@ class ArcTunnelNet(
 
     fun mtlsClient(identity: ArcTunnelIdentity): OkHttpClient = client(mtlsContext(identity))
 
-    /** The control-stream client: no read timeout (the server only PINGs every ≤ 30 s; the watchdog guards silence). */
+    /**
+     * The control-stream client: no read timeout, so the 90 s watchdog is what bounds a TLS handshake through it. On an
+     * open duplex stream OkHttp applies no read timeout anyway.
+     */
     fun controlClient(identity: ArcTunnelIdentity): OkHttpClient =
         mtlsClient(identity).newBuilder().readTimeout(0, TimeUnit.MILLISECONDS).build()
 

@@ -42,7 +42,10 @@ class ArcTunnelEnrollmentImpl
                 ArcTunnelIdentityStore(File(context.filesDir, STORE_DIR), env.hosts, keys)
             }
 
-        /** One network layer (one connection pool) per environment, shared by requests and sessions. */
+        /**
+         * One network layer per environment, shared by requests and sessions; its connection pool serves the requests,
+         * each control connection has its own.
+         */
         override fun net(env: ArcTunnelEnv): ArcTunnelNet =
             nets.getOrPut(env) { ArcTunnelNet(env.trustedCaPem, ArcTunnelEdgeOverride.parse(env.edgeOverride)) }
 

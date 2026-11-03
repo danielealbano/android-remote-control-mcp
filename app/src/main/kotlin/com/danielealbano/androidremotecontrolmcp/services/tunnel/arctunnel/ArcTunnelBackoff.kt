@@ -1,6 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
-/** Control reconnect delays: 1, 2, 4, 8, 16 s, then 16 s; [reset] after a bound control stream. */
+/** Control reconnect delays: 1, 2, 4, 8, 16 s, then 16 s; [reset] after a bound control stream ended without a MOVE. */
 class ArcTunnelBackoff {
     private var current = INITIAL_MS
 

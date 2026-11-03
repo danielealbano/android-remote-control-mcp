@@ -22,6 +22,10 @@ class ArcTunnelTestEvents : ArcTunnelControlEvents {
     @Volatile
     var throwOnFirstBound: Boolean = false
 
+    /** When set, [onBound] runs it after counting the bind (the races with the frames that follow a bind). */
+    @Volatile
+    var onBoundHook: (() -> Unit)? = null
+
     /** When set, [onRenewNudge] suspends until it completes (single-flight tests). */
     @Volatile
     var nudgeGate: CompletableDeferred<Unit>? = null
@@ -34,6 +38,7 @@ class ArcTunnelTestEvents : ArcTunnelControlEvents {
         val count = boundCount.incrementAndGet()
         bound.countDown()
         check(!(throwOnFirstBound && count == 1)) { "injected unexpected failure" }
+        onBoundHook?.invoke()
     }
 
     override fun onUnbound() {

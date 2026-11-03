@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -16,6 +17,16 @@ class ArcTunnelHostRelay(
     private val targetPort: Int,
 ) : AutoCloseable {
     private val server = ServerSocket(listenPort, BACKLOG, InetAddress.getByName("0.0.0.0"))
+    private val open: MutableSet<Socket> = ConcurrentHashMap.newKeySet()
+    private val acceptedCount = AtomicInteger()
+
+    /** How many connections this relay accepted so far. */
+    val accepted: Int get() = acceptedCount.get()
+
+    /** Cuts every connection through this relay; new ones are still accepted. */
+    fun dropConnections() {
+        open.toList().forEach(::closeQuietly)
+    }
 
     fun start() {
         Thread({ acceptLoop() }, "arc-tunnel-relay").apply { isDaemon = true }.start()
@@ -33,6 +44,7 @@ class ArcTunnelHostRelay(
                 } catch (_: IOException) {
                     return
                 }
+            acceptedCount.incrementAndGet()
             val upstream =
                 try {
                     Socket("127.0.0.1", targetPort)
@@ -40,9 +52,11 @@ class ArcTunnelHostRelay(
                     client.close()
                     continue
                 }
-            val open = AtomicInteger(2)
-            pump(client, upstream, open)
-            pump(upstream, client, open)
+            open += client
+            open += upstream
+            val directions = AtomicInteger(2)
+            pump(client, upstream, directions)
+            pump(upstream, client, directions)
         }
     }
 
@@ -50,7 +64,7 @@ class ArcTunnelHostRelay(
     private fun pump(
         from: Socket,
         to: Socket,
-        open: AtomicInteger,
+        directions: AtomicInteger,
     ) {
         Thread({
             try {
@@ -59,9 +73,11 @@ class ArcTunnelHostRelay(
             } catch (_: IOException) {
                 // the peer went away: fall through to the close below
             } finally {
-                if (open.decrementAndGet() == 0 || from.isClosed || to.isClosed) {
+                if (directions.decrementAndGet() == 0 || from.isClosed || to.isClosed) {
                     closeQuietly(from)
                     closeQuietly(to)
+                    open -= from
+                    open -= to
                 }
             }
         }, "arc-tunnel-relay-pump").apply { isDaemon = true }.start()

@@ -16,6 +16,20 @@ class ArcTunnelFramesTest {
     ): Buffer = Buffer().writeByte(type).writeInt(length)
 
     @Test
+    fun `frame type values are the protocol's`() {
+        assertEquals(
+            listOf(1, 2, 3, 4, 5),
+            listOf(
+                ArcTunnelFrames.OPEN,
+                ArcTunnelFrames.PING,
+                ArcTunnelFrames.PONG,
+                ArcTunnelFrames.RENEW_NUDGE,
+                ArcTunnelFrames.MOVE,
+            ),
+        )
+    }
+
+    @Test
     fun `reads type and payload`() {
         val source = Buffer().write(ArcTunnelTestServer.frame(ArcTunnelFrames.OPEN, """{"token":"t"}"""))
 
