@@ -99,6 +99,15 @@ class E2EArcTunnelTest {
         assertTrue(response.contains("\"resource\":\"https://${fqdn()}/mcp\""), response)
     }
 
+    /** The shape that failed with `invalid_target` on ChatGPT: HTTP/2 named another URL than HTTP/1.1. */
+    @Test
+    fun `the OAuth flow works through the tunnel on a mix of HTTP versions, with a port-less public host`() {
+        val flow = ArcTunnelOAuthFlow(stack, fqdn())
+
+        flow.assertPublicUrlsOnBothProtocols()
+        flow.assertToolsListedOnBothProtocols(flow.obtainAccessToken())
+    }
+
     @Test
     fun `health is served through the tunnel over HTTP-2`() {
         val request =
