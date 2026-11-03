@@ -212,6 +212,21 @@ class ArcTunnelReceivedCertificateTest {
         }
 
     @Test
+    fun `an enrollment whose save fails shows Failed and issues once`() =
+        runBlocking {
+            saveIdentity()
+            val before = impl.store(env).load()
+            val storeDir = File(filesDir, ArcTunnelEnrollmentImpl.STORE_DIR)
+            check(File(storeDir, "${hosts.envKey}.json.tmp").mkdirs()) { "could not block the save" }
+
+            impl.execute(env, rotate = false)
+
+            assertEquals(1, issues.get())
+            assertTrue(impl.state.value is ArcTunnelEnrollmentState.Failed, "state ${impl.state.value}")
+            assertEquals(before, impl.store(env).load())
+        }
+
+    @Test
     fun `a first enrollment cancelled once the certificate is received is saved all the same`() =
         runBlocking {
             val flow = ArcTunnelEnrollmentFlow(keys, ArcTunnelEnroller(keys, serverLog))
