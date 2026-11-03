@@ -37,6 +37,20 @@ data class E2EArcTunnelStatus(
     }
 }
 
+/** Mirror of the app's debug `E2EArcTunnelChainProbe`, which says what its fields mean; both MUST change together. */
+@Serializable
+data class E2EArcTunnelChainProbe(
+    @SerialName("saved_certificates") val savedCertificates: Int,
+    @SerialName("factory_certificates") val factoryCertificates: Int,
+    @SerialName("parsed_certificates") val parsedCertificates: Int,
+    @SerialName("whole_reaches_root") val wholeReachesRoot: Boolean,
+    @SerialName("leaf_reaches_root") val leafReachesRoot: Boolean,
+) {
+    companion object {
+        fun parse(text: String): E2EArcTunnelChainProbe = Json.decodeFromString(serializer(), text)
+    }
+}
+
 /** What [AndroidContainerSetup.configureArcTunnel] sends. */
 data class ArcTunnelE2ESettings(
     val tunnelEnabled: Boolean,

@@ -5,6 +5,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.InetAddress
+import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
@@ -28,6 +29,16 @@ object ArcTunnelPublicClient {
             it.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\nConnection: close\r\n\r\n".toByteArray())
             it.outputStream.flush()
             return it.inputStream.readNBytes(READ_LIMIT).decodeToString()
+        }
+    }
+
+    /** The certificates a client receives from the phone; a chain that does not reach the root fails the handshake. */
+    fun servedChain(
+        stack: ArcTunnelStack,
+        fqdn: String,
+    ): List<X509Certificate> {
+        stack.connectTls(fqdn).use { socket ->
+            return socket.session.peerCertificates.map { it as X509Certificate }
         }
     }
 
