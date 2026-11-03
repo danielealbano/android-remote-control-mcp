@@ -180,6 +180,32 @@ class ArcTunnelReceivedCertificateTest {
         }
 
     @Test
+    fun `a renew cancelled right after the answer was read installs and saves it, issuing once`() =
+        runBlocking {
+            val caller = AtomicReference<Job>()
+            val net = spyk(impl.net(env))
+            every { net.mtlsClient(any()) } answers {
+                callOriginal()
+                    .newBuilder()
+                    .addInterceptor(ArcTunnelTestServer.atEndOfBody { caller.get().cancel() })
+                    .build()
+            }
+            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
+            impl.store(env).save(identity)
+            val job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) { impl.renew(identity, null) }
+            caller.set(job)
+
+            job.start()
+            withTimeout(BUDGET_MS) { job.join() }
+
+            assertTrue(job.isCancelled)
+            assertEquals(1, identity.state().generation)
+            assertEquals(1, issues.get())
+            assertSavedWithCertificate()
+            assertEquals(1, requireNotNull(impl.store(env).load()).generation)
+        }
+
+    @Test
     fun `a renew cancelled before the certificate is received saves nothing`() =
         runBlocking {
             val identity = saveIdentity()

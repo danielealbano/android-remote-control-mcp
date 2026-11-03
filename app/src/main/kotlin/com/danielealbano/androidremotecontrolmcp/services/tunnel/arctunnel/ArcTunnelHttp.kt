@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -17,6 +18,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /** JSON GET/POST on the IO dispatcher; a call is cancelled together with the calling coroutine. */
 object ArcTunnelHttp {
@@ -87,28 +89,38 @@ object ArcTunnelHttp {
      * the body. Every exception reaches the caller: OkHttp's asynchronous path rethrows a non-I/O exception on
      * its own thread, which would crash the app. Cancelling the coroutine cancels the call, which aborts a
      * blocked connect, upload or body read.
+     *
+     * An answer read in full is returned even if the cancellation lands while it is handed back, because an `/issue`
+     * answer is a certificate already spent. The caller's next suspension point still sees the cancellation.
      */
-    suspend fun await(call: Call): Pair<Int, String> =
-        coroutineScope {
-            // UNDISPATCHED: the canceller is parked before the call starts, so a cancellation is never missed.
-            val canceller =
-                launch(start = CoroutineStart.UNDISPATCHED) {
-                    try {
-                        awaitCancellation()
-                    } finally {
-                        call.cancel()
+    suspend fun await(call: Call): Pair<Int, String> {
+        val answer = AtomicReference<Pair<Int, String>>()
+        try {
+            coroutineScope {
+                // UNDISPATCHED: the canceller is parked before the call starts, so a cancellation is never missed.
+                val canceller =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            call.cancel()
+                        }
                     }
+                try {
+                    withContext(Dispatchers.IO) { call.execute().use { answer.set(it.code to it.body.string()) } }
+                } catch (e: IOException) {
+                    // A call cancelled by our own cancellation fails with an IOException: report the cancellation.
+                    ensureActive()
+                    throw e
+                } finally {
+                    canceller.cancel()
                 }
-            try {
-                withContext(Dispatchers.IO) { call.execute().use { it.code to it.body.string() } }
-            } catch (e: IOException) {
-                // A call cancelled by our own cancellation fails with an IOException: report the cancellation.
-                ensureActive()
-                throw e
-            } finally {
-                canceller.cancel()
             }
+        } catch (e: CancellationException) {
+            if (answer.get() == null) throw e
         }
+        return answer.get()
+    }
 
     fun fail(
         status: Int,
