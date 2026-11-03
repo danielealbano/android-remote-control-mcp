@@ -2,13 +2,11 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import okhttp3.Dns
 import okhttp3.OkHttpClient
-import java.io.ByteArrayInputStream
 import java.net.InetAddress
 import java.net.Socket
 import java.security.KeyStore
 import java.security.Principal
 import java.security.SecureRandom
-import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -73,10 +71,7 @@ class ArcTunnelNet(
 
     private fun loadRoots(pem: String): KeyStore {
         val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
-        CertificateFactory
-            .getInstance("X.509")
-            .generateCertificates(ByteArrayInputStream(pem.toByteArray()))
-            .forEachIndexed { i, c -> ks.setCertificateEntry("root$i", c as X509Certificate) }
+        ArcTunnelPem.parseChain(pem).forEachIndexed { i, c -> ks.setCertificateEntry("root$i", c) }
         return ks
     }
 
