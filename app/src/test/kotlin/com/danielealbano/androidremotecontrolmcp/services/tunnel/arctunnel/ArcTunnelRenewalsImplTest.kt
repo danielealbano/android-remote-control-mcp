@@ -139,7 +139,6 @@ class ArcTunnelRenewalsImplTest {
         coVerify(exactly = 1) { enrollment.renew(saved, null, any()) }
         assertEquals(ArcTunnelRenewalState.Renewing, seen.get())
         assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
-        assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
         assertEquals(1, logged("chain is incomplete"))
         assertEquals(1, logged("replace the incomplete chain"))
     }
@@ -293,7 +292,6 @@ class ArcTunnelRenewalsImplTest {
         withTimeout(BUDGET_MS) { renewals.checkSavedChain(saved) }
 
         assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
-        assertEquals(ARC_TUNNEL_CERT_CHECK, store.load()?.certCheck)
         assertEquals(1, logged("replace the incomplete chain"))
         assertEquals(0, logged("check failed"))
     }

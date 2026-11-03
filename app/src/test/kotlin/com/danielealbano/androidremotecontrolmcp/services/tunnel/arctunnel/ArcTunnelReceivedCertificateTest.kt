@@ -111,10 +111,31 @@ class ArcTunnelReceivedCertificateTest {
     private fun enrollBody(): String =
         """{"name":"${ArcTunnelTestIdentity.NAME}","identity_cert":${quote(pem("id"))},"issue_nonce":"0b01"}"""
 
+    /** A saved identity with no certificate and no marker, so a save that should not happen shows in the record. */
     private fun saveIdentity(): ArcTunnelIdentity {
         val identity = ArcTunnelTestIdentity.create(keys, impl.net(env), withPublicChain = false)
         impl.store(env).save(identity)
+        val file = File(storeDir(), "${hosts.envKey}.json")
+        file.writeText(file.readText().replace(Regex(""","cert_check":\d+"""), ""))
         return identity
+    }
+
+    private fun storeDir(): File = File(filesDir, ArcTunnelEnrollmentImpl.STORE_DIR)
+
+    private fun blockSaves() {
+        check(File(storeDir(), "${hosts.envKey}.json.tmp").mkdirs()) { "could not block the save" }
+    }
+
+    private suspend fun failSetup() {
+        enrollAnswer = {
+            MockResponse
+                .Builder()
+                .code(401)
+                .body("""{"reason":"denied","retryable":false}""")
+                .build()
+        }
+        impl.execute(env, rotate = false)
+        assertTrue(impl.state.value is ArcTunnelEnrollmentState.Failed, "state ${impl.state.value}")
     }
 
     /** Runs [block] with a way to cancel it from inside, and waits for it to end; returns its job. */
@@ -172,21 +193,14 @@ class ArcTunnelReceivedCertificateTest {
             gate.countDown()
 
             assertEquals(before, impl.store(env).load())
+            assertEquals(0, before?.certCheck)
             assertEquals(0, identity.state().generation)
         }
 
     @Test
     fun `a renew cancelled once the certificate is received still clears a setup failure`() =
         runBlocking {
-            enrollAnswer = {
-                MockResponse
-                    .Builder()
-                    .code(401)
-                    .body("""{"reason":"denied","retryable":false}""")
-                    .build()
-            }
-            impl.execute(env, rotate = false)
-            assertTrue(impl.state.value is ArcTunnelEnrollmentState.Failed, "state ${impl.state.value}")
+            failSetup()
             val identity = saveIdentity()
 
             cancellable { cancel -> impl.renew(identity, null) { cancel() } }
@@ -195,12 +209,24 @@ class ArcTunnelReceivedCertificateTest {
         }
 
     @Test
+    fun `a renew whose save fails leaves a setup failure shown`() =
+        runBlocking {
+            failSetup()
+            val identity = saveIdentity()
+            blockSaves()
+
+            impl.renew(identity, null)
+
+            assertEquals(1, identity.state().generation)
+            assertTrue(impl.state.value is ArcTunnelEnrollmentState.Failed, "state ${impl.state.value}")
+        }
+
+    @Test
     fun `a renew whose save fails succeeds with the new certificate, logged, and issues once`() =
         runBlocking {
             val identity = saveIdentity()
             val before = impl.store(env).load()
-            val storeDir = File(filesDir, ArcTunnelEnrollmentImpl.STORE_DIR)
-            check(File(storeDir, "${hosts.envKey}.json.tmp").mkdirs()) { "could not block the save" }
+            blockSaves()
 
             impl.renew(identity, null)
 
@@ -216,8 +242,7 @@ class ArcTunnelReceivedCertificateTest {
         runBlocking {
             saveIdentity()
             val before = impl.store(env).load()
-            val storeDir = File(filesDir, ArcTunnelEnrollmentImpl.STORE_DIR)
-            check(File(storeDir, "${hosts.envKey}.json.tmp").mkdirs()) { "could not block the save" }
+            blockSaves()
 
             impl.execute(env, rotate = false)
 

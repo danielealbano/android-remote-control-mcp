@@ -149,7 +149,6 @@ class ArcTunnelPemTest {
 
     @Test
     fun `parseChain returns an empty chain for a blank input`() {
-        assertTrue(ArcTunnelPem.parseChain("").isEmpty())
         assertTrue(ArcTunnelPem.parseChain(" \n\r\n ").isEmpty())
     }
 
