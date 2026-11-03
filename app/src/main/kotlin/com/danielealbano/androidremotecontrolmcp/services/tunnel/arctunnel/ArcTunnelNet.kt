@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import android.util.Log
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.InetAddress
@@ -7,6 +8,7 @@ import java.net.Socket
 import java.security.KeyStore
 import java.security.Principal
 import java.security.SecureRandom
+import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -26,7 +28,8 @@ class ArcTunnelNet(
     trustedCaPem: String?,
     private val edgeOverride: ArcTunnelEdgeOverride?,
 ) {
-    private val trust: X509TrustManager = trustManager(trustedCaPem?.takeIf { it.isNotBlank() }?.let { loadRoots(it) })
+    private val roots: KeyStore? = trustedCaPem?.takeIf { it.isNotBlank() }?.let { loadRoots(it) }
+    private val trust: X509TrustManager = trustManager(roots)
     private val dns: Dns =
         if (edgeOverride == null) Dns.SYSTEM else Dns { listOf(InetAddress.getByName(edgeOverride.host)) }
     private val base: OkHttpClient = OkHttpClient.Builder().dns(dns).build()
@@ -57,6 +60,27 @@ class ArcTunnelNet(
     fun close() {
         base.connectionPool.evictAll()
     }
+
+    /**
+     * Whether [chain] reaches a root this phone trusts with its own certificates alone, which is what a client that does
+     * not fetch intermediates needs. How many certificates that takes depends on the CA and on the phone's roots.
+     *
+     * Every check has its own trust manager, over an explicit key store: a trust manager remembers the intermediates it
+     * verified, and without a key store Android hands out one per process, so a bare leaf would pass after any connection
+     * through the same CA.
+     */
+    fun reachesTrustedRoot(chain: List<X509Certificate>): Boolean {
+        if (chain.isEmpty()) return false
+        return try {
+            trustManager(roots ?: androidRoots()).checkServerTrusted(chain.toTypedArray(), ANY_KEY_EXCHANGE)
+            true
+        } catch (e: CertificateException) {
+            Log.i(TAG, "the chain does not reach a trusted root", e)
+            false
+        }
+    }
+
+    private fun androidRoots(): KeyStore = KeyStore.getInstance(ANDROID_ROOTS_STORE).apply { load(null, null) }
 
     private fun mtlsContext(identity: ArcTunnelIdentity): SSLContext = sslContext(DynamicIdentityKeyManager(identity))
 
@@ -128,5 +152,13 @@ class ArcTunnelNet(
         override fun getCertificateChain(a: String?): Array<X509Certificate> = cred().chain.toTypedArray()
 
         override fun getPrivateKey(a: String?) = cred().key
+    }
+
+    private companion object {
+        const val TAG = "MCP:ArcTunnelNet"
+        const val ANDROID_ROOTS_STORE = "AndroidCAStore"
+
+        /** The auth type accepted for any key: only the chain matters here. */
+        const val ANY_KEY_EXCHANGE = "UNKNOWN"
     }
 }

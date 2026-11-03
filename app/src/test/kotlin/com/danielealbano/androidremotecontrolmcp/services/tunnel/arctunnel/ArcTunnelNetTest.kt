@@ -3,9 +3,11 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockWebServer
 import okhttp3.Request
+import okhttp3.tls.HeldCertificate
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.net.Socket
+import java.security.cert.X509Certificate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -45,6 +48,78 @@ class ArcTunnelNetTest {
             .newCall(request)
             .execute()
             .use { it.code }
+    }
+
+    /** root -> intermediate -> leaf, with [trusted] as the only trust anchor. */
+    private class TrustFixture {
+        val root: HeldCertificate =
+            HeldCertificate
+                .Builder()
+                .certificateAuthority(1)
+                .commonName("root")
+                .build()
+        val intermediate: HeldCertificate =
+            HeldCertificate
+                .Builder()
+                .certificateAuthority(0)
+                .signedBy(root)
+                .commonName("intermediate")
+                .build()
+        val leaf: X509Certificate =
+            HeldCertificate
+                .Builder()
+                .signedBy(intermediate)
+                .commonName("leaf")
+                .build()
+                .certificate
+        val trusted: ArcTunnelNet = ArcTunnelNet(ArcTunnelPem.encode("CERTIFICATE", root.certificate.encoded), null)
+    }
+
+    @Test
+    fun `a chain with its intermediate reaches the trusted root`() {
+        val t = TrustFixture()
+
+        assertTrue(t.trusted.reachesTrustedRoot(listOf(t.leaf, t.intermediate.certificate)))
+        assertTrue(t.trusted.reachesTrustedRoot(listOf(t.leaf, t.intermediate.certificate, t.root.certificate)))
+    }
+
+    @Test
+    fun `a leaf whose intermediate is missing does not reach the trusted root`() {
+        val t = TrustFixture()
+
+        assertFalse(t.trusted.reachesTrustedRoot(listOf(t.leaf)))
+    }
+
+    @Test
+    fun `a bare leaf still fails after the whole chain passed`() {
+        val t = TrustFixture()
+
+        assertTrue(t.trusted.reachesTrustedRoot(listOf(t.leaf, t.intermediate.certificate)))
+
+        assertFalse(t.trusted.reachesTrustedRoot(listOf(t.leaf)))
+    }
+
+    @Test
+    fun `an empty chain and a chain under another root do not reach the trusted root`() {
+        val t = TrustFixture()
+        val other = TrustFixture()
+
+        assertFalse(t.trusted.reachesTrustedRoot(emptyList()))
+        assertFalse(t.trusted.reachesTrustedRoot(listOf(other.leaf, other.intermediate.certificate)))
+    }
+
+    @Test
+    fun `every root of a trust bundle with blank lines between them is trusted`() {
+        val first = TrustFixture()
+        val second = TrustFixture()
+        val bundle =
+            listOf(first.root, second.root).joinToString("\n") {
+                ArcTunnelPem.encode("CERTIFICATE", it.certificate.encoded)
+            }
+        val trusting = ArcTunnelNet(bundle, null)
+
+        assertTrue(trusting.reachesTrustedRoot(listOf(first.leaf, first.intermediate.certificate)))
+        assertTrue(trusting.reachesTrustedRoot(listOf(second.leaf, second.intermediate.certificate)))
     }
 
     @Test

@@ -1,5 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
+import io.mockk.every
+import io.mockk.spyk
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -17,6 +20,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.security.KeyStoreException
+import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
@@ -25,10 +30,31 @@ import java.util.concurrent.atomic.AtomicInteger
 @DisplayName("ArcTunnelEnroller")
 class ArcTunnelEnrollerTest {
     private val keys = FakeArcTunnelKeyStore()
-    private val enroller = ArcTunnelEnroller(keys)
+    private val serverLog = RecordingServerLogRepository()
+    private val enroller = ArcTunnelEnroller(keys, serverLog)
     private val hosts = ArcTunnelTestServer.hosts
     private val prefix = ArcTunnelEnroller.aliasPrefix(hosts)
     private val service = Service()
+    private val issuerRoot =
+        HeldCertificate
+            .Builder()
+            .certificateAuthority(1)
+            .commonName("issuer root")
+            .build()
+    private val issuerIntermediate =
+        HeldCertificate
+            .Builder()
+            .certificateAuthority(0)
+            .signedBy(issuerRoot)
+            .commonName("issuer intermediate")
+            .build()
+    private val issuedLeaf =
+        HeldCertificate
+            .Builder()
+            .signedBy(issuerIntermediate)
+            .commonName("${ArcTunnelTestIdentity.NAME}.d.${ArcTunnelTestServer.BASE}")
+            .build()
+            .certificate
     private lateinit var server: MockWebServer
     private lateinit var net: ArcTunnelNet
 
@@ -114,6 +140,18 @@ class ArcTunnelEnrollerTest {
             .code(code)
             .body("""{"reason":"refused","retryable":$retryable,"retry_after_seconds":$retryAfter}""")
             .build()
+
+    private fun certificatePem(certificate: X509Certificate): String =
+        ArcTunnelPem.encode("CERTIFICATE", certificate.encoded)
+
+    /** Trusts the mock server, to reach it, and [issuerRoot], to check what it issues. */
+    private fun netTrustingIssuerRoot(): ArcTunnelNet =
+        ArcTunnelNet(
+            ArcTunnelTestServer.certPem + certificatePem(issuerRoot.certificate),
+            ArcTunnelEdgeOverride("127.0.0.1", server.port),
+        )
+
+    private fun incompleteChainReports(): Int = serverLog.entries.count { it.message.contains("chain is incomplete") }
 
     private fun commonName(csrPem: String): String {
         val der =
@@ -238,6 +276,47 @@ class ArcTunnelEnrollerTest {
             assertTrue(error != null)
             assertTrue(keys.deleted.contains("${prefix}identity-1"))
             assertEquals(before, identity.state())
+        }
+
+    @Test
+    fun `an issued leaf alone is installed once, with no failure and no retry, and reported`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, netTrustingIssuerRoot(), withPublicChain = false)
+
+            service.issueAnswers += ArcTunnelTestServer.json(issueBody(certificatePem(issuedLeaf)))
+            enroller.issue(identity, "0c01")
+
+            assertEquals(1, service.count(ISSUE_PATH))
+            assertEquals(listOf(issuedLeaf), identity.state().publicChain)
+            assertEquals(1, identity.state().generation)
+            assertEquals(1, incompleteChainReports())
+        }
+
+    @Test
+    fun `an issued bundle reaching a trusted root is installed whole and not reported`() =
+        runBlocking {
+            val identity = ArcTunnelTestIdentity.create(keys, netTrustingIssuerRoot(), withPublicChain = false)
+            val bundle = certificatePem(issuedLeaf) + "\n" + certificatePem(issuerIntermediate.certificate)
+
+            service.issueAnswers += ArcTunnelTestServer.json(issueBody(bundle))
+            enroller.issue(identity, "0c01")
+
+            assertEquals(listOf(issuedLeaf, issuerIntermediate.certificate), identity.state().publicChain)
+            assertEquals(0, incompleteChainReports())
+        }
+
+    @Test
+    fun `a chain check that cannot run keeps the installed chain and reports nothing`() =
+        runBlocking {
+            val broken = spyk(net)
+            every { broken.reachesTrustedRoot(any()) } throws KeyStoreException("no roots")
+            val identity = ArcTunnelTestIdentity.create(keys, broken, withPublicChain = false)
+
+            enroller.issue(identity, "0c01")
+
+            assertEquals(1, identity.state().publicChain.size)
+            assertEquals(1, service.count(ISSUE_PATH))
+            assertEquals(0, incompleteChainReports())
         }
 
     @Test

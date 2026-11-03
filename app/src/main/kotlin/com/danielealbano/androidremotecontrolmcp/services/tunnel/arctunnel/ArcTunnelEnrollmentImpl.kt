@@ -33,7 +33,7 @@ class ArcTunnelEnrollmentImpl
         private val requestInFlight = AtomicBoolean(false)
         private val stores = ConcurrentHashMap<String, ArcTunnelIdentityStore>()
         private val nets = ConcurrentHashMap<ArcTunnelEnv, ArcTunnelNet>()
-        private val enroller = ArcTunnelEnroller(keys)
+        private val enroller = ArcTunnelEnroller(keys, serverLog)
         private val flow = ArcTunnelEnrollmentFlow(keys, enroller)
 
         /** One store instance per environment, so its `@Synchronized` methods really serialize all writers. */

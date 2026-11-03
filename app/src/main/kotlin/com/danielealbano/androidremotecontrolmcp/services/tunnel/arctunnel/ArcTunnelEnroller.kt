@@ -1,13 +1,17 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
+import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.security.cert.X509Certificate
 
 /** Phase 1 enrollment, Phase 2 issuance and every renewal (PROTOCOL.md §2–§3) with one TLS key per name. */
 class ArcTunnelEnroller(
     private val keys: ArcTunnelKeyStore,
+    private val serverLog: ServerLogRepository,
 ) {
     /**
      * Phase 1: attested identity key + bootstrap identity cert; returns the identity (no public cert yet) +
@@ -130,12 +134,38 @@ class ArcTunnelEnroller(
                 identity.net.url(identity.hosts.controlHost, ISSUE_PATH),
                 ArcTunnelJson.encodeToString(ArcTunnelIssueRequest.serializer(), request),
             )
-        return identity.install(
-            nextIdentityAlias,
-            ArcTunnelPem.parseChain(response.identityCert),
-            ArcTunnelPem.parseChain(response.publicCert),
-            response.ca.ifEmpty { base.caId },
-            generation,
+        val publicChain = ArcTunnelPem.parseChain(response.publicCert)
+        val stale =
+            identity.install(
+                nextIdentityAlias,
+                ArcTunnelPem.parseChain(response.identityCert),
+                publicChain,
+                response.ca.ifEmpty { base.caId },
+                generation,
+            )
+        reportIfIncomplete(identity, publicChain)
+        return stale
+    }
+
+    /**
+     * PROTOCOL.md §3: an incomplete chain is still a good issuance, the certificate is spent and retrying would spend
+     * another, so it stays installed and is only reported. A check that cannot run reports nothing.
+     */
+    private fun reportIfIncomplete(
+        identity: ArcTunnelIdentity,
+        publicChain: List<X509Certificate>,
+    ) {
+        val complete =
+            runCatching { identity.net.reachesTrustedRoot(publicChain) }
+                .onFailure { Log.w(TAG, "could not check the issued chain of ${identity.name}", it) }
+                .getOrDefault(true)
+        if (complete) return
+        val count = publicChain.size
+        Log.w(TAG, "the issued chain of ${identity.name} ($count certificates) does not reach a trusted root")
+        serverLog.log(
+            ServerLogEntry.Type.TUNNEL,
+            "Free E2E tunnel certificate chain is incomplete ($count certificates): clients that do not fetch " +
+                "intermediates may refuse it until the next renewal",
         )
     }
 
