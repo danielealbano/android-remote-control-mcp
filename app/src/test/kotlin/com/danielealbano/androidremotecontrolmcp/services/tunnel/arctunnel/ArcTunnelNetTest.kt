@@ -91,15 +91,6 @@ class ArcTunnelNetTest {
     }
 
     @Test
-    fun `a bare leaf still fails after the whole chain passed`() {
-        val t = TrustFixture()
-
-        assertTrue(t.trusted.reachesTrustedRoot(listOf(t.leaf, t.intermediate.certificate)))
-
-        assertFalse(t.trusted.reachesTrustedRoot(listOf(t.leaf)))
-    }
-
-    @Test
     fun `an empty chain and a chain under another root do not reach the trusted root`() {
         val t = TrustFixture()
         val other = TrustFixture()

@@ -134,7 +134,7 @@ class E2EArcTunnelTest {
         assertEquals("Connected", AndroidContainerSetup.queryArcTunnel().tunnel)
     }
 
-    /** On redroid's own Conscrypt, which has the bug: Pebble sends no blank line, so nothing else here reaches it. */
+    /** Redroid's own Conscrypt has the bug, and nothing else in this stack sends it a blank line. */
     @Test
     fun `the real parser keeps a bundle with blank lines whole and the real trust manager needs the intermediates`() {
         val probe = AndroidContainerSetup.probeArcTunnelChain()

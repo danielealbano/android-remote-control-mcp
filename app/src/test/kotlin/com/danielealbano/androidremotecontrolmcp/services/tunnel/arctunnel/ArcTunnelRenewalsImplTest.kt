@@ -6,6 +6,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -217,11 +218,21 @@ class ArcTunnelRenewalsImplTest {
             entered.complete(Unit)
             awaitCancellation()
         }
-        val caller = launch(Dispatchers.IO) { renewals.checkSavedChain(saved) }
+        val thrown = AtomicReference<Throwable>()
+        val caller =
+            launch(Dispatchers.IO) {
+                try {
+                    renewals.checkSavedChain(saved)
+                } catch (e: CancellationException) {
+                    thrown.set(e)
+                    throw e
+                }
+            }
         withTimeout(BUDGET_MS) { entered.await() }
 
         caller.cancelAndJoin()
 
+        assertTrue(thrown.get() is CancellationException, "the cancellation must reach the caller")
         assertEquals(ArcTunnelRenewalState.Idle, renewals.state.value)
         assertEquals(0, store.load()?.certCheck)
         assertEquals(0, logged("check failed"))

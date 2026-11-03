@@ -38,7 +38,7 @@ object ArcTunnelPem {
      * Conscrypt, and Let's Encrypt writes one between its certificates, so those phones got the leaf alone.
      *
      * A blank [pem] is an empty chain. No certificate at all, or a first one that does not parse, throws; a later one
-     * that does not parse is logged and skipped.
+     * that does not parse is logged and skipped. Only complete BEGIN to END blocks count, the rest of [pem] is ignored.
      */
     fun parseChain(pem: String): List<X509Certificate> {
         if (pem.isBlank()) return emptyList()
@@ -50,7 +50,7 @@ object ArcTunnelPem {
                 try {
                     parseCertificate(factory, block)
                 } catch (e: CertificateException) {
-                    Log.w(TAG, "certificate ${index + 1} of the bundle skipped", e)
+                    Log.w(TAG, "certificate ${index + 2} of ${blocks.size} of the bundle skipped", e)
                     null
                 }
             }

@@ -80,7 +80,7 @@ class E2EArcTunnelDeviceTest {
             }
         }
 
-    /** A real CA's chain against the phone's own roots, in the real app process, after real connections to the CA. */
+    /** A real CA's chain against the phone's own roots, in the real app process. */
     @Test
     fun `the phone's trust manager needs the intermediates of its real chain`() {
         val probe = AndroidContainerSetup.probeArcTunnelChain(requireNotNull(serial))
