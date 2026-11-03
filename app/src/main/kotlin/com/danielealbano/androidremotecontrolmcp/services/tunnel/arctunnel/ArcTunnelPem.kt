@@ -34,8 +34,8 @@ object ArcTunnelPem {
 
     /**
      * Parses each certificate of [pem] on its own, leaf first. `generateCertificates` over a whole bundle stops without
-     * an error at what it cannot read and keeps the rest out: a corrupted block on every Android, a blank line on older
-     * Conscrypt, and Let's Encrypt writes one between its certificates, so those phones got the leaf alone.
+     * an error at what it cannot read and keeps the rest out: a corrupted block, and on older Conscrypt a blank line,
+     * which Let's Encrypt writes between its certificates, so those phones got the leaf alone.
      *
      * A blank [pem] is an empty chain. No certificate at all, or a first one that does not parse, throws; a later one
      * that does not parse is logged and skipped. A block that lost its END gets one and is judged the same way, so a

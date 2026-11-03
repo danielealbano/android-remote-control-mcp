@@ -25,8 +25,9 @@ private const val PROGRESS_SIZE_DP = 16
  * A free E2E tunnel certificate renewal at tunnel start, while it runs and whoever started the server, over the whole
  * app. Cancel aborts the renewal and stops the MCP server, until [cancelEnabled] says the certificate is received and
  * must be installed; Back or a tap outside only hides this ([onHide]), because a renewal can wait a long time and the
- * app stays usable meanwhile. A failure is not shown here but in [ArcTunnelRenewalBlock], since resolving it can need
- * another screen.
+ * app stays usable meanwhile. It closes when the renewal ends: a missing or expired certificate that failed goes on in
+ * [ArcTunnelRenewalBlock], since resolving it can need another screen, and a saved chain that failed is only logged,
+ * because the tunnel starts anyway.
  */
 @Composable
 fun ArcTunnelRenewalDialog(
