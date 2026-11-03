@@ -42,7 +42,10 @@ class ArcTunnelNet(
 
     fun mtlsClient(identity: ArcTunnelIdentity): OkHttpClient = client(mtlsContext(identity))
 
-    /** The control-stream client: no read timeout (the server only PINGs every ≤ 30 s; the watchdog guards silence). */
+    /**
+     * The control-stream client: no read timeout, so the 90 s watchdog is what bounds a TLS handshake through it. On an
+     * open duplex stream OkHttp applies no read timeout anyway.
+     */
     fun controlClient(identity: ArcTunnelIdentity): OkHttpClient =
         mtlsClient(identity).newBuilder().readTimeout(0, TimeUnit.MILLISECONDS).build()
 
