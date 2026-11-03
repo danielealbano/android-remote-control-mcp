@@ -1,9 +1,13 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
+import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.host
 import io.ktor.server.request.port
+import io.ktor.util.AttributeKey
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -11,8 +15,9 @@ import kotlin.coroutines.coroutineContext
 /**
  * Derivation of the public base URL the client actually connected on, used by every absolute URL the
  * server hands out (OAuth metadata, share-content links). The host is taken from `X-Forwarded-Host` /
- * `Host` and the scheme from `X-Forwarded-Proto` / the listener scheme, so the URL is reachable across
- * all topologies (cloudflared, ngrok, Tailscale Funnel, router/DDNS).
+ * `Host` / the HTTP/2 `:authority` and the scheme from `X-Forwarded-Proto` / the listener scheme, so the
+ * URL is reachable across all topologies (cloudflared, ngrok, Tailscale Funnel, router/DDNS, the free E2E
+ * tunnel).
  *
  * **Security rationale (forwarded-header trust) — by design:** the derivation trusts the client-settable
  * `X-Forwarded-*` headers, but the response is PER-CONNECTION, so a spoofed host only changes the
@@ -25,6 +30,17 @@ import kotlin.coroutines.coroutineContext
 private const val HTTP_DEFAULT_PORT = 80
 private const val HTTPS_DEFAULT_PORT = 443
 private const val SCHEME_SEPARATOR = "://"
+
+/** Set on requests of the free E2E tunnel's loopback listener by [markTunnelListenerRequests]. */
+internal val TunnelListenerRequest = AttributeKey<Unit>("TunnelListenerRequest")
+
+/**
+ * Marks every request of this application as one of the free E2E tunnel's loopback listener, see
+ * [listenerAuthority]. Runs in the first phase of the pipeline, before anything derives a URL.
+ */
+fun Application.markTunnelListenerRequests() {
+    intercept(ApplicationCallPipeline.Setup) { call.attributes.put(TunnelListenerRequest, Unit) }
+}
 
 /** Returns a normalized `scheme://host[:port]` from forwarded/Host headers. */
 fun deriveBaseUrl(call: ApplicationCall): String {
@@ -48,8 +64,22 @@ fun deriveBaseUrl(call: ApplicationCall): String {
             ?.substringBefore(',')
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
-    val hostPort = forwardedHost ?: rawHost ?: "${call.request.host()}:${call.request.port()}"
+    val hostPort = forwardedHost ?: rawHost ?: listenerAuthority(call)
     return normalizeBaseUrl("$scheme://$hostPort")
+}
+
+/**
+ * The authority of a request with no `Host` header, which every HTTP/2 request is: `:authority` replaces it, Ktor keeps
+ * pseudo-headers out of `request.headers`, and when `:authority` names no port `request.port()` answers the local
+ * socket's port. That port means nothing on the free E2E tunnel's listener, a random loopback port no public client can
+ * reach, so there it is dropped. Any other listener keeps it, because there a client really connects to that port.
+ */
+private fun listenerAuthority(call: ApplicationCall): String {
+    val host = call.request.host()
+    val port = call.request.port()
+    val isLoopbackPort =
+        call.attributes.contains(TunnelListenerRequest) && port == call.request.origin.localPort
+    return if (isLoopbackPort) host else "$host:$port"
 }
 
 /**

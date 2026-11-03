@@ -7,6 +7,7 @@ import io.ktor.server.plugins.origin
 import io.ktor.server.request.ApplicationRequest
 import io.ktor.server.request.host
 import io.ktor.server.request.port
+import io.ktor.util.Attributes
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -49,7 +50,9 @@ class RequestBaseUrlTest {
         forwardedHost: String? = null,
         forwardedProto: String? = null,
         hostHeader: String? = null,
+        tunnelListener: Boolean = false,
         listener: Listener = Listener(),
+        localPort: Int = listener.port,
     ): ApplicationCall {
         val headerPairs = mutableListOf<Pair<String, List<String>>>()
         forwardedHost?.let { headerPairs += "X-Forwarded-Host" to listOf(it) }
@@ -63,11 +66,59 @@ class RequestBaseUrlTest {
         every { request.port() } returns listener.port
         val connectionPoint = mockk<RequestConnectionPoint>()
         every { connectionPoint.scheme } returns listener.scheme
+        every { connectionPoint.localPort } returns localPort
         every { request.origin } returns connectionPoint
 
+        val attributes = Attributes()
+        if (tunnelListener) attributes.put(TunnelListenerRequest, Unit)
         val call = mockk<ApplicationCall>()
         every { call.request } returns request
+        every { call.attributes } returns attributes
         return call
+    }
+
+    @Test
+    @DisplayName("on the tunnel listener, no Host and the local socket's port gives no port")
+    fun tunnelListenerDropsTheLoopbackPort() {
+        val call =
+            mockCall(
+                tunnelListener = true,
+                listener = Listener(host = "name.d.example.test", port = 62835, scheme = "https"),
+                localPort = 62835,
+            )
+        assertEquals("https://name.d.example.test", deriveBaseUrl(call))
+    }
+
+    @Test
+    @DisplayName("on the tunnel listener, a port other than the local socket's is one the client named")
+    fun tunnelListenerKeepsANamedPort() {
+        val call =
+            mockCall(
+                tunnelListener = true,
+                listener = Listener(host = "name.d.example.test", port = 18443, scheme = "https"),
+                localPort = 62835,
+            )
+        assertEquals("https://name.d.example.test:18443", deriveBaseUrl(call))
+    }
+
+    @Test
+    @DisplayName("on any other listener, the local socket's port is the one the client connected to")
+    fun otherListenersKeepTheLocalPort() {
+        val call =
+            mockCall(
+                listener = Listener(host = "192.168.1.5", port = 8443, scheme = "https"),
+                localPort = 8443,
+            )
+        assertEquals("https://192.168.1.5:8443", deriveBaseUrl(call))
+    }
+
+    @Test
+    @DisplayName("on the tunnel listener, X-Forwarded-Host and Host still win")
+    fun tunnelListenerStillPrefersTheHeaders() {
+        val forwarded = mockCall(forwardedHost = "forwarded.example:1234", tunnelListener = true)
+        val host = mockCall(hostHeader = "host.example:1234", tunnelListener = true)
+        assertEquals("http://forwarded.example:1234", deriveBaseUrl(forwarded))
+        assertEquals("http://host.example:1234", deriveBaseUrl(host))
     }
 
     @Test

@@ -224,7 +224,57 @@ class McpServerTunnelListenerTest {
                 it.body.string()
             }
 
-        assertTrue(body.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), body)
+        // The listener's own port is never public, so it is not part of the URL.
+        assertTrue(body.contains("\"resource\":\"https://$LOOPBACK/mcp\""), body)
+    }
+
+    /** What a public client sends through the tunnel on port 443: an authority with no port. */
+    @Test
+    fun `an HTTP-2 authority with no port gives URLs with no port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata =
+            okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), PROTECTED_RESOURCE, PUBLIC_HOST).use {
+                assertEquals(Protocol.HTTP_2, it.protocol)
+                it.body.string()
+            }
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), metadata)
+        assertTrue(metadata.contains("\"authorization_servers\":[\"https://$PUBLIC_HOST\"]"), metadata)
+    }
+
+    @Test
+    fun `an HTTP-2 authority with a port keeps that port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata =
+            okHttpGet(
+                port,
+                listOf(Protocol.HTTP_2, Protocol.HTTP_1_1),
+                PROTECTED_RESOURCE,
+                "$PUBLIC_HOST:$PUBLIC_PORT",
+            ).use { it.body.string() }
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST:$PUBLIC_PORT/mcp\""), metadata)
+    }
+
+    @Test
+    fun `HTTP-1-1 and HTTP-2 give the same URLs for the same public host`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val overHttp1 =
+            okHttpGet(port, listOf(Protocol.HTTP_1_1), PROTECTED_RESOURCE, PUBLIC_HOST).use {
+                it.body.string()
+            }
+        val overHttp2 =
+            okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), PROTECTED_RESOURCE, PUBLIC_HOST).use {
+                it.body.string()
+            }
+
+        assertEquals(overHttp1, overHttp2)
     }
 
     @Test
@@ -262,6 +312,7 @@ class McpServerTunnelListenerTest {
         port: Int,
         protocols: List<Protocol>,
         path: String,
+        publicHost: String? = null,
     ): Response {
         val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
         val client =
@@ -275,6 +326,8 @@ class McpServerTunnelListenerTest {
             Request
                 .Builder()
                 .url("https://$LOOPBACK:$port$path")
+                // OkHttp sends this as `Host` over HTTP/1.1 and as `:authority` over HTTP/2.
+                .apply { publicHost?.let { header("Host", it) } }
                 .build()
         return client.newCall(request).execute()
     }
@@ -349,6 +402,8 @@ class McpServerTunnelListenerTest {
     }
 
     private companion object {
+        const val PUBLIC_HOST = "name.d.tunnel.example"
+        const val PUBLIC_PORT = 8443
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50
         const val TIMEOUT_MS = 5_000

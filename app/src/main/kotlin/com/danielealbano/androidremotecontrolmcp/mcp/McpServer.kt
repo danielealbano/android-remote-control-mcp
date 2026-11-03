@@ -290,6 +290,7 @@ class McpServer(
                 }
             },
             module = {
+                markTunnelListenerRequests()
                 configureApplication()
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
