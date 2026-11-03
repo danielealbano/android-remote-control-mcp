@@ -25,12 +25,13 @@ interface ArcTunnelRenewals {
     suspend fun renewForStart(identity: ArcTunnelIdentity)
 
     /**
-     * The once-only check of a saved certificate not marked with [ARC_TUNNEL_CERT_CHECK]: a chain that reaches a trusted
-     * root is only marked, any other is renewed (shown as Renewing) and saved marked, all of it logged. Older Conscrypt
-     * saved incomplete chains, and clients that do not fetch intermediates refuse those.
+     * The once-only check of a saved certificate not marked with [ARC_TUNNEL_CERT_CHECK]: a chain that reaches a
+     * trusted root is only marked, any other is renewed (shown as Renewing) and saved marked, all of it logged. Older
+     * Conscrypt saved incomplete chains, and clients that do not fetch intermediates refuse those.
      *
-     * Never fails the tunnel start, unlike [renewForStart], because the certificate it holds is still valid: a failure, or
-     * no certificate within the time limit, is logged, the certificate stays, and the next tunnel start checks again.
+     * Never fails the tunnel start, unlike [renewForStart], because the certificate it holds is still valid: a failure,
+     * or no certificate within the time limit, is logged, the certificate stays, and the next tunnel start checks
+     * again.
      */
     suspend fun checkSavedChain(identity: ArcTunnelIdentity)
 

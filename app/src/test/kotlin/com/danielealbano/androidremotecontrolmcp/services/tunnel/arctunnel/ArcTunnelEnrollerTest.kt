@@ -141,13 +141,12 @@ class ArcTunnelEnrollerTest {
             .body("""{"reason":"refused","retryable":$retryable,"retry_after_seconds":$retryAfter}""")
             .build()
 
-    private fun certificatePem(certificate: X509Certificate): String =
-        ArcTunnelPem.encode("CERTIFICATE", certificate.encoded)
+    private fun certPem(cert: X509Certificate): String = ArcTunnelPem.encode("CERTIFICATE", cert.encoded)
 
     /** Trusts the mock server, to reach it, and [issuerRoot], to check what it issues. */
     private fun netTrustingIssuerRoot(): ArcTunnelNet =
         ArcTunnelNet(
-            ArcTunnelTestServer.certPem + certificatePem(issuerRoot.certificate),
+            ArcTunnelTestServer.certPem + certPem(issuerRoot.certificate),
             ArcTunnelEdgeOverride("127.0.0.1", server.port),
         )
 
@@ -283,7 +282,7 @@ class ArcTunnelEnrollerTest {
         runBlocking {
             val identity = ArcTunnelTestIdentity.create(keys, netTrustingIssuerRoot(), withPublicChain = false)
 
-            service.issueAnswers += ArcTunnelTestServer.json(issueBody(certificatePem(issuedLeaf)))
+            service.issueAnswers += ArcTunnelTestServer.json(issueBody(certPem(issuedLeaf)))
             enroller.issue(identity, "0c01")
 
             assertEquals(1, service.count(ISSUE_PATH))
@@ -296,7 +295,7 @@ class ArcTunnelEnrollerTest {
     fun `an issued bundle reaching a trusted root is installed whole and not reported`() =
         runBlocking {
             val identity = ArcTunnelTestIdentity.create(keys, netTrustingIssuerRoot(), withPublicChain = false)
-            val bundle = certificatePem(issuedLeaf) + "\n" + certificatePem(issuerIntermediate.certificate)
+            val bundle = certPem(issuedLeaf) + "\n" + certPem(issuerIntermediate.certificate)
 
             service.issueAnswers += ArcTunnelTestServer.json(issueBody(bundle))
             enroller.issue(identity, "0c01")

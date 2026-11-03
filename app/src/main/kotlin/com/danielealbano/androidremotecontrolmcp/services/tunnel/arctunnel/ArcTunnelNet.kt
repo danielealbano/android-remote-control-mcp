@@ -62,25 +62,24 @@ class ArcTunnelNet(
     }
 
     /**
-     * Whether [chain] reaches a root this phone trusts with its own certificates alone, which is what a client that does
-     * not fetch intermediates needs. How many certificates that takes depends on the CA and on the phone's roots.
+     * Whether [chain] reaches a root this phone trusts with its own certificates alone, which is what a client that
+     * does not fetch intermediates needs. How many certificates that takes depends on the CA and on the phone's roots.
      *
-     * Every check has its own trust manager, over an explicit key store: a trust manager remembers the intermediates it
-     * verified, and without a key store Android hands out one per process, so a bare leaf would pass after any connection
-     * through the same CA.
+     * Every check has its own trust manager, over an explicit key store: a trust manager remembers the intermediates
+     * it verified, and without a key store Android hands out one per process, so a bare leaf would pass after any
+     * connection through the same CA.
      */
     fun reachesTrustedRoot(chain: List<X509Certificate>): Boolean {
         if (chain.isEmpty()) return false
         return try {
-            trustManager(roots ?: androidRoots()).checkServerTrusted(chain.toTypedArray(), ANY_KEY_EXCHANGE)
+            val anchors = roots ?: KeyStore.getInstance(ANDROID_ROOTS_STORE).apply { load(null, null) }
+            trustManager(anchors).checkServerTrusted(chain.toTypedArray(), ANY_KEY_EXCHANGE)
             true
         } catch (e: CertificateException) {
             Log.i(TAG, "the chain does not reach a trusted root", e)
             false
         }
     }
-
-    private fun androidRoots(): KeyStore = KeyStore.getInstance(ANDROID_ROOTS_STORE).apply { load(null, null) }
 
     private fun mtlsContext(identity: ArcTunnelIdentity): SSLContext = sslContext(DynamicIdentityKeyManager(identity))
 
@@ -92,12 +91,6 @@ class ArcTunnelNet(
             .newBuilder()
             .sslSocketFactory(ctx.socketFactory, trust)
             .build()
-
-    private fun loadRoots(pem: String): KeyStore {
-        val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
-        ArcTunnelPem.parseChain(pem).forEachIndexed { i, c -> ks.setCertificateEntry("root$i", c) }
-        return ks
-    }
 
     private fun trustManager(roots: KeyStore?): X509TrustManager {
         val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
@@ -160,5 +153,11 @@ class ArcTunnelNet(
 
         /** The auth type accepted for any key: only the chain matters here. */
         const val ANY_KEY_EXCHANGE = "UNKNOWN"
+
+        fun loadRoots(pem: String): KeyStore {
+            val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
+            ArcTunnelPem.parseChain(pem).forEachIndexed { i, c -> ks.setCertificateEntry("root$i", c) }
+            return ks
+        }
     }
 }
