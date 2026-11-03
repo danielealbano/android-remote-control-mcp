@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.net.InetAddress
@@ -18,10 +19,11 @@ class ArcTunnelMoveTargetTest {
         assertEquals(value.substringAfter(':').toInt(), target?.port)
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = ["[2001:db8::1]:443"])
-    fun `a bracketed IPv6 host and port are accepted`(value: String) {
-        assertEquals(ArcTunnelMoveTarget(InetAddress.getByName("2001:db8::1"), 443), ArcTunnelMoveTarget.parse(value))
+    @Test
+    fun `a bracketed IPv6 host and port are accepted`() {
+        val expected = ArcTunnelMoveTarget(InetAddress.getByName("2001:db8::1"), 443)
+
+        assertEquals(expected, ArcTunnelMoveTarget.parse("[2001:db8::1]:443"))
     }
 
     @ParameterizedTest
@@ -36,6 +38,10 @@ class ArcTunnelMoveTargetTest {
             "203.0.113.2:http",
             "2001:db8::1:443",
             "a b:443",
+            "203.0.113.2:443/path",
+            "u@203.0.113.2:443",
+            "203.0.113.2:443?x=1",
+            "203.0.113.2:443#f",
         ],
     )
     fun `anything else is not a valid address`(value: String) {

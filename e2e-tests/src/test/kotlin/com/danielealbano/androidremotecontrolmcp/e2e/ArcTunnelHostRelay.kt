@@ -52,8 +52,8 @@ class ArcTunnelHostRelay(
                     continue
                 }
             acceptedCount.incrementAndGet()
-            this.open += client
-            this.open += upstream
+            open += client
+            open += upstream
             val directions = AtomicInteger(2)
             pump(client, upstream, directions)
             pump(upstream, client, directions)

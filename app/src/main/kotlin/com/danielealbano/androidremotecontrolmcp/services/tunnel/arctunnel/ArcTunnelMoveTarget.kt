@@ -19,7 +19,7 @@ data class ArcTunnelMoveTarget(
         fun parse(value: String): ArcTunnelMoveTarget? =
             try {
                 val uri = URI("tcp://$value")
-                require(uri.host != null && uri.port in 1..MAX_PORT) { "not host:port" }
+                require("${uri.host}:${uri.port}" == value && uri.port in 1..MAX_PORT) { "not host:port" }
                 ArcTunnelMoveTarget(InetAddress.getByName(uri.host.removeSurrounding("[", "]")), uri.port)
             } catch (e: URISyntaxException) {
                 skipped(value, e)

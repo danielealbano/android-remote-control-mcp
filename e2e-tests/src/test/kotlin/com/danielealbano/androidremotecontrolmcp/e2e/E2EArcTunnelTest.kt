@@ -131,8 +131,8 @@ class E2EArcTunnelTest {
     }
 
     /**
-     * The phone's edge override points at the first node only, so the second node can only reach it through a MOVE:
-     * it must still serve through the second node once the first one is gone.
+     * The phone's edge override points at the first node only, so the phone can only reach the second node through a
+     * MOVE: the tunnel must still serve through the second node once the first one is gone.
      */
     @Test
     @Order(Int.MAX_VALUE)
@@ -141,12 +141,12 @@ class E2EArcTunnelTest {
         val second = ArcTunnelStack.SECOND_EDGE_HOST_PORT
         ArcTunnelPublicClient.KeepAlive(stack, fqdn(), ArcTunnelStack.EDGE_HOST_PORT).use { inFlight ->
             assertOk(inFlight.get(HEALTH))
-            val phoneConnections = stack.secondReplicaConnections()
+            val connectionsBeforeDrain = stack.secondReplicaConnections()
 
             stack.stopFirstReplicaGracefully()
 
             awaitTrue("the phone to open a connection to the second node on MOVE") {
-                stack.secondReplicaConnections() > phoneConnections
+                stack.secondReplicaConnections() > connectionsBeforeDrain
             }
             assertOk(inFlight.get(HEALTH))
             assertOk(ArcTunnelPublicClient.get(stack, fqdn(), HEALTH))
@@ -160,6 +160,7 @@ class E2EArcTunnelTest {
             awaitTrue("the tunnel to serve through the second node after the second move") {
                 healthThrough(second).startsWith(HTTP_OK)
             }
+            assertOk(inFlight.get(HEALTH))
         }
 
         awaitTrue("the first node to finish its drain and exit") { !stack.firstReplicaRunning() }

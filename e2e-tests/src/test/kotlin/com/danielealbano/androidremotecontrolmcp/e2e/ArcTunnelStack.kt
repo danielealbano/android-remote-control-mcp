@@ -141,7 +141,10 @@ class ArcTunnelStack(
         waitForReservedCert(CONTROL_HOST, SECOND_EDGE_HOST_PORT)
     }
 
-    /** Connections the second node's relay accepted so far: with no public traffic there, the phone's. */
+    /**
+     * Connections the second node's relay accepted so far, from anyone (the stack's own checks included): compare
+     * against a baseline taken while only the phone can connect.
+     */
     fun secondReplicaConnections(): Int = requireNotNull(secondRelay).accepted
 
     /** Cuts the phone's connections to the second node; new ones are still accepted. */

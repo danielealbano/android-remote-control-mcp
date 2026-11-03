@@ -79,8 +79,10 @@ class ArcTunnelControl(
     /**
      * Serves control streams until [stop]; OPEN handlers, renewals and the watchdogs run as children of this scope.
      * Any failure ends the current stream only (reported to [ArcTunnelControlEvents.onAttemptFailed]); the loop
-     * reconnects with backoff, as the reference client does. A MOVE is followed at once, and the status stays as it
-     * is: the moved-away connection still serves.
+     * reconnects with backoff, as the reference client does. A MOVE is followed at once, except one answered by the
+     * DNS connection opened after a MOVE, which waits the backoff; the status stays as it is, because the moved-away
+     * connection still serves. Only a stream that ends without a MOVE resets the backoff: a draining node's `200` and
+     * MOVE is not a bind.
      */
     suspend fun run() =
         supervisorScope {
@@ -97,7 +99,7 @@ class ArcTunnelControl(
                 if (!running.get() || !isActive) break
                 attempt.failure?.let(events::onAttemptFailed)
                 moveTo = attempt.moveTo
-                if (wasBound.get() && !attempt.moveAfterBackoff) backoff.reset()
+                if (wasBound.get() && moveTo == null) backoff.reset()
                 if (moveTo == null) events.onUnbound()
                 if (moveTo == null || attempt.moveAfterBackoff) delay(backoff.next())
             }
