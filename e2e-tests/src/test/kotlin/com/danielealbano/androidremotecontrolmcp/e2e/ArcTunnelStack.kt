@@ -102,7 +102,7 @@ class ArcTunnelStack(
         val minioUrl = "http://${minio.host}:${minio.getMappedPort(MINIO_PORT)}"
         ArcTunnelS3.ensureBucket(minioUrl, MINIO_ACCESS, MINIO_SECRET, BUCKET)
 
-        // challtestsrv: the DNS Pebble consults; every name resolves to the server's static IP.
+        // challtestsrv: the DNS Pebble consults; every name resolves to the first node's static IP.
         val dnsHostPort = freeUdpPort()
         val chal =
             start(
@@ -252,7 +252,7 @@ class ArcTunnelStack(
     private fun pebbleSslContext(): SSLContext =
         SSLContext.getInstance("TLS").apply { init(null, arrayOf<TrustManager>(pebbleTrustManager()), null) }
 
-    /** The reserved hosts serve an ACME cert only once the server issued it: wait for a verified handshake. */
+    /** A reserved host serves an ACME cert once its node holds it, issued or adopted: wait for a verified handshake. */
     private fun waitForReservedCert(
         host: String,
         edgePort: Int,
