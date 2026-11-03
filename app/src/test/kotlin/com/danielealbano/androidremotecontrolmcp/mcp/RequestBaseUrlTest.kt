@@ -50,9 +50,8 @@ class RequestBaseUrlTest {
         forwardedHost: String? = null,
         forwardedProto: String? = null,
         hostHeader: String? = null,
-        tunnelListener: Boolean = false,
+        http2Authority: String? = null,
         listener: Listener = Listener(),
-        localPort: Int = listener.port,
     ): ApplicationCall {
         val headerPairs = mutableListOf<Pair<String, List<String>>>()
         forwardedHost?.let { headerPairs += "X-Forwarded-Host" to listOf(it) }
@@ -66,11 +65,10 @@ class RequestBaseUrlTest {
         every { request.port() } returns listener.port
         val connectionPoint = mockk<RequestConnectionPoint>()
         every { connectionPoint.scheme } returns listener.scheme
-        every { connectionPoint.localPort } returns localPort
         every { request.origin } returns connectionPoint
 
         val attributes = Attributes()
-        if (tunnelListener) attributes.put(TunnelListenerRequest, Unit)
+        http2Authority?.let { attributes.put(Http2Authority, it) }
         val call = mockk<ApplicationCall>()
         every { call.request } returns request
         every { call.attributes } returns attributes
@@ -78,45 +76,51 @@ class RequestBaseUrlTest {
     }
 
     @Test
-    @DisplayName("on the tunnel listener, no Host and the local socket's port gives no port")
-    fun tunnelListenerDropsTheLoopbackPort() {
+    @DisplayName("an HTTP/2 authority with no port gives no port, whatever port the socket has")
+    fun http2AuthorityWithNoPort() {
         val call =
             mockCall(
-                tunnelListener = true,
+                http2Authority = "name.d.example.test",
                 listener = Listener(host = "name.d.example.test", port = 62835, scheme = "https"),
-                localPort = 62835,
             )
         assertEquals("https://name.d.example.test", deriveBaseUrl(call))
     }
 
     @Test
-    @DisplayName("on the tunnel listener, a port other than the local socket's is one the client named")
-    fun tunnelListenerKeepsANamedPort() {
+    @DisplayName("an HTTP/2 authority naming the socket's own port keeps it")
+    fun http2AuthorityNamingTheSocketPort() {
         val call =
             mockCall(
-                tunnelListener = true,
-                listener = Listener(host = "name.d.example.test", port = 18443, scheme = "https"),
-                localPort = 62835,
-            )
-        assertEquals("https://name.d.example.test:18443", deriveBaseUrl(call))
-    }
-
-    @Test
-    @DisplayName("on any other listener, the local socket's port is the one the client connected to")
-    fun otherListenersKeepTheLocalPort() {
-        val call =
-            mockCall(
+                http2Authority = "192.168.1.5:8443",
                 listener = Listener(host = "192.168.1.5", port = 8443, scheme = "https"),
-                localPort = 8443,
             )
         assertEquals("https://192.168.1.5:8443", deriveBaseUrl(call))
     }
 
     @Test
-    @DisplayName("on the tunnel listener, X-Forwarded-Host and Host still win")
-    fun tunnelListenerStillPrefersTheHeaders() {
-        val forwarded = mockCall(forwardedHost = "forwarded.example:1234", tunnelListener = true)
-        val host = mockCall(hostHeader = "host.example:1234", tunnelListener = true)
+    @DisplayName("an HTTP/2 authority naming the scheme's default port gives no port")
+    fun http2AuthorityNamingTheDefaultPort() {
+        val call =
+            mockCall(
+                http2Authority = "name.d.example.test:443",
+                listener = Listener(host = "name.d.example.test", port = 443, scheme = "https"),
+            )
+        assertEquals("https://name.d.example.test", deriveBaseUrl(call))
+    }
+
+    @Test
+    @DisplayName("an HTTP/2 authority with an IPv6 address keeps the brackets, with and without a port")
+    fun http2AuthorityWithIpv6() {
+        val listener = Listener(host = "[::1]", port = 8443, scheme = "https")
+        assertEquals("https://[::1]", deriveBaseUrl(mockCall(http2Authority = "[::1]", listener = listener)))
+        assertEquals("https://[::1]:8443", deriveBaseUrl(mockCall(http2Authority = "[::1]:8443", listener = listener)))
+    }
+
+    @Test
+    @DisplayName("X-Forwarded-Host and Host win over an HTTP/2 authority")
+    fun headersWinOverHttp2Authority() {
+        val forwarded = mockCall(forwardedHost = "forwarded.example:1234", http2Authority = "authority.example")
+        val host = mockCall(hostHeader = "host.example:1234", http2Authority = "authority.example")
         assertEquals("http://forwarded.example:1234", deriveBaseUrl(forwarded))
         assertEquals("http://host.example:1234", deriveBaseUrl(host))
     }

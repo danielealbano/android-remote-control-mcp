@@ -290,13 +290,14 @@ class McpServer(
                 }
             },
             module = {
-                markTunnelListenerRequests()
                 configureApplication()
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
         )
 
     private fun io.ktor.server.application.Application.configureApplication() {
+        captureHttp2Authority()
+
         // Base plugins in the canonical order (ContentNegotiation → CORS → auth). CORS MUST precede
         // auth so browser preflight OPTIONS (no Authorization header) are answered by CORS instead of
         // being failed closed by auth. The order lives in installMcpBasePlugins so it stays consistent

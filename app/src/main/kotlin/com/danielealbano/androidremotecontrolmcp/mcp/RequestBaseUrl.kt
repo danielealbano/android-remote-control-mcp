@@ -31,15 +31,19 @@ private const val HTTP_DEFAULT_PORT = 80
 private const val HTTPS_DEFAULT_PORT = 443
 private const val SCHEME_SEPARATOR = "://"
 
-/** Set on requests of the free E2E tunnel's loopback listener by [markTunnelListenerRequests]. */
-internal val TunnelListenerRequest = AttributeKey<Unit>("TunnelListenerRequest")
+/** The `:authority` of an HTTP/2 request, saved by [captureHttp2Authority]. */
+internal val Http2Authority = AttributeKey<String>("Http2Authority")
 
 /**
- * Marks every request of this application as one of the free E2E tunnel's loopback listener, see
- * [listenerAuthority]. Runs in the first phase of the pipeline, before anything derives a URL.
+ * Saves the `:authority` of every HTTP/2 request for [deriveBaseUrl]. HTTP/2 normally carries it instead of `Host`, and
+ * `request.port()` cannot replace it: with no port in `:authority` it answers the local socket's port, so a client that
+ * named no port and one that named that very port look the same. Runs in the first phase of the pipeline, because
+ * [Http2RequestAuthority] needs the engine's own request and routes see a wrapper.
  */
-fun Application.markTunnelListenerRequests() {
-    intercept(ApplicationCallPipeline.Setup) { call.attributes.put(TunnelListenerRequest, Unit) }
+fun Application.captureHttp2Authority() {
+    intercept(ApplicationCallPipeline.Setup) {
+        Http2RequestAuthority.of(call.request)?.let { call.attributes.put(Http2Authority, it) }
+    }
 }
 
 /** Returns a normalized `scheme://host[:port]` from forwarded/Host headers. */
@@ -64,22 +68,12 @@ fun deriveBaseUrl(call: ApplicationCall): String {
             ?.substringBefore(',')
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
-    val hostPort = forwardedHost ?: rawHost ?: listenerAuthority(call)
+    val hostPort =
+        forwardedHost
+            ?: rawHost
+            ?: call.attributes.getOrNull(Http2Authority)
+            ?: "${call.request.host()}:${call.request.port()}"
     return normalizeBaseUrl("$scheme://$hostPort")
-}
-
-/**
- * The authority of a request with no `Host` header, which every HTTP/2 request is: `:authority` replaces it, Ktor keeps
- * pseudo-headers out of `request.headers`, and when `:authority` names no port `request.port()` answers the local
- * socket's port. That port means nothing on the free E2E tunnel's listener, a random loopback port no public client can
- * reach, so there it is dropped. Any other listener keeps it, because there a client really connects to that port.
- */
-private fun listenerAuthority(call: ApplicationCall): String {
-    val host = call.request.host()
-    val port = call.request.port()
-    val isLoopbackPort =
-        call.attributes.contains(TunnelListenerRequest) && port == call.request.origin.localPort
-    return if (isLoopbackPort) host else "$host:$port"
 }
 
 /**
