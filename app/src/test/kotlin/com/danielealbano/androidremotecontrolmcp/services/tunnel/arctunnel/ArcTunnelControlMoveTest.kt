@@ -463,17 +463,26 @@ class ArcTunnelControlMoveTest {
     }
 
     @Test
-    fun `MOVE on the new connection is followed`() {
+    fun `MOVE on the new connection is followed, each at once`() {
+        val stamped = ConcurrentLinkedQueue<Long>()
         val second = otherServer()
         val third = otherServer()
-        server.enqueue(moveAndHold(addr(second)))
+        server.enqueue(
+            scripted { out ->
+                stamped.add(System.nanoTime())
+                out.write(moveFrame(addr(second)))
+                out.flush()
+            },
+        )
         second.enqueue(moveAndHold(addr(third)))
-        third.enqueue(ArcTunnelTestServer.hold())
+        third.enqueue(scripted { stamped.add(System.nanoTime()) })
         start()
 
         taken(third)
+        val at = stamps(stamped, 2)
 
         assertEquals(1, second.requestCount)
+        assertTrue(gapMs(at[0], at[1]) < TWO_BACKOFFS_MS, "two moves took ${gapMs(at[0], at[1])} ms")
         assertNoStatusChange()
     }
 
@@ -804,6 +813,9 @@ class ArcTunnelControlMoveTest {
         const val RECONNECT_STREAMS = 5
         const val FIRST_BACKOFF_MIN_MS = 900L
         const val SECOND_BACKOFF_MIN_MS = 1_900L
+
+        /** What two moves would take if they waited the backoff (1 s + 2 s); without it they take far less. */
+        const val TWO_BACKOFFS_MS = 3_000L
         const val REFUSED_REASON = "the tunnel service refused the connection (HTTP 503)"
         const val SILENT_REASON = "no data from the tunnel service for 90 s"
         val SILENCE_NANOS: Long = TimeUnit.SECONDS.toNanos(91)
