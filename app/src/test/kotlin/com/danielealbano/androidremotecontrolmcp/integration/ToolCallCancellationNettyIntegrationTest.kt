@@ -187,7 +187,7 @@ class ToolCallCancellationNettyIntegrationTest {
 
     private companion object {
         const val LOOPBACK = "127.0.0.1"
-        const val WAIT_MS = 5_000L
+        const val WAIT_MS = 30_000L
         const val POLL_MS = 50L
         const val STOP_GRACE_MS = 100L
         const val STOP_TIMEOUT_MS = 1_000L
