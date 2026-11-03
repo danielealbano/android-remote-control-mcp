@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.api.model.Network.Ipam
 import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.GenericContainer
@@ -137,6 +138,7 @@ class ArcTunnelStack(
      * certificates the first node published to the shared store.
      */
     fun startSecondReplica() {
+        liveDockerClient()
         secondRelay = relayTo(start(serverContainer(secondReplica)), secondReplica)
         waitForReservedCert(CONTROL_HOST, SECOND_EDGE_HOST_PORT)
     }
@@ -154,13 +156,18 @@ class ArcTunnelStack(
 
     /** Tells the first node to stop, as a service manager does: it goes through its drain and exits. */
     fun stopFirstReplicaGracefully() {
-        DockerClientFactory
-            .instance()
-            .client()
+        liveDockerClient()
             .killContainerCmd(firstServer.containerId)
             .withSignal("SIGTERM")
             .exec()
     }
+
+    /**
+     * A socket-activated podman service exits after 5 s without requests, which breaks the Docker client's pooled
+     * connection, and the client retries only idempotent requests on a new one. Pinging first gives the POST that
+     * follows a live connection.
+     */
+    private fun liveDockerClient(): DockerClient = DockerClientFactory.instance().client().also { it.pingCmd().exec() }
 
     fun firstReplicaRunning(): Boolean = firstServer.isRunning
 
