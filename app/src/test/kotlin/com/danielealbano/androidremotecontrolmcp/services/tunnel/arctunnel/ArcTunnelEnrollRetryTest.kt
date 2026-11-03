@@ -2,11 +2,15 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.io.IOException
@@ -89,6 +93,27 @@ class ArcTunnelEnrollRetryTest {
 
             assertSame(failures[3], thrown)
             assertEquals(4, attempts.size)
+        }
+
+    @Test
+    fun `a refusal arriving with a cancellation announces no retry`() =
+        runTest {
+            var announced = 0
+            val job =
+                launch {
+                    ArcTunnelEnrollRetry.run<Unit>(
+                        freshNonce = { "n" },
+                        enroll = {
+                            currentCoroutineContext().cancel()
+                            throw ArcTunnelApiException("busy", true, 3600, 503)
+                        },
+                    ) { _, _, _ -> announced++ }
+                }
+
+            job.join()
+
+            assertTrue(job.isCancelled)
+            assertEquals(0, announced)
         }
 
     @Test
