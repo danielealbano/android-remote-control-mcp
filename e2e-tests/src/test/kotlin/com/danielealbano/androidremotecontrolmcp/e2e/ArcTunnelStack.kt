@@ -133,8 +133,8 @@ class ArcTunnelStack(
     }
 
     /**
-     * Starts a second node on [SECOND_EDGE_HOST_PORT]. Pebble validates on one port only, so this node never issues:
-     * it adopts the reserved certificates the first node published to the shared store.
+     * Starts a second node on [SECOND_EDGE_HOST_PORT]. It orders no certificate: at start it adopts the reserved
+     * certificates the first node published to the shared store.
      */
     fun startSecondReplica() {
         secondRelay = relayTo(start(serverContainer(secondReplica)), secondReplica)
