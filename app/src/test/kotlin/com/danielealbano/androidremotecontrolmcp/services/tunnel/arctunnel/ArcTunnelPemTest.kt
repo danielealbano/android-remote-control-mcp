@@ -114,6 +114,13 @@ class ArcTunnelPemTest {
     }
 
     @Test
+    fun `parseChain keeps a whole certificate that only lost its END`() {
+        val bundle = pem(chain[0]) + pem(chain[1]).substringBefore("-----END") + pem(chain[2])
+
+        assertEquals(chain, ArcTunnelPem.parseChain(bundle))
+    }
+
+    @Test
     fun `parseChain skips a last block cut short`() {
         val bundle = pem(chain[0]) + pem(chain[1]) + cutShort(chain[2])
 

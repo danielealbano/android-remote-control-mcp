@@ -100,7 +100,7 @@ class ArcTunnelNetTest {
     }
 
     @Test
-    fun `every root of a trust bundle with blank lines between them is trusted`() {
+    fun `every root of a trust bundle is trusted`() {
         val first = TrustFixture()
         val second = TrustFixture()
         val bundle =

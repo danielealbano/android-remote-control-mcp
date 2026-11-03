@@ -16,6 +16,7 @@ object ArcTunnelSavedRecord {
     private const val DIR = "files/arc-tunnel"
     private const val PUBLIC_CHAIN = "public_chain"
     private const val CERT_CHECK = "cert_check"
+    private const val GENERATION = "generation"
     private const val END_CERTIFICATE = "-----END CERTIFICATE-----"
 
     fun edit(
@@ -24,19 +25,21 @@ object ArcTunnelSavedRecord {
         serial: String = AndroidContainerSetup.adbSerial,
     ) {
         val path = path(baseAddress, serial)
-        val edited = change(read(path, serial)).toString()
+        val edited = change(readFile(path, serial)).toString()
         val encoded = Base64.getEncoder().encodeToString(edited.toByteArray())
         runAs(serial, "sh", "-c", "'echo $encoded | base64 -d > $path'")
     }
 
-    /** The marker of the saved certificate; 0 when it has none. */
-    fun certCheck(
+    fun read(
         baseAddress: String,
         serial: String = AndroidContainerSetup.adbSerial,
-    ): Int =
-        read(path(baseAddress, serial), serial)[CERT_CHECK]
-            ?.jsonPrimitive
-            ?.int ?: 0
+    ): JsonObject = readFile(path(baseAddress, serial), serial)
+
+    /** The marker of the saved certificate; 0 when it has none. */
+    fun certCheck(record: JsonObject): Int = record[CERT_CHECK]?.jsonPrimitive?.int ?: 0
+
+    /** How many issuances the saved identity went through. */
+    fun generation(record: JsonObject): Int = requireNotNull(record[GENERATION]).jsonPrimitive.int
 
     fun withoutCertCheck(record: JsonObject): JsonObject = JsonObject(record - CERT_CHECK)
 
@@ -47,7 +50,7 @@ object ArcTunnelSavedRecord {
         return JsonObject(record + (PUBLIC_CHAIN to JsonPrimitive(leaf)))
     }
 
-    private fun read(
+    private fun readFile(
         path: String,
         serial: String,
     ): JsonObject = Json.parseToJsonElement(runAs(serial, "cat", path)).jsonObject

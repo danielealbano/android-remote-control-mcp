@@ -25,7 +25,10 @@ sealed class ArcTunnelRenewalState {
  * a request in flight included) and mirrored into [state] for the UI.
  */
 interface ArcTunnelRenewals {
-    /** Idle → Renewing, then Installing once the certificate is received → Idle | Failed. */
+    /**
+     * Idle → Renewing → Idle | Failed, or Renewing → Installing once the certificate is received → Idle. Only
+     * [renewForStart] reaches Failed.
+     */
     val state: StateFlow<ArcTunnelRenewalState>
 
     /** Issues the missing or expired public certificate and saves it; throws the failure (shown as [state]). */

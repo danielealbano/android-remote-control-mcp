@@ -155,7 +155,7 @@ class E2EArcTunnelTest {
      */
     @Test
     @Order(Int.MAX_VALUE - 1)
-    fun `a saved chain cut to the leaf is renewed once at tunnel start and a whole one is only marked`() {
+    fun `a saved chain cut to the leaf is renewed once at tunnel start, then not again, and a whole one only marked`() {
         val whole = ArcTunnelPublicClient.servedChain(stack, fqdn())
         assertTrue(whole.size >= 2, "the stack must issue a chain to cut: ${whole.size} certificates")
 
@@ -164,14 +164,19 @@ class E2EArcTunnelTest {
         val renewed = ArcTunnelPublicClient.servedChain(stack, fqdn())
         assertEquals(whole.size, renewed.size)
         assertNotEquals(whole.first(), renewed.first(), "the chain must come from a new certificate")
-        assertTrue(ArcTunnelSavedRecord.certCheck(ArcTunnelStack.BASE_ADDRESS) > 0)
+        val renewedRecord = ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)
+        assertTrue(ArcTunnelSavedRecord.certCheck(renewedRecord) > 0)
 
-        restartTunnel { it }
-        assertEquals(renewed.first(), ArcTunnelPublicClient.servedChain(stack, fqdn()).first(), "marked: no renewal")
+        restartTunnel { ArcTunnelSavedRecord.withLeafOnly(it) }
+        assertEquals(
+            ArcTunnelSavedRecord.generation(renewedRecord),
+            ArcTunnelSavedRecord.generation(ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)),
+            "a marked certificate must not be renewed, even with its chain cut",
+        )
 
-        restartTunnel { ArcTunnelSavedRecord.withoutCertCheck(it) }
+        restartTunnel { ArcTunnelSavedRecord.withoutCertCheck(renewedRecord) }
         assertEquals(renewed.first(), ArcTunnelPublicClient.servedChain(stack, fqdn()).first(), "whole: no renewal")
-        assertTrue(ArcTunnelSavedRecord.certCheck(ArcTunnelStack.BASE_ADDRESS) > 0)
+        assertTrue(ArcTunnelSavedRecord.certCheck(ArcTunnelSavedRecord.read(ArcTunnelStack.BASE_ADDRESS)) > 0)
     }
 
     private fun restartTunnel(editSavedRecord: (JsonObject) -> JsonObject) {
