@@ -77,7 +77,8 @@ class ArcTunnelControl(
     }
 
     /**
-     * Serves control streams until [stop]; OPEN handlers, renewals and the watchdogs run as children of this scope.
+     * Serves control streams until [stop]; OPEN handlers, renewals, the watchdogs and the moved-away connections run as
+     * children of this scope.
      * A failure ends the current stream only and the loop reconnects with backoff, as the reference client does. Each
      * failed round is reported to [ArcTunnelControlEvents.onAttemptFailed]; a MOVE address that refuses or fails and
      * the end of a moved-away connection are not.

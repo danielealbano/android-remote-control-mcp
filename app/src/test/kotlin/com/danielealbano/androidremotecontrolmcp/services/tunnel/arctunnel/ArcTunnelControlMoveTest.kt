@@ -316,7 +316,7 @@ class ArcTunnelControlMoveTest {
         old.assertAnswersPing()
         old.end.countDown()
         assertLatch(old.clientEnded, "the client must end the old connection after the server did")
-        Thread.sleep(SETTLE_MS)
+        Thread.sleep(RECONNECT_WINDOW_MS)
 
         assertEquals(1, server.requestCount, "the end of the old connection must not reconnect")
         assertEquals(2, events.boundCount.get())
@@ -522,7 +522,7 @@ class ArcTunnelControlMoveTest {
         start()
 
         taken(target)
-        Thread.sleep(SETTLE_MS)
+        Thread.sleep(RECONNECT_WINDOW_MS)
 
         assertEquals(1, server.requestCount)
         assertNoStatusChange()
@@ -727,6 +727,31 @@ class ArcTunnelControlMoveTest {
         }
 
     @Test
+    fun `a scope cancelled before the hand-off still closes the moved-away connection`() =
+        runBlocking {
+            val sockets = RecordingSocketFactory()
+            val target = otherServer()
+            server.enqueue(moveAndHold(addr(target)))
+            // Runs before the frames are read: by then the MOVE is buffered, and it is delivered despite the cancel.
+            events.onBoundHook = {
+                Thread.sleep(SETTLE_MS)
+                requireNotNull(job).cancel()
+            }
+            start(
+                net
+                    .controlClient(identity)
+                    .newBuilder()
+                    .socketFactory(sockets)
+                    .build(),
+            )
+
+            withTimeout(STOP_BUDGET_MS) { requireNotNull(job).join() }
+
+            assertTrue(sockets.sockets[0].isClosed, "the connection must be cleaned up")
+            assertEquals(emptyList<Throwable>(), recorded.toList())
+        }
+
+    @Test
     fun `the end of the moved-away connection closes its socket and only its own`() {
         val sockets = RecordingSocketFactory()
         val target = otherServer()
@@ -806,6 +831,9 @@ class ArcTunnelControlMoveTest {
         const val POLL_MS = 10L
         const val JOIN_MS = 1_000L
         const val SETTLE_MS = 300L
+
+        /** A reconnect would have arrived by now: the first backoff wait, plus a margin. */
+        const val RECONNECT_WINDOW_MS = ArcTunnelBackoff.INITIAL_MS + SETTLE_MS
         const val STAYS_OPEN_MS = 500
         const val SILENCE_MS = 12_000L
         const val STOP_BUDGET_MS = 2_000L

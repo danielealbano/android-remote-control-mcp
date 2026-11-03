@@ -26,6 +26,14 @@ class ArcTunnelMoveTargetTest {
         assertEquals(expected, ArcTunnelMoveTarget.parse("[2001:db8::1]:443"))
     }
 
+    @Test
+    fun `a host name and port are accepted`() {
+        val target = ArcTunnelMoveTarget.parse("localhost:443")
+
+        assertEquals(InetAddress.getByName("localhost"), target?.address)
+        assertEquals(443, target?.port)
+    }
+
     @ParameterizedTest
     @ValueSource(
         strings = [
@@ -44,7 +52,7 @@ class ArcTunnelMoveTargetTest {
             "203.0.113.2:443#f",
         ],
     )
-    fun `anything else is not a valid address`(value: String) {
+    fun `a value that is not exactly host and port is not a valid address`(value: String) {
         assertNull(ArcTunnelMoveTarget.parse(value))
     }
 }

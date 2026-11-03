@@ -44,6 +44,7 @@ class ArcTunnelHostRelay(
                 } catch (_: IOException) {
                     return
                 }
+            acceptedCount.incrementAndGet()
             val upstream =
                 try {
                     Socket("127.0.0.1", targetPort)
@@ -51,7 +52,6 @@ class ArcTunnelHostRelay(
                     client.close()
                     continue
                 }
-            acceptedCount.incrementAndGet()
             open += client
             open += upstream
             val directions = AtomicInteger(2)
