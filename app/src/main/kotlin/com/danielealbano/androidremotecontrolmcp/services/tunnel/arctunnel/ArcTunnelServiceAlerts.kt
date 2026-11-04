@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -17,7 +18,10 @@ import javax.inject.Singleton
 
 /** The notification for a problem the tunnel service's status page reports. */
 interface ArcTunnelServiceAlerts {
-    /** Posts or updates the notification, alerting only the first time. Answers false if it cannot be posted. */
+    /**
+     * Posts or updates the notification, alerting only the first time. Answers false if the user would not see it, with
+     * the permission missing or this notification's channel turned off.
+     */
     fun show(problem: ArcTunnelServiceProblem): Boolean
 
     fun clear()
@@ -30,8 +34,11 @@ class ArcTunnelServiceAlertsImpl
         @ApplicationContext private val context: Context,
     ) : ArcTunnelServiceAlerts {
         override fun show(problem: ArcTunnelServiceProblem): Boolean {
+            val manager = NotificationManagerCompat.from(context)
             val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-            if (permission != PackageManager.PERMISSION_GRANTED) return false
+            val channel = manager.getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID)
+            val turnedOff = channel?.importance == NotificationManager.IMPORTANCE_NONE
+            if (permission != PackageManager.PERMISSION_GRANTED || turnedOff) return false
             val statusPage =
                 Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -55,7 +62,7 @@ class ArcTunnelServiceAlertsImpl
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
                     .build()
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+            manager.notify(NOTIFICATION_ID, notification)
             return true
         }
 
@@ -80,7 +87,7 @@ class ArcTunnelServiceAlertsImpl
                 NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
             }
 
-            const val NOTIFICATION_ID = 1007
+            private const val NOTIFICATION_ID = 1007
             private const val REQUEST_CODE = 7
         }
     }

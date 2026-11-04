@@ -4,8 +4,9 @@ import kotlinx.coroutines.delay
 
 /**
  * Keeps the notification in line with the status page while a free E2E tunnel session runs. It only touches the
- * notification when the answer changes, and removes it when the session ends. The page itself is asked at most once per
- * [ArcTunnelStatusPage.CHECK_INTERVAL_MS]: refreshing more often only picks up an answer the Server screen got first.
+ * notification when the answer changes or the last post could not be shown, and removes it when the session ends. The
+ * page itself is asked at most once per [ArcTunnelStatusPage.CHECK_INTERVAL_MS]: refreshing more often only picks up an
+ * answer the Server screen got first.
  */
 class ArcTunnelServiceStatusWatcher(
     private val status: ArcTunnelServiceStatus,
@@ -23,7 +24,7 @@ class ArcTunnelServiceStatusWatcher(
         }
     }
 
-    /** What the notification shows now. One that could not be posted is retried, as the permission may come later. */
+    /** What the notification shows now. One that could not be shown is retried, as the user may allow it later. */
     private fun update(
         shown: ArcTunnelServiceProblem?,
         problem: ArcTunnelServiceProblem?,

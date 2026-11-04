@@ -34,7 +34,7 @@ import javax.inject.Inject
 
 /**
  * Free E2E tunnel provider: identity + certificate, loopback TLS listener, control loop,
- * Certificate Transparency check.
+ * Certificate Transparency check, tunnel service status watcher.
  */
 class ArcTunnelProvider
     @Inject

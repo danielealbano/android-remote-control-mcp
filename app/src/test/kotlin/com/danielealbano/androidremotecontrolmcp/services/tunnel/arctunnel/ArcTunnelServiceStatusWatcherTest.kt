@@ -90,6 +90,22 @@ class ArcTunnelServiceStatusWatcherTest {
         }
 
     @Test
+    fun `a change that could not be posted still removes the old notification when the problem ends`() =
+        runTest {
+            val worse = ArcTunnelServiceProblem("downtime", listOf("Tunnels", "Database"))
+            coEvery { status.currentProblem() } returnsMany listOf(PROBLEM, worse, null)
+            every { alerts.show(any()) } returnsMany listOf(true, false)
+
+            val job = launch { watcher.run() }
+            runCurrent()
+            advanceTimeBy(REFRESH_MS + 1)
+            advanceTimeBy(REFRESH_MS)
+
+            verify(exactly = 1) { alerts.clear() }
+            job.cancel()
+        }
+
+    @Test
     fun `back to operational removes the notification, and a new problem posts again`() =
         runTest {
             coEvery { status.currentProblem() } returnsMany listOf(PROBLEM, null, PROBLEM)

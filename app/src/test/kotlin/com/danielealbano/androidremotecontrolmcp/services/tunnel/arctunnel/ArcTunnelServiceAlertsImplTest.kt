@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -32,17 +34,24 @@ class ArcTunnelServiceAlertsImplTest {
     private val context = mockk<Context>(relaxed = true)
     private val manager = mockk<NotificationManagerCompat>(relaxed = true)
     private val notification = mockk<Notification>(relaxed = true)
+    private val channel = mockk<NotificationChannel>()
+    private val statusPageIntent = mockk<Intent>(relaxed = true)
+    private val tap = mockk<PendingIntent>(relaxed = true)
     private val alerts = ArcTunnelServiceAlertsImpl(context)
 
     @BeforeEach
     fun setUp() {
         mockkStatic(ContextCompat::class, NotificationManagerCompat::class, PendingIntent::class, Uri::class)
         mockkConstructor(NotificationCompat.Builder::class, Intent::class)
-        every { anyConstructed<Intent>().addFlags(any()) } returns mockk(relaxed = true)
         every { NotificationManagerCompat.from(any()) } returns manager
-        every { PendingIntent.getActivity(any(), any(), any(), any()) } returns mockk(relaxed = true)
-        every { Uri.parse(any()) } returns mockk(relaxed = true)
+        every { manager.getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID) } returns channel
+        every { channel.importance } returns NotificationManager.IMPORTANCE_DEFAULT
+        every { Uri.parse(ArcTunnelStatusPage.PAGE_URL) } returns mockk(relaxed = true)
+        every { viewStatusPage().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) } returns statusPageIntent
+        every { PendingIntent.getActivity(context, any(), statusPageIntent, IMMUTABLE_UPDATE) } returns tap
         every { anyConstructed<NotificationCompat.Builder>().build() } returns notification
+        every { statusChannelBuilder().build() } returns notification
+        every { context.getString(R.string.server_arc_tunnel_status_title) } returns "Title"
         every { context.getString(R.string.server_arc_tunnel_status_body, *anyVararg()) } returns "Generic"
         every { context.getString(R.string.server_arc_tunnel_status_body_affected, *anyVararg()) } returns "Affected"
     }
@@ -57,50 +66,56 @@ class ArcTunnelServiceAlertsImplTest {
         every { ContextCompat.checkSelfPermission(any(), any()) } returns result
     }
 
-    /** The builder created for the status channel; MockK routes a construction only to matchers known beforehand. */
+    /** The builder for the status channel; MockK routes a construction only to matchers known beforehand. */
     private fun MockKMatcherScope.statusChannelBuilder(): NotificationCompat.Builder =
         constructedWith(
             OfTypeMatcher<Context>(Context::class),
             EqMatcher(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID),
         )
 
+    /** Only the status page's address parses to a [Uri] here, so any other one does not reach this intent. */
+    private fun MockKMatcherScope.viewStatusPage(): Intent =
+        constructedWith(
+            EqMatcher(Intent.ACTION_VIEW),
+            OfTypeMatcher<Uri>(Uri::class),
+        )
+
     @Test
     fun `show posts 1007 on the status channel with the affected services`() {
         permission(granted = true)
-        every { statusChannelBuilder().build() } returns notification
 
         val posted = alerts.show(ArcTunnelServiceProblem("degraded", listOf("Tunnels", "Database")))
 
         assertTrue(posted)
+        verify { statusChannelBuilder().setContentTitle("Title") }
         verify { statusChannelBuilder().setContentText("Affected") }
+        verify { statusChannelBuilder().setStyle(ofType<NotificationCompat.BigTextStyle>()) }
+        verify { statusChannelBuilder().setSmallIcon(R.drawable.ic_notification) }
         verify { context.getString(R.string.server_arc_tunnel_status_body_affected, "degraded", "Tunnels, Database") }
-        verify { manager.notify(ArcTunnelServiceAlertsImpl.NOTIFICATION_ID, notification) }
+        verify { manager.notify(NOTIFICATION_ID, notification) }
     }
 
     @Test
     fun `show with no affected services uses the generic text`() {
         permission(granted = true)
-        every { statusChannelBuilder().build() } returns notification
 
         val posted = alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
 
         assertTrue(posted)
         verify { statusChannelBuilder().setContentText("Generic") }
         verify { context.getString(R.string.server_arc_tunnel_status_body, "degraded") }
-        verify { manager.notify(ArcTunnelServiceAlertsImpl.NOTIFICATION_ID, notification) }
+        verify { manager.notify(NOTIFICATION_ID, notification) }
     }
 
     @Test
     fun `show alerts once and a tap opens the status page`() {
         permission(granted = true)
-        every { statusChannelBuilder().build() } returns notification
 
         alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
 
         verify { statusChannelBuilder().setOnlyAlertOnce(true) }
         verify { statusChannelBuilder().setAutoCancel(true) }
-        verify { Uri.parse(ArcTunnelStatusPage.PAGE_URL) }
-        verify { anyConstructed<Intent>().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        verify { statusChannelBuilder().setContentIntent(tap) }
     }
 
     @Test
@@ -114,16 +129,32 @@ class ArcTunnelServiceAlertsImplTest {
     }
 
     @Test
+    fun `show with the channel turned off posts nothing and says so`() {
+        permission(granted = true)
+        every { channel.importance } returns NotificationManager.IMPORTANCE_NONE
+
+        val posted = alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
+
+        assertFalse(posted)
+        verify(exactly = 0) { manager.notify(any<Int>(), any()) }
+    }
+
+    @Test
     fun `clear cancels 1007`() {
         alerts.clear()
 
-        verify { manager.cancel(ArcTunnelServiceAlertsImpl.NOTIFICATION_ID) }
+        verify { manager.cancel(NOTIFICATION_ID) }
     }
 
     @Test
     fun `clearLeftover cancels 1007`() {
         ArcTunnelServiceAlertsImpl.clearLeftover(context)
 
-        verify { manager.cancel(ArcTunnelServiceAlertsImpl.NOTIFICATION_ID) }
+        verify { manager.cancel(NOTIFICATION_ID) }
+    }
+
+    private companion object {
+        const val NOTIFICATION_ID = 1007
+        const val IMMUTABLE_UPDATE = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     }
 }
