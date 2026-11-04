@@ -314,7 +314,7 @@
     <string name="remote_access_arc_tunnel_ct_check_label">Certificate Transparency check</string>
     <string name="remote_access_arc_tunnel_ct_check_description">Looks up public certificate logs for your tunnel name and warns if a certificate was issued to another key</string>
     <string name="remote_access_arc_tunnel_url_label">Public URL</string>
-    <string name="remote_access_arc_tunnel_status_link">Tunnel Status</string>
+    <string name="remote_access_arc_tunnel_status_link">Tunnel status</string>
     <string name="remote_access_arc_tunnel_status_check_label">Tunnel service status check</string>
     <string name="remote_access_arc_tunnel_status_check_description">With the free tunnel on, checks the public status page every 30 minutes while the server is running or the Server screen is open, and warns if the service reports a problem</string>
     <string name="remote_access_arc_tunnel_url_refresh">Get a new name</string>

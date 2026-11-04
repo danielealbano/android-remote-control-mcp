@@ -228,6 +228,54 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `a renewal waiting for the user still notifies about a reported problem`() =
+        runBlocking {
+            val problem = ArcTunnelServiceProblem("degraded", listOf("ACME Certificate Issuing"))
+            coEvery { serviceStatus.currentProblem() } returns problem
+            coEvery { enrollment.readyIdentity(any()) } returns expiredIdentity()
+            coEvery { renewals.renewForStart(any()) } throws IllegalStateException("acme_unavailable")
+            coEvery { renewals.awaitRetry() } coAnswers { awaitCancellation() }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            assertEquals("acme_unavailable", awaitError().message)
+            verify(timeout = BUDGET_MS) { serviceAlerts.show(problem) }
+            verify(exactly = 0) { host.startTlsListener(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a start that fails removes the notification`() =
+        runBlocking {
+            val posted = CompletableDeferred<Unit>()
+            coEvery { serviceStatus.currentProblem() } returns ArcTunnelServiceProblem("degraded", emptyList())
+            every { serviceAlerts.show(any()) } answers { posted.complete(Unit) }
+            coEvery { renewals.checkSavedChain(any()) } coAnswers {
+                posted.await()
+                error("chain check failed")
+            }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            assertEquals("chain check failed", awaitError().message)
+            verify(timeout = BUDGET_MS) { serviceAlerts.clear() }
+        }
+
+    @Test
+    fun `a phone with no identity never asks the status page`() =
+        runBlocking {
+            coEvery { enrollment.readyIdentity(any()) } returns null
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+            awaitError()
+            delay(NOTHING_ASKED_MS)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+        }
+
+    @Test
     fun `with the setting off the status page is never asked`() =
         runBlocking {
             provider.bind(host)

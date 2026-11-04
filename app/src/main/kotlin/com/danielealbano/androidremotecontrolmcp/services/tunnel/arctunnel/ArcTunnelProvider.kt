@@ -167,6 +167,10 @@ class ArcTunnelProvider
             val outcome =
                 runCatching {
                     val identity = enrollment.readyIdentity(s.env) ?: error(NOT_ENROLLED_MESSAGE)
+                    // Before the renewal: one the service cannot answer waits here for the user, when this helps most.
+                    if (s.statusCheckEnabled) {
+                        s.scope.launch { ArcTunnelServiceStatusWatcher(serviceStatus, serviceAlerts).run() }
+                    }
                     if (certificateMissingOrExpired(identity)) {
                         renewForStart(identity)
                     } else {
@@ -194,9 +198,6 @@ class ArcTunnelProvider
                     armBindTimeout(s)
                     s.scope.launch { control.run() }
                     s.scope.launch { swapLoop(s) }
-                    if (s.statusCheckEnabled) {
-                        s.scope.launch { ArcTunnelServiceStatusWatcher(serviceStatus, serviceAlerts).run() }
-                    }
                 }
             outcome.onFailure {
                 if (it is CancellationException) throw it
