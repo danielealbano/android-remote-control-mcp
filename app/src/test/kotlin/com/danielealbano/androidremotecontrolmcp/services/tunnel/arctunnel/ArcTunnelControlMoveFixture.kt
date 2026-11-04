@@ -83,7 +83,8 @@ abstract class ArcTunnelControlMoveFixture {
                 ),
                 { peers.local.localPort },
                 events,
-                localConnectWindowMs = LOCAL_WINDOW_MS,
+                { _, _ -> AutoCloseable {} },
+                LOCAL_WINDOW_MS,
             )
         val c = ArcTunnelControl(client, net, ArcTunnelTestServer.CONTROL_HOST, handler, events)
         c.watchdogClock = watchdogClock

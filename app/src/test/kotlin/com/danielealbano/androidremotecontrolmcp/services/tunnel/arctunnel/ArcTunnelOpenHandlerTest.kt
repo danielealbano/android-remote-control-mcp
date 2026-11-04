@@ -16,6 +16,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -26,6 +27,8 @@ class ArcTunnelOpenHandlerTest {
     private val peers = ArcTunnelTestPeers()
     private val events = ArcTunnelTestEvents()
     private val sessions = ArcTunnelSessions {}
+    private val holds = CopyOnWriteArrayList<Pair<Int, String>>()
+    private val closedHolds = CopyOnWriteArrayList<Int>()
     private val dialBack =
         ArcTunnelDialBack(
             ArcTunnelTestServer.CONTROL_HOST,
@@ -43,12 +46,22 @@ class ArcTunnelOpenHandlerTest {
     private fun handler(
         localPort: Int,
         windowMs: Long = WINDOW_MS,
-    ) = ArcTunnelOpenHandler(dialBack, { localPort }, events, windowMs)
+    ) = ArcTunnelOpenHandler(
+        dialBack,
+        { localPort },
+        events,
+        { port, clientIp ->
+            holds += port to clientIp
+            AutoCloseable { closedHolds += port }
+        },
+        windowMs,
+    )
 
     private fun open(
         addr: String = "127.0.0.1:${peers.dial.localPort}",
         token: String = "t",
-    ) = ArcTunnelOpenPayload(token = token, addr = addr)
+        clientAddr: String = CLIENT_ADDR,
+    ) = ArcTunnelOpenPayload(token = token, addr = addr, clientAddr = clientAddr)
 
     private fun closedPort(): Int = ServerSocket(0, BACKLOG, InetAddress.getLoopbackAddress()).use { it.localPort }
 
@@ -154,6 +167,52 @@ class ArcTunnelOpenHandlerTest {
         }
 
     @Test
+    fun `the client's address is held against the local socket for as long as the splice lives`() =
+        runBlocking {
+            val remote = AtomicReference<Socket>()
+            val local = AtomicReference<Socket>()
+            val upgraded = CountDownLatch(1)
+            val accepted = CountDownLatch(1)
+            peers.acceptUpgrade(remote, upgraded)
+            peers.acceptLocal(local, accepted)
+            val job = launch(Dispatchers.IO) { handler(peers.local.localPort).handle(open(), sessions) }
+            awaitLatch(upgraded)
+            awaitLatch(accepted)
+            withTimeout(LATCH_BUDGET_MS) { while (holds.isEmpty()) delay(POLL_MS) }
+
+            assertEquals(listOf(local.get().port to CLIENT_IP), holds.toList())
+            assertTrue(closedHolds.isEmpty())
+
+            remote.get().close()
+            local.get().close()
+            withTimeout(LATCH_BUDGET_MS) { job.join() }
+
+            assertEquals(listOf(local.get().port), closedHolds.toList())
+        }
+
+    @Test
+    fun `a failed local connect holds no address`() =
+        runBlocking {
+            val remote = AtomicReference<Socket>()
+            val upgraded = CountDownLatch(1)
+            peers.acceptUpgrade(remote, upgraded)
+
+            handler(closedPort()).handle(open(), sessions)
+
+            assertTrue(holds.isEmpty())
+        }
+
+    @Test
+    fun `an OPEN without client_addr is ignored`() =
+        runBlocking {
+            handler(peers.local.localPort).handle(open(clientAddr = ""), sessions)
+
+            peers.dial.soTimeout = NOTHING_ACCEPTED_MS
+            assertTrue(runCatching { peers.dial.accept().close() }.exceptionOrNull() is SocketTimeoutException)
+            assertTrue(holds.isEmpty())
+        }
+
+    @Test
     fun `invalid OPEN is ignored`() =
         runBlocking {
             handler(peers.local.localPort).handle(open(token = ""), sessions)
@@ -164,6 +223,8 @@ class ArcTunnelOpenHandlerTest {
         }
 
     private companion object {
+        const val CLIENT_IP = "198.51.100.7"
+        const val CLIENT_ADDR = "$CLIENT_IP:52144"
         const val BACKLOG = 50
         const val WINDOW_MS = 300L
         const val LONG_WINDOW_MS = 5_000L

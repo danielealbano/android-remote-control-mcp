@@ -108,7 +108,7 @@ class OAuthLoggingIntegrationTest {
             McpIntegrationTestHelper.withOAuthTestApplication(
                 deps = deps,
                 publicUrlOverride = OVERRIDE,
-                clientIpSource = ClientIpSource.UNKNOWN,
+                clientIpSource = ClientIpSource.FREE_TUNNEL,
             ) { ctx ->
                 val clientId = register(client)
 

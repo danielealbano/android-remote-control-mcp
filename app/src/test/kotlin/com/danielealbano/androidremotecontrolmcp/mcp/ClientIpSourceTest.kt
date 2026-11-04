@@ -40,6 +40,7 @@ class ClientIpSourceTest {
         cfConnectingIp: String? = SPOOFED_CF,
         xForwardedFor: List<String>? = listOf(SPOOFED_XFF),
         remoteAddress: String = LOOPBACK,
+        tunnelClientIp: String? = null,
     ): ApplicationCall {
         val pairs = mutableListOf<Pair<String, List<String>>>()
         cfConnectingIp?.let { pairs += "CF-Connecting-IP" to listOf(it) }
@@ -53,6 +54,7 @@ class ClientIpSourceTest {
 
         val attributes = Attributes()
         source?.let { attributes.put(ClientIpSourceKey, it) }
+        tunnelClientIp?.let { attributes.put(TunnelClientIpKey, it) }
         return mockk {
             every { this@mockk.request } returns request
             every { this@mockk.attributes } returns attributes
@@ -99,10 +101,16 @@ class ClientIpSourceTest {
     }
 
     @Test
-    @DisplayName("UNKNOWN reports no address, so the free tunnel's loopback peer never reads as this phone")
-    fun unknownReportsNoAddress() {
-        assertNull(call(ClientIpSource.UNKNOWN).clientIp())
-        assertNull(call(ClientIpSource.UNKNOWN, remoteAddress = LAN_PEER).clientIp())
+    @DisplayName("FREE_TUNNEL reports the relay's address and no header")
+    fun freeTunnelReportsTheRelaysAddress() {
+        assertEquals(REAL, call(ClientIpSource.FREE_TUNNEL, tunnelClientIp = REAL).clientIp())
+    }
+
+    @Test
+    @DisplayName("FREE_TUNNEL without a relay address reports none, so its loopback peer never reads as this phone")
+    fun freeTunnelWithoutAddressReportsNone() {
+        assertNull(call(ClientIpSource.FREE_TUNNEL).clientIp())
+        assertNull(call(ClientIpSource.FREE_TUNNEL, remoteAddress = LAN_PEER).clientIp())
     }
 
     @Test
@@ -122,7 +130,7 @@ class ClientIpSourceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(ClientIpSource::class, names = ["UNKNOWN"], mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(ClientIpSource::class, names = ["FREE_TUNNEL"], mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("a peer that is not loopback is the client itself, whatever the headers say")
     fun anotherPeerIsTheClient(source: ClientIpSource) {
         assertEquals(LAN_PEER, call(source, remoteAddress = LAN_PEER).clientIp())

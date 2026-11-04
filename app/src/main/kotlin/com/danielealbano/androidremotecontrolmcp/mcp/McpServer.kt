@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthRouteDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsContext
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
@@ -84,6 +85,7 @@ class McpServer(
 
     @Volatile
     private var tunnelListener: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+    override val clientAddresses = TunnelClientAddresses()
 
     /** Test seam: the random loopback port source of the tunnel listener. */
     internal var tunnelPortChooser: () -> Int = ::randomPort
@@ -292,7 +294,8 @@ class McpServer(
             },
             module = {
                 // Nothing on the way here sets or strips a header, as TLS ends on the phone, and the peer is loopback.
-                configureApplication(ClientIpSource.UNKNOWN)
+                resolveTunnelClients(clientAddresses)
+                configureApplication(ClientIpSource.FREE_TUNNEL)
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
         )

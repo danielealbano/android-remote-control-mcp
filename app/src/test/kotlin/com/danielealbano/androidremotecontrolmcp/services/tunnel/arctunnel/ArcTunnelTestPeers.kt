@@ -68,7 +68,8 @@ class ArcTunnelTestPeers : AutoCloseable {
     fun openFrame(): ByteArray =
         ArcTunnelTestServer.frame(
             ArcTunnelFrames.OPEN,
-            """{"token":"t","addr":"127.0.0.1:${dial.localPort}","use_https":false,"use_mtls":false}""",
+            """{"token":"t","addr":"127.0.0.1:${dial.localPort}","use_https":false,"use_mtls":false,""" +
+                """"client_addr":"198.51.100.7:52144"}""",
         )
 
     /** Accepts one dial-back, drains the upgrade request and answers 101; the accepted socket lands in [accepted]. */

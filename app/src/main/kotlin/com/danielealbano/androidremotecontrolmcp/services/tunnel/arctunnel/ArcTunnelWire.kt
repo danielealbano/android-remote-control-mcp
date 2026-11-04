@@ -1,8 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import io.netty.util.NetUtil
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+
+private const val MAX_PORT = 65535
 
 val ArcTunnelJson: Json =
     Json {
@@ -58,8 +61,24 @@ data class ArcTunnelOpenPayload(
     val addr: String = "",
     @SerialName("use_https") val useHttps: Boolean = false,
     @SerialName("use_mtls") val useMtls: Boolean = false,
+    @SerialName("client_addr") val clientAddr: String = "",
 ) {
-    fun isValid(): Boolean = token.isNotEmpty() && addr.isNotEmpty() && (useHttps || !useMtls)
+    /** The address in [clientAddr] (`1.2.3.4:5` or `[::1]:5`), or null when it is missing or malformed. */
+    fun clientIp(): String? {
+        val isIpv6 = clientAddr.startsWith("[")
+        val host =
+            if (isIpv6) {
+                clientAddr.substringAfter('[').substringBefore("]:", "")
+            } else {
+                clientAddr.substringBefore(':', "")
+            }
+        val port = clientAddr.substringAfterLast(':', "").toIntOrNull()
+        val isIp = if (isIpv6) NetUtil.isValidIpV6Address(host) else NetUtil.isValidIpV4Address(host)
+        return host.takeIf { isIp && port != null && port in 0..MAX_PORT }
+    }
+
+    /** PROTOCOL.md section 4: `client_addr` is required, and an `OPEN` without it is invalid and ignored. */
+    fun isValid(): Boolean = token.isNotEmpty() && addr.isNotEmpty() && clientIp() != null && (useHttps || !useMtls)
 }
 
 @Serializable

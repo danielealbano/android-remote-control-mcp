@@ -15,6 +15,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import java.net.URLEncoder
 
@@ -53,6 +54,7 @@ class ArcTunnelOAuthFlow(
         path: String,
         post: RequestBody? = null,
         token: String? = null,
+        spoofedAddress: String? = null,
     ): Answer {
         val request =
             Request
@@ -61,7 +63,12 @@ class ArcTunnelOAuthFlow(
                 .header("Host", fqdn)
                 .header("Accept", "application/json, text/event-stream")
                 .apply { token?.let { header("Authorization", "Bearer $it") } }
-                .apply { post?.let { post(it) } }
+                .apply {
+                    spoofedAddress?.let {
+                        header("CF-Connecting-IP", it)
+                        header("X-Forwarded-For", it)
+                    }
+                }.apply { post?.let { post(it) } }
                 .build()
         return http.newCall(request).execute().use {
             Answer(it.code, it.body.string(), it.protocol, it.header("WWW-Authenticate"), it.header("Location"))
@@ -93,7 +100,26 @@ class ArcTunnelOAuthFlow(
         val clientId = register()
         val approvalId = authorizeInBrowser(clientId)
         AndroidContainerSetup.approvePendingOAuth()
-        return redeem(clientId, awaitCode(approvalId))
+        val token = redeem(clientId, awaitCode(approvalId))
+        assertAddressCameFromTheRelay()
+        return token
+    }
+
+    /** The real relay's `client_addr` reached the phone: not the loopback peer, not what the client sent. */
+    private fun assertAddressCameFromTheRelay() {
+        val log =
+            AndroidContainerSetup.execAdb(
+                "shell",
+                "run-as",
+                AndroidContainerSetup.APP_PACKAGE,
+                "sh",
+                "-c",
+                "'cat files/server_logs/*.data'",
+            )
+        val origin = log.substringAfterLast("OAuth authorization requested by $CLIENT_NAME", "").take(ORIGIN_CHARS)
+        assertTrue(origin.startsWith(" from "), "no address logged: $origin")
+        assertFalse(origin.contains("127.0.0.1"), origin)
+        assertFalse(origin.contains(SPOOFED_ADDRESS), origin)
     }
 
     /** `tools/list` with [token] answers on both HTTP versions, so the token's audience matches both. */
@@ -111,7 +137,7 @@ class ArcTunnelOAuthFlow(
         val body =
             """{"redirect_uris":["$REDIRECT"],"token_endpoint_auth_method":"none",""" +
                 """"grant_types":["authorization_code","refresh_token"],"response_types":["code"],""" +
-                """"scope":"mcp","client_name":"E2E public client"}"""
+                """"scope":"mcp","client_name":"$CLIENT_NAME"}"""
         val answer = send(http1, "/register", json(body))
         assertEquals(CREATED, answer.code, answer.body)
         return field(answer.body, "client_id")
@@ -122,7 +148,7 @@ class ArcTunnelOAuthFlow(
             "response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(REDIRECT)}" +
                 "&code_challenge=${enc(CHALLENGE)}&code_challenge_method=S256&state=xyz&scope=mcp" +
                 "&resource=${enc(resource)}"
-        val answer = send(http2, "/authorize?$query")
+        val answer = send(http2, "/authorize?$query", spoofedAddress = SPOOFED_ADDRESS)
         assertEquals(Protocol.HTTP_2, answer.protocol)
         // A refusal such as invalid_target is a redirect with the error in its location.
         assertEquals(OK, answer.code, "location: ${answer.location}, body: ${answer.body}")
@@ -182,5 +208,8 @@ class ArcTunnelOAuthFlow(
         const val UNAUTHORIZED = 401
         const val APPROVAL_TIMEOUT_MS = 30_000L
         const val POLL_MS = 500L
+        const val CLIENT_NAME = "E2E public client"
+        const val SPOOFED_ADDRESS = "198.51.100.6"
+        const val ORIGIN_CHARS = 60
     }
 }

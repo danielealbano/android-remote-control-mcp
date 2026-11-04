@@ -179,7 +179,7 @@ class ArcTunnelProvider
                     monitor.restoreAlert()
                     val events = Events(s)
                     val dialBack = net.dialBack(s.env.hosts.controlHost, identity)
-                    val opens = ArcTunnelOpenHandler(dialBack, { s.port.get() }, events)
+                    val opens = ArcTunnelOpenHandler(dialBack, { s.port.get() }, events, s.host.clientAddresses::hold)
                     val control =
                         ArcTunnelControl(net.controlClient(identity), net, s.env.hosts.controlHost, opens, events)
                     s.opens = opens
