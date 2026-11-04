@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/arc-mcp-logo.png" alt="ARC MCP, Android Remote Control MCP" width="640">
+</p>
+
 # Android Remote Control MCP
 
 [![CI](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml)
