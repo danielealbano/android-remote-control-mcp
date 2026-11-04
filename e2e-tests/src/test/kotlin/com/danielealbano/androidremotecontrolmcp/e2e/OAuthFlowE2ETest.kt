@@ -1,5 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.APPROVAL_ID_REGEX
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CHALLENGE
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CODE_REGEX
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.VERIFIER
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -196,13 +200,6 @@ class OAuthFlowE2ETest {
         const val REDIRECT = "http://localhost/callback"
         const val HTTP_TIMEOUT_MS = 15_000
         const val STATUS_TIMEOUT_MS = 30_000L
-
-        // RFC 7636 Appendix B PKCE test vector.
-        const val VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-        const val CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-
-        val APPROVAL_ID_REGEX = Regex("""var id = "([^"]+)"""")
-        val CODE_REGEX = Regex("""[?&]code=([^&]+)""")
         val SETTLED_STATES = setOf("approved", "denied", "expired")
     }
 }
