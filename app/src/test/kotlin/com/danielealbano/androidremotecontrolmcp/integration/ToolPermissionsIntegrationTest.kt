@@ -288,6 +288,7 @@ class ToolPermissionsIntegrationTest {
                 "find_nodes",
                 "click_node",
                 "long_click_node",
+                "perform_node_action",
                 "tap_node",
                 "scroll_to_node",
                 "scroll_node",

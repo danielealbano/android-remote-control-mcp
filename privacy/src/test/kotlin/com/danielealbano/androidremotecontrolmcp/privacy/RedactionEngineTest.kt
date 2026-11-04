@@ -184,6 +184,35 @@ class RedactionEngineTest {
         }
 
     @Test
+    fun `redactTree redacts action labels in order and flags the node`() =
+        runTest {
+            val config =
+                PrivacyModeConfig(
+                    enabled = true,
+                    disabledCategories = allExcept(PiiCategory.EMAILS),
+                    placeholderFormat = PlaceholderFormat.NUMBERED,
+                )
+            val barBounds = BoundsData(0, 100, 50, 150)
+            val root =
+                node(
+                    "root",
+                    children =
+                        listOf(
+                            node("bar", bounds = barBounds)
+                                .copy(actions = listOf("Mail a@b.com", "Upvote", "Mail c@d.com")),
+                            node("clean", text = "hello").copy(actions = listOf("Share post")),
+                        ),
+                )
+
+            val processed = engine.redactTree(tree(root), config)
+
+            val children = processed.result.windows.single().tree.children
+            assertEquals(listOf("Mail [EMAIL_1]", "Upvote", "Mail [EMAIL_2]"), children[0].actions)
+            assertEquals(listOf("Share post"), children[1].actions)
+            assertEquals(listOf(barBounds), processed.flaggedBounds)
+        }
+
+    @Test
     fun `redactTree uses nearest label context for editable fields`() =
         runTest {
             // NationalIdDetector only fires with a national-id cue in the context; the cue arrives via the

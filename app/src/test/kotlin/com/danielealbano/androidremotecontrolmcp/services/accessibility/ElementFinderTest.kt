@@ -305,7 +305,7 @@ class ElementFinderTest {
     @DisplayName("ElementInfo mapping")
     inner class ElementInfoMapping {
         @Test
-        @DisplayName("maps every ElementInfo field, password included")
+        @DisplayName("maps every ElementInfo field, password and actions included")
         fun mapsEveryElementInfoFieldPasswordIncluded() {
             // Arrange
             val passwordField =
@@ -320,7 +320,7 @@ class ElementFinderTest {
                     longClickable = true,
                     editable = true,
                     isPassword = true,
-                )
+                ).copy(actions = listOf("Show password"))
             val tree = createNode(id = "node_root", children = listOf(passwordField))
 
             // Act
@@ -343,6 +343,7 @@ class ElementFinderTest {
                         enabled = true,
                         visible = true,
                         password = true,
+                        actions = listOf("Show password"),
                     ),
                 ),
                 results,

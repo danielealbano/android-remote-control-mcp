@@ -35,6 +35,7 @@ class CompactTreeFormatterTest {
         enabled: Boolean = false,
         visible: Boolean = false,
         isPassword: Boolean = false,
+        actions: List<String> = emptyList(),
         children: List<AccessibilityNodeData> = emptyList(),
     ) = AccessibilityNodeData(
         id = id,
@@ -51,6 +52,7 @@ class CompactTreeFormatterTest {
         enabled = enabled,
         visible = visible,
         isPassword = isPassword,
+        actions = actions,
         children = children,
     )
 
@@ -410,6 +412,12 @@ class CompactTreeFormatterTest {
         @DisplayName("returns true for editable node")
         fun returnsTrueForEditableNode() {
             assertTrue(formatter.shouldKeepNode(makeNode(editable = true)))
+        }
+
+        @Test
+        @DisplayName("returns true for node with labelled actions only")
+        fun returnsTrueForNodeWithLabelledActions() {
+            assertTrue(formatter.shouldKeepNode(makeNode(actions = listOf("Upvote"))))
         }
 
         @Test
@@ -1379,5 +1387,222 @@ class CompactTreeFormatterTest {
     private companion object {
         const val MIXED_LEAVES = 500
         const val PAGED_LEAVES = 250
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // actions section
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("actions section")
+    inner class ActionsSectionTests {
+        private val notes =
+            listOf(
+                CompactTreeFormatter.NOTE_LINE,
+                CompactTreeFormatter.NOTE_LINE_CUSTOM_ELEMENTS,
+                CompactTreeFormatter.NOTE_LINE_FLAGS_LEGEND,
+                CompactTreeFormatter.NOTE_LINE_OFFSCREEN_HINT,
+                "screen:1080x2400 density:420 orientation:portrait",
+            )
+
+        private val windowHeader =
+            "--- window:1 type:APPLICATION pkg:com.example.app title:unknown layer:0 focused:false ---"
+
+        /** A structural root over a title, a vote bar listed only for its actions, and an offscreen share button. */
+        private fun voteWindow(): WindowData {
+            val root =
+                makeNode(
+                    id = "node_root",
+                    visible = true,
+                    children =
+                        listOf(
+                            makeNode(id = "node_title", text = "Title", visible = true),
+                            makeNode(id = "node_bar", visible = true, actions = listOf("Upvote", "Downvote")),
+                            makeNode(
+                                id = "node_share",
+                                text = "Share",
+                                clickable = true,
+                                visible = false,
+                                actions = listOf("Share post"),
+                            ),
+                        ),
+                )
+            return WindowData(windowId = 1, windowType = "APPLICATION", packageName = "com.example.app", tree = root)
+        }
+
+        private fun plainWindow(): WindowData =
+            WindowData(
+                windowId = 2,
+                windowType = "SYSTEM",
+                packageName = "com.android.systemui",
+                tree = makeNode(id = "node_clock", text = "21:40", visible = true),
+            )
+
+        @Test
+        @DisplayName("formatMultiWindow puts the section after the rows and before the hierarchy, byte for byte")
+        fun formatMultiWindowExactBytes() {
+            val expected =
+                (
+                    notes +
+                        listOf(
+                            windowHeader,
+                            CompactTreeFormatter.HEADER,
+                            "node_title\t-\tTitle\t-\t-\t0,0,100,100\ton",
+                            "node_bar\t-\t-\t-\t-\t0,0,100,100\ton",
+                            "node_share\t-\tShare\t-\t-\t0,0,100,100\toff,clk",
+                            "Nodes with actions:",
+                            "",
+                            "* node_bar: Upvote¦Downvote",
+                            "* node_share: Share post",
+                            CompactTreeFormatter.HIERARCHY_HEADER,
+                            "node_title",
+                            "node_bar",
+                            "node_share",
+                        )
+                ).joinToString("\n")
+
+            val output = formatter.formatMultiWindow(PaginationTestTrees.result(voteWindow()), defaultScreenInfo)
+
+            assertEquals(expected, output)
+        }
+
+        @Test
+        @DisplayName("without the hierarchy the section ends the window block")
+        fun withoutHierarchySectionEndsWindowBlock() {
+            val result = MultiWindowResult(windows = listOf(voteWindow(), plainWindow()))
+
+            val output =
+                formatter.formatMultiWindow(
+                    result,
+                    defaultScreenInfo,
+                    ScreenStateFormatOptions(includeHierarchy = false),
+                )
+
+            assertTrue(
+                output.contains(
+                    "* node_share: Share post\n--- window:2 type:SYSTEM pkg:com.android.systemui title:unknown " +
+                        "layer:0 focused:false ---",
+                ),
+            )
+            assertFalse(output.contains(CompactTreeFormatter.HIERARCHY_HEADER))
+        }
+
+        @Test
+        @DisplayName("an offscreen node left out with include_offscreen=false has no line")
+        fun offscreenNodeLeftOutHasNoLine() {
+            val output =
+                formatter.formatMultiWindow(
+                    PaginationTestTrees.result(voteWindow()),
+                    defaultScreenInfo,
+                    ScreenStateFormatOptions(includeOffscreen = false),
+                )
+
+            assertTrue(output.contains("Nodes with actions:\n\n* node_bar: Upvote¦Downvote\nhierarchy:"))
+            assertFalse(output.contains("node_share"))
+        }
+
+        @Test
+        @DisplayName("a window whose listed nodes have no actions has no section")
+        fun windowWithoutActionsHasNoSection() {
+            val output = formatter.formatMultiWindow(PaginationTestTrees.result(plainWindow()), defaultScreenInfo)
+
+            assertFalse(output.contains(CompactTreeFormatter.ACTIONS_HEADER))
+            assertFalse(output.contains("\n* "))
+        }
+
+        @Test
+        @DisplayName("each window has its own section")
+        fun eachWindowHasItsOwnSection() {
+            val second =
+                WindowData(
+                    windowId = 2,
+                    windowType = "SYSTEM",
+                    packageName = "com.android.systemui",
+                    tree = makeNode(id = "node_toggle", visible = true, actions = listOf("Expand")),
+                )
+
+            val result = MultiWindowResult(windows = listOf(voteWindow(), second))
+
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo)
+
+            assertEquals(2, output.lines().count { it == CompactTreeFormatter.ACTIONS_HEADER })
+            val secondBlock = output.substringAfter("--- window:2")
+            assertTrue(secondBlock.contains("Nodes with actions:\n\n* node_toggle: Expand\nhierarchy:"))
+            assertFalse(secondBlock.contains("node_bar"))
+        }
+
+        @Test
+        @DisplayName("format puts the section after the rows and before the hierarchy")
+        fun formatPutsSectionBeforeHierarchy() {
+            val output = formatter.format(voteWindow().tree, "com.example.app", ".Main", defaultScreenInfo)
+
+            assertTrue(
+                output.contains(
+                    "node_share\t-\tShare\t-\t-\t0,0,100,100\toff,clk\nNodes with actions:\n\n" +
+                        "* node_bar: Upvote¦Downvote\n* node_share: Share post\nhierarchy:\n",
+                ),
+            )
+        }
+
+        @Test
+        @DisplayName("a page lists only the actions of its own nodes, and a page without any has no section")
+        fun pageListsOnlyItsOwnNodes() {
+            val leaves =
+                List(250) { i ->
+                    makeNode(
+                        id = "node_leaf_$i",
+                        text = "Leaf $i",
+                        visible = true,
+                        actions = if (i == 0) listOf("Upvote") else emptyList(),
+                    )
+                }
+            val result =
+                PaginationTestTrees.result(
+                    WindowData(
+                        windowId = 1,
+                        windowType = "APPLICATION",
+                        tree = makeNode(id = "node_root", visible = true, children = leaves),
+                    ),
+                )
+            val snapshot = ScreenStateSnapshot("snap1", result, defaultScreenInfo, 250, 2)
+
+            val page1 = formatter.formatMultiWindowPage(snapshot, 1)
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertTrue(page1.contains("node_leaf_199\t-\tLeaf 199\t-\t-\t0,0,100,100\ton\nNodes with actions:\n\n"))
+            assertTrue(page1.contains("\n* node_leaf_0: Upvote\nhierarchy:\n"))
+            assertFalse(page2.contains(CompactTreeFormatter.ACTIONS_HEADER))
+        }
+
+        @Test
+        @DisplayName("a page's section holds the page's action nodes only")
+        fun pageSectionHoldsPageNodesOnly() {
+            val leaves =
+                List(250) { i ->
+                    makeNode(
+                        id = "node_leaf_$i",
+                        text = "Leaf $i",
+                        visible = true,
+                        actions = if (i == 0 || i == 240) listOf("Action $i") else emptyList(),
+                    )
+                }
+            val result =
+                PaginationTestTrees.result(
+                    WindowData(
+                        windowId = 1,
+                        windowType = "APPLICATION",
+                        tree = makeNode(id = "node_root", visible = true, children = leaves),
+                    ),
+                )
+            val snapshot = ScreenStateSnapshot("snap1", result, defaultScreenInfo, 250, 2)
+
+            val page1 = formatter.formatMultiWindowPage(snapshot, 1)
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertTrue(page1.contains("* node_leaf_0: Action 0"))
+            assertFalse(page1.contains("* node_leaf_240"))
+            assertTrue(page2.contains("Nodes with actions:\n\n* node_leaf_240: Action 240\nhierarchy:\n"))
+            assertFalse(page2.contains("* node_leaf_0"))
+        }
     }
 }

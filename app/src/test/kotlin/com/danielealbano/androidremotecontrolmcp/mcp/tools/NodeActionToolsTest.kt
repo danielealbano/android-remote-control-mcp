@@ -4,8 +4,12 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.danielealbano.androidremotecontrolmcp.data.model.PlaceholderFormat
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PiiCategory
+import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -38,6 +42,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -1580,6 +1585,214 @@ class NodeActionToolsTest {
                     mockActionExecutor.scrollNode("node_list", ScrollDirection.DOWN, any())
                     mockActionExecutor.scrollNode("node_list_moved", ScrollDirection.DOWN, any())
                 }
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // perform_node_action
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PerformNodeActionTool")
+    inner class PerformNodeActionToolTests {
+        private val voteBar =
+            AccessibilityNodeData(
+                id = "node_bar",
+                contentDescription = "349 votes",
+                bounds = BoundsData(0, 500, 1080, 600),
+                visible = true,
+                actions = listOf("Upvote", "Downvote"),
+            )
+        private val title = leaf("node_title", "Post title", visible = true)
+        private val tree = screenWith(title, voteBar)
+
+        private fun toolWith(
+            gate: PrivacyToolGate = PrivacyToolTestDoubles.passthroughGate(),
+            substitutor: PlaceholderSubstitutor = PrivacyToolTestDoubles.identitySubstitutor(),
+        ) = PerformNodeActionTool(
+            mockTreeParser,
+            mockActionExecutor,
+            mockAccessibilityServiceProvider,
+            mockNodeCache,
+            NodeTargetResolver(realFinder, gate, substitutor),
+            gate,
+        )
+
+        private fun params(
+            nodeId: String,
+            action: String,
+        ) = buildJsonObject {
+            put("node_id", nodeId)
+            put("action", action)
+        }
+
+        @Test
+        fun `performs the action by its label and reports it`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Downvote")
+                } returns Result.success(Unit)
+
+                val result = toolWith().execute(params("node_bar", "Downvote"))
+
+                assertEquals("Action 'Downvote' performed on node 'node_bar'", extractTextContent(result))
+                assertNotEquals(true, result.isError)
+            }
+
+        @Test
+        fun `targets the node by a selector like click_node`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.success(Unit)
+                val bySelector =
+                    buildJsonObject {
+                        put("by", "content_desc")
+                        put("value", "349 votes")
+                        put("action", "Upvote")
+                    }
+
+                val text = extractTextContent(toolWith().execute(bySelector))
+
+                assertEquals("Action 'Upvote' performed on node 'node_bar'", text)
+            }
+
+        @Test
+        fun `an unknown node_id is node not found before any matching`() =
+            runTest {
+                treesInOrder(tree)
+
+                val e =
+                    assertThrows<McpToolException.NodeNotFound> { toolWith().execute(params("node_gone", "Upvote")) }
+
+                assertEquals("Node 'node_gone' not found", e.message)
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a label the node does not list returns an untrusted error listing its labels, case-sensitively`() =
+            runTest {
+                treesInOrder(tree)
+
+                val result = toolWith().execute(params("node_bar", "upvote"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
+                assertTrue(
+                    text.endsWith(
+                        "Node 'node_bar' has no action with that label (case-sensitive). Its actions: Upvote¦Downvote",
+                    ),
+                    text,
+                )
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a node without labelled actions says so`() =
+            runTest {
+                treesInOrder(tree)
+
+                val result = toolWith().execute(params("node_title", "Upvote"))
+
+                assertEquals(true, result.isError)
+                assertTrue(extractTextContent(result).endsWith("Node 'node_title' has no labelled actions"))
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `with Privacy Mode the label is matched as shown, unreversed, and the first unredacted match runs`() =
+            runTest {
+                val contacts =
+                    voteBar.copy(id = "node_contacts", actions = listOf("Call Alice", "Call Bob", "Share"))
+                val contactsTree = screenWith(contacts)
+                treesInOrder(contactsTree)
+                val gate = mockk<PrivacyToolGate>()
+                val batch = slot<List<Pair<String?, String>>>()
+                coEvery { gate.nodeTexts(windowsOf(contactsTree), capture(batch)) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { (text, _) ->
+                        text?.replace(Regex("Alice|Bob"), "[NAME_1]")
+                    }
+                }
+                // The store resolves [NAME_1], so a tool that reversed the placeholder would look for "Call Alice".
+                val store = PseudonymStore()
+                store.placeholderFor("Alice", PiiCategory.NAMES, PlaceholderFormat.NUMBERED)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_contacts", windowsOf(contactsTree), "Call Alice")
+                } returns Result.success(Unit)
+
+                val tool = toolWith(gate, PlaceholderSubstitutor(store))
+
+                val result = tool.execute(params("node_contacts", "Call [NAME_1]"))
+
+                assertEquals("Action 'Call [NAME_1]' performed on node 'node_contacts'", extractTextContent(result))
+                assertEquals(
+                    listOf("Call Alice" to "node_contacts", "Call Bob" to "node_contacts", "Share" to "node_contacts"),
+                    batch.captured,
+                )
+                coVerify(exactly = 1) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a missing, empty or non-string action is invalid params`() =
+            runTest {
+                treesInOrder(tree)
+                val tool = toolWith()
+
+                assertThrows<McpToolException.InvalidParams> {
+                    tool.execute(buildJsonObject { put("node_id", "node_bar") })
+                }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params("node_bar", "")) }
+                assertThrows<McpToolException.InvalidParams> {
+                    tool.execute(
+                        buildJsonObject {
+                            put("node_id", "node_bar")
+                            put("action", 7)
+                        },
+                    )
+                }
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a label gone from the live node reports the executor's label-free message`() =
+            runTest {
+                treesInOrder(tree)
+                val gone = "Node 'node_bar' no longer offers the requested action; read the screen again"
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.failure(IllegalStateException(gone))
+
+                val e =
+                    assertThrows<McpToolException.ActionFailed> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                assertEquals(gone, e.message)
+            }
+
+        @Test
+        fun `an action the app refuses is action failed with the executor's text`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.failure(IllegalStateException("Action failed on node 'node_bar'"))
+
+                val e =
+                    assertThrows<McpToolException.ActionFailed> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                assertEquals("Action failed on node 'node_bar'", e.message)
+            }
+
+        @Test
+        fun `accessibility not ready is permission denied and performs nothing`() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns false
+
+                assertThrows<McpToolException.PermissionDenied> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
             }
     }
 }

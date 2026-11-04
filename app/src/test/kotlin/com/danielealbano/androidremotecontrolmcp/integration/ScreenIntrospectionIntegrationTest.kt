@@ -247,6 +247,39 @@ class ScreenIntrospectionIntegrationTest {
         }
 
     @Test
+    fun `get_screen_state lists a node shown only for its labelled actions under Nodes with actions`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            val voteBar =
+                AccessibilityNodeData(
+                    id = "node_bar",
+                    className = "android.view.View",
+                    bounds = BoundsData(0, 500, 1080, 600),
+                    visible = true,
+                    enabled = true,
+                    actions = listOf("Upvote", "Downvote"),
+                )
+            McpIntegrationTestHelper.setupMultiWindowMock(
+                deps = deps,
+                tree = sampleTree.copy(children = sampleTree.children + voteBar),
+                screenInfo = sampleScreenInfo,
+                packageName = "com.example.app",
+                activityName = ".MainActivity",
+            )
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result = client.callTool(name = "android_get_screen_state", arguments = emptyMap())
+                assertNotEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("\nnode_bar\tView\t-\t-\t-\t0,500,1080,600\ton,ena\n"), text)
+                assertTrue(
+                    text.contains("\nNodes with actions:\n\n* node_bar: Upvote¦Downvote\nhierarchy:\n"),
+                    text,
+                )
+            }
+        }
+
+    @Test
     fun `get_screen_state without screenshot does not call captureScreenshot`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()

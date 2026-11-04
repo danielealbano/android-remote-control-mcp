@@ -24,6 +24,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
 import io.mockk.verifyOrder
@@ -486,6 +487,36 @@ class ScreenIntrospectionToolsTest {
                 assertEquals(2, result.content.size)
                 verify(exactly = 0) { mockScreenshotAnnotator.annotate(any(), any(), any(), any()) }
                 verify { mockScreenshotEncoder.bitmapToScreenshotData(captured, ScreenCaptureProvider.DEFAULT_QUALITY) }
+            }
+
+        @Test
+        @DisplayName("a visible node listed only for its labelled actions is annotated on the screenshot")
+        fun actionOnlyNodeIsAnnotated() =
+            runTest {
+                setupReadyService()
+                stubScreenshot()
+                val voteBar =
+                    AccessibilityNodeData(
+                        id = "node_bar",
+                        bounds = BoundsData(0, 500, 1080, 600),
+                        visible = true,
+                        actions = listOf("Upvote", "Downvote"),
+                    )
+                every {
+                    mockTreeParser.parseTree(mockRootNode, "root_w0", any())
+                } returns sampleTree.copy(children = sampleTree.children + voteBar)
+                val realFormatter = CompactTreeFormatter()
+                every { mockCompactTreeFormatter.shouldKeepNode(any()) } answers {
+                    realFormatter.shouldKeepNode(firstArg())
+                }
+                val annotated = slot<List<AccessibilityNodeData>>()
+                every {
+                    mockScreenshotAnnotator.annotate(any(), capture(annotated), any(), any())
+                } returns mockk(relaxed = true)
+
+                handler.execute(buildJsonObject { put("include_screenshot", true) })
+
+                assertEquals(listOf("node_btn", "node_bar"), annotated.captured.map { it.id })
             }
 
         @Test
