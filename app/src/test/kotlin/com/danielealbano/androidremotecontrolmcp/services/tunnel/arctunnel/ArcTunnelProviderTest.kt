@@ -265,7 +265,11 @@ class ArcTunnelProviderTest {
     @Test
     fun `a phone with no identity never asks the status page`() =
         runBlocking {
-            coEvery { enrollment.readyIdentity(any()) } returns null
+            // Slow enough that a watcher started before the identity read would have asked by then.
+            coEvery { enrollment.readyIdentity(any()) } coAnswers {
+                delay(NOTHING_ASKED_MS)
+                null
+            }
             provider.bind(host)
 
             provider.start(LOCAL_PORT, publicService)
