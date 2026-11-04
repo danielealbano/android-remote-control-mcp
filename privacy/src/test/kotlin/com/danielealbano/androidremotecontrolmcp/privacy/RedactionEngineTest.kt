@@ -206,7 +206,10 @@ class RedactionEngineTest {
 
             val processed = engine.redactTree(tree(root), config)
 
-            val children = processed.result.windows.single().tree.children
+            val children =
+                processed.result.windows
+                    .single()
+                    .tree.children
             assertEquals(listOf("Mail [EMAIL_1]", "Upvote", "Mail [EMAIL_2]"), children[0].actions)
             assertEquals(listOf("Share post"), children[1].actions)
             assertEquals(listOf(barBounds), processed.flaggedBounds)

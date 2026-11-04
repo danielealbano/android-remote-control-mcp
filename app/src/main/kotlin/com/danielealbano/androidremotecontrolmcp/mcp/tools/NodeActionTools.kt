@@ -314,9 +314,21 @@ class PerformNodeActionTool
             // One slot per label, in order, so the matched position is also that of the unredacted label.
             val shown = privacyToolGate.nodeTexts(multiWindowResult.windows, node.actions.map { it to nodeId })
             val index = shown.indexOf(action)
-            if (index < 0) return noMatchResult(nodeId, shown)
+            return if (index < 0) {
+                noMatchResult(nodeId, shown)
+            } else {
+                perform(nodeId, multiWindowResult.windows, node.actions[index], action)
+            }
+        }
 
-            val result = actionExecutor.performLabelledAction(nodeId, multiWindowResult.windows, node.actions[index])
+        /** Runs the action listed as [label] (unredacted) of the node [nodeId], reporting it as [action]. */
+        private suspend fun perform(
+            nodeId: String,
+            windows: List<WindowData>,
+            label: String,
+            action: String,
+        ): CallToolResult {
+            val result = actionExecutor.performLabelledAction(nodeId, windows, label)
             result.onFailure { e -> mapNodeActionException(e, nodeId) }
 
             Log.d(TAG, "perform_node_action: nodeId=$nodeId succeeded")

@@ -70,6 +70,8 @@ object NodeActionLabels {
             ?.trim()
             ?.ifEmpty { null }
 
-    private fun listedLabel(action: AccessibilityAction): String? =
-        if (action.id in EXCLUDED_IDS) null else sanitize(action.label)
+    private fun listedLabel(action: AccessibilityAction): String? {
+        if (action.id in EXCLUDED_IDS) return null
+        return sanitize(action.label)
+    }
 }

@@ -81,7 +81,9 @@ class RedactionEngine
                 val ref = refs[index]
                 when (ref.field) {
                     Field.TEXT -> byNode.text[ref.nodeId] = value
+
                     Field.DESCRIPTION -> byNode.description[ref.nodeId] = value
+
                     // A node's labels are collected one after the other, in order, so appending keeps their order.
                     Field.ACTION -> byNode.actions.getOrPut(ref.nodeId) { ArrayList() }.add(value)
                 }
