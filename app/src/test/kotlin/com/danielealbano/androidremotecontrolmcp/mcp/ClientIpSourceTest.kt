@@ -109,7 +109,17 @@ class ClientIpSourceTest {
     @DisplayName("a forwarded value that is not an IP literal is ignored")
     fun textIsNotAnAddress() {
         assertEquals(LOOPBACK, call(ClientIpSource.NGROK, xForwardedFor = listOf("Verified, safe")).clientIp())
-        for (text in listOf("Verified, safe", "cafe", "dead.beef", "..", "::::", "999.1.1.1", "1.2.3.4:5678")) {
+        for (text in listOf(
+            "Verified, safe",
+            "cafe",
+            "dead.beef",
+            "..",
+            "::::",
+            "999.1.1.1",
+            "1.2.3.4:5678",
+            "::1%Verified by Google",
+            "[::1]",
+        )) {
             assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = text).clientIp(), text)
         }
     }

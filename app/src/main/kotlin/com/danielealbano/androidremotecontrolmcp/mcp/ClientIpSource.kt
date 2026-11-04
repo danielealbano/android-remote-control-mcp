@@ -45,6 +45,7 @@ enum class ClientIpSource {
 internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
 private const val IPV4_LOOPBACK_PREFIX = "127."
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
+private const val NON_LITERAL_CHARS = "%[]"
 
 /** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
 fun Application.markClientIpSource(source: ClientIpSource) {
@@ -73,7 +74,11 @@ private fun forwardedAddress(
         ClientIpSource.UNKNOWN, ClientIpSource.SOCKET_PEER -> null
         ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
-    }?.trim()?.takeIf { NetUtil.isValidIpV4Address(it) || NetUtil.isValidIpV6Address(it) }
+    }?.trim()?.takeIf { isIpLiteral(it) }
+
+/** `NetUtil` stops reading at a `%` and accepts brackets, so anything could follow a valid start without this check. */
+private fun isIpLiteral(value: String): Boolean =
+    value.none { it in NON_LITERAL_CHARS } && (NetUtil.isValidIpV4Address(value) || NetUtil.isValidIpV6Address(value))
 
 private fun isLoopback(address: String): Boolean {
     val host = address.substringBefore('%')
