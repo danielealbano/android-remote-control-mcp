@@ -30,6 +30,18 @@ class TunnelClientAddressesTest {
         assertNull(addresses.clientIpOf(PORT))
     }
 
+    @Test
+    fun `closing an old hold leaves a newer one for the same client alone`() {
+        val old = addresses.hold(PORT, FIRST)
+        val reused = addresses.hold(PORT, FIRST)
+
+        old.close()
+        assertEquals(FIRST, addresses.clientIpOf(PORT))
+
+        reused.close()
+        assertNull(addresses.clientIpOf(PORT))
+    }
+
     private companion object {
         const val PORT = 52144
         const val FIRST = "198.51.100.7"
