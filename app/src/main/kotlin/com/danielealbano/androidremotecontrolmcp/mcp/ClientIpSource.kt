@@ -34,11 +34,17 @@ enum class ClientIpSource {
     companion object {
         /** The source for a plain HTTP listener, the only kind a Cloudflare or ngrok tunnel forwards to. */
         fun of(config: ServerConfig): ClientIpSource =
-            when {
-                !config.tunnelEnabled -> SOCKET_PEER
-                config.tunnelProvider == TunnelProviderType.CLOUDFLARE -> CLOUDFLARE
-                config.tunnelProvider == TunnelProviderType.NGROK -> NGROK
-                else -> SOCKET_PEER
+            if (!config.tunnelEnabled) {
+                SOCKET_PEER
+            } else {
+                when (config.tunnelProvider) {
+                    // The free tunnel has its own listener, so this one only sees direct clients.
+                    TunnelProviderType.ARC_TUNNEL -> SOCKET_PEER
+
+                    TunnelProviderType.CLOUDFLARE -> CLOUDFLARE
+
+                    TunnelProviderType.NGROK -> NGROK
+                }
             }
     }
 }
@@ -47,6 +53,7 @@ internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
 internal val TunnelClientIpKey = AttributeKey<String>("TunnelClientIp")
 private const val IPV4_LOOPBACK_PREFIX = "127."
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
+private const val NON_LITERAL_CHARS = "%[]"
 
 /** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
 fun Application.markClientIpSource(source: ClientIpSource) {
@@ -82,7 +89,11 @@ private fun forwardedAddress(
         ClientIpSource.FREE_TUNNEL, ClientIpSource.SOCKET_PEER -> null
         ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
-    }?.trim()?.takeIf { NetUtil.isValidIpV4Address(it) || NetUtil.isValidIpV6Address(it) }
+    }?.trim()?.takeIf { isIpLiteral(it) }
+
+/** `NetUtil` stops reading an IPv6 address at a `%`, so any text could follow it, and accepts one in brackets. */
+private fun isIpLiteral(value: String): Boolean =
+    value.none { it in NON_LITERAL_CHARS } && (NetUtil.isValidIpV4Address(value) || NetUtil.isValidIpV6Address(value))
 
 private fun isLoopback(address: String): Boolean {
     val host = address.substringBefore('%')
