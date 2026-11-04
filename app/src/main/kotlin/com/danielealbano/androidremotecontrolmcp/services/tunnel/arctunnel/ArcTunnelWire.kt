@@ -6,8 +6,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private const val MAX_PORT = 65535
-private val BRACKETED_HOST_PORT = Regex("""\[([^\[\]]+)]:(\d{1,5})""")
-private val PLAIN_HOST_PORT = Regex("""([^:\[\]]+):(\d{1,5})""")
+
+// [0-9], not \d: on Android \d also matches digits of other scripts, and toInt() throws on some of them.
+private val BRACKETED_HOST_PORT = Regex("""\[([^\[\]]+)]:([0-9]{1,5})""")
+private val PLAIN_HOST_PORT = Regex("""([^:\[\]]+):([0-9]{1,5})""")
 
 val ArcTunnelJson: Json =
     Json {

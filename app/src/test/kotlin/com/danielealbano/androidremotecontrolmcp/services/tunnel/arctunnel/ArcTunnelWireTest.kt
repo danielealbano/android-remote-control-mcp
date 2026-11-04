@@ -65,6 +65,7 @@ class ArcTunnelWireTest {
             "[::1]:",
             "%:1",
             "198.51.100.7:123456",
+            "[%eth0]:5",
         ],
     )
     fun `OpenPayload clientIp refuses a malformed client_addr`(clientAddr: String) {
