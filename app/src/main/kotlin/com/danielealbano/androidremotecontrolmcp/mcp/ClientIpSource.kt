@@ -76,7 +76,7 @@ private fun forwardedAddress(
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
     }?.trim()?.takeIf { isIpLiteral(it) }
 
-/** `NetUtil` stops reading at a `%` and accepts brackets, so anything could follow a valid start without this check. */
+/** `NetUtil` stops reading an IPv6 address at a `%`, so any text could follow it, and accepts one in brackets. */
 private fun isIpLiteral(value: String): Boolean =
     value.none { it in NON_LITERAL_CHARS } && (NetUtil.isValidIpV4Address(value) || NetUtil.isValidIpV6Address(value))
 
