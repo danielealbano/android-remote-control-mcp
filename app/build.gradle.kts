@@ -606,7 +606,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         }
 
     classDirectories.setFrom(debugTree)
-    sourceDirectories.setFrom(files("src/main/kotlin", "src/gms/kotlin", "src/debug/kotlin"))
+    sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin", "src/gms/kotlin", "src/debug/kotlin"))
     executionData.setFrom(
         fileTree(layout.buildDirectory) {
             include("jacoco/testGmsDebugUnitTest.exec")

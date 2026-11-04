@@ -218,13 +218,54 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
 
-        val body =
-            okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), PROTECTED_RESOURCE).use {
-                assertEquals(Protocol.HTTP_2, it.protocol)
-                it.body.string()
-            }
+        val body = http2Body(port, PROTECTED_RESOURCE)
 
         assertTrue(body.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), body)
+    }
+
+    /** What a public client sends through the tunnel on port 443: an authority with no port. */
+    @Test
+    fun `an HTTP-2 authority with no port gives URLs with no port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, PUBLIC_HOST)
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), metadata)
+        assertTrue(metadata.contains("\"authorization_servers\":[\"https://$PUBLIC_HOST\"]"), metadata)
+    }
+
+    @Test
+    fun `an HTTP-2 authority naming port 443 gives URLs with no port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, "$PUBLIC_HOST:$HTTPS_DEFAULT_PORT")
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), metadata)
+    }
+
+    @Test
+    fun `an HTTP-2 authority with a port keeps that port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, "$PUBLIC_HOST:$PUBLIC_PORT")
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST:$PUBLIC_PORT/mcp\""), metadata)
+    }
+
+    @Test
+    fun `HTTP-1-1 and HTTP-2 give the same URLs for the same host`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        for (host in listOf(PUBLIC_HOST, "$PUBLIC_HOST:$PUBLIC_PORT", "$LOOPBACK:$port")) {
+            val overHttp1 =
+                okHttpGet(port, listOf(Protocol.HTTP_1_1), PROTECTED_RESOURCE, host).use { it.body.string() }
+
+            assertEquals(overHttp1, http2Body(port, PROTECTED_RESOURCE, host), host)
+        }
     }
 
     @Test
@@ -262,6 +303,7 @@ class McpServerTunnelListenerTest {
         port: Int,
         protocols: List<Protocol>,
         path: String,
+        publicHost: String? = null,
     ): Response {
         val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
         val client =
@@ -275,9 +317,22 @@ class McpServerTunnelListenerTest {
             Request
                 .Builder()
                 .url("https://$LOOPBACK:$port$path")
+                // OkHttp sends this as `Host` over HTTP/1.1 and as `:authority` over HTTP/2.
+                .apply { publicHost?.let { header("Host", it) } }
                 .build()
         return client.newCall(request).execute()
     }
+
+    /** The body of a GET that really went over HTTP/2, so `:authority` is what the server read. */
+    private fun http2Body(
+        port: Int,
+        path: String,
+        publicHost: String? = null,
+    ): String =
+        okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), path, publicHost).use {
+            assertEquals(Protocol.HTTP_2, it.protocol)
+            it.body.string()
+        }
 
     /** One HTTP/1.1 GET over a TLS socket that offers no ALPN; returns the raw response. */
     private fun rawGet(
@@ -349,6 +404,9 @@ class McpServerTunnelListenerTest {
     }
 
     private companion object {
+        const val PUBLIC_HOST = "name.d.tunnel.example"
+        const val PUBLIC_PORT = 8443
+        const val HTTPS_DEFAULT_PORT = 443
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50
         const val TIMEOUT_MS = 5_000

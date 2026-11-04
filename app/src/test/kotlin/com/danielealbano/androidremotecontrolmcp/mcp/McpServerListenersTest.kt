@@ -8,6 +8,7 @@ import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
@@ -47,12 +48,14 @@ class McpServerListenersTest {
     private fun start(
         localhostTunnelPort: Int?,
         https: Boolean = false,
-    ): McpServer = newServer(localhostTunnelPort, https).also { it.start() }
+        oauth: Boolean = false,
+    ): McpServer = newServer(localhostTunnelPort, https, oauth = oauth).also { it.start() }
 
     private fun newServer(
         localhostTunnelPort: Int?,
         https: Boolean = false,
         specificAddress: String? = null,
+        oauth: Boolean = false,
     ): McpServer {
         val config =
             ServerConfig(
@@ -61,7 +64,7 @@ class McpServerListenersTest {
                 specificBindAddress = specificAddress.orEmpty(),
                 bearerToken = TOKEN,
                 bearerTokenEnabled = true,
-                oauthEnabled = false,
+                oauthEnabled = oauth,
                 httpsEnabled = https,
             )
         return McpServer(
@@ -191,6 +194,57 @@ class McpServerListenersTest {
         assertTrue(NetworkUtils.isPortAvailable(tunnelPort, LOOPBACK))
     }
 
+    /** A router forwarding public port 443 to the phone's HTTPS port: the client names no port. */
+    @Test
+    fun `an HTTPS main listener gives URLs with no port to a host with no port, on both HTTP versions`() {
+        start(localhostTunnelPort = null, https = true, oauth = true)
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val metadata = httpsMetadata(protocol, PUBLIC_HOST)
+
+            assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), "$protocol: $metadata")
+        }
+    }
+
+    /** A client connecting directly names the port, here the listener's own, and needs it back. */
+    @Test
+    fun `an HTTPS main listener keeps a port the client names, on both HTTP versions`() {
+        start(localhostTunnelPort = null, https = true, oauth = true)
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val metadata = httpsMetadata(protocol, "$LAN_ADDRESS:$mainPort")
+
+            assertTrue(
+                metadata.contains("\"resource\":\"https://$LAN_ADDRESS:$mainPort/mcp\""),
+                "$protocol: $metadata",
+            )
+        }
+    }
+
+    /** OkHttp sends the host as `Host` over HTTP/1.1 and as `:authority` over HTTP/2. */
+    private fun httpsMetadata(
+        protocol: Protocol,
+        host: String,
+    ): String {
+        val trusting = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val httpsClient =
+            client
+                .newBuilder()
+                .sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager)
+                .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$mainPort/.well-known/oauth-protected-resource")
+                .header("Host", host)
+                .build()
+        return httpsClient.newCall(request).execute().use {
+            assertEquals(protocol, it.protocol)
+            it.body.string()
+        }
+    }
+
     private fun status(
         httpClient: OkHttpClient,
         url: String,
@@ -227,6 +281,8 @@ class McpServerListenersTest {
     private companion object {
         const val LOOPBACK = "127.0.0.1"
         const val IPV6_LOOPBACK = "::1"
+        const val PUBLIC_HOST = "myphone.ddns.example"
+        const val LAN_ADDRESS = "192.168.1.5"
         const val BACKLOG = 50
         const val STOP_TIMEOUT_MS = 1_000L
         const val TOKEN = "listener-test-token"
