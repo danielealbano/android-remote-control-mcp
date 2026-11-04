@@ -51,7 +51,7 @@ class ArcTunnelServiceStatusTest {
     private fun status() = ArcTunnelServiceStatusImpl(server.url("/index.json").toString(), Dispatchers.IO) { nowMs }
 
     @Test
-    fun `it reads the public status page`() {
+    fun `the status page addresses are the public ones`() {
         assertEquals("https://status.arc-tunnel.io/", ArcTunnelStatusPage.PAGE_URL)
         assertEquals("https://status.arc-tunnel.io/index.json", ArcTunnelStatusPage.JSON_URL)
     }

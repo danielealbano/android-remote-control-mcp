@@ -113,6 +113,7 @@ class SettingsRepositoryImplTest {
                 assertEquals("", config.ngrokAuthtoken)
                 assertEquals("", config.ngrokDomain)
                 assertEquals("", config.deviceSlug)
+                assertTrue(config.arcTunnelStatusCheckEnabled)
             }
 
         @Test
