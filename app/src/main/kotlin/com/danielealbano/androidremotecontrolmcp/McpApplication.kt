@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppIconCache
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlertsImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateCheckScheduler
 import com.danielealbano.androidremotecontrolmcp.startup.runFlavorStartupMigrations
 import dagger.hilt.android.HiltAndroidApp
@@ -46,6 +47,7 @@ class McpApplication :
         // on a background coroutine (non-blocking — must never stall onCreate). No-op in foss.
         runFlavorStartupMigrations(this)
         createNotificationChannels()
+        ArcTunnelServiceAlertsImpl.clearLeftover(this)
         configureOsmdroid()
         appIconCache.preload()
         // Apply the one-time auth-model migration eagerly so the UI Flow reflects the migrated model
@@ -108,7 +110,9 @@ class McpApplication :
                 ARC_TUNNEL_STATUS_CHANNEL_ID,
                 getString(R.string.notification_channel_arc_tunnel_status_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
-            ),
+            ).apply {
+                description = "Alert when the free E2E tunnel service reports a problem"
+            },
         )
         notificationManager.createNotificationChannel(updateChannel)
         notificationManager.createNotificationChannel(arcTunnelAlertChannel)

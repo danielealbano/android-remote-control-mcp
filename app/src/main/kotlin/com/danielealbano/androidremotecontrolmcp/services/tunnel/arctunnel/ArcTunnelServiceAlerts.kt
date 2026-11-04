@@ -32,7 +32,9 @@ class ArcTunnelServiceAlertsImpl
         override fun show(problem: ArcTunnelServiceProblem) {
             val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
             if (permission != PackageManager.PERMISSION_GRANTED) return
-            val statusPage = Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL))
+            val statusPage =
+                Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val pendingIntent =
                 PendingIntent.getActivity(
                     context,
@@ -71,8 +73,13 @@ class ArcTunnelServiceAlertsImpl
                 )
             }
 
-        private companion object {
-            const val NOTIFICATION_ID = 1007
-            const val REQUEST_CODE = 7
+        companion object {
+            /** Only a running tunnel session keeps it up, so a new process removes what a dead one left behind. */
+            fun clearLeftover(context: Context) {
+                NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+            }
+
+            private const val NOTIFICATION_ID = 1007
+            private const val REQUEST_CODE = 7
         }
     }

@@ -1,18 +1,25 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.util.concurrent.TimeUnit
 
 @DisplayName("Tunnel service status")
 class ArcTunnelServiceStatusTest {
@@ -212,22 +219,50 @@ class ArcTunnelServiceStatusTest {
         }
 
     @Test
-    fun `a cancellation still cancels`() {
-        val failure =
-            runCatching {
-                runBlocking {
-                    server.enqueue(MockResponse.Builder().body(page()).build())
-                    val status = status()
-                    coroutineContext[kotlinx.coroutines.Job]?.cancel()
-                    status.currentProblem()
-                }
-            }.exceptionOrNull()
+    fun `callers at the same time make one request and get the same answer`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(page())
+                    .headersDelay(SLOW_RESPONSE_MS, TimeUnit.MILLISECONDS)
+                    .build(),
+            )
+            val status = status()
 
-        assertEquals(true, failure is CancellationException)
-    }
+            val answers = List(CALLERS) { async(Dispatchers.IO) { status.currentProblem() } }.awaitAll()
+
+            assertEquals(List(CALLERS) { ArcTunnelServiceProblem("degraded", listOf("Tunnels")) }, answers)
+            assertEquals(1, server.requestCount)
+        }
+
+    @Test
+    fun `cancelling ends the request at once, and it still counts towards the limit`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(page())
+                    .headersDelay(NEVER_ANSWERS_S, TimeUnit.SECONDS)
+                    .build(),
+            )
+            val status = status()
+            val job = launch(Dispatchers.IO) { status.currentProblem() }
+            withContext(Dispatchers.IO) { server.takeRequest() }
+
+            withTimeout(CANCEL_BUDGET_MS) { job.cancelAndJoin() }
+
+            assertTrue(job.isCancelled)
+            assertNull(status.currentProblem())
+            assertEquals(1, server.requestCount)
+        }
 
     private companion object {
         const val START_MS = 1_000L
+        const val CALLERS = 4
+        const val SLOW_RESPONSE_MS = 200L
+        const val NEVER_ANSWERS_S = 5L
+        const val CANCEL_BUDGET_MS = 2_000L
         const val HTTP_ERROR = 503
         const val TOO_LARGE = 1_100_000
     }

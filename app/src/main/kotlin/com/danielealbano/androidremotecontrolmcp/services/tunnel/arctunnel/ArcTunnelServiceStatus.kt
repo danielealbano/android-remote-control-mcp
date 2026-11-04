@@ -5,16 +5,24 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resumeWithException
 
 /** What the public status page of the free E2E tunnel reports when it is not operational. */
 data class ArcTunnelServiceProblem(
@@ -26,8 +34,9 @@ data class ArcTunnelServiceProblem(
 /** The state of the free E2E tunnel service, from its public status page. */
 interface ArcTunnelServiceStatus {
     /**
-     * The reported problem, or null when there is none or anything prevents knowing. The page is asked at most once per
-     * [ArcTunnelStatusPage.CHECK_INTERVAL_MS]; until then the last answer stands. Never throws, except to cancel.
+     * The reported problem, or null when there is none or anything prevents knowing. A process asks the page at most
+     * once per [ArcTunnelStatusPage.CHECK_INTERVAL_MS]; until then the last answer stands. Never throws, except to
+     * cancel.
      */
     suspend fun currentProblem(): ArcTunnelServiceProblem?
 }
@@ -96,32 +105,59 @@ class ArcTunnelServiceStatusImpl internal constructor(
     )
 
     private val client by lazy { OkHttpClient.Builder().callTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS).build() }
+    private val mutex = Mutex()
 
-    @Volatile
+    /** Lives as long as the process: a new process asks again. */
     private var lastCheck: Check? = null
 
     override suspend fun currentProblem(): ArcTunnelServiceProblem? =
         withContext(ioDispatcher) {
-            val last = lastCheck
-            if (last != null && nowMs() - last.atMs < ArcTunnelStatusPage.CHECK_INTERVAL_MS) {
-                last.problem
-            } else {
-                check().also { lastCheck = Check(nowMs(), it) }
+            mutex.withLock {
+                val last = lastCheck
+                if (last != null && nowMs() - last.atMs < ArcTunnelStatusPage.CHECK_INTERVAL_MS) {
+                    last.problem
+                } else {
+                    // Before asking, so a request cancelled half way counts towards the limit too.
+                    lastCheck = Check(nowMs(), last?.problem)
+                    check().also { lastCheck = Check(nowMs(), it) }
+                }
             }
         }
 
-    private fun check(): ArcTunnelServiceProblem? =
+    private suspend fun check(): ArcTunnelServiceProblem? =
         runCatching { ArcTunnelStatusPage.parseProblem(fetch()) }
             .onFailure {
                 if (it is CancellationException) throw it
                 Log.d(TAG, "Tunnel status check failed: ${it.javaClass.simpleName}")
             }.getOrNull()
 
-    private fun fetch(): String =
-        client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-            check(response.isSuccessful) { "HTTP ${response.code}" }
-            response.peekBody(MAX_BODY_BYTES).string()
+    private suspend fun fetch(): String =
+        suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(Request.Builder().url(url).build())
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(
+                        call: Call,
+                        e: IOException,
+                    ) {
+                        continuation.resumeWithException(e)
+                    }
+
+                    override fun onResponse(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        continuation.resumeWith(runCatching { response.use { bodyOf(it) } })
+                    }
+                },
+            )
         }
+
+    private fun bodyOf(response: Response): String {
+        check(response.isSuccessful) { "HTTP ${response.code}" }
+        return response.peekBody(MAX_BODY_BYTES).string()
+    }
 
     private companion object {
         const val TAG = "MCP:ArcTunnelStatus"

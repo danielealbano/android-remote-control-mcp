@@ -448,6 +448,7 @@ adb shell am broadcast \
   --es tunnel_provider "android-remote-control-mcp-tunneld" \
   --es arc_tunnel_base_address "arc-tunnel.io" \
   --ez arc_tunnel_ct_check_enabled true \
+  --ez arc_tunnel_status_check_enabled true \
   --es cloudflare_tunnel_mode "TOKEN" \
   --es cloudflare_tunnel_token "your-cloudflare-tunnel-token" \
   --es cloudflare_tunnel_extra_args "--edge region1.v2.argotunnel.com:7844" \
@@ -491,7 +492,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `tunnel_provider` | string | `android-remote-control-mcp-tunneld` (free E2E tunnel), `CLOUDFLARE` or `NGROK` |
 | `arc_tunnel_base_address` | string | Base address of the free E2E tunnel service (default `arc-tunnel.io`; hosts `enroll.`, `connect.` and `d.` are derived) |
 | `arc_tunnel_ct_check_enabled` | boolean | Certificate Transparency check for the free E2E tunnel (default `true`) |
-| `arc_tunnel_status_check_enabled` | boolean | Status check of the public free E2E tunnel service, at most every 30 minutes while the server is running or the Server screen is open (default `true`) |
+| `arc_tunnel_status_check_enabled` | boolean | Status check of the public free E2E tunnel service, every 30 minutes while the server is running or the Server screen is open (default `true`) |
 | `arc_tunnel_enroll` | boolean | `true` enrolls the free E2E tunnel (or resumes a failed certificate issuance) with the settings in the same broadcast, while the app is visible and the server is stopped; headless, use the trampoline action `enroll-tunnel` below. The public URL appears in the Server tab |
 | `cloudflare_tunnel_mode` | string | `FREE` (Quick Tunnel, random `*.trycloudflare.com` URL) or `TOKEN` (named tunnel with static hostname) |
 | `cloudflare_tunnel_token` | string | Cloudflare named-tunnel token (used when `cloudflare_tunnel_mode` is `TOKEN`) |

@@ -77,11 +77,10 @@ class ArcTunnelViewModel
         val ctAlert: StateFlow<ArcTunnelCtAlert?> = ctAlerts.alert
 
         /**
-         * A problem reported by the status page of the public tunnel service. It only concerns a phone with a saved
-         * identity on that service, the free tunnel selected and this check left on. It is only refreshed while this is
-         * collected, so while the Server screen is visible: nothing polls in the background. A refresh reuses the last
-         * answer until [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that
-         * interval.
+         * A problem reported by the status page of the public tunnel service, for the Server screen. It only concerns a
+         * phone with a saved identity on that service, the free tunnel selected and this check left on. It is only
+         * refreshed while this is collected, so while that screen is visible. A refresh reuses the last answer until
+         * [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
         val serviceProblem: StateFlow<ArcTunnelServiceProblem?> =

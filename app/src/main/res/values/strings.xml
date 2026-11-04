@@ -316,7 +316,7 @@
     <string name="remote_access_arc_tunnel_url_label">Public URL</string>
     <string name="remote_access_arc_tunnel_status_link">Tunnel Status</string>
     <string name="remote_access_arc_tunnel_status_check_label">Tunnel service status check</string>
-    <string name="remote_access_arc_tunnel_status_check_description">Checks the public status page at most every 30 minutes while the server is running or the Server screen is open, and warns if the service reports a problem</string>
+    <string name="remote_access_arc_tunnel_status_check_description">Checks the public status page every 30 minutes while the server is running or the Server screen is open, and warns if the service reports a problem</string>
     <string name="remote_access_arc_tunnel_url_refresh">Get a new name</string>
     <string name="remote_access_arc_tunnel_set_up">Set up tunnel</string>
     <string name="remote_access_arc_tunnel_url_loading">Loading…</string>
