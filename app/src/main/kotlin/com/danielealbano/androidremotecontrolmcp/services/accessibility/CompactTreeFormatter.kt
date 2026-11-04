@@ -16,6 +16,8 @@ import javax.inject.Inject
  * - Line 6: `screen:<w>x<h> density:<dpi> orientation:<orientation>`
  * - Line 7: TSV header: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
  * - Lines 8+: one TSV row per kept node (flat, no depth)
+ * - When a kept node has labelled actions: `Nodes with actions:`, a blank line, then `* <node_id>: <label>¦<label>`
+ *   per such node (see [NodeActionLabels])
  * - Line N: `hierarchy:`
  * - Lines N+1+: one line per kept node, indented by 2 spaces per nesting depth
  *
@@ -27,6 +29,7 @@ import javax.inject.Inject
  * - is longClickable
  * - is scrollable
  * - is editable
+ * - has labelled actions
  *
  * Filtered nodes are skipped in output, but their children are still
  * walked and may appear if they independently pass the filter.
@@ -71,17 +74,22 @@ class CompactTreeFormatter
 
             // Lines 8+: walk tree and append kept nodes
             val hierarchySb = StringBuilder()
+            val listed = mutableListOf<AccessibilityNodeData>()
             walkTree(
                 tree,
                 visitors =
                     listOf(
-                        { node, _ -> appendElementRow(sb, node) },
+                        { node, _ ->
+                            appendElementRow(sb, node)
+                            listed.add(node)
+                        },
                         { node, depth ->
                             repeat(depth) { hierarchySb.append(HIERARCHY_INDENT) }
                             hierarchySb.appendLine(node.id)
                         },
                     ),
             )
+            appendActionsSection(sb, listed)
             sb.appendLine(HIERARCHY_HEADER)
             sb.append(hierarchySb)
 
@@ -132,8 +140,9 @@ class CompactTreeFormatter
          * Formats multi-window screen state as a compact string.
          *
          * Each window gets its own section with a header line containing window metadata,
-         * followed by a TSV column header and element rows, then its `hierarchy:` block unless
-         * [options] leaves it out. The default [options] give the full output.
+         * followed by a TSV column header and element rows, its actions section when a listed node
+         * has labelled actions, then its `hierarchy:` block unless [options] leaves it out. The
+         * default [options] give the full output.
          */
         fun formatMultiWindow(
             result: MultiWindowResult,
@@ -164,7 +173,11 @@ class CompactTreeFormatter
                 sb.appendLine(buildWindowHeader(windowData))
                 sb.appendLine(HEADER)
                 val hierarchySb = StringBuilder()
-                val rowVisitor: (AccessibilityNodeData, Int) -> Unit = { node, _ -> appendElementRow(sb, node) }
+                val listed = mutableListOf<AccessibilityNodeData>()
+                val rowVisitor: (AccessibilityNodeData, Int) -> Unit = { node, _ ->
+                    appendElementRow(sb, node)
+                    listed.add(node)
+                }
                 val hierarchyVisitor: (AccessibilityNodeData, Int) -> Unit = { node, depth ->
                     repeat(depth) { hierarchySb.append(HIERARCHY_INDENT) }
                     hierarchySb.appendLine(node.id)
@@ -172,6 +185,7 @@ class CompactTreeFormatter
                 val visitors =
                     if (options.includeHierarchy) listOf(rowVisitor, hierarchyVisitor) else listOf(rowVisitor)
                 walkTree(windowData.tree, visitors = visitors, options = options)
+                appendActionsSection(sb, listed)
                 if (options.includeHierarchy) {
                     sb.appendLine(HIERARCHY_HEADER)
                     sb.append(hierarchySb)
@@ -213,7 +227,8 @@ class CompactTreeFormatter
                 node.clickable ||
                 node.longClickable ||
                 node.scrollable ||
-                node.editable
+                node.editable ||
+                node.actions.isNotEmpty()
 
         /**
          * Strips a fully-qualified class name to its simple name.
@@ -348,6 +363,8 @@ class CompactTreeFormatter
             const val FLAG_ENABLED = "ena"
             const val FLAG_PASSWORD = "pwd"
             const val HIERARCHY_HEADER = "hierarchy:"
+            const val ACTIONS_HEADER = "Nodes with actions:"
+            internal const val ACTIONS_ITEM_PREFIX = "* "
             internal const val HIERARCHY_INDENT = "  "
             private const val FLAG_SEPARATOR = ","
             const val HEADER =
@@ -477,9 +494,10 @@ private fun collectKeptNodes(
 }
 
 /**
- * Emits a window section for [pageNodes]: window header, TSV rows, and (unless [options] leaves it
- * out) a `hierarchy:` block holding those rows PLUS their listed ancestors (listed-ancestor closure),
- * at the same listed-depth indentation as [CompactTreeFormatter.formatMultiWindow].
+ * Emits a window section for [pageNodes]: window header, TSV rows, the actions section of those rows,
+ * and (unless [options] leaves it out) a `hierarchy:` block holding those rows PLUS their listed
+ * ancestors (listed-ancestor closure), at the same listed-depth indentation as
+ * [CompactTreeFormatter.formatMultiWindow].
  */
 private fun appendWindowPageSection(
     formatter: CompactTreeFormatter,
@@ -491,6 +509,7 @@ private fun appendWindowPageSection(
     sb.appendLine(formatter.buildWindowHeader(windowData))
     sb.appendLine(CompactTreeFormatter.HEADER)
     for (node in pageNodes) formatter.appendElementRow(sb, node)
+    appendActionsSection(sb, pageNodes)
     if (options.includeHierarchy) appendPageHierarchy(formatter, sb, windowData, pageNodes, options)
 }
 
@@ -530,4 +549,23 @@ private fun appendPageHierarchy(
         for (child in node.children) appendHierarchy(child, childDepth)
     }
     appendHierarchy(windowData.tree, 0)
+}
+
+/**
+ * Appends the actions section of [listed], the nodes one window section lists: [CompactTreeFormatter.ACTIONS_HEADER],
+ * a blank line, then `* <node_id>: <label>¦<label>` for each of them with labelled actions, in order. Nothing when
+ * none has any.
+ */
+internal fun appendActionsSection(
+    sb: StringBuilder,
+    listed: List<AccessibilityNodeData>,
+) {
+    if (listed.none { it.actions.isNotEmpty() }) return
+    sb.appendLine(CompactTreeFormatter.ACTIONS_HEADER)
+    sb.appendLine()
+    for (node in listed) {
+        if (node.actions.isEmpty()) continue
+        sb.append(CompactTreeFormatter.ACTIONS_ITEM_PREFIX).append(node.id).append(": ")
+        sb.appendLine(node.actions.joinToString(NodeActionLabels.SEPARATOR))
+    }
 }

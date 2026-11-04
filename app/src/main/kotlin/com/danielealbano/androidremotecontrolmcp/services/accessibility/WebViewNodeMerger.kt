@@ -15,8 +15,8 @@ import javax.inject.Inject
  * ## Algorithm (single bottom-up pass = fixpoint)
  *
  * Within a web subtree, each node is classified and processed after its children:
- * - **Anchor** — an interactive node (clickable / long-clickable / editable / scrollable). Always
- *   kept (it is a tap target). Its text becomes its accessible name plus any descendant content
+ * - **Anchor** — an interactive node (clickable / long-clickable / editable / scrollable / with
+ *   labelled actions). Always kept (it is a tap target, or its actions are performed on it). Its text becomes its accessible name plus any descendant content
  *   not already present in that name. Keeps its original id and bounds, so element actions still
  *   resolve it.
  * - **Block** — a semantic block role ([BLOCK_ROLES]: article, listItem, section, figure, …).
@@ -167,9 +167,12 @@ class WebViewNodeMerger
             }
         }
 
-        /** Whether a node is a tap target that must be preserved as its own node. */
+        /**
+         * Whether a node must be preserved as its own node: a tap target, or a node whose labelled
+         * actions are performed on it.
+         */
         private fun isInteractive(node: AccessibilityNodeData): Boolean =
-            node.clickable || node.longClickable || node.editable || node.scrollable
+            node.clickable || node.longClickable || node.editable || node.scrollable || node.actions.isNotEmpty()
 
         /**
          * The node's own text/contentDescription, combined so neither is ever dropped (with redundant

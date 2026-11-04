@@ -36,6 +36,8 @@ data class BoundsData(
  *   populated by Chrome and the Android System WebView on every web accessibility node. Null for
  *   native and Compose nodes. Used to scope WebView node collapsing to web content only.
  * @property targetUrl Target URL from `getExtras()` for links and images, or null when absent.
+ * @property actions Labels of the node's accessibility actions that can be performed by label, in the node's
+ *   order (custom ones such as a vote bar's "Upvote", and standard ones the app labelled).
  * @property children The child nodes of this node.
  */
 @Serializable
@@ -58,6 +60,7 @@ data class AccessibilityNodeData(
     val visible: Boolean = false,
     val webRole: String? = null,
     val targetUrl: String? = null,
+    val actions: List<String> = emptyList(),
     val children: List<AccessibilityNodeData> = emptyList(),
 )
 

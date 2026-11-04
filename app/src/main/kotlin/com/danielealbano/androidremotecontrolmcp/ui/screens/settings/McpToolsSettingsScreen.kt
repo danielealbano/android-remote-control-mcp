@@ -112,6 +112,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                 ToolEntry("find_nodes", R.string.mcp_tool_find_nodes),
                 ToolEntry("click_node", R.string.mcp_tool_click_node),
                 ToolEntry("long_click_node", R.string.mcp_tool_long_click_node),
+                ToolEntry("perform_node_action", R.string.mcp_tool_perform_node_action),
                 ToolEntry("tap_node", R.string.mcp_tool_tap_node),
                 ToolEntry("scroll_to_node", R.string.mcp_tool_scroll_to_node),
                 ToolEntry("scroll_node", R.string.mcp_tool_scroll_node),

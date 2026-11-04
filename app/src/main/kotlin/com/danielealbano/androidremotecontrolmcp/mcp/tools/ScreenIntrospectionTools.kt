@@ -315,6 +315,9 @@ class GetScreenStateHandler
                         "list alone is not sufficient to understand the screen layout). " +
                         "Includes a hierarchy section showing node nesting via indentation " +
                         "(leave it out with include_hierarchy=false). " +
+                        "Nodes whose controls the app exposes as labelled accessibility actions (e.g. a vote " +
+                        "bar's Upvote) are listed under 'Nodes with actions'; perform one with " +
+                        "${toolNamePrefix}perform_node_action. " +
                         "Large screens are split into pages of 200 nodes: the response includes a " +
                         "'page:N/total' line and a cursor; call again with that cursor to fetch the " +
                         "next page. You do NOT need to fetch every page — stop once you have found " +

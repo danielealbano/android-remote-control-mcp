@@ -76,15 +76,18 @@ class RedactionEngine
                 collectFields(window.tree, nearestLabels, items, refs)
             }
             val redacted = redactTexts(items, config)
-            val textByNode = HashMap<String, String>()
-            val descByNode = HashMap<String, String>()
+            val byNode = RedactedFields()
             redacted.forEachIndexed { index, value ->
                 val ref = refs[index]
-                if (ref.isText) textByNode[ref.nodeId] = value else descByNode[ref.nodeId] = value
+                when (ref.field) {
+                    Field.TEXT -> byNode.text[ref.nodeId] = value
+                    Field.DESCRIPTION -> byNode.description[ref.nodeId] = value
+                    // A node's labels are collected one after the other, in order, so appending keeps their order.
+                    Field.ACTION -> byNode.actions.getOrPut(ref.nodeId) { ArrayList() }.add(value)
+                }
             }
             val flaggedBounds = mutableListOf<BoundsData>()
-            val newWindows =
-                result.windows.map { it.copy(tree = rebuild(it.tree, textByNode, descByNode, flaggedBounds)) }
+            val newWindows = result.windows.map { it.copy(tree = rebuild(it.tree, byNode, flaggedBounds)) }
             return ProcessedTree(result.copy(windows = newWindows), flaggedBounds)
         }
 
@@ -97,35 +100,51 @@ class RedactionEngine
             val context = contextExtractor.extract(node, nearestLabels[node.id])
             node.text?.takeIf { it.isNotBlank() }?.let {
                 items += TextItem(it, context)
-                refs += FieldRef(node.id, isText = true)
+                refs += FieldRef(node.id, Field.TEXT)
             }
             node.contentDescription?.takeIf { it.isNotBlank() }?.let {
                 items += TextItem(it, context)
-                refs += FieldRef(node.id, isText = false)
+                refs += FieldRef(node.id, Field.DESCRIPTION)
+            }
+            // Action labels are never blank: the parser lists only labels with content.
+            for (label in node.actions) {
+                items += TextItem(label, context)
+                refs += FieldRef(node.id, Field.ACTION)
             }
             node.children.forEach { collectFields(it, nearestLabels, items, refs) }
         }
 
         private fun rebuild(
             node: AccessibilityNodeData,
-            textByNode: Map<String, String>,
-            descByNode: Map<String, String>,
+            byNode: RedactedFields,
             flaggedBounds: MutableList<BoundsData>,
         ): AccessibilityNodeData {
-            val newText = textByNode[node.id] ?: node.text
-            val newDesc = descByNode[node.id] ?: node.contentDescription
-            if (newText != node.text || newDesc != node.contentDescription) {
+            val newText = byNode.text[node.id] ?: node.text
+            val newDesc = byNode.description[node.id] ?: node.contentDescription
+            val newActions = byNode.actions[node.id] ?: node.actions
+            if (newText != node.text || newDesc != node.contentDescription || newActions != node.actions) {
                 flaggedBounds += node.bounds
             }
             return node.copy(
                 text = newText,
                 contentDescription = newDesc,
-                children = node.children.map { rebuild(it, textByNode, descByNode, flaggedBounds) },
+                actions = newActions,
+                children = node.children.map { rebuild(it, byNode, flaggedBounds) },
             )
         }
 
+        /** Which field of a node a redacted text belongs to. */
+        private enum class Field { TEXT, DESCRIPTION, ACTION }
+
         private data class FieldRef(
             val nodeId: String,
-            val isText: Boolean,
+            val field: Field,
         )
+
+        /** The redacted values of a tree, by node id: its text, its content description and its action labels. */
+        private class RedactedFields {
+            val text = HashMap<String, String>()
+            val description = HashMap<String, String>()
+            val actions = HashMap<String, MutableList<String>>()
+        }
     }

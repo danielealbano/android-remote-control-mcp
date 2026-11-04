@@ -66,6 +66,16 @@ interface ActionExecutor {
         windows: List<WindowData>,
     ): Result<Unit>
 
+    /**
+     * Performs the first action of the live node [nodeId] listed with [label] ([NodeActionLabels]). The failures
+     * never name the label: with Privacy Mode on it is the unredacted one.
+     */
+    suspend fun performLabelledAction(
+        nodeId: String,
+        windows: List<WindowData>,
+        label: String,
+    ): Result<Unit>
+
     /** Gives input focus to the node [nodeId] (ACTION_FOCUS), for a field a click did not focus. */
     suspend fun focusNode(
         nodeId: String,

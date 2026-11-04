@@ -17,6 +17,6 @@ interface PrivacyPipeline {
     /** Same contract as [processText] for many items with a single model batch (packing amortization). */
     suspend fun processTexts(items: List<TextItem>): List<String>
 
-    /** Redacts node text/contentDescription across all windows and returns the flagged node bounds. */
+    /** Redacts node text/contentDescription/action labels across all windows and returns the flagged node bounds. */
     suspend fun processTree(result: MultiWindowResult): ProcessedTree
 }

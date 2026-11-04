@@ -95,6 +95,30 @@ class ActionExecutorImpl
         }
 
         /**
+         * Performs the first action of the live node [nodeId] listed with [label] ([NodeActionLabels.actionFor]).
+         * Both failures are [IllegalStateException]s whose messages leave the label out.
+         */
+        override suspend fun performLabelledAction(
+            nodeId: String,
+            windows: List<WindowData>,
+            label: String,
+        ): Result<Unit> =
+            performNodeAction(nodeId, windows, "labelled action") { realNode ->
+                val action =
+                    NodeActionLabels.actionFor(realNode, label)
+                        ?: return@performNodeAction Result.failure(
+                            IllegalStateException(
+                                "Node '$nodeId' no longer offers the requested action; read the screen again",
+                            ),
+                        )
+                if (realNode.performAction(action.id)) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(IllegalStateException("Action failed on node '$nodeId'"))
+                }
+            }
+
+        /**
          * Gives input focus to the node identified by [nodeId] (ACTION_FOCUS). A click does not always move input
          * focus: in Chrome, clicking a web input through accessibility can leave it on the previously focused input.
          */

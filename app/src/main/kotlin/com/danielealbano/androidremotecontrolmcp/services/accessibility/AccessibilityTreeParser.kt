@@ -107,6 +107,7 @@ class AccessibilityTreeParser
             val extras = node.extras
             val webRole = extras?.getString(EXTRA_KEY_CHROME_ROLE)?.takeIf(String::isNotEmpty)
             val targetUrl = extras?.getString(EXTRA_KEY_TARGET_URL)?.takeIf(String::isNotEmpty)
+            val actions = NodeActionLabels.labelsOf(node)
 
             // Max depth protection: return current node as leaf without recursing into children
             if (depth >= MAX_TREE_DEPTH) {
@@ -132,6 +133,7 @@ class AccessibilityTreeParser
                         visible = visible,
                         webRole = webRole,
                         targetUrl = targetUrl,
+                        actions = actions,
                         children = emptyList(),
                     )
 
@@ -198,6 +200,7 @@ class AccessibilityTreeParser
                     visible = visible,
                     webRole = webRole,
                     targetUrl = targetUrl,
+                    actions = actions,
                     children = children,
                 )
 

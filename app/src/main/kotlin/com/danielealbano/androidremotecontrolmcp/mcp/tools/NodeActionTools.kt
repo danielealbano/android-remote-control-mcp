@@ -18,6 +18,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.NodeActionLabels
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -91,15 +92,7 @@ class FindNodesTool
 
             Log.d(TAG, "find_nodes: by=$byStr, visibleOnly=$visibleOnly, found=${elements.size}")
 
-            val redactedFields =
-                privacyToolGate.nodeTexts(
-                    result.windows,
-                    elements.flatMap { listOf(it.text to it.id, it.contentDescription to it.id) },
-                )
-            val redactedElements =
-                elements.mapIndexed { index, element ->
-                    element.copy(text = redactedFields[index * 2], contentDescription = redactedFields[index * 2 + 1])
-                }
+            val redactedElements = McpToolUtils.redactElements(privacyToolGate, result.windows, elements)
 
             val resultJson =
                 buildJsonObject {
@@ -125,7 +118,8 @@ class FindNodesTool
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
                     "Find UI nodes matching the specified criteria " +
-                        "(text, content_desc, resource_id, class_name)",
+                        "(text, content_desc, resource_id, class_name). Each node lists the labels of its " +
+                        "accessibility actions in 'actions'; perform one with ${toolNamePrefix}perform_node_action.",
                 inputSchema =
                     ToolSchema(
                         properties =
@@ -280,6 +274,103 @@ class LongClickNodeTool
         companion object {
             private const val TAG = "MCP:LongClickNodeTool"
             const val TOOL_NAME = "long_click_node"
+        }
+    }
+
+/**
+ * MCP tool: perform_node_action
+ *
+ * Performs one of a node's labelled accessibility actions ([NodeActionLabels]), by its label as listed by
+ * get_screen_state, find_nodes and get_node_details. Some apps expose controls only this way, as actions of a single
+ * node (a vote bar whose "Upvote" and "Downvote" buttons are not nodes of their own).
+ */
+class PerformNodeActionTool
+    @Inject
+    constructor(
+        private val treeParser: AccessibilityTreeParser,
+        private val actionExecutor: ActionExecutor,
+        private val accessibilityServiceProvider: AccessibilityServiceProvider,
+        private val nodeCache: AccessibilityNodeCache,
+        private val targetResolver: NodeTargetResolver,
+        private val privacyToolGate: PrivacyToolGate,
+    ) {
+        suspend fun execute(arguments: JsonObject?): CallToolResult {
+            val target = targetResolver.parse(arguments)
+            // Matched as given against the labels as shown, which Privacy Mode redacts the same way on every read. Never
+            // reversed through PlaceholderSubstitutor: a masked value cannot be restored, so it would never match.
+            val action = McpToolUtils.requireString(arguments, PARAM_ACTION)
+            if (action.isEmpty()) throw McpToolException.InvalidParams("Parameter '$PARAM_ACTION' must be non-empty")
+
+            val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
+            val nodeId =
+                when (val resolution = targetResolver.resolve(target, multiWindowResult.windows)) {
+                    is NodeResolution.Resolved -> resolution.nodeId
+                    is NodeResolution.Ambiguous -> return resolution.result
+                }
+            val node =
+                targetResolver.nodeOf(multiWindowResult.windows, nodeId)
+                    ?: throw McpToolException.NodeNotFound("Node '$nodeId' not found")
+
+            // One slot per label, in order, so the matched position is also that of the unredacted label.
+            val shown = privacyToolGate.nodeTexts(multiWindowResult.windows, node.actions.map { it to nodeId })
+            val index = shown.indexOf(action)
+            if (index < 0) return noMatchResult(nodeId, shown)
+
+            val result = actionExecutor.performLabelledAction(nodeId, multiWindowResult.windows, node.actions[index])
+            result.onFailure { e -> mapNodeActionException(e, nodeId) }
+
+            Log.d(TAG, "perform_node_action: nodeId=$nodeId succeeded")
+            return McpToolUtils.textResult("Action '$action' performed on node '$nodeId'")
+        }
+
+        /** The error for an action the node [nodeId] does not list, with the labels it lists as [shown]. */
+        private fun noMatchResult(
+            nodeId: String,
+            shown: List<String?>,
+        ): CallToolResult {
+            val text =
+                if (shown.isEmpty()) {
+                    "Node '$nodeId' has no labelled actions"
+                } else {
+                    "Node '$nodeId' has no action with that label (case-sensitive). Its actions: " +
+                        shown.joinToString(NodeActionLabels.SEPARATOR) { it.orEmpty() }
+                }
+            return McpToolUtils.untrustedTextResult(text).copy(isError = true)
+        }
+
+        fun register(
+            registrar: LoggedToolRegistrar,
+            toolNamePrefix: String,
+        ) {
+            registrar.addTool(
+                toolName = TOOL_NAME,
+                name = "$toolNamePrefix$TOOL_NAME",
+                description =
+                    "Perform one of a node's labelled accessibility actions, by node ID or by a selector (by + value, " +
+                        "the single on-screen match), and the action's label exactly as listed under 'Nodes with " +
+                        "actions' of ${toolNamePrefix}get_screen_state, in 'actions' of ${toolNamePrefix}find_nodes " +
+                        "or in the actions column of ${toolNamePrefix}get_node_details. Some apps expose controls " +
+                        "only as actions of one node (e.g. a vote bar's Upvote and Downvote). Returns after the app " +
+                        "accepts the action.",
+                inputSchema =
+                    ToolSchema(
+                        properties =
+                            buildJsonObject {
+                                putNodeTargetProperties(toolNamePrefix)
+                                putJsonObject(PARAM_ACTION) {
+                                    put("type", "string")
+                                    put("description", "The action's label, exactly as listed (case-sensitive)")
+                                }
+                            },
+                        required = listOf(PARAM_ACTION),
+                    ),
+            ) { request -> execute(request.arguments) }
+        }
+
+        companion object {
+            private const val TAG = "MCP:PerformNodeActionTool"
+            const val TOOL_NAME = "perform_node_action"
+            internal const val PARAM_ACTION = "action"
         }
     }
 
@@ -1178,6 +1269,16 @@ fun registerNodeActionTools(
     if (perms.isToolEnabled(LongClickNodeTool.TOOL_NAME)) {
         LongClickNodeTool(treeParser, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
             .register(registrar, toolNamePrefix)
+    }
+    if (perms.isToolEnabled(PerformNodeActionTool.TOOL_NAME)) {
+        PerformNodeActionTool(
+            treeParser,
+            actionExecutor,
+            accessibilityServiceProvider,
+            nodeCache,
+            targetResolver,
+            privacyToolGate,
+        ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TapNodeTool.TOOL_NAME)) {
         TapNodeTool(treeParser, elementFinder, actionExecutor, accessibilityServiceProvider, nodeCache, targetResolver)
