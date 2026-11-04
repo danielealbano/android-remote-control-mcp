@@ -12,6 +12,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -248,7 +249,7 @@ class ArcTunnelServiceStatusTest {
             )
             val status = status()
             val job = launch(Dispatchers.IO) { status.currentProblem() }
-            withContext(Dispatchers.IO) { server.takeRequest() }
+            withContext(Dispatchers.IO) { assertNotNull(server.takeRequest(REQUEST_BUDGET_S, TimeUnit.SECONDS)) }
 
             withTimeout(CANCEL_BUDGET_MS) { job.cancelAndJoin() }
 
@@ -263,6 +264,7 @@ class ArcTunnelServiceStatusTest {
         const val SLOW_RESPONSE_MS = 200L
         const val NEVER_ANSWERS_S = 5L
         const val CANCEL_BUDGET_MS = 2_000L
+        const val REQUEST_BUDGET_S = 5L
         const val HTTP_ERROR = 503
         const val TOO_LARGE = 1_100_000
     }

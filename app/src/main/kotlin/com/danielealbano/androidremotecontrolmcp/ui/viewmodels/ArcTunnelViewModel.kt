@@ -78,9 +78,9 @@ class ArcTunnelViewModel
 
         /**
          * A problem reported by the status page of the public tunnel service, for the Server screen. It only concerns a
-         * phone with a saved identity on that service, the free tunnel selected and this check left on. It is only
-         * refreshed while this is collected, so while that screen is visible. A refresh reuses the last answer until
-         * [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
+         * phone with a saved identity on that service, the free tunnel on and selected, and this check left on. It is
+         * only refreshed while this is collected, so while that screen is visible. A refresh reuses the last answer
+         * until [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
         val serviceProblem: StateFlow<ArcTunnelServiceProblem?> =
