@@ -60,6 +60,8 @@ class ArcTunnelProviderTest {
     private val renewals = mockk<ArcTunnelRenewals>(relaxed = true)
     private val host = mockk<TunnelListenerHost>()
     private val ctAlerts = mockk<ArcTunnelCtAlerts>(relaxed = true)
+    private val serviceStatus = mockk<ArcTunnelServiceStatus>()
+    private val serviceAlerts = mockk<ArcTunnelServiceAlerts>(relaxed = true)
     private val serverLog = RecordingServerLogRepository()
     private val peers = ArcTunnelTestPeers()
     private val onRequest = AtomicReference<() -> Unit>()
@@ -92,7 +94,9 @@ class ArcTunnelProviderTest {
         }
         every { host.stopTlsListener() } just runs
         every { host.clientAddresses } returns TunnelClientAddresses()
-        provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog)
+        every { serviceAlerts.clear() } just runs
+        coEvery { serviceStatus.currentProblem() } returns null
+        provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog, serviceStatus, serviceAlerts)
     }
 
     @AfterEach
@@ -201,6 +205,49 @@ class ArcTunnelProviderTest {
             assertEquals(TunnelProviderType.ARC_TUNNEL, connected.providerType)
             coVerify(exactly = 1) { enrollment.readyIdentity(any()) }
             verify(exactly = 1) { host.startTlsListener(any(), null, any()) }
+        }
+
+    /** The public base address: the test server's certificate is not for it, so the tunnel never gets to Connected. */
+    private val publicService = config.copy(arcTunnelBaseAddress = ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
+
+    @Test
+    fun `on the public service a reported problem notifies, and stopping removes it`() =
+        runBlocking {
+            val problem = ArcTunnelServiceProblem("degraded", listOf("Tunnels"))
+            coEvery { serviceStatus.currentProblem() } returns problem
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            verify(timeout = BUDGET_MS) { serviceAlerts.show(problem) }
+
+            provider.stop()
+
+            verify(timeout = BUDGET_MS) { serviceAlerts.clear() }
+        }
+
+    @Test
+    fun `with the setting off the status page is never asked`() =
+        runBlocking {
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService.copy(arcTunnelStatusCheckEnabled = false))
+            awaitThat { listenerStarts.get() > 0 }
+            delay(NOTHING_ASKED_MS)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+        }
+
+    @Test
+    fun `a self-hosted base address never asks the status page`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
         }
 
     @Test
@@ -726,6 +773,7 @@ class ArcTunnelProviderTest {
     }
 
     private companion object {
+        const val NOTHING_ASKED_MS = 300L
         const val LOCAL_PORT = 8080
         const val LISTENER_PORT = 50_000
         const val BACKLOG = 50

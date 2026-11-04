@@ -103,6 +103,13 @@ class McpApplication :
 
         notificationManager.createNotificationChannel(mcpServerChannel)
         notificationManager.createNotificationChannel(oauthApprovalChannel)
+        notificationManager.createNotificationChannel(
+            NotificationChannel(
+                ARC_TUNNEL_STATUS_CHANNEL_ID,
+                getString(R.string.notification_channel_arc_tunnel_status_name),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ),
+        )
         notificationManager.createNotificationChannel(updateChannel)
         notificationManager.createNotificationChannel(arcTunnelAlertChannel)
     }
@@ -113,5 +120,6 @@ class McpApplication :
         const val OAUTH_APPROVAL_CHANNEL_ID = "oauth_approval_channel"
         const val UPDATE_CHANNEL_ID = "update_channel"
         const val ARC_TUNNEL_ALERT_CHANNEL_ID = "arc_tunnel_alert_channel"
+        const val ARC_TUNNEL_STATUS_CHANNEL_ID = "arc_tunnel_status_channel"
     }
 }

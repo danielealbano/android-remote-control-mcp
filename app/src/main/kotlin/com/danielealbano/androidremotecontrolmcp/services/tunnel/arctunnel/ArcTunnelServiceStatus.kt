@@ -14,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /** What the public status page of the free E2E tunnel reports when it is not operational. */
 data class ArcTunnelServiceProblem(
@@ -78,6 +79,7 @@ object ArcTunnelStatusPage {
     private fun string(element: JsonElement?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content
 }
 
+@Singleton
 class ArcTunnelServiceStatusImpl internal constructor(
     private val url: String,
     private val ioDispatcher: CoroutineDispatcher,
