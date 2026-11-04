@@ -26,6 +26,7 @@ class ArcTunnelWireTest {
         assertFalse(open("""{"token":"t","addr":"",$client}""").isValid())
         assertFalse(open("""{"token":"t","addr":"h:1","use_https":false,"use_mtls":true,$client}""").isValid())
         assertFalse(open("""{"token":"t","addr":"h:1"}""").isValid(), "client_addr is required")
+        assertFalse(open("""{"token":"t","addr":"h:1","client_addr":""}""").isValid(), "an empty one counts as none")
     }
 
     @ParameterizedTest
