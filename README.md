@@ -12,7 +12,7 @@ An Android application that runs as an **MCP (Model Context Protocol) server**, 
 
 The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device: reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
 
-Optional [Privacy Mode](#privacy-mode) detects and hides personal data, such as emails, card numbers, credentials and names, in what the tools return, before it leaves the device for the AI provider. Detection runs entirely on the device, and it reduces exposure rather than guaranteeing it.
+Optional [Privacy Mode](#privacy-mode) detects and hides personal data, such as emails, card numbers, credentials and names, in what the tools return, before it leaves the device for the AI provider. Detection runs entirely on the device. It reduces exposure, but cannot guarantee that nothing personal gets through.
 
 To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel gives it a public URL with no account and no registration. TLS ends on the phone, so the tunnel service only relays encrypted bytes and cannot read your traffic. Cloudflare and ngrok are also supported, but they terminate TLS themselves and can read it.
 
