@@ -54,7 +54,12 @@ class ArcTunnelCtMonitorTest {
 
     @AfterEach
     fun tearDown() {
-        scope.cancel()
+        // A check that already read its answer still writes it after the cancellation (ArcTunnelHttp.await keeps it),
+        // so it must be over before the temporary directory goes, or it fails on a scope nothing handles.
+        runBlocking {
+            scope.cancel()
+            withTimeout(BUDGET_MS) { parent.join() }
+        }
         server.close()
     }
 
