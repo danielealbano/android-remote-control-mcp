@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.auth
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.canonicalResource
+import com.danielealbano.androidremotecontrolmcp.mcp.clientIp
 import com.danielealbano.androidremotecontrolmcp.mcp.deriveBaseUrl
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
@@ -136,9 +137,7 @@ val McpAuthPlugin =
             }
 
             // Fail closed.
-            val remoteAddr = call.request.local.remoteAddress
-            val forwardedFor = call.request.headers["X-Forwarded-For"]
-            val addrInfo = if (forwardedFor != null) "$remoteAddr (forwarded-for: $forwardedFor)" else remoteAddr
+            val addrInfo = call.clientIp() ?: "unknown"
             Log.w(TAG, "Authentication failed from $addrInfo")
             onAuthFailure?.invoke(addrInfo)
             if (oauthEnabled) {

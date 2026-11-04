@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
@@ -50,12 +51,13 @@ class McpServerTunnelListenerTest {
             .build()
     private val material = TunnelTlsMaterial(held.keyPair.private, listOf(held.certificate))
     private lateinit var server: McpServer
+    private val serverLog = RecordingServerLogRepository()
 
     @BeforeEach
     fun setUp() {
         server =
             McpServer(
-                ServerConfig(port = freePort(), bindingAddress = BindingAddress.LOCALHOST),
+                ServerConfig(port = freePort(), bindingAddress = BindingAddress.LOCALHOST, bearerToken = TOKEN),
                 null,
                 mockk<Server>(relaxed = true),
                 mockk(relaxed = true),
@@ -66,7 +68,7 @@ class McpServerTunnelListenerTest {
                     mockk(relaxed = true),
                     mockk(relaxed = true),
                 ),
-                RecordingServerLogRepository(),
+                serverLog,
                 InFlightToolCalls(),
                 null,
             )
@@ -268,6 +270,34 @@ class McpServerTunnelListenerTest {
         }
     }
 
+    /** Nothing on the way to this listener sets or strips these headers, so any client could put them there. */
+    @Test
+    fun `a client cannot choose the address it shows through the tunnel listener`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val client =
+            OkHttpClient
+                .Builder()
+                .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                .hostnameVerifier { _, _ -> true }
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$port/mcp")
+                .header("CF-Connecting-IP", SPOOFED)
+                .header("X-Forwarded-For", SPOOFED)
+                .build()
+
+        client.newCall(request).execute().use { assertEquals(HTTP_UNAUTHORIZED, it.code) }
+
+        assertEquals(
+            "Authentication failed from $LOOPBACK",
+            serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+        )
+    }
+
     @Test
     fun `HTTP-1-1 requests see the https scheme`() {
         server.start()
@@ -407,6 +437,9 @@ class McpServerTunnelListenerTest {
         const val PUBLIC_HOST = "name.d.tunnel.example"
         const val PUBLIC_PORT = 8443
         const val HTTPS_DEFAULT_PORT = 443
+        const val TOKEN = "tunnel-listener-test-token"
+        const val SPOOFED = "198.51.100.6"
+        const val HTTP_UNAUTHORIZED = 401
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50
         const val TIMEOUT_MS = 5_000

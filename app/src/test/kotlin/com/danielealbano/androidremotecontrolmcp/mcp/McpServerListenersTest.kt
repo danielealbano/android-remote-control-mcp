@@ -2,6 +2,8 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
@@ -38,6 +40,7 @@ class McpServerListenersTest {
     private val mainPort = ports[0]
     private val tunnelPort = ports[1]
     private var server: McpServer? = null
+    private val serverLog = RecordingServerLogRepository()
     private val client = OkHttpClient()
 
     @AfterEach
@@ -49,13 +52,15 @@ class McpServerListenersTest {
         localhostTunnelPort: Int?,
         https: Boolean = false,
         oauth: Boolean = false,
-    ): McpServer = newServer(localhostTunnelPort, https, oauth = oauth).also { it.start() }
+        tunnel: TunnelProviderType? = null,
+    ): McpServer = newServer(localhostTunnelPort, https, oauth = oauth, tunnel = tunnel).also { it.start() }
 
     private fun newServer(
         localhostTunnelPort: Int?,
         https: Boolean = false,
         specificAddress: String? = null,
         oauth: Boolean = false,
+        tunnel: TunnelProviderType? = null,
     ): McpServer {
         val config =
             ServerConfig(
@@ -66,6 +71,8 @@ class McpServerListenersTest {
                 bearerTokenEnabled = true,
                 oauthEnabled = oauth,
                 httpsEnabled = https,
+                tunnelEnabled = tunnel != null,
+                tunnelProvider = tunnel ?: TunnelProviderType.ARC_TUNNEL,
             )
         return McpServer(
             config,
@@ -79,7 +86,7 @@ class McpServerListenersTest {
                 mockk(relaxed = true),
                 mockk(relaxed = true),
             ),
-            RecordingServerLogRepository(),
+            serverLog,
             InFlightToolCalls(),
             localhostTunnelPort,
         ).also { server = it }
@@ -221,6 +228,74 @@ class McpServerListenersTest {
         }
     }
 
+    @Test
+    fun `behind Cloudflare the logged address is CF-Connecting-IP`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.CLOUDFLARE)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $SPOOFED_CF", lastAuthFailure())
+    }
+
+    @Test
+    fun `behind ngrok the logged address is the last X-Forwarded-For value`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.NGROK)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $NGROK_ADDED", lastAuthFailure())
+    }
+
+    @Test
+    fun `with no tunnel the logged address is the socket peer`() {
+        start(localhostTunnelPort = null)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+    }
+
+    @Test
+    fun `the free tunnel selected does not make the main listener trust a header`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.ARC_TUNNEL)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+    }
+
+    @Test
+    fun `an HTTPS main listener trusts no header, as no tunnel forwards to it`() {
+        start(localhostTunnelPort = tunnelPort, https = true, tunnel = TunnelProviderType.CLOUDFLARE)
+        val trusting = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val httpsClient =
+            client.newBuilder().sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager).build()
+
+        failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", httpsClient)
+        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$tunnelPort/mcp", client)
+        assertEquals("Authentication failed from $SPOOFED_CF", lastAuthFailure())
+    }
+
+    /** What ngrok delivers: what the client sent, then the real address on a line of its own. */
+    private fun failAuthenticationWithSpoofedHeaders(
+        url: String,
+        httpClient: OkHttpClient,
+    ) {
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .header("CF-Connecting-IP", SPOOFED_CF)
+                .addHeader("X-Forwarded-For", SPOOFED_XFF)
+                .addHeader("X-Forwarded-For", NGROK_ADDED)
+                .build()
+        assertEquals(HTTP_UNAUTHORIZED, httpClient.newCall(request).execute().use { it.code })
+    }
+
+    private fun lastAuthFailure(): String = serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message
+
     /** OkHttp sends the host as `Host` over HTTP/1.1 and as `:authority` over HTTP/2. */
     private fun httpsMetadata(
         protocol: Protocol,
@@ -283,6 +358,9 @@ class McpServerListenersTest {
         const val IPV6_LOOPBACK = "::1"
         const val PUBLIC_HOST = "myphone.ddns.example"
         const val LAN_ADDRESS = "192.168.1.5"
+        const val SPOOFED_CF = "198.51.100.6"
+        const val SPOOFED_XFF = "198.51.100.7"
+        const val NGROK_ADDED = "203.0.113.10"
         const val BACKLOG = 50
         const val STOP_TIMEOUT_MS = 1_000L
         const val TOKEN = "listener-test-token"
