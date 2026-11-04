@@ -82,6 +82,7 @@ class AdbConfigHandler(
         applyTunnelLocalPort(intent)
         applyArcTunnelBaseAddress(intent)
         applyArcTunnelCtCheckEnabled(intent)
+        applyArcTunnelStatusCheckEnabled(intent)
         applyFileSizeLimit(intent)
         applyAllowHttpDownloads(intent)
         applyAllowUnverifiedHttpsCerts(intent)
@@ -343,6 +344,13 @@ class AdbConfigHandler(
         Log.i(TAG, "Free E2E tunnel certificate check updated to $value")
     }
 
+    private suspend fun applyArcTunnelStatusCheckEnabled(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_ARC_TUNNEL_STATUS_CHECK_ENABLED)) return
+        val value = intent.getBooleanExtra(EXTRA_ARC_TUNNEL_STATUS_CHECK_ENABLED, true)
+        settingsRepository.updateArcTunnelStatusCheckEnabled(value)
+        Log.i(TAG, "Free E2E tunnel status check updated to $value")
+    }
+
     /**
      * `--ez arc_tunnel_enroll true`: enrolls (or resumes issuance) in the background with the settings just
      * applied.
@@ -492,6 +500,7 @@ class AdbConfigHandler(
         internal const val EXTRA_TUNNEL_LOCAL_PORT = "tunnel_local_port"
         internal const val EXTRA_ARC_TUNNEL_BASE_ADDRESS = "arc_tunnel_base_address"
         internal const val EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED = "arc_tunnel_ct_check_enabled"
+        internal const val EXTRA_ARC_TUNNEL_STATUS_CHECK_ENABLED = "arc_tunnel_status_check_enabled"
         internal const val EXTRA_ARC_TUNNEL_ENROLL = "arc_tunnel_enroll"
         internal const val EXTRA_FILE_SIZE_LIMIT_MB = "file_size_limit_mb"
         internal const val EXTRA_ALLOW_HTTP_DOWNLOADS = "allow_http_downloads"

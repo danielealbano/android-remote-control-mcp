@@ -78,28 +78,32 @@ class ArcTunnelViewModel
 
         /**
          * A problem reported by the status page of the public tunnel service. It only concerns a phone with a saved
-         * identity on that service and with the free tunnel selected. It is only refreshed while this is collected, so
-         * while the Server screen is visible: nothing polls in the background. A refresh reuses the last answer until
-         * [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
+         * identity on that service, the free tunnel selected and this check left on. It is only refreshed while this is
+         * collected, so while the Server screen is visible: nothing polls in the background. A refresh reuses the last
+         * answer until [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that
+         * interval.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
         val serviceProblem: StateFlow<ArcTunnelServiceProblem?> =
             combine(settingsRepository.serverConfig, _url) { config, url ->
-                config.tunnelEnabled &&
+                config.arcTunnelStatusCheckEnabled &&
+                    config.tunnelEnabled &&
                     config.tunnelProvider == TunnelProviderType.ARC_TUNNEL &&
                     config.arcTunnelBaseAddress == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS &&
                     url is ArcTunnelUrlState.Enrolled
             }.distinctUntilChanged()
-                .flatMapLatest { relevant -> if (relevant) reportedProblems() else flowOf(null) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), null)
-
-        private fun reportedProblems() =
-            flow {
-                while (true) {
-                    emit(serviceStatus.currentProblem())
-                    delay(SERVICE_STATUS_REFRESH_MS)
-                }
-            }
+                .flatMapLatest<Boolean, ArcTunnelServiceProblem?> { relevant ->
+                    if (relevant) {
+                        flow {
+                            while (true) {
+                                emit(serviceStatus.currentProblem())
+                                delay(SERVICE_STATUS_REFRESH_MS)
+                            }
+                        }
+                    } else {
+                        flowOf(null)
+                    }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), null)
 
         @Volatile
         private var env: ArcTunnelEnv = ArcTunnelEnv(ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
@@ -163,6 +167,10 @@ class ArcTunnelViewModel
             val value = _baseAddressInput.value
             if (!ArcTunnelHosts.isValidBaseAddress(value) || value == persisted) return
             viewModelScope.launch(ioDispatcher) { settingsRepository.updateArcTunnelBaseAddress(value) }
+        }
+
+        fun updateStatusCheckEnabled(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) { settingsRepository.updateArcTunnelStatusCheckEnabled(enabled) }
         }
 
         fun updateCtCheckEnabled(enabled: Boolean) {

@@ -60,6 +60,7 @@ import javax.inject.Inject
  *   --ei tunnel_local_port 61200 \
  *   --es arc_tunnel_base_address "arc-tunnel.io" \
  *   --ez arc_tunnel_ct_check_enabled true \
+ *   --ez arc_tunnel_status_check_enabled true \
  *   --ez arc_tunnel_enroll true \
  *   --ei file_size_limit_mb 50 \
  *   --ez allow_http_downloads false \

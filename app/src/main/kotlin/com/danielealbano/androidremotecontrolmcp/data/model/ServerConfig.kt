@@ -28,6 +28,7 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property arcTunnelBaseAddress Base address of the free E2E tunnel service (`enroll.`, `connect.` and the
  *   tunnel domain `d.` are derived from it).
  * @property arcTunnelCtCheckEnabled Whether the Certificate Transparency check of the tunnel certificate runs.
+ * @property arcTunnelStatusCheckEnabled Whether the Server screen checks the public tunnel service's status page.
  * @property arcTunnelEdgeOverride Debug/E2E only: `host:port` the tunnel client dials instead of DNS (empty = none).
  * @property arcTunnelTrustedCaPem Debug/E2E only: PEM CA bundle trusted for the tunnel service (empty = system CAs).
  * @property fileSizeLimitMb File size limit for file operations (in MB).
@@ -68,6 +69,7 @@ data class ServerConfig(
     val cloudflareTunnelExtraArgs: String = "",
     val arcTunnelBaseAddress: String = DEFAULT_ARC_TUNNEL_BASE_ADDRESS,
     val arcTunnelCtCheckEnabled: Boolean = true,
+    val arcTunnelStatusCheckEnabled: Boolean = true,
     val arcTunnelEdgeOverride: String = "",
     val arcTunnelTrustedCaPem: String = "",
     val fileSizeLimitMb: Int = DEFAULT_FILE_SIZE_LIMIT_MB,

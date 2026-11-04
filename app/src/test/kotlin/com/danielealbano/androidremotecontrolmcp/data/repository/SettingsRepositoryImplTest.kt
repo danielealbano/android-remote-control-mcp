@@ -799,6 +799,7 @@ class SettingsRepositoryImplTest {
                 dataStore.edit {
                     it[stringPreferencesKey("arc_tunnel_base_address")] = "tunnel.example.org"
                     it[booleanPreferencesKey("arc_tunnel_ct_check_enabled")] = false
+                    it[booleanPreferencesKey("arc_tunnel_status_check_enabled")] = false
                     it[stringPreferencesKey("arc_tunnel_edge_override")] = "10.0.0.1:18443"
                     it[stringPreferencesKey("arc_tunnel_trusted_ca_pem")] = "pem"
                 }
@@ -807,6 +808,7 @@ class SettingsRepositoryImplTest {
 
                 assertEquals("tunnel.example.org", config.arcTunnelBaseAddress)
                 assertFalse(config.arcTunnelCtCheckEnabled)
+                assertFalse(config.arcTunnelStatusCheckEnabled)
                 assertEquals("10.0.0.1:18443", config.arcTunnelEdgeOverride)
                 assertEquals("pem", config.arcTunnelTrustedCaPem)
             }

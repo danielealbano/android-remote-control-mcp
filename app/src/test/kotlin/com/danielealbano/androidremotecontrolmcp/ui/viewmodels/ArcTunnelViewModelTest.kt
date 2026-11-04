@@ -179,6 +179,7 @@ class ArcTunnelViewModelTest {
                     reportedConfig().copy(tunnelProvider = TunnelProviderType.NGROK),
                     reportedConfig().copy(tunnelProvider = TunnelProviderType.CLOUDFLARE),
                     reportedConfig().copy(tunnelEnabled = false),
+                    reportedConfig().copy(arcTunnelStatusCheckEnabled = false),
                     reportedConfig().copy(arcTunnelBaseAddress = "tunnel.example.org"),
                 )
             for (settings in notRelevant) {
@@ -282,6 +283,35 @@ class ArcTunnelViewModelTest {
             advanceUntilIdle()
 
             coVerify(exactly = 0) { repository.updateArcTunnelBaseAddress(any()) }
+        }
+
+    @Test
+    fun `updateStatusCheckEnabled persists`() =
+        runTest(dispatcher) {
+            createViewModel()
+
+            viewModel.updateStatusCheckEnabled(false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { repository.updateArcTunnelStatusCheckEnabled(false) }
+        }
+
+    @Test
+    fun `turning the status check off drops the alert and stops asking`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            startForStatus(reportedConfig())
+            val collector = collectProblem()
+            runCurrent()
+            assertEquals(PROBLEM, viewModel.serviceProblem.value)
+
+            config.value = reportedConfig().copy(arcTunnelStatusCheckEnabled = false)
+            runCurrent()
+            assertEquals(null, viewModel.serviceProblem.value)
+
+            advanceTimeBy(STATUS_POLL_MS * 3)
+            coVerify(exactly = 1) { serviceStatus.currentProblem() }
+            collector.cancel()
         }
 
     @Test

@@ -10,6 +10,7 @@ import javax.inject.Inject
 
 internal val ARC_TUNNEL_BASE_ADDRESS_KEY = stringPreferencesKey("arc_tunnel_base_address")
 internal val ARC_TUNNEL_CT_CHECK_ENABLED_KEY = booleanPreferencesKey("arc_tunnel_ct_check_enabled")
+internal val ARC_TUNNEL_STATUS_CHECK_ENABLED_KEY = booleanPreferencesKey("arc_tunnel_status_check_enabled")
 internal val ARC_TUNNEL_EDGE_OVERRIDE_KEY = stringPreferencesKey("arc_tunnel_edge_override")
 internal val ARC_TUNNEL_TRUSTED_CA_PEM_KEY = stringPreferencesKey("arc_tunnel_trusted_ca_pem")
 
@@ -39,6 +40,20 @@ class ArcTunnelSettingsImpl
                 prefs[ARC_TUNNEL_CT_CHECK_ENABLED_KEY] = enabled
                 settingsChangeLogger.submit("arc_tunnel_ct_check_enabled", old.toString(), enabled.toString()) { _, n ->
                     "Free E2E tunnel certificate check ${if (n.toBoolean()) "enabled" else "disabled"}"
+                }
+            }
+        }
+
+        override suspend fun updateArcTunnelStatusCheckEnabled(enabled: Boolean) {
+            dataStore.edit { prefs ->
+                val old = prefs[ARC_TUNNEL_STATUS_CHECK_ENABLED_KEY] ?: true
+                prefs[ARC_TUNNEL_STATUS_CHECK_ENABLED_KEY] = enabled
+                settingsChangeLogger.submit(
+                    "arc_tunnel_status_check_enabled",
+                    old.toString(),
+                    enabled.toString(),
+                ) { _, n ->
+                    "Free E2E tunnel status check ${if (n.toBoolean()) "enabled" else "disabled"}"
                 }
             }
         }
