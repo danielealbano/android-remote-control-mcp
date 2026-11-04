@@ -16,9 +16,9 @@ import javax.inject.Inject
  *
  * Within a web subtree, each node is classified and processed after its children:
  * - **Anchor** — an interactive node (clickable / long-clickable / editable / scrollable / with
- *   labelled actions). Always kept (it is a tap target, or its actions are performed on it). Its text becomes its accessible name plus any descendant content
- *   not already present in that name. Keeps its original id and bounds, so element actions still
- *   resolve it.
+ *   labelled actions). Always kept (it is a tap target, or its actions are performed on it). Its
+ *   text becomes its accessible name plus any descendant content not already present in that
+ *   name. Keeps its original id and bounds, so element actions still resolve it.
  * - **Block** — a semantic block role ([BLOCK_ROLES]: article, listItem, section, figure, …).
  *   Kept when it carries any content, holding the merged markdown of its non-block descendants.
  *   Empty blocks are dropped and their kept descendants bubble up.

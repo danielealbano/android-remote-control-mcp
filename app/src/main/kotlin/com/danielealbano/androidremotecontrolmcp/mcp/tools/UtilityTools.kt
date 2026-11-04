@@ -751,7 +751,8 @@ class GetNodeDetailsTool
                 privacyToolGate.nodeTexts(
                     multiWindowResult.windows,
                     nodes.flatMap { (id, node) ->
-                        listOf(node?.text to id, node?.contentDescription to id) + node?.actions.orEmpty().map { it to id }
+                        listOf(node?.text to id, node?.contentDescription to id) +
+                            node?.actions.orEmpty().map { it to id }
                     },
                 )
 

@@ -296,8 +296,8 @@ class PerformNodeActionTool
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val target = targetResolver.parse(arguments)
-            // Matched as given against the labels as shown, which Privacy Mode redacts the same way on every read. Never
-            // reversed through PlaceholderSubstitutor: a masked value cannot be restored, so it would never match.
+            // Matched as given against the labels as shown, which Privacy Mode redacts the same way on every read.
+            // Never reversed through PlaceholderSubstitutor: a masked value cannot be restored, so it would not match.
             val action = McpToolUtils.requireString(arguments, PARAM_ACTION)
             if (action.isEmpty()) throw McpToolException.InvalidParams("Parameter '$PARAM_ACTION' must be non-empty")
 
@@ -346,12 +346,12 @@ class PerformNodeActionTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Perform one of a node's labelled accessibility actions, by node ID or by a selector (by + value, " +
-                        "the single on-screen match), and the action's label exactly as listed under 'Nodes with " +
-                        "actions' of ${toolNamePrefix}get_screen_state, in 'actions' of ${toolNamePrefix}find_nodes " +
-                        "or in the actions column of ${toolNamePrefix}get_node_details. Some apps expose controls " +
-                        "only as actions of one node (e.g. a vote bar's Upvote and Downvote). Returns after the app " +
-                        "accepts the action.",
+                    "Perform one of a node's labelled accessibility actions, by node ID or by a selector " +
+                        "(by + value, the single on-screen match), and the action's label exactly as listed under " +
+                        "'Nodes with actions' of ${toolNamePrefix}get_screen_state, in 'actions' of " +
+                        "${toolNamePrefix}find_nodes or in the actions column of ${toolNamePrefix}get_node_details. " +
+                        "Some apps expose controls only as actions of one node (e.g. a vote bar's Upvote and " +
+                        "Downvote). Returns after the app accepts the action.",
                 inputSchema =
                     ToolSchema(
                         properties =

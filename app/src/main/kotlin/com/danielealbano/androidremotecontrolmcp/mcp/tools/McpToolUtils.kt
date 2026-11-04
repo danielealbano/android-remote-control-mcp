@@ -578,7 +578,8 @@ internal object McpToolUtils {
         var offset = 0
         return elements.map { element ->
             val labels = redacted.subList(offset + 2, offset + 2 + element.actions.size).filterNotNull()
-            val safe = element.copy(text = redacted[offset], contentDescription = redacted[offset + 1], actions = labels)
+            val safe =
+                element.copy(text = redacted[offset], contentDescription = redacted[offset + 1], actions = labels)
             offset += 2 + element.actions.size
             safe
         }
