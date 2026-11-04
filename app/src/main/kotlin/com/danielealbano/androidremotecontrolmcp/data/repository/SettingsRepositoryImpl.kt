@@ -139,6 +139,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         cloudflareTunnelExtraArgs = prefs[CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY] ?: "",
         arcTunnelBaseAddress = prefs[ARC_TUNNEL_BASE_ADDRESS_KEY] ?: ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS,
         arcTunnelCtCheckEnabled = prefs[ARC_TUNNEL_CT_CHECK_ENABLED_KEY] ?: true,
+        arcTunnelStatusCheckEnabled = prefs[ARC_TUNNEL_STATUS_CHECK_ENABLED_KEY] ?: true,
         arcTunnelEdgeOverride = prefs[ARC_TUNNEL_EDGE_OVERRIDE_KEY] ?: "",
         arcTunnelTrustedCaPem = prefs[ARC_TUNNEL_TRUSTED_CA_PEM_KEY] ?: "",
         fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,

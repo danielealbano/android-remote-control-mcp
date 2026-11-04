@@ -84,6 +84,7 @@ class ServerConfigTest {
             val config = ServerConfig()
             assertEquals("arc-tunnel.io", config.arcTunnelBaseAddress)
             assertTrue(config.arcTunnelCtCheckEnabled)
+            assertTrue(config.arcTunnelStatusCheckEnabled)
             assertEquals("", config.arcTunnelEdgeOverride)
             assertEquals("", config.arcTunnelTrustedCaPem)
         }

@@ -289,6 +289,7 @@ fun TunnelSettingsScreen(
                         tunnelEnabled = serverConfig.tunnelEnabled,
                         enabled = isEnabled,
                         ctCheckEnabled = serverConfig.arcTunnelCtCheckEnabled,
+                        statusCheckEnabled = serverConfig.arcTunnelStatusCheckEnabled,
                         onStopServer = { viewModel.stopServer(context) },
                         viewModel = arcViewModel,
                         renewalViewModel = arcRenewalViewModel,

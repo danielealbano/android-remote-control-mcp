@@ -2,6 +2,9 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,13 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelStatusPage
 import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalBlock
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelUrlState
@@ -49,6 +55,7 @@ data class ArcTunnelSettingsState(
     val tunnelEnabled: Boolean,
     val enabled: Boolean,
     val ctCheckEnabled: Boolean,
+    val statusCheckEnabled: Boolean,
     val baseAddress: String,
     val baseAddressValid: Boolean,
     val url: ArcTunnelUrlState,
@@ -61,6 +68,7 @@ data class ArcTunnelSettingsActions(
     val onBaseAddressChange: (String) -> Unit,
     val onBaseAddressCommit: () -> Unit,
     val onCtCheckChange: (Boolean) -> Unit,
+    val onStatusCheckChange: (Boolean) -> Unit,
     val onEnroll: () -> Unit,
     val onCancelEnrollment: () -> Unit,
     val onRotateName: () -> Unit,
@@ -91,6 +99,7 @@ fun ArcTunnelSettingsSection(
     tunnelEnabled: Boolean,
     enabled: Boolean,
     ctCheckEnabled: Boolean,
+    statusCheckEnabled: Boolean,
     onStopServer: () -> Unit,
     viewModel: ArcTunnelViewModel,
     renewalViewModel: ArcTunnelRenewalViewModel,
@@ -107,6 +116,7 @@ fun ArcTunnelSettingsSection(
                 tunnelEnabled = tunnelEnabled,
                 enabled = enabled,
                 ctCheckEnabled = ctCheckEnabled,
+                statusCheckEnabled = statusCheckEnabled,
                 baseAddress = baseAddress,
                 baseAddressValid = baseAddressValid,
                 url = url,
@@ -119,6 +129,7 @@ fun ArcTunnelSettingsSection(
                 onBaseAddressChange = viewModel::updateBaseAddressInput,
                 onBaseAddressCommit = viewModel::commitBaseAddress,
                 onCtCheckChange = viewModel::updateCtCheckEnabled,
+                onStatusCheckChange = viewModel::updateStatusCheckEnabled,
                 onEnroll = viewModel::enroll,
                 onCancelEnrollment = viewModel::cancelEnrollment,
                 onRotateName = viewModel::rotateName,
@@ -126,6 +137,47 @@ fun ArcTunnelSettingsSection(
                 onRetryRenewal = renewalViewModel::retry,
             ),
     )
+}
+
+@Composable
+private fun ArcTunnelSwitchRow(
+    @StringRes label: Int,
+    @StringRes description: Int,
+    checked: Boolean,
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth().toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onChange,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = stringResource(label), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = stringResource(description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            enabled = enabled,
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        )
+    }
+}
+
+/** The status page is that of the public service: a self-hosted base address has its own, or none. */
+internal fun arcTunnelIsPublicService(baseAddress: String): Boolean {
+    val address = baseAddress.trim()
+    return address == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS
 }
 
 @Composable
@@ -160,32 +212,21 @@ fun ArcTunnelSettingsContent(
                     .onFocusChanged { if (!it.isFocused) actions.onBaseAddressCommit() },
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier =
-                Modifier.fillMaxWidth().toggleable(
-                    value = state.ctCheckEnabled,
-                    enabled = state.enabled,
-                    role = Role.Switch,
-                    onValueChange = actions.onCtCheckChange,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.remote_access_arc_tunnel_ct_check_label),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = stringResource(R.string.remote_access_arc_tunnel_ct_check_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(
-                checked = state.ctCheckEnabled,
-                onCheckedChange = null,
+        ArcTunnelSwitchRow(
+            label = R.string.remote_access_arc_tunnel_ct_check_label,
+            description = R.string.remote_access_arc_tunnel_ct_check_description,
+            checked = state.ctCheckEnabled,
+            enabled = state.enabled,
+            onChange = actions.onCtCheckChange,
+        )
+        if (arcTunnelIsPublicService(state.baseAddress)) {
+            Spacer(modifier = Modifier.height(8.dp))
+            ArcTunnelSwitchRow(
+                label = R.string.remote_access_arc_tunnel_status_check_label,
+                description = R.string.remote_access_arc_tunnel_status_check_description,
+                checked = state.statusCheckEnabled,
                 enabled = state.enabled,
-                modifier = Modifier.minimumInteractiveComponentSize(),
+                onChange = actions.onStatusCheckChange,
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -198,6 +239,19 @@ fun ArcTunnelSettingsContent(
                 onRetry = actions.onRetryRenewal,
                 cancelEnabled = state.renewal != ArcTunnelRenewalState.Installing,
             )
+        }
+        if (arcTunnelIsPublicService(state.baseAddress)) {
+            val context = LocalContext.current
+            TextButton(
+                onClick = {
+                    runCatching {
+                        val page = Uri.parse(ArcTunnelStatusPage.PAGE_URL)
+                        context.startActivity(Intent(Intent.ACTION_VIEW, page))
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.remote_access_arc_tunnel_status_link))
+            }
         }
     }
 

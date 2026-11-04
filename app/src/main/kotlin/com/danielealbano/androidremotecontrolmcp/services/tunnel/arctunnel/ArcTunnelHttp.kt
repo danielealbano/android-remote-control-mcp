@@ -15,6 +15,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.util.concurrent.TimeUnit
@@ -93,8 +94,14 @@ object ArcTunnelHttp {
      * An answer read in full is returned even if the cancellation lands while it is handed back, because an `/issue`
      * answer is a certificate already spent. The caller's next suspension point still sees the cancellation.
      */
-    suspend fun await(call: Call): Pair<Int, String> {
-        val answer = AtomicReference<Pair<Int, String>>()
+    suspend fun await(call: Call): Pair<Int, String> = await(call) { it.code to it.body.string() }
+
+    /** [await] with the caller reading the response, for example to cap how much of it is read. */
+    suspend fun <T : Any> await(
+        call: Call,
+        read: (Response) -> T,
+    ): T {
+        val answer = AtomicReference<T>()
         try {
             coroutineScope {
                 // UNDISPATCHED: the canceller is parked before the call starts, so a cancellation is never missed.
@@ -107,7 +114,7 @@ object ArcTunnelHttp {
                         }
                     }
                 try {
-                    withContext(Dispatchers.IO) { call.execute().use { answer.set(it.code to it.body.string()) } }
+                    withContext(Dispatchers.IO) { call.execute().use { answer.set(read(it)) } }
                 } catch (e: IOException) {
                     // A call cancelled by our own cancellation fails with an IOException: report the cancellation.
                     ensureActive()

@@ -34,7 +34,7 @@ import javax.inject.Inject
 
 /**
  * Free E2E tunnel provider: identity + certificate, loopback TLS listener, control loop,
- * Certificate Transparency check.
+ * Certificate Transparency check, tunnel service status watcher.
  */
 class ArcTunnelProvider
     @Inject
@@ -44,6 +44,8 @@ class ArcTunnelProvider
         private val keys: ArcTunnelKeyStore,
         private val ctAlerts: ArcTunnelCtAlerts,
         private val serverLog: ServerLogRepository,
+        private val serviceStatus: ArcTunnelServiceStatus,
+        private val serviceAlerts: ArcTunnelServiceAlerts,
     ) : TunnelProvider {
         /** Everything belonging to one started tunnel; dropped as a whole by [close]. */
         private class Session(
@@ -51,6 +53,7 @@ class ArcTunnelProvider
             val scope: CoroutineScope,
             val env: ArcTunnelEnv,
             val ctCheckEnabled: Boolean,
+            val statusCheckEnabled: Boolean,
         ) {
             val port = AtomicInteger(0)
             val servedNotAfterMs = AtomicLong(0)
@@ -128,7 +131,11 @@ class ArcTunnelProvider
                         val handler =
                             CoroutineExceptionHandler { _, t -> Log.e(TAG, "unexpected tunnel session failure", t) }
                         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + handler)
-                        Session(host, scope, ArcTunnelEnv.from(config), config.arcTunnelCtCheckEnabled)
+                        val statusCheckEnabled =
+                            config.arcTunnelStatusCheckEnabled &&
+                                config.arcTunnelBaseAddress == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS
+                        val env = ArcTunnelEnv.from(config)
+                        Session(host, scope, env, config.arcTunnelCtCheckEnabled, statusCheckEnabled)
                     }
                 launched.onSuccess {
                     session = it
@@ -160,6 +167,10 @@ class ArcTunnelProvider
             val outcome =
                 runCatching {
                     val identity = enrollment.readyIdentity(s.env) ?: error(NOT_ENROLLED_MESSAGE)
+                    // Before the renewal: one the service cannot answer waits here for the user, when this helps most.
+                    if (s.statusCheckEnabled) {
+                        s.scope.launch { ArcTunnelServiceStatusWatcher(serviceStatus, serviceAlerts).run() }
+                    }
                     if (certificateMissingOrExpired(identity)) {
                         renewForStart(identity)
                     } else {
