@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private const val MAX_PORT = 65535
+private val BRACKETED_HOST_PORT = Regex("""\[([^\[\]]+)]:(\d{1,5})""")
+private val PLAIN_HOST_PORT = Regex("""([^:\[\]]+):(\d{1,5})""")
 
 val ArcTunnelJson: Json =
     Json {
@@ -63,21 +65,24 @@ data class ArcTunnelOpenPayload(
     @SerialName("use_mtls") val useMtls: Boolean = false,
     @SerialName("client_addr") val clientAddr: String = "",
 ) {
-    /** The address in [clientAddr] (`1.2.3.4:5` or `[::1]:5`), or null when it is missing or malformed. */
+    /**
+     * The address in [clientAddr] (`1.2.3.4:5` or `[::1]:5`), or null when it is missing or malformed. The zone a
+     * link-local peer comes with (`[fe80::1%eth0]:5`) is dropped: an address is all that may reach the approval screen.
+     */
     fun clientIp(): String? {
-        val isIpv6 = clientAddr.startsWith("[")
-        val host =
-            if (isIpv6) {
-                clientAddr.substringAfter('[').substringBefore("]:", "")
-            } else {
-                clientAddr.substringBefore(':', "")
-            }
-        val port = clientAddr.substringAfterLast(':', "").toIntOrNull()
-        val isIp = if (isIpv6) NetUtil.isValidIpV6Address(host) else NetUtil.isValidIpV4Address(host)
-        return host.takeIf { isIp && port != null && port in 0..MAX_PORT }
+        val ipv6 = BRACKETED_HOST_PORT.matchEntire(clientAddr)
+        val ipv4 = PLAIN_HOST_PORT.matchEntire(clientAddr)
+        val host = ipv6?.groupValues?.get(1)?.substringBefore('%') ?: ipv4?.groupValues?.get(1)
+        val port = (ipv6 ?: ipv4)?.groupValues?.get(2)?.toInt()
+        val isIp =
+            if (ipv6 != null) NetUtil.isValidIpV6Address(host.orEmpty()) else NetUtil.isValidIpV4Address(host.orEmpty())
+        return host.takeIf { isIp && port != null && port <= MAX_PORT }
     }
 
-    /** PROTOCOL.md section 4: `client_addr` is required, and an `OPEN` without it is invalid and ignored. */
+    /**
+     * PROTOCOL.md section 4: `client_addr` is required, and an `OPEN` without it or with an empty one is invalid and
+     * ignored. A malformed one is treated the same.
+     */
     fun isValid(): Boolean = token.isNotEmpty() && addr.isNotEmpty() && clientIp() != null && (useHttps || !useMtls)
 }
 

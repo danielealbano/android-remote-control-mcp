@@ -318,37 +318,7 @@ class McpServerTunnelListenerTest {
         for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
             val holds = CopyOnWriteArrayList<AutoCloseable>()
             val sockets =
-                object : SocketFactory() {
-                    override fun createSocket(): Socket =
-                        Socket().apply {
-                            bind(InetSocketAddress(LOOPBACK, 0))
-                            holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS)
-                        }
-
-                    override fun createSocket(
-                        host: String,
-                        port: Int,
-                    ): Socket = error("not used by OkHttp")
-
-                    override fun createSocket(
-                        host: String,
-                        port: Int,
-                        localHost: InetAddress,
-                        localPort: Int,
-                    ): Socket = error("not used by OkHttp")
-
-                    override fun createSocket(
-                        host: InetAddress,
-                        port: Int,
-                    ): Socket = error("not used by OkHttp")
-
-                    override fun createSocket(
-                        address: InetAddress,
-                        port: Int,
-                        localAddress: InetAddress,
-                        localPort: Int,
-                    ): Socket = error("not used by OkHttp")
-                }
+                boundSockets(LOOPBACK) { localPort -> holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS) }
             val client =
                 OkHttpClient
                     .Builder()
@@ -379,6 +349,75 @@ class McpServerTunnelListenerTest {
             client.connectionPool.evictAll()
         }
     }
+
+    /** An app on the phone that binds the port of a live splice on another loopback address. */
+    @Test
+    fun `a connection from another loopback address does not get the address held for its port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val holds = CopyOnWriteArrayList<AutoCloseable>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .socketFactory(
+                    boundSockets(OTHER_LOOPBACK) { localPort ->
+                        holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS)
+                    },
+                ).sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                .hostnameVerifier { _, _ -> true }
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$port/mcp")
+                .build()
+
+        client.newCall(request).execute().use { assertEquals(HTTP_UNAUTHORIZED, it.code) }
+
+        assertEquals(
+            "Authentication failed from unknown",
+            serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+        )
+        holds.forEach { it.close() }
+    }
+
+    /** Sockets bound before connecting, so their local port is known before any byte reaches the listener. */
+    private fun boundSockets(
+        source: String,
+        onBound: (localPort: Int) -> Unit,
+    ): SocketFactory =
+        object : SocketFactory() {
+            override fun createSocket(): Socket =
+                Socket().apply {
+                    bind(InetSocketAddress(source, 0))
+                    onBound(localPort)
+                }
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+                localHost: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: InetAddress,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                address: InetAddress,
+                port: Int,
+                localAddress: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+        }
 
     @Test
     fun `HTTP-1-1 requests see the https scheme`() {
@@ -522,6 +561,7 @@ class McpServerTunnelListenerTest {
         const val TOKEN = "tunnel-listener-test-token"
         const val SPOOFED = "198.51.100.6"
         const val RELAY_ADDRESS = "203.0.113.10"
+        const val OTHER_LOOPBACK = "127.0.0.2"
         const val HTTP_UNAUTHORIZED = 401
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50

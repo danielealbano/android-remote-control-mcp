@@ -34,6 +34,8 @@ class ArcTunnelWireTest {
         "198.51.100.7:52144, 198.51.100.7",
         "[2001:db8::7]:52144, 2001:db8::7",
         "[::ffff:198.51.100.7]:1, ::ffff:198.51.100.7",
+        "[fe80::1%eth0]:5, fe80::1",
+        "[::1%Verified by Google]:1, ::1",
     )
     fun `OpenPayload clientIp reads the host of client_addr`(
         clientAddr: String,
@@ -57,6 +59,12 @@ class ArcTunnelWireTest {
             "[2001:db8::7:1",
             "example.com:443",
             "Verified, safe:1",
+            "[[::1]]:1",
+            "198.51.100.7:junk:1",
+            "[::1]:x]:1",
+            "[::1]:",
+            "%:1",
+            "198.51.100.7:123456",
         ],
     )
     fun `OpenPayload clientIp refuses a malformed client_addr`(clientAddr: String) {

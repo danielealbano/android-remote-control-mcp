@@ -52,6 +52,7 @@ enum class ClientIpSource {
 internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
 internal val TunnelClientIpKey = AttributeKey<String>("TunnelClientIp")
 private const val IPV4_LOOPBACK_PREFIX = "127."
+private const val SPLICE_SOURCE_ADDRESS = "127.0.0.1"
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
 private const val NON_LITERAL_CHARS = "%[]"
 
@@ -60,10 +61,16 @@ fun Application.markClientIpSource(source: ClientIpSource) {
     intercept(ApplicationCallPipeline.Setup) { call.attributes.put(ClientIpSourceKey, source) }
 }
 
-/** Looks up the public client of every request of the free E2E tunnel's listener, by its connection's remote port. */
+/**
+ * Looks up the public client of every request of the free E2E tunnel's listener, by its connection's remote port. Only
+ * for the splice's own source address: another app could bind that port on another loopback address.
+ */
 fun Application.resolveTunnelClients(addresses: TunnelClientAddresses) {
     intercept(ApplicationCallPipeline.Setup) {
-        addresses.clientIpOf(call.request.origin.remotePort)?.let { call.attributes.put(TunnelClientIpKey, it) }
+        val origin = call.request.origin
+        if (origin.remoteAddress == SPLICE_SOURCE_ADDRESS) {
+            addresses.clientIpOf(origin.remotePort)?.let { call.attributes.put(TunnelClientIpKey, it) }
+        }
     }
 }
 

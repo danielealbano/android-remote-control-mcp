@@ -199,6 +199,8 @@ class ArcTunnelOpenHandlerTest {
 
             handler(closedPort()).handle(open(), sessions)
 
+            awaitLatch(upgraded)
+            assertEquals(1, events.failures.size)
             assertTrue(holds.isEmpty())
         }
 
