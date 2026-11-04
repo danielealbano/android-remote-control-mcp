@@ -33,7 +33,9 @@ import java.net.URI
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPrivateKey
 import java.security.spec.ECParameterSpec
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.SocketFactory
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -306,6 +308,117 @@ class McpServerTunnelListenerTest {
         }
     }
 
+    /** As the splice does: the local port of the socket is known, and held, before any byte reaches the listener. */
+    @Test
+    fun `the tunnel listener reports the relay's address for the connection`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val holds = CopyOnWriteArrayList<AutoCloseable>()
+            val sockets =
+                boundSockets(LOOPBACK) { localPort -> holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS) }
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .socketFactory(sockets)
+                    .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                    .hostnameVerifier { _, _ -> true }
+                    .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                    .build()
+            val request =
+                Request
+                    .Builder()
+                    .url("https://$LOOPBACK:$port/mcp")
+                    .header("CF-Connecting-IP", SPOOFED)
+                    .header("X-Forwarded-For", SPOOFED)
+                    .build()
+
+            client.newCall(request).execute().use {
+                assertEquals(protocol, it.protocol)
+                assertEquals(HTTP_UNAUTHORIZED, it.code)
+            }
+
+            assertEquals(
+                "Authentication failed from $RELAY_ADDRESS",
+                serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+                "$protocol",
+            )
+            holds.forEach { it.close() }
+            client.connectionPool.evictAll()
+        }
+    }
+
+    /** An app on the phone that binds the port of a live splice on another loopback address. */
+    @Test
+    fun `a connection from another loopback address does not get the address held for its port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val holds = CopyOnWriteArrayList<AutoCloseable>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .socketFactory(
+                    boundSockets(OTHER_LOOPBACK) { localPort ->
+                        holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS)
+                    },
+                ).sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                .hostnameVerifier { _, _ -> true }
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$port/mcp")
+                .build()
+
+        client.newCall(request).execute().use { assertEquals(HTTP_UNAUTHORIZED, it.code) }
+
+        assertEquals(
+            "Authentication failed from unknown",
+            serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+        )
+        holds.forEach { it.close() }
+    }
+
+    /** Sockets bound before connecting, so their local port is known before any byte reaches the listener. */
+    private fun boundSockets(
+        source: String,
+        onBound: (localPort: Int) -> Unit,
+    ): SocketFactory =
+        object : SocketFactory() {
+            override fun createSocket(): Socket =
+                Socket().apply {
+                    bind(InetSocketAddress(source, 0))
+                    onBound(localPort)
+                }
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+                localHost: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: InetAddress,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                address: InetAddress,
+                port: Int,
+                localAddress: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+        }
+
     @Test
     fun `HTTP-1-1 requests see the https scheme`() {
         server.start()
@@ -447,6 +560,8 @@ class McpServerTunnelListenerTest {
         const val HTTPS_DEFAULT_PORT = 443
         const val TOKEN = "tunnel-listener-test-token"
         const val SPOOFED = "198.51.100.6"
+        const val RELAY_ADDRESS = "203.0.113.10"
+        const val OTHER_LOOPBACK = "127.0.0.2"
         const val HTTP_UNAUTHORIZED = 401
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50

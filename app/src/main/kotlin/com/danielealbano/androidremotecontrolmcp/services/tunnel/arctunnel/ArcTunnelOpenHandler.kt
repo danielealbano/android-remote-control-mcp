@@ -9,6 +9,7 @@ class ArcTunnelOpenHandler(
     private val dialBack: ArcTunnelDialBack,
     private val localPort: () -> Int,
     private val events: ArcTunnelControlEvents,
+    private val holdClientAddress: (localPort: Int, clientIp: String) -> AutoCloseable,
     private val localConnectWindowMs: Long = ArcTunnelLocalConnect.WINDOW_MS,
 ) {
     private val splices = AtomicInteger()
@@ -21,8 +22,13 @@ class ArcTunnelOpenHandler(
         open: ArcTunnelOpenPayload,
         sessions: ArcTunnelSessions,
     ) {
-        if (!open.isValid()) {
-            Log.w(TAG, "invalid OPEN ignored: addr=${open.addr} use_https=${open.useHttps} use_mtls=${open.useMtls}")
+        val clientIp = open.clientIp()
+        if (!open.isValid() || clientIp == null) {
+            Log.w(
+                TAG,
+                "invalid OPEN ignored: addr=${open.addr} use_https=${open.useHttps} use_mtls=${open.useMtls} " +
+                    "client_addr=${open.clientAddr}",
+            )
             return
         }
         val remote = openRemote(open, sessions) ?: return
@@ -31,7 +37,8 @@ class ArcTunnelOpenHandler(
             val local = if (sessions.add(remote.socket)) openLocal(open.addr, remote, sessions) else null
             if (local != null) {
                 spliced = true
-                splice(local, remote, sessions)
+                // Held before the splice starts, so before the first byte of the first request can arrive.
+                holdClientAddress(local.localPort, clientIp).use { splice(local, remote, sessions) }
             }
         } finally {
             // A cancellation before the splice (e.g. inside the local-connect window) must not leave the

@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
 import io.ktor.http.Headers
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -17,8 +18,8 @@ import io.netty.util.NetUtil
  * docs/PROJECT.md for what each tunnel was measured to deliver.
  */
 enum class ClientIpSource {
-    /** Nothing tells this listener who the client is, and its peer is always loopback: it reports no address. */
-    UNKNOWN,
+    /** The relay's `client_addr` for this connection, held in [TunnelClientAddresses], or none. No header counts. */
+    FREE_TUNNEL,
 
     /** The socket peer: nothing in front of this listener sets a header that can be trusted. */
     SOCKET_PEER,
@@ -49,13 +50,28 @@ enum class ClientIpSource {
 }
 
 internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
+internal val TunnelClientIpKey = AttributeKey<String>("TunnelClientIp")
 private const val IPV4_LOOPBACK_PREFIX = "127."
+private const val SPLICE_SOURCE_ADDRESS = "127.0.0.1"
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
 private const val NON_LITERAL_CHARS = "%[]"
 
 /** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
 fun Application.markClientIpSource(source: ClientIpSource) {
     intercept(ApplicationCallPipeline.Setup) { call.attributes.put(ClientIpSourceKey, source) }
+}
+
+/**
+ * Looks up the public client of every request of the free E2E tunnel's listener, by its connection's remote port. Only
+ * for the splice's own source address: another app could bind that port on another loopback address.
+ */
+fun Application.resolveTunnelClients(addresses: TunnelClientAddresses) {
+    intercept(ApplicationCallPipeline.Setup) {
+        val origin = call.request.origin
+        if (origin.remoteAddress == SPLICE_SOURCE_ADDRESS) {
+            addresses.clientIpOf(origin.remotePort)?.let { call.attributes.put(TunnelClientIpKey, it) }
+        }
+    }
 }
 
 /**
@@ -66,7 +82,7 @@ fun ApplicationCall.clientIp(): String? {
     val source = attributes.getOrNull(ClientIpSourceKey) ?: ClientIpSource.SOCKET_PEER
     val peer = request.origin.remoteAddress.takeIf { it.isNotEmpty() }
     return when {
-        source == ClientIpSource.UNKNOWN -> null
+        source == ClientIpSource.FREE_TUNNEL -> attributes.getOrNull(TunnelClientIpKey)
         peer != null && isLoopback(peer) -> forwardedAddress(source, request.headers) ?: peer
         else -> peer
     }
@@ -77,7 +93,7 @@ private fun forwardedAddress(
     headers: Headers,
 ): String? =
     when (source) {
-        ClientIpSource.UNKNOWN, ClientIpSource.SOCKET_PEER -> null
+        ClientIpSource.FREE_TUNNEL, ClientIpSource.SOCKET_PEER -> null
         ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
     }?.trim()?.takeIf { isIpLiteral(it) }

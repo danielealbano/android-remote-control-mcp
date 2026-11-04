@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.coEvery
@@ -90,6 +91,7 @@ class ArcTunnelProviderTest {
             secondArg<Int?>() ?: LISTENER_PORT
         }
         every { host.stopTlsListener() } just runs
+        every { host.clientAddresses } returns TunnelClientAddresses()
         provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog)
     }
 

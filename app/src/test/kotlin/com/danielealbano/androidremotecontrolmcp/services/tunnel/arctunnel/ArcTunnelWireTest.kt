@@ -2,9 +2,13 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("ArcTunnel wire types")
 class ArcTunnelWireTest {
@@ -15,11 +19,57 @@ class ArcTunnelWireTest {
 
     @Test
     fun `OpenPayload isValid rules`() {
-        assertTrue(open("""{"token":"t","addr":"h:1","use_https":true,"use_mtls":true,"extra":1}""").isValid())
-        assertTrue(open("""{"token":"t","addr":"h:1"}""").isValid())
-        assertFalse(open("""{"token":"","addr":"h:1"}""").isValid())
-        assertFalse(open("""{"token":"t","addr":""}""").isValid())
-        assertFalse(open("""{"token":"t","addr":"h:1","use_https":false,"use_mtls":true}""").isValid())
+        val client = """"client_addr":"198.51.100.7:52144""""
+        assertTrue(open("""{"token":"t","addr":"h:1","use_https":true,"use_mtls":true,"extra":1,$client}""").isValid())
+        assertTrue(open("""{"token":"t","addr":"h:1",$client}""").isValid())
+        assertFalse(open("""{"token":"","addr":"h:1",$client}""").isValid())
+        assertFalse(open("""{"token":"t","addr":"",$client}""").isValid())
+        assertFalse(open("""{"token":"t","addr":"h:1","use_https":false,"use_mtls":true,$client}""").isValid())
+        assertFalse(open("""{"token":"t","addr":"h:1"}""").isValid(), "client_addr is required")
+        assertFalse(open("""{"token":"t","addr":"h:1","client_addr":""}""").isValid(), "an empty one counts as none")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "198.51.100.7:52144, 198.51.100.7",
+        "[2001:db8::7]:52144, 2001:db8::7",
+        "[::ffff:198.51.100.7]:1, ::ffff:198.51.100.7",
+        "[fe80::1%eth0]:5, fe80::1",
+        "[::1%Verified by Google]:1, ::1",
+    )
+    fun `OpenPayload clientIp reads the host of client_addr`(
+        clientAddr: String,
+        clientIp: String,
+    ) {
+        assertEquals(clientIp, ArcTunnelOpenPayload(clientAddr = clientAddr).clientIp())
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "",
+            "198.51.100.7",
+            "198.51.100.7:",
+            "198.51.100.7:port",
+            "198.51.100.7:65536",
+            "999.1.1.1:1",
+            "2001:db8::7:52144",
+            "[198.51.100.7]:1",
+            "[2001:db8::7]",
+            "[2001:db8::7:1",
+            "example.com:443",
+            "Verified, safe:1",
+            "[[::1]]:1",
+            "198.51.100.7:junk:1",
+            "[::1]:x]:1",
+            "[::1]:",
+            "%:1",
+            "198.51.100.7:123456",
+            "[%eth0]:5",
+        ],
+    )
+    fun `OpenPayload clientIp refuses a malformed client_addr`(clientAddr: String) {
+        assertNull(ArcTunnelOpenPayload(clientAddr = clientAddr).clientIp())
     }
 
     @Test

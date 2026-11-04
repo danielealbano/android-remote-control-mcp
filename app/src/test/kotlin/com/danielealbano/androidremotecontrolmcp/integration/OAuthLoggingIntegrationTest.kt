@@ -101,14 +101,14 @@ class OAuthLoggingIntegrationTest {
         }
 
     @Test
-    @DisplayName("authorize takes the address from what the listener trusts: none on the free tunnel")
+    @DisplayName("authorize takes the address from what the listener trusts: none without a relay address")
     fun authorizeUsesTheListenersSource() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.withOAuthTestApplication(
                 deps = deps,
                 publicUrlOverride = OVERRIDE,
-                clientIpSource = ClientIpSource.UNKNOWN,
+                clientIpSource = ClientIpSource.FREE_TUNNEL,
             ) { ctx ->
                 val clientId = register(client)
 
