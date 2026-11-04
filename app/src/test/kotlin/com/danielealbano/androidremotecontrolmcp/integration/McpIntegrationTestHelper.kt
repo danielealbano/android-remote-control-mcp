@@ -10,10 +10,12 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfi
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.ClientIpSource
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.effectiveBaseUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpBasePlugins
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpStatelessTransport
+import com.danielealbano.androidremotecontrolmcp.mcp.markClientIpSource
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStoreImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenServiceImpl
@@ -548,6 +550,7 @@ object McpIntegrationTestHelper {
         bearerTokenEnabled: Boolean = false,
         bearerToken: String = "",
         publicUrlOverride: String = "",
+        clientIpSource: ClientIpSource? = null,
         testBlock: suspend io.ktor.server.testing.ApplicationTestBuilder.(OAuthTestContext) -> Unit,
     ) {
         val sdkServer = createSdkServer(deps)
@@ -570,6 +573,7 @@ object McpIntegrationTestHelper {
 
         testApplication {
             application {
+                clientIpSource?.let { markClientIpSource(it) }
                 // Full production wiring WITH CORS in front of the real OAuth routes, so the
                 // OAuth-flow tests verify OAuth and CORS coexist end-to-end.
                 installMcpBasePlugins {

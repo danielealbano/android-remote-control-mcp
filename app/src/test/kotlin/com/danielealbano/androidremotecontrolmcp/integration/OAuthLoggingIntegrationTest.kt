@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
+import com.danielealbano.androidremotecontrolmcp.mcp.ClientIpSource
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -94,6 +96,34 @@ class OAuthLoggingIntegrationTest {
                 assertNotEquals(SPOOFED_ADDRESS, approval.clientIp)
                 assertTrue(
                     deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).none { it.message.contains(SPOOFED_ADDRESS) },
+                )
+            }
+        }
+
+    @Test
+    @DisplayName("authorize takes the address from what the listener trusts: none on the free tunnel")
+    fun authorizeUsesTheListenersSource() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.withOAuthTestApplication(
+                deps = deps,
+                publicUrlOverride = OVERRIDE,
+                clientIpSource = ClientIpSource.UNKNOWN,
+            ) { ctx ->
+                val clientId = register(client)
+
+                authorize(client, clientId, spoofedAddress = SPOOFED_ADDRESS)
+
+                val approval =
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                assertNull(approval.clientIp)
+                assertTrue(
+                    deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).any {
+                        it.message.endsWith("authorization requested by Claude")
+                    },
                 )
             }
         }

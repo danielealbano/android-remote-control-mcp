@@ -108,10 +108,17 @@ class ClientIpSourceTest {
     @Test
     @DisplayName("a forwarded value that is not an IP literal is ignored")
     fun textIsNotAnAddress() {
-        assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "Verified, safe").clientIp())
-        assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "cafe").clientIp())
         assertEquals(LOOPBACK, call(ClientIpSource.NGROK, xForwardedFor = listOf("Verified, safe")).clientIp())
-        assertEquals("2001:db8::7", call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "2001:db8::7").clientIp())
+        for (text in listOf("Verified, safe", "cafe", "dead.beef", "..", "::::", "999.1.1.1", "1.2.3.4:5678")) {
+            assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = text).clientIp(), text)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["203.0.113.10", "2001:db8::7", "2001:DB8::7", "::ffff:203.0.113.10"])
+    @DisplayName("a forwarded IPv4 or IPv6 literal is accepted")
+    fun addressesAreAccepted(address: String) {
+        assertEquals(address, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = address).clientIp())
     }
 
     @ParameterizedTest

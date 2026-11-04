@@ -287,7 +287,7 @@ class McpServerListenersTest {
 
         for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
             val pinned = httpsClient.protocols(listOf(protocol, Protocol.HTTP_1_1).distinct()).build()
-            failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", pinned)
+            failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", pinned, protocol)
             assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure(), "$protocol")
         }
 
@@ -321,6 +321,7 @@ class McpServerListenersTest {
     private fun failAuthenticationWithSpoofedHeaders(
         url: String,
         httpClient: OkHttpClient,
+        protocol: Protocol? = null,
     ) {
         val request =
             Request
@@ -330,7 +331,10 @@ class McpServerListenersTest {
                 .addHeader("X-Forwarded-For", SPOOFED_XFF)
                 .addHeader("X-Forwarded-For", NGROK_ADDED)
                 .build()
-        assertEquals(HTTP_UNAUTHORIZED, httpClient.newCall(request).execute().use { it.code })
+        httpClient.newCall(request).execute().use {
+            assertEquals(HTTP_UNAUTHORIZED, it.code)
+            protocol?.let { expected -> assertEquals(expected, it.protocol) }
+        }
     }
 
     private fun lastAuthFailure(): String = serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message

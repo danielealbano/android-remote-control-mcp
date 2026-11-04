@@ -9,6 +9,7 @@ import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.util.AttributeKey
+import io.netty.util.NetUtil
 
 /**
  * What a listener trusts for the address of the client behind a request. The address and a location looked up from it
@@ -44,7 +45,6 @@ enum class ClientIpSource {
 internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
 private const val IPV4_LOOPBACK_PREFIX = "127."
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
-private val IP_LITERAL = Regex("""(?=.*[:.])[0-9A-Fa-f:.]{2,45}""")
 
 /** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
 fun Application.markClientIpSource(source: ClientIpSource) {
@@ -73,7 +73,7 @@ private fun forwardedAddress(
         ClientIpSource.UNKNOWN, ClientIpSource.SOCKET_PEER -> null
         ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
-    }?.trim()?.takeIf { IP_LITERAL.matches(it) }
+    }?.trim()?.takeIf { NetUtil.isValidIpV4Address(it) || NetUtil.isValidIpV6Address(it) }
 
 private fun isLoopback(address: String): Boolean {
     val host = address.substringBefore('%')
