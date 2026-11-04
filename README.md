@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="docs/assets/arc-mcp-logo.png" alt="ARC MCP, Android Remote Control MCP" width="640">
+  <br>
+  <sub>The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</sub>
+</p>
+
 # Android Remote Control MCP
 
 [![CI](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml)
