@@ -2,6 +2,8 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,13 +33,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelStatusPage
 import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalBlock
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelUrlState
@@ -128,6 +133,12 @@ fun ArcTunnelSettingsSection(
     )
 }
 
+/** The status page is that of the public service: a self-hosted base address has its own, or none. */
+internal fun arcTunnelStatusLinkVisible(baseAddress: String): Boolean {
+    val address = baseAddress.trim()
+    return address == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS
+}
+
 @Composable
 fun ArcTunnelSettingsContent(
     state: ArcTunnelSettingsState,
@@ -198,6 +209,19 @@ fun ArcTunnelSettingsContent(
                 onRetry = actions.onRetryRenewal,
                 cancelEnabled = state.renewal != ArcTunnelRenewalState.Installing,
             )
+        }
+        if (arcTunnelStatusLinkVisible(state.baseAddress)) {
+            val context = LocalContext.current
+            TextButton(
+                onClick = {
+                    runCatching {
+                        val page = Uri.parse(ArcTunnelStatusPage.PAGE_URL)
+                        context.startActivity(Intent(Intent.ACTION_VIEW, page))
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.remote_access_arc_tunnel_status_link))
+            }
         }
     }
 

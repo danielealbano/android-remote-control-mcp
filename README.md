@@ -1,17 +1,20 @@
 <p align="center">
   <img src="docs/assets/arc-mcp-logo.png" alt="ARC MCP, Android Remote Control MCP" width="640">
-  <br>
-  <sub>The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</sub>
 </p>
 
 # Android Remote Control MCP
 
 [![CI](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml)
 [![License: GPL v3 or later](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE.md)
+[![Tunnel status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fstatus.arc-tunnel.io%2Findex.json&query=%24.data.attributes.aggregate_state&label=tunnel&color=blue)](https://status.arc-tunnel.io/)
 
 An Android application that runs as an **MCP (Model Context Protocol) server**, enabling AI models to **fully control an Android device** remotely using accessibility services and screenshot capture.
 
-The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device — reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
+The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device: reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
+
+Optional [Privacy Mode](#privacy-mode) detects and hides personal data, such as emails, card numbers, credentials and names, in what the tools return, before it leaves the device for the AI provider. Detection runs entirely on the device, and it reduces exposure rather than guaranteeing it.
+
+To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel gives it a public URL with no account and no registration. TLS ends on the phone, so the tunnel service only relays encrypted bytes and cannot read your traffic. Cloudflare and ngrok are also supported, but they terminate TLS themselves and can read it.
 
 > **Warning:** This software is provided "as-is" without warranty of any kind, for **research and educational purposes only**. The authors do not condone the use of this tool for any illegal, unauthorized, or unethical activities. Users are solely responsible for ensuring their use complies with all applicable laws and regulations. By using this software, you agree to use it responsibly and at your own risk.
 

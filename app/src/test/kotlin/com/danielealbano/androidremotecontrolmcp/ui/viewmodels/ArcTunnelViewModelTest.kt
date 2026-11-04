@@ -10,6 +10,8 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceProblem
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -18,11 +20,17 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -43,6 +51,7 @@ class ArcTunnelViewModelTest {
     private val repository = mockk<SettingsRepository>(relaxed = true)
     private val enrollment = mockk<ArcTunnelEnrollment>(relaxed = true)
     private val ctAlerts = mockk<ArcTunnelCtAlerts>(relaxed = true)
+    private val serviceStatus = mockk<ArcTunnelServiceStatus>()
     private val renewal = MutableStateFlow<ArcTunnelRenewalState>(ArcTunnelRenewalState.Idle)
     private val renewals = mockk<ArcTunnelRenewals>(relaxed = true) { every { state } returns renewal }
     private var savedUrl: String? = null
@@ -63,11 +72,144 @@ class ArcTunnelViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): ArcTunnelViewModel =
-        ArcTunnelViewModel(repository, enrollment, renewals, ctAlerts, dispatcher).also { viewModel = it }
+    private fun createViewModel(): ArcTunnelViewModel {
+        viewModel = ArcTunnelViewModel(repository, enrollment, renewals, ctAlerts, serviceStatus, dispatcher)
+        return viewModel
+    }
 
     private fun arc(tunnelEnabled: Boolean): ServerConfig =
         ServerConfig(tunnelEnabled = tunnelEnabled, tunnelProvider = TunnelProviderType.ARC_TUNNEL)
+
+    private fun reportedConfig() = arc(tunnelEnabled = true)
+
+    /** Starts the view model on [settings] and lets it read them; polling only begins once something collects. */
+    private fun TestScope.startForStatus(settings: ServerConfig) {
+        config.value = settings
+        savedUrl = "https://name.d.arc-tunnel.io"
+        createViewModel()
+        advanceUntilIdle()
+    }
+
+    private fun TestScope.collectProblem(): Job {
+        val collecting = UnconfinedTestDispatcher(testScheduler)
+        return launch(collecting) { viewModel.serviceProblem.collect {} }
+    }
+
+    @Test
+    fun `the status page is not asked while nothing collects the problem`() =
+        runTest(dispatcher) {
+            startForStatus(reportedConfig())
+
+            advanceTimeBy(STATUS_POLL_MS * 2)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+        }
+
+    @Test
+    fun `a reported problem shows while collected, and refreshes it`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            startForStatus(reportedConfig())
+
+            val collector = collectProblem()
+            runCurrent()
+            assertEquals(PROBLEM, viewModel.serviceProblem.value)
+            coVerify(exactly = 1) { serviceStatus.currentProblem() }
+
+            advanceTimeBy(STATUS_POLL_MS + 1)
+            coVerify(exactly = 2) { serviceStatus.currentProblem() }
+
+            collector.cancel()
+        }
+
+    @Test
+    fun `the alert goes away once the page no longer reports a problem`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returnsMany listOf(PROBLEM, null)
+            startForStatus(reportedConfig())
+
+            val collector = collectProblem()
+            runCurrent()
+            assertEquals(PROBLEM, viewModel.serviceProblem.value)
+
+            advanceTimeBy(STATUS_POLL_MS + 1)
+            assertEquals(null, viewModel.serviceProblem.value)
+
+            collector.cancel()
+        }
+
+    @Test
+    fun `leaving the screen stops asking and drops the alert`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            startForStatus(reportedConfig())
+            val collector = collectProblem()
+            runCurrent()
+
+            collector.cancel()
+            advanceTimeBy(STATUS_POLL_MS * 3)
+
+            coVerify(exactly = 1) { serviceStatus.currentProblem() }
+            assertEquals(null, viewModel.serviceProblem.value)
+        }
+
+    @Test
+    fun `no saved identity means the page is not asked`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            config.value = reportedConfig()
+            savedUrl = null
+            createViewModel()
+            advanceUntilIdle()
+
+            val collector = collectProblem()
+            advanceTimeBy(STATUS_POLL_MS)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+            assertEquals(null, viewModel.serviceProblem.value)
+            collector.cancel()
+        }
+
+    @Test
+    fun `another provider, the tunnel off or a self-hosted server means the page is not asked`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            val notRelevant =
+                listOf(
+                    reportedConfig().copy(tunnelProvider = TunnelProviderType.NGROK),
+                    reportedConfig().copy(tunnelProvider = TunnelProviderType.CLOUDFLARE),
+                    reportedConfig().copy(tunnelEnabled = false),
+                    reportedConfig().copy(arcTunnelBaseAddress = "tunnel.example.org"),
+                )
+            for (settings in notRelevant) {
+                startForStatus(settings)
+
+                val collector = collectProblem()
+                advanceTimeBy(STATUS_POLL_MS)
+
+                coVerify(exactly = 0) { serviceStatus.currentProblem() }
+                assertEquals(null, viewModel.serviceProblem.value, "$settings")
+                collector.cancel()
+            }
+        }
+
+    @Test
+    fun `moving to another provider drops the alert and stops asking`() =
+        runTest(dispatcher) {
+            coEvery { serviceStatus.currentProblem() } returns PROBLEM
+            startForStatus(reportedConfig())
+            val collector = collectProblem()
+            runCurrent()
+            assertEquals(PROBLEM, viewModel.serviceProblem.value)
+
+            config.value = reportedConfig().copy(tunnelProvider = TunnelProviderType.NGROK)
+            runCurrent()
+            assertEquals(null, viewModel.serviceProblem.value)
+
+            advanceTimeBy(STATUS_POLL_MS * 3)
+            coVerify(exactly = 1) { serviceStatus.currentProblem() }
+            collector.cancel()
+        }
 
     @Test
     fun `url is Loading until the first config then NotEnrolled or Enrolled`() =
@@ -410,6 +552,9 @@ class ArcTunnelViewModelTest {
         }
 
     private companion object {
+        const val STATUS_POLL_MS = 60_000L
+        val PROBLEM = ArcTunnelServiceProblem("degraded", listOf("Tunnels"))
+
         const val URL = "https://abcdefghij.d.arc-tunnel.io"
         const val OTHER_BASE = "tunnel.example.org"
         const val OTHER_URL = "https://abcdefghij.d.tunnel.example.org"

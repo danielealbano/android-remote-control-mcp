@@ -14,11 +14,22 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceProblem
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,6 +56,7 @@ class ArcTunnelViewModel
         private val enrollment: ArcTunnelEnrollment,
         private val renewals: ArcTunnelRenewals,
         private val ctAlerts: ArcTunnelCtAlerts,
+        private val serviceStatus: ArcTunnelServiceStatus,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _baseAddressInput = MutableStateFlow(ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
@@ -63,6 +75,31 @@ class ArcTunnelViewModel
         val enrollmentState: StateFlow<ArcTunnelEnrollmentState> = enrollment.state
 
         val ctAlert: StateFlow<ArcTunnelCtAlert?> = ctAlerts.alert
+
+        /**
+         * A problem reported by the status page of the public tunnel service. It only concerns a phone with a saved
+         * identity on that service and with the free tunnel selected. It is only refreshed while this is collected, so
+         * while the Server screen is visible: nothing polls in the background. A refresh reuses the last answer until
+         * [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val serviceProblem: StateFlow<ArcTunnelServiceProblem?> =
+            combine(settingsRepository.serverConfig, _url) { config, url ->
+                config.tunnelEnabled &&
+                    config.tunnelProvider == TunnelProviderType.ARC_TUNNEL &&
+                    config.arcTunnelBaseAddress == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS &&
+                    url is ArcTunnelUrlState.Enrolled
+            }.distinctUntilChanged()
+                .flatMapLatest { relevant -> if (relevant) reportedProblems() else flowOf(null) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), null)
+
+        private fun reportedProblems() =
+            flow {
+                while (true) {
+                    emit(serviceStatus.currentProblem())
+                    delay(SERVICE_STATUS_REFRESH_MS)
+                }
+            }
 
         @Volatile
         private var env: ArcTunnelEnv = ArcTunnelEnv(ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
@@ -190,5 +227,9 @@ class ArcTunnelViewModel
             val url = enrollment.savedUrl(env)
             _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
             if (url != null) _enrollmentRequested.value = false
+        }
+
+        private companion object {
+            const val SERVICE_STATUS_REFRESH_MS = 60_000L
         }
     }

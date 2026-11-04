@@ -1,0 +1,234 @@
+package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
+
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+
+@DisplayName("Tunnel service status")
+class ArcTunnelServiceStatusTest {
+    private lateinit var server: MockWebServer
+
+    @BeforeEach
+    fun setUp() {
+        server = MockWebServer().apply { start() }
+    }
+
+    @AfterEach
+    fun tearDown() {
+        server.close()
+    }
+
+    private fun page(
+        state: String = """"degraded"""",
+        included: String = """[${resource("Tunnels", "degraded")},${resource("Database", "operational")}]""",
+    ) = """{"data":{"type":"status_page","attributes":{"aggregate_state":$state}},"included":$included}"""
+
+    private fun resource(
+        name: String,
+        status: String,
+    ) = """{"type":"status_page_resource","attributes":{"public_name":"$name","status":"$status"}}"""
+
+    private var nowMs = START_MS
+
+    private fun status() = ArcTunnelServiceStatusImpl(server.url("/index.json").toString(), Dispatchers.IO) { nowMs }
+
+    @Test
+    fun `operational is no problem, even if one service says otherwise`() {
+        assertNull(ArcTunnelStatusPage.parseProblem(page(""""operational"""")))
+    }
+
+    @Test
+    fun `any other state is a problem, with the services not operational`() {
+        val problem = ArcTunnelStatusPage.parseProblem(page())
+
+        assertEquals(ArcTunnelServiceProblem("degraded", listOf("Tunnels")), problem)
+    }
+
+    @Test
+    fun `a state not seen before is still a problem, shown readably`() {
+        assertEquals("partial outage", ArcTunnelStatusPage.parseProblem(page(""""partial_outage"""", "[]"))?.state)
+    }
+
+    @Test
+    fun `a service that is not monitored is not listed as affected`() {
+        val included = """[${resource("Tunnels", "downtime")},${resource("Fleet", "not_monitored")}]"""
+
+        assertEquals(listOf("Tunnels"), ArcTunnelStatusPage.parseProblem(page(included = included))?.affected)
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "",
+            "not json",
+            "[]",
+            "null",
+            "<html>maintenance</html>",
+            "{}",
+            """{"data":null}""",
+            """{"data":[]}""",
+            """{"data":{}}""",
+            """{"data":{"attributes":null}}""",
+            """{"data":{"attributes":{}}}""",
+            """{"data":{"attributes":{"aggregate_state":null}}}""",
+            """{"data":{"attributes":{"aggregate_state":""}}}""",
+            """{"data":{"attributes":{"aggregate_state":"  "}}}""",
+            """{"data":{"attributes":{"aggregate_state":5}}}""",
+            """{"data":{"attributes":{"aggregate_state":true}}}""",
+            """{"data":{"attributes":{"aggregate_state":{"a":1}}}}""",
+            """{"aggregate_state":"degraded"}""",
+        ],
+    )
+    fun `without a readable overall state nothing is reported`(body: String) {
+        assertNull(ArcTunnelStatusPage.parseProblem(body))
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "null",
+            "{}",
+            "5",
+            "[5,null,{}]",
+            """[{"type":"status_page_resource"}]""",
+            """[{"type":"status_page_resource","attributes":null}]""",
+            """[{"type":"status_page_resource","attributes":{"status":"degraded"}}]""",
+            """[{"type":"status_page_resource","attributes":{"public_name":"Tunnels"}}]""",
+            """[{"type":"status_page_resource","attributes":{"public_name":5,"status":"degraded"}}]""",
+            """[{"type":"other","attributes":{"public_name":"Tunnels","status":"degraded"}}]""",
+        ],
+    )
+    fun `details that cannot be read lose only the details`(included: String) {
+        val problem = ArcTunnelStatusPage.parseProblem(page(included = included))
+
+        assertEquals(ArcTunnelServiceProblem("degraded", emptyList()), problem)
+    }
+
+    @Test
+    fun `a missing list of services loses only the details`() {
+        val body = """{"data":{"attributes":{"aggregate_state":"degraded"}}}"""
+
+        assertEquals(ArcTunnelServiceProblem("degraded", emptyList()), ArcTunnelStatusPage.parseProblem(body))
+    }
+
+    @Test
+    fun `the page is read as JSON whatever content type it is served with`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(page())
+                    .setHeader("Content-Type", "text/html; charset=utf-8")
+                    .build(),
+            )
+
+            assertEquals(ArcTunnelServiceProblem("degraded", listOf("Tunnels")), status().currentProblem())
+        }
+
+    @Test
+    fun `an HTTP error reports nothing`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(HTTP_ERROR)
+                    .body(page())
+                    .build(),
+            )
+
+            assertNull(status().currentProblem())
+        }
+
+    @Test
+    fun `a server that cannot be reached reports nothing`() =
+        runBlocking {
+            val status = status()
+            server.close()
+
+            assertNull(status.currentProblem())
+        }
+
+    @Test
+    fun `a malformed URL reports nothing`() =
+        runBlocking {
+            assertNull(ArcTunnelServiceStatusImpl("not a url", Dispatchers.IO) { nowMs }.currentProblem())
+        }
+
+    @Test
+    fun `a body too large to read reports nothing`() =
+        runBlocking {
+            val tooLong = page().replace("degraded", "degraded" + " ".repeat(TOO_LARGE))
+            server.enqueue(MockResponse.Builder().body(tooLong).build())
+
+            assertNull(status().currentProblem())
+        }
+
+    @Test
+    fun `the page is asked once per interval, however often the answer is wanted`() =
+        runBlocking {
+            server.enqueue(MockResponse.Builder().body(page()).build())
+            val status = status()
+
+            repeat(3) { assertEquals("degraded", status.currentProblem()?.state) }
+            nowMs += ArcTunnelStatusPage.CHECK_INTERVAL_MS - 1
+            assertEquals("degraded", status.currentProblem()?.state)
+
+            assertEquals(1, server.requestCount)
+        }
+
+    @Test
+    fun `the page is asked again once the interval has passed`() =
+        runBlocking {
+            server.enqueue(MockResponse.Builder().body(page()).build())
+            server.enqueue(MockResponse.Builder().body(page(""""operational"""")).build())
+            val status = status()
+            assertEquals("degraded", status.currentProblem()?.state)
+
+            nowMs += ArcTunnelStatusPage.CHECK_INTERVAL_MS
+
+            assertNull(status.currentProblem())
+            assertEquals(2, server.requestCount)
+        }
+
+    @Test
+    fun `a failed check also waits for the interval, so a broken page is not hammered`() =
+        runBlocking {
+            server.enqueue(MockResponse.Builder().code(HTTP_ERROR).build())
+            val status = status()
+
+            repeat(3) { assertNull(status.currentProblem()) }
+
+            assertEquals(1, server.requestCount)
+        }
+
+    @Test
+    fun `a cancellation still cancels`() {
+        val failure =
+            runCatching {
+                runBlocking {
+                    server.enqueue(MockResponse.Builder().body(page()).build())
+                    val status = status()
+                    coroutineContext[kotlinx.coroutines.Job]?.cancel()
+                    status.currentProblem()
+                }
+            }.exceptionOrNull()
+
+        assertEquals(true, failure is CancellationException)
+    }
+
+    private companion object {
+        const val START_MS = 1_000L
+        const val HTTP_ERROR = 503
+        const val TOO_LARGE = 1_100_000
+    }
+}

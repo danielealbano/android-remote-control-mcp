@@ -68,6 +68,15 @@ class ArcTunnelSettingsContentTest {
         ).forEach { assertFalse(arcTunnelSetUpVisible(it), it.toString()) }
     }
 
+    @Test
+    fun `the status link shows for the public service only`() {
+        assertTrue(arcTunnelStatusLinkVisible("arc-tunnel.io"))
+        assertTrue(arcTunnelStatusLinkVisible(" arc-tunnel.io "))
+        assertFalse(arcTunnelStatusLinkVisible("tunnel.example.org"))
+        assertFalse(arcTunnelStatusLinkVisible("sub.arc-tunnel.io"))
+        assertFalse(arcTunnelStatusLinkVisible(""))
+    }
+
     private companion object {
         const val URL = "https://abcdefghij.d.arc-tunnel.io"
     }
