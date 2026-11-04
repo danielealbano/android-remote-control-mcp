@@ -276,26 +276,34 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
         val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
-        val client =
-            OkHttpClient
-                .Builder()
-                .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
-                .hostnameVerifier { _, _ -> true }
-                .build()
-        val request =
-            Request
-                .Builder()
-                .url("https://$LOOPBACK:$port/mcp")
-                .header("CF-Connecting-IP", SPOOFED)
-                .header("X-Forwarded-For", SPOOFED)
-                .build()
 
-        client.newCall(request).execute().use { assertEquals(HTTP_UNAUTHORIZED, it.code) }
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                    .hostnameVerifier { _, _ -> true }
+                    .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                    .build()
+            val request =
+                Request
+                    .Builder()
+                    .url("https://$LOOPBACK:$port/mcp")
+                    .header("CF-Connecting-IP", SPOOFED)
+                    .header("X-Forwarded-For", SPOOFED)
+                    .build()
 
-        assertEquals(
-            "Authentication failed from $LOOPBACK",
-            serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
-        )
+            client.newCall(request).execute().use {
+                assertEquals(protocol, it.protocol)
+                assertEquals(HTTP_UNAUTHORIZED, it.code)
+            }
+
+            assertEquals(
+                "Authentication failed from unknown",
+                serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+                "$protocol",
+            )
+        }
     }
 
     @Test

@@ -16,6 +16,9 @@ import io.ktor.util.AttributeKey
  * docs/PROJECT.md for what each tunnel was measured to deliver.
  */
 enum class ClientIpSource {
+    /** Nothing tells this listener who the client is, and its peer is always loopback: it reports no address. */
+    UNKNOWN,
+
     /** The socket peer: nothing in front of this listener sets a header that can be trusted. */
     SOCKET_PEER,
 
@@ -41,6 +44,7 @@ enum class ClientIpSource {
 internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
 private const val IPV4_LOOPBACK_PREFIX = "127."
 private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
+private val IP_LITERAL = Regex("""(?=.*[:.])[0-9A-Fa-f:.]{2,45}""")
 
 /** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
 fun Application.markClientIpSource(source: ClientIpSource) {
@@ -52,10 +56,13 @@ fun Application.markClientIpSource(source: ClientIpSource) {
  * a tunnel's own process connects over loopback, and any other peer is the client itself.
  */
 fun ApplicationCall.clientIp(): String? {
-    val peer = request.origin.remoteAddress.takeIf { it.isNotEmpty() }
     val source = attributes.getOrNull(ClientIpSourceKey) ?: ClientIpSource.SOCKET_PEER
-    val forwarded = if (peer != null && isLoopback(peer)) forwardedAddress(source, request.headers) else null
-    return forwarded ?: peer
+    val peer = request.origin.remoteAddress.takeIf { it.isNotEmpty() }
+    return when {
+        source == ClientIpSource.UNKNOWN -> null
+        peer != null && isLoopback(peer) -> forwardedAddress(source, request.headers) ?: peer
+        else -> peer
+    }
 }
 
 private fun forwardedAddress(
@@ -63,10 +70,10 @@ private fun forwardedAddress(
     headers: Headers,
 ): String? =
     when (source) {
-        ClientIpSource.SOCKET_PEER -> null
+        ClientIpSource.UNKNOWN, ClientIpSource.SOCKET_PEER -> null
         ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
         ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
-    }?.trim()?.takeIf { it.isNotEmpty() }
+    }?.trim()?.takeIf { IP_LITERAL.matches(it) }
 
 private fun isLoopback(address: String): Boolean {
     val host = address.substringBefore('%')

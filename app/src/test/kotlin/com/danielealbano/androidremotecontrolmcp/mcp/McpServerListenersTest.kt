@@ -18,10 +18,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.security.KeyStore
 
@@ -53,7 +56,12 @@ class McpServerListenersTest {
         https: Boolean = false,
         oauth: Boolean = false,
         tunnel: TunnelProviderType? = null,
-    ): McpServer = newServer(localhostTunnelPort, https, oauth = oauth, tunnel = tunnel).also { it.start() }
+        network: Boolean = false,
+    ): McpServer {
+        val created = newServer(localhostTunnelPort, https, oauth = oauth, tunnel = tunnel, network = network)
+        created.start()
+        return created
+    }
 
     private fun newServer(
         localhostTunnelPort: Int?,
@@ -61,11 +69,17 @@ class McpServerListenersTest {
         specificAddress: String? = null,
         oauth: Boolean = false,
         tunnel: TunnelProviderType? = null,
+        network: Boolean = false,
     ): McpServer {
         val config =
             ServerConfig(
                 port = mainPort,
-                bindingAddress = if (specificAddress == null) BindingAddress.LOCALHOST else BindingAddress.SPECIFIC,
+                bindingAddress =
+                    when {
+                        specificAddress != null -> BindingAddress.SPECIFIC
+                        network -> BindingAddress.NETWORK
+                        else -> BindingAddress.LOCALHOST
+                    },
                 specificBindAddress = specificAddress.orEmpty(),
                 bearerToken = TOKEN,
                 bearerTokenEnabled = true,
@@ -269,13 +283,38 @@ class McpServerListenersTest {
         start(localhostTunnelPort = tunnelPort, https = true, tunnel = TunnelProviderType.CLOUDFLARE)
         val trusting = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
         val httpsClient =
-            client.newBuilder().sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager).build()
+            client.newBuilder().sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager)
 
-        failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", httpsClient)
-        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val pinned = httpsClient.protocols(listOf(protocol, Protocol.HTTP_1_1).distinct()).build()
+            failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", pinned)
+            assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure(), "$protocol")
+        }
 
         failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$tunnelPort/mcp", client)
         assertEquals("Authentication failed from $SPOOFED_CF", lastAuthFailure())
+    }
+
+    /** A LAN client: the peer is not loopback, so it is the client itself even with a tunnel on. */
+    @Test
+    fun `a client on another address cannot choose the address it shows`() {
+        val addresses =
+            NetworkInterface
+                .getNetworkInterfaces()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.asSequence() }
+                .filterIsInstance<Inet4Address>()
+                .map { requireNotNull(it.hostAddress) }
+                .toList()
+        assumeTrue(addresses.isNotEmpty(), "this machine has no non-loopback IPv4 address")
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.CLOUDFLARE, network = true)
+
+        failAuthenticationWithSpoofedHeaders("http://${addresses.first()}:$mainPort/mcp", client)
+
+        // With several interfaces the kernel may pick another of them as the source.
+        val logged = lastAuthFailure().substringAfter("from ")
+        assertTrue(logged in addresses, "$logged is not one of $addresses")
     }
 
     /** What ngrok delivers: what the client sent, then the real address on a line of its own. */

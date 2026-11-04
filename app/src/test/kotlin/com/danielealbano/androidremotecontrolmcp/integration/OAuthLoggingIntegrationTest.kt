@@ -4,6 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -19,6 +20,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -70,6 +72,28 @@ class OAuthLoggingIntegrationTest {
                         it.message.contains("rejected redirect URI(s)") &&
                             it.message.contains("https://evil.example/cb")
                     },
+                )
+            }
+        }
+
+    @Test
+    @DisplayName("authorize shows and logs no address a client set in its headers")
+    fun authorizeIgnoresAddressesInHeaders() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
+                val clientId = register(client)
+
+                authorize(client, clientId, spoofedAddress = SPOOFED_ADDRESS)
+
+                val approval =
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                assertNotEquals(SPOOFED_ADDRESS, approval.clientIp)
+                assertTrue(
+                    deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).none { it.message.contains(SPOOFED_ADDRESS) },
                 )
             }
         }
@@ -162,8 +186,13 @@ class OAuthLoggingIntegrationTest {
     private suspend fun authorize(
         client: HttpClient,
         clientId: String,
+        spoofedAddress: String? = null,
     ): HttpResponse =
         client.get("/authorize") {
+            spoofedAddress?.let {
+                header("CF-Connecting-IP", it)
+                header("X-Forwarded-For", it)
+            }
             url {
                 parameters.append("response_type", "code")
                 parameters.append("client_id", clientId)
@@ -241,6 +270,7 @@ class OAuthLoggingIntegrationTest {
     private companion object {
         const val REDIRECT = "https://claude.ai/api/mcp/auth_callback"
         const val OVERRIDE = "https://test.host"
+        const val SPOOFED_ADDRESS = "198.51.100.6"
         const val CANONICAL = "https://test.host/mcp"
 
         // RFC 7636 Appendix B PKCE test vector.

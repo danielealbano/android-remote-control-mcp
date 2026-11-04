@@ -291,8 +291,8 @@ class McpServer(
                 }
             },
             module = {
-                // Nothing on the way here sets or strips a header: TLS ends on the phone.
-                configureApplication(ClientIpSource.SOCKET_PEER)
+                // Nothing on the way here sets or strips a header, as TLS ends on the phone, and the peer is loopback.
+                configureApplication(ClientIpSource.UNKNOWN)
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
         )

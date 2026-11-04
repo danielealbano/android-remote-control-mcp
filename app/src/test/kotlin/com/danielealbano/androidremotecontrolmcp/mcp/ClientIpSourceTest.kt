@@ -66,7 +66,7 @@ class ClientIpSourceTest {
     }
 
     @Test
-    @DisplayName("SOCKET_PEER trusts no header, as on the free tunnel where the peer is always loopback")
+    @DisplayName("SOCKET_PEER trusts no header")
     fun socketPeerTrustsNoHeader() {
         assertEquals(LOOPBACK, call(ClientIpSource.SOCKET_PEER).clientIp())
     }
@@ -98,8 +98,24 @@ class ClientIpSourceTest {
         assertEquals(LOOPBACK, call(ClientIpSource.NGROK, xForwardedFor = null).clientIp())
     }
 
+    @Test
+    @DisplayName("UNKNOWN reports no address, so the free tunnel's loopback peer never reads as this phone")
+    fun unknownReportsNoAddress() {
+        assertNull(call(ClientIpSource.UNKNOWN).clientIp())
+        assertNull(call(ClientIpSource.UNKNOWN, remoteAddress = LAN_PEER).clientIp())
+    }
+
+    @Test
+    @DisplayName("a forwarded value that is not an IP literal is ignored")
+    fun textIsNotAnAddress() {
+        assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "Verified, safe").clientIp())
+        assertEquals(LOOPBACK, call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "cafe").clientIp())
+        assertEquals(LOOPBACK, call(ClientIpSource.NGROK, xForwardedFor = listOf("Verified, safe")).clientIp())
+        assertEquals("2001:db8::7", call(ClientIpSource.CLOUDFLARE, cfConnectingIp = "2001:db8::7").clientIp())
+    }
+
     @ParameterizedTest
-    @EnumSource(ClientIpSource::class)
+    @EnumSource(ClientIpSource::class, names = ["UNKNOWN"], mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("a peer that is not loopback is the client itself, whatever the headers say")
     fun anotherPeerIsTheClient(source: ClientIpSource) {
         assertEquals(LAN_PEER, call(source, remoteAddress = LAN_PEER).clientIp())
