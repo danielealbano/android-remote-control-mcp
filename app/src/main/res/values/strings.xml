@@ -143,6 +143,7 @@
     <string name="about_attributions_section">Attributions</string>
     <string name="about_attribution_dbip">IP geolocation data by DB-IP (db-ip.com), licensed under CC BY 4.0.</string>
     <string name="about_attribution_privacy_model">Privacy Mode PII detection model by Ai4Privacy (MIT license). Built with Llama.</string>
+    <string name="about_attribution_android_robot">The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</string>
     <string name="about_footer">Copyright 2026–2027 Daniele Salvatore Albano. Licensed under GPLv3 or later, without warranty.</string>
 
     <!-- Clipboard -->

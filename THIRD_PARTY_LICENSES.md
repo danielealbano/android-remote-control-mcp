@@ -265,3 +265,11 @@ Rust crates compiled into it:
 |---|---|---|
 | DB-IP IP to City Lite database (compiled into the app at build time) | CC BY 4.0 | https://db-ip.com |
 | Ai4Privacy multilingual PII anonymiser model (downloaded by the app on first use of Privacy Mode, not part of the APK) | MIT; Built with Llama | https://huggingface.co/ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii |
+
+## Artwork
+
+| Component | License | Source |
+|---|---|---|
+| Android robot, modified in the ARC MCP logo and the app icon | CC BY 3.0 | https://developer.android.com/distribute/marketing-tools/brand-guidelines |
+
+The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.

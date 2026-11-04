@@ -231,6 +231,12 @@ fun AboutScreen(
                         }
                     },
             )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.about_attribution_android_robot),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             Spacer(Modifier.height(24.dp))
 
