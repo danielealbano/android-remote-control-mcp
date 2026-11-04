@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.geo.GeoLocation
 import com.danielealbano.androidremotecontrolmcp.mcp.canonicalResource
+import com.danielealbano.androidremotecontrolmcp.mcp.clientIp
 import com.danielealbano.androidremotecontrolmcp.mcp.effectiveBaseUrl
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode

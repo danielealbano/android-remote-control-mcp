@@ -199,7 +199,7 @@ class McpServer(
             factory = Netty,
             port = port,
             host = host,
-            module = { configureApplication() },
+            module = { configureApplication(ClientIpSource.of(config)) },
         )
 
     private fun createHttpsServer(): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
@@ -217,7 +217,8 @@ class McpServer(
                     port = config.port
                 }
             },
-            module = { configureApplication() },
+            // A tunnel never forwards to this listener: Cloudflare and ngrok get their own plain HTTP one.
+            module = { configureApplication(ClientIpSource.SOCKET_PEER) },
         )
     }
 
@@ -290,13 +291,15 @@ class McpServer(
                 }
             },
             module = {
-                configureApplication()
+                // Nothing on the way here sets or strips a header, as TLS ends on the phone, and the peer is loopback.
+                configureApplication(ClientIpSource.UNKNOWN)
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
         )
 
-    private fun io.ktor.server.application.Application.configureApplication() {
+    private fun io.ktor.server.application.Application.configureApplication(clientIpSource: ClientIpSource) {
         captureHttp2Authority()
+        markClientIpSource(clientIpSource)
 
         // Base plugins in the canonical order (ContentNegotiation → CORS → auth). CORS MUST precede
         // auth so browser preflight OPTIONS (no Authorization header) are answered by CORS instead of
