@@ -94,6 +94,7 @@ class ArcTunnelProviderTest {
         }
         every { host.stopTlsListener() } just runs
         every { host.clientAddresses } returns TunnelClientAddresses()
+        every { serviceAlerts.show(any()) } returns true
         every { serviceAlerts.clear() } just runs
         coEvery { serviceStatus.currentProblem() } returns null
         provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog, serviceStatus, serviceAlerts)

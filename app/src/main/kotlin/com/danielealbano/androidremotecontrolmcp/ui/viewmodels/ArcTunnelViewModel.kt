@@ -45,8 +45,9 @@ sealed class ArcTunnelUrlState {
 }
 
 /**
- * UI state and actions of the free E2E tunnel provider (enrollment, URL, CT toggle, CT alert). ONE instance is
- * created at `MainScreen` level and passed to the Server and Settings screens (shared enrollment request).
+ * UI state and actions of the free E2E tunnel provider (enrollment, URL, CT toggle, CT alert, status check toggle,
+ * service problem). ONE instance is created at `MainScreen` level and passed to the Server and Settings screens
+ * (shared enrollment request).
  */
 @HiltViewModel
 class ArcTunnelViewModel

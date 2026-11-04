@@ -479,6 +479,7 @@
     <string name="notification_update_available_body">Version %1$s is available — tap to view the release</string>
     <string name="notification_channel_arc_tunnel_alert_name">Tunnel certificate alerts</string>
     <string name="notification_channel_arc_tunnel_status_name">Tunnel service status</string>
+    <string name="notification_channel_arc_tunnel_status_description">Alert when the free E2E tunnel service reports a problem</string>
     <string name="notification_arc_tunnel_ct_title">Tunnel certificate alert</string>
     <string name="notification_arc_tunnel_ct_body">A certificate for %1$s was issued to another key — tap to review</string>
     <string name="notification_arc_tunnel_enroll_title">Setting up the free E2E tunnel</string>

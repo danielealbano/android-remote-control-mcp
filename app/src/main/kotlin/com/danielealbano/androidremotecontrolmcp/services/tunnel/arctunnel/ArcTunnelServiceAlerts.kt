@@ -17,7 +17,8 @@ import javax.inject.Singleton
 
 /** The notification for a problem the tunnel service's status page reports. */
 interface ArcTunnelServiceAlerts {
-    fun show(problem: ArcTunnelServiceProblem)
+    /** Posts or updates the notification, alerting only the first time. Answers false if it cannot be posted. */
+    fun show(problem: ArcTunnelServiceProblem): Boolean
 
     fun clear()
 }
@@ -28,10 +29,9 @@ class ArcTunnelServiceAlertsImpl
     constructor(
         @ApplicationContext private val context: Context,
     ) : ArcTunnelServiceAlerts {
-        /** Posts or updates the notification, alerting only the first time; no-op without POST_NOTIFICATIONS. */
-        override fun show(problem: ArcTunnelServiceProblem) {
+        override fun show(problem: ArcTunnelServiceProblem): Boolean {
             val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-            if (permission != PackageManager.PERMISSION_GRANTED) return
+            if (permission != PackageManager.PERMISSION_GRANTED) return false
             val statusPage =
                 Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -56,6 +56,7 @@ class ArcTunnelServiceAlertsImpl
                     .setContentIntent(pendingIntent)
                     .build()
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+            return true
         }
 
         override fun clear() {
@@ -79,7 +80,7 @@ class ArcTunnelServiceAlertsImpl
                 NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
             }
 
-            private const val NOTIFICATION_ID = 1007
+            const val NOTIFICATION_ID = 1007
             private const val REQUEST_CODE = 7
         }
     }

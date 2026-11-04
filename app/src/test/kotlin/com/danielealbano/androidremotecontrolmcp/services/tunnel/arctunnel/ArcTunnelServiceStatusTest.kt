@@ -258,6 +258,33 @@ class ArcTunnelServiceStatusTest {
             assertEquals(1, server.requestCount)
         }
 
+    @Test
+    fun `a cancelled new request keeps the last answer until the next one is due`() =
+        runBlocking {
+            server.enqueue(MockResponse.Builder().body(page()).build())
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(page(""""operational""""))
+                    .headersDelay(NEVER_ANSWERS_S, TimeUnit.SECONDS)
+                    .build(),
+            )
+            val status = status()
+            val degraded = ArcTunnelServiceProblem("degraded", listOf("Tunnels"))
+            assertEquals(degraded, status.currentProblem())
+            nowMs += ArcTunnelStatusPage.CHECK_INTERVAL_MS
+            val job = launch(Dispatchers.IO) { status.currentProblem() }
+            withContext(Dispatchers.IO) {
+                assertNotNull(server.takeRequest(REQUEST_BUDGET_S, TimeUnit.SECONDS))
+                assertNotNull(server.takeRequest(REQUEST_BUDGET_S, TimeUnit.SECONDS))
+            }
+
+            withTimeout(CANCEL_BUDGET_MS) { job.cancelAndJoin() }
+
+            assertEquals(degraded, status.currentProblem())
+            assertEquals(2, server.requestCount)
+        }
+
     private companion object {
         const val START_MS = 1_000L
         const val CALLERS = 4

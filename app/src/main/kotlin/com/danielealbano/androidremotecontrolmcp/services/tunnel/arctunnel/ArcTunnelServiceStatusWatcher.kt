@@ -15,17 +15,37 @@ class ArcTunnelServiceStatusWatcher(
         var shown: ArcTunnelServiceProblem? = null
         try {
             while (true) {
-                val problem = status.currentProblem()
-                if (problem != shown) {
-                    if (problem == null) alerts.clear() else alerts.show(problem)
-                    shown = problem
-                }
+                shown = update(shown, status.currentProblem())
                 delay(REFRESH_MS)
             }
         } finally {
             alerts.clear()
         }
     }
+
+    /** What the notification shows now. One that could not be posted is retried, as the permission may come later. */
+    private fun update(
+        shown: ArcTunnelServiceProblem?,
+        problem: ArcTunnelServiceProblem?,
+    ): ArcTunnelServiceProblem? =
+        when {
+            problem == shown -> {
+                shown
+            }
+
+            problem == null -> {
+                alerts.clear()
+                null
+            }
+
+            alerts.show(problem) -> {
+                problem
+            }
+
+            else -> {
+                shown
+            }
+        }
 
     private companion object {
         const val REFRESH_MS = 300_000L

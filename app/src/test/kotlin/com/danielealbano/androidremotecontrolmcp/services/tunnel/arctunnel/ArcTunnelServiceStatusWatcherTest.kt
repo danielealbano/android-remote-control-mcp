@@ -25,7 +25,7 @@ class ArcTunnelServiceStatusWatcherTest {
 
     @BeforeEach
     fun setUp() {
-        every { alerts.show(any()) } just runs
+        every { alerts.show(any()) } returns true
         every { alerts.clear() } just runs
     }
 
@@ -54,6 +54,21 @@ class ArcTunnelServiceStatusWatcherTest {
             runCurrent()
 
             verify(exactly = 1) { alerts.show(PROBLEM) }
+            job.cancel()
+        }
+
+    @Test
+    fun `a problem that could not be posted is posted once it can be, then not again`() =
+        runTest {
+            coEvery { status.currentProblem() } returns PROBLEM
+            every { alerts.show(any()) } returnsMany listOf(false, true)
+
+            val job = launch { watcher.run() }
+            runCurrent()
+            advanceTimeBy(REFRESH_MS * 3)
+            runCurrent()
+
+            verify(exactly = 2) { alerts.show(PROBLEM) }
             job.cancel()
         }
 

@@ -111,7 +111,7 @@ class McpApplication :
                 getString(R.string.notification_channel_arc_tunnel_status_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "Alert when the free E2E tunnel service reports a problem"
+                description = getString(R.string.notification_channel_arc_tunnel_status_description)
             },
         )
         notificationManager.createNotificationChannel(updateChannel)
