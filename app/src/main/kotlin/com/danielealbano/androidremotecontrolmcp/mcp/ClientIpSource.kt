@@ -33,11 +33,17 @@ enum class ClientIpSource {
     companion object {
         /** The source for a plain HTTP listener, the only kind a Cloudflare or ngrok tunnel forwards to. */
         fun of(config: ServerConfig): ClientIpSource =
-            when {
-                !config.tunnelEnabled -> SOCKET_PEER
-                config.tunnelProvider == TunnelProviderType.CLOUDFLARE -> CLOUDFLARE
-                config.tunnelProvider == TunnelProviderType.NGROK -> NGROK
-                else -> SOCKET_PEER
+            if (!config.tunnelEnabled) {
+                SOCKET_PEER
+            } else {
+                when (config.tunnelProvider) {
+                    // The free tunnel has its own listener, so this one only sees direct clients.
+                    TunnelProviderType.ARC_TUNNEL -> SOCKET_PEER
+
+                    TunnelProviderType.CLOUDFLARE -> CLOUDFLARE
+
+                    TunnelProviderType.NGROK -> NGROK
+                }
             }
     }
 }
