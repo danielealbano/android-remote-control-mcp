@@ -208,7 +208,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 59 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -220,7 +220,7 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 
 **Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
-**Note**: `android_get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive) are omitted. Text and contentDescription are truncated to 100 characters; use `android_get_node_details` to retrieve full values. Flags use comma-separated abbreviations with a legend in the TSV notes. When screenshot is included, it is annotated with red bounding boxes and node ID labels for on-screen nodes, unless `annotate=false`. `include_offscreen=false` leaves out nodes that are not on screen and `include_hierarchy=false` leaves out the `hierarchy:` section; both are fixed by the fresh capture and kept by its cursor pages. Screenshots are spaced at least 334 ms apart (Android rejects requests 333 ms or less apart).
+**Note**: `android_get_screen_state` returns a filtered flat TSV list — structural-only nodes (no text, no contentDescription, no resourceId, not interactive, no labelled accessibility actions) are omitted. Each window section lists the labels of its listed nodes' accessibility actions under `Nodes with actions:` (`* <node_id>: <label>¦<label>`, custom actions and labelled standard ones, leaving out those that take arguments), the only way to reach controls some apps expose as actions of one node; `android_find_nodes` (`actions`) and `android_get_node_details` (`actions` column) carry them too, and Privacy Mode redacts them like text. Text and contentDescription are truncated to 100 characters; use `android_get_node_details` to retrieve full values. Flags use comma-separated abbreviations with a legend in the TSV notes. When screenshot is included, it is annotated with red bounding boxes and node ID labels for on-screen nodes, unless `annotate=false`. `include_offscreen=false` leaves out nodes that are not on screen and `include_hierarchy=false` leaves out the `hierarchy:` section; both are fixed by the fresh capture and kept by its cursor pages. Screenshots are spaced at least 334 ms apart (Android rejects requests 333 ms or less apart).
 
 ### 2. Touch Action Tools (5 tools)
 
@@ -234,7 +234,7 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
-### 3. Node Action Tools (6 tools)
+### 3. Node Action Tools (7 tools)
 
 "Target" = exactly one of `node_id` (string) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
 
@@ -243,11 +243,12 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 | `android_find_nodes` | Find UI nodes by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false), `visible_only` (boolean, default false) |
 | `android_click_node` | Click an accessibility node | Target | — |
 | `android_long_click_node` | Long-click an accessibility node | Target | — |
+| `android_perform_node_action` | Perform one of a node's labelled accessibility actions by its label as listed (controls some apps expose only as actions of one node, e.g. Reddit's vote bar); exact, case-sensitive, first match; with Privacy Mode on, matched against the redacted labels | Target, `action` (string) | — |
 | `android_tap_node` | Gesture-based tap at a random point within node bounds (unlike `android_click_node`, which uses ACTION_CLICK) | Target | `inset_percentage` (number: 0.0-45.0, default 5.0) |
 | `android_scroll_to_node` | Scroll the nearest scrollable ancestor in the given direction until the node is visible (up to 5 scrolls, stops early when it does not scroll further), re-finding it after each scroll; returns its current ID | Target, `direction` (string: up/down/left/right) | — |
 | `android_scroll_node` | Scroll a scrollable node once in a direction | Target, `direction` (string: up/down/left/right) | — |
 
-**Errors**: Returns `CallToolResult(isError = true)` if node not found (ID invalid or stale, or no selector match), the selector is ambiguous, or the node does not support the action. `android_find_nodes` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if node not found (ID invalid or stale, or no selector match), the selector is ambiguous, or the node does not support the action (for `android_perform_node_action`: lists no action with that label, listing the ones it has, or no longer offers it on the live node). `android_find_nodes` returns empty array (not error) when no matches found.
 
 ### 4. Text Input Tools (5 tools)
 
@@ -285,7 +286,7 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 | `android_set_clipboard` | Set clipboard content | `text` (string) | — |
 | `android_wait_for_node` | Wait until node appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
 | `android_wait_for_idle` | Wait for UI to become idle | `timeout` (number, ms, 1-30000) | — |
-| `android_get_node_details` | Get full untruncated text/desc and the password-field flag by node_ids | `node_ids` (array of strings) | — |
+| `android_get_node_details` | Get full untruncated text/desc, the password-field flag and the accessibility action labels by node_ids | `node_ids` (array of strings) | — |
 
 **Timeout behavior**: Both `android_wait_for_node` and `android_wait_for_idle` require a mandatory `timeout` parameter (max 30000ms). On timeout, they return a non-error `CallToolResult` with an informational message (not an error).
 
@@ -839,7 +840,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 58 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 59 tools
 
 ---
 
