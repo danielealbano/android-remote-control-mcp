@@ -51,6 +51,12 @@ class ArcTunnelServiceStatusTest {
     private fun status() = ArcTunnelServiceStatusImpl(server.url("/index.json").toString(), Dispatchers.IO) { nowMs }
 
     @Test
+    fun `it reads the public status page`() {
+        assertEquals("https://status.arc-tunnel.io/", ArcTunnelStatusPage.PAGE_URL)
+        assertEquals("https://status.arc-tunnel.io/index.json", ArcTunnelStatusPage.JSON_URL)
+    }
+
+    @Test
     fun `operational is no problem, even if one service says otherwise`() {
         assertNull(ArcTunnelStatusPage.parseProblem(page(""""operational"""")))
     }

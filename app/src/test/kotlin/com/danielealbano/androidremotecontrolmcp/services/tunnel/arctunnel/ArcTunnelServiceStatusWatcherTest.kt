@@ -25,7 +25,8 @@ class ArcTunnelServiceStatusWatcherTest {
 
     @BeforeEach
     fun setUp() {
-        every { alerts.show(any()) } returns true
+        every { alerts.canShow() } returns true
+        every { alerts.show(any()) } just runs
         every { alerts.clear() } just runs
     }
 
@@ -58,17 +59,38 @@ class ArcTunnelServiceStatusWatcherTest {
         }
 
     @Test
-    fun `a problem that could not be posted is posted once it can be, then not again`() =
+    fun `a problem the user cannot see yet is posted once they can, then not again`() =
         runTest {
             coEvery { status.currentProblem() } returns PROBLEM
-            every { alerts.show(any()) } returnsMany listOf(false, true)
+            every { alerts.canShow() } returnsMany listOf(false, true)
 
             val job = launch { watcher.run() }
             runCurrent()
+            verify(exactly = 0) { alerts.show(any()) }
             advanceTimeBy(REFRESH_MS * 3)
             runCurrent()
 
-            verify(exactly = 2) { alerts.show(PROBLEM) }
+            verify(exactly = 1) { alerts.show(PROBLEM) }
+            verify(exactly = 0) { alerts.clear() }
+            job.cancel()
+        }
+
+    @Test
+    fun `a problem the user can no longer see is posted again once they can`() =
+        runTest {
+            coEvery { status.currentProblem() } returns PROBLEM
+            every { alerts.canShow() } returnsMany listOf(true, false, true)
+
+            val job = launch { watcher.run() }
+            runCurrent()
+            advanceTimeBy(REFRESH_MS + 1)
+            advanceTimeBy(REFRESH_MS)
+
+            verifyOrder {
+                alerts.show(PROBLEM)
+                alerts.clear()
+                alerts.show(PROBLEM)
+            }
             job.cancel()
         }
 
@@ -86,22 +108,6 @@ class ArcTunnelServiceStatusWatcherTest {
                 alerts.show(PROBLEM)
                 alerts.show(worse)
             }
-            job.cancel()
-        }
-
-    @Test
-    fun `a change that could not be posted still removes the old notification when the problem ends`() =
-        runTest {
-            val worse = ArcTunnelServiceProblem("downtime", listOf("Tunnels", "Database"))
-            coEvery { status.currentProblem() } returnsMany listOf(PROBLEM, worse, null)
-            every { alerts.show(any()) } returnsMany listOf(true, false)
-
-            val job = launch { watcher.run() }
-            runCurrent()
-            advanceTimeBy(REFRESH_MS + 1)
-            advanceTimeBy(REFRESH_MS)
-
-            verify(exactly = 1) { alerts.clear() }
             job.cancel()
         }
 

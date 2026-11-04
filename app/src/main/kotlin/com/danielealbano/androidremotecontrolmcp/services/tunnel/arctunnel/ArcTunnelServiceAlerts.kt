@@ -18,11 +18,11 @@ import javax.inject.Singleton
 
 /** The notification for a problem the tunnel service's status page reports. */
 interface ArcTunnelServiceAlerts {
-    /**
-     * Posts or updates the notification, alerting only the first time. Answers false if the user would not see it, with
-     * the permission missing or this notification's channel turned off.
-     */
-    fun show(problem: ArcTunnelServiceProblem): Boolean
+    /** Whether the user would see the notification: not with the permission missing or its channel turned off. */
+    fun canShow(): Boolean
+
+    /** Posts or updates the notification, alerting only the first time. */
+    fun show(problem: ArcTunnelServiceProblem)
 
     fun clear()
 }
@@ -33,12 +33,19 @@ class ArcTunnelServiceAlertsImpl
     constructor(
         @ApplicationContext private val context: Context,
     ) : ArcTunnelServiceAlerts {
-        override fun show(problem: ArcTunnelServiceProblem): Boolean {
-            val manager = NotificationManagerCompat.from(context)
+        override fun canShow(): Boolean {
             val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-            val channel = manager.getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID)
-            val turnedOff = channel?.importance == NotificationManager.IMPORTANCE_NONE
-            if (permission != PackageManager.PERMISSION_GRANTED || turnedOff) return false
+            val channel =
+                NotificationManagerCompat
+                    .from(context)
+                    .getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID)
+            return permission == PackageManager.PERMISSION_GRANTED &&
+                channel?.importance != NotificationManager.IMPORTANCE_NONE
+        }
+
+        override fun show(problem: ArcTunnelServiceProblem) {
+            val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            if (permission != PackageManager.PERMISSION_GRANTED) return
             val statusPage =
                 Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -62,8 +69,7 @@ class ArcTunnelServiceAlertsImpl
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
                     .build()
-            manager.notify(NOTIFICATION_ID, notification)
-            return true
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
         }
 
         override fun clear() {

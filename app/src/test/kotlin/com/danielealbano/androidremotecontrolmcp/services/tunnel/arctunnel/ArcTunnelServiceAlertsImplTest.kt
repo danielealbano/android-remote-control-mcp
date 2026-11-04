@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -42,7 +43,7 @@ class ArcTunnelServiceAlertsImplTest {
     @BeforeEach
     fun setUp() {
         mockkStatic(ContextCompat::class, NotificationManagerCompat::class, PendingIntent::class, Uri::class)
-        mockkConstructor(NotificationCompat.Builder::class, Intent::class)
+        mockkConstructor(NotificationCompat.Builder::class, NotificationCompat.BigTextStyle::class, Intent::class)
         every { NotificationManagerCompat.from(any()) } returns manager
         every { manager.getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID) } returns channel
         every { channel.importance } returns NotificationManager.IMPORTANCE_DEFAULT
@@ -63,7 +64,7 @@ class ArcTunnelServiceAlertsImplTest {
 
     private fun permission(granted: Boolean) {
         val result = if (granted) PackageManager.PERMISSION_GRANTED else PackageManager.PERMISSION_DENIED
-        every { ContextCompat.checkSelfPermission(any(), any()) } returns result
+        every { ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) } returns result
     }
 
     /** The builder for the status channel; MockK routes a construction only to matchers known beforehand. */
@@ -84,13 +85,14 @@ class ArcTunnelServiceAlertsImplTest {
     fun `show posts 1007 on the status channel with the affected services`() {
         permission(granted = true)
 
-        val posted = alerts.show(ArcTunnelServiceProblem("degraded", listOf("Tunnels", "Database")))
+        alerts.show(ArcTunnelServiceProblem("degraded", listOf("Tunnels", "Database")))
 
-        assertTrue(posted)
         verify { statusChannelBuilder().setContentTitle("Title") }
         verify { statusChannelBuilder().setContentText("Affected") }
+        verify { anyConstructed<NotificationCompat.BigTextStyle>().bigText("Affected") }
         verify { statusChannelBuilder().setStyle(ofType<NotificationCompat.BigTextStyle>()) }
         verify { statusChannelBuilder().setSmallIcon(R.drawable.ic_notification) }
+        verify { statusChannelBuilder().setCategory(NotificationCompat.CATEGORY_STATUS) }
         verify { context.getString(R.string.server_arc_tunnel_status_body_affected, "degraded", "Tunnels, Database") }
         verify { manager.notify(NOTIFICATION_ID, notification) }
     }
@@ -99,9 +101,8 @@ class ArcTunnelServiceAlertsImplTest {
     fun `show with no affected services uses the generic text`() {
         permission(granted = true)
 
-        val posted = alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
+        alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
 
-        assertTrue(posted)
         verify { statusChannelBuilder().setContentText("Generic") }
         verify { context.getString(R.string.server_arc_tunnel_status_body, "degraded") }
         verify { manager.notify(NOTIFICATION_ID, notification) }
@@ -119,24 +120,42 @@ class ArcTunnelServiceAlertsImplTest {
     }
 
     @Test
-    fun `show without POST_NOTIFICATIONS posts nothing and says so`() {
+    fun `show without POST_NOTIFICATIONS posts nothing`() {
         permission(granted = false)
 
-        val posted = alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
+        alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
 
-        assertFalse(posted)
         verify(exactly = 0) { manager.notify(any<Int>(), any()) }
     }
 
     @Test
-    fun `show with the channel turned off posts nothing and says so`() {
+    fun `canShow with the permission and the channel on`() {
+        permission(granted = true)
+
+        assertTrue(alerts.canShow())
+    }
+
+    @Test
+    fun `canShow is false without POST_NOTIFICATIONS`() {
+        permission(granted = false)
+
+        assertFalse(alerts.canShow())
+    }
+
+    @Test
+    fun `canShow is false with the channel turned off`() {
         permission(granted = true)
         every { channel.importance } returns NotificationManager.IMPORTANCE_NONE
 
-        val posted = alerts.show(ArcTunnelServiceProblem("degraded", emptyList()))
+        assertFalse(alerts.canShow())
+    }
 
-        assertFalse(posted)
-        verify(exactly = 0) { manager.notify(any<Int>(), any()) }
+    @Test
+    fun `canShow does not block on a channel the system does not have`() {
+        permission(granted = true)
+        every { manager.getNotificationChannel(McpApplication.ARC_TUNNEL_STATUS_CHANNEL_ID) } returns null
+
+        assertTrue(alerts.canShow())
     }
 
     @Test
