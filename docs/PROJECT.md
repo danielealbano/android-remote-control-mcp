@@ -146,7 +146,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/` — `MainActivity.kt`, `NetworkChangeWatcher.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
   - `ui/screens/` — `HomeScreen.kt`, `settings/ArcTunnelSettingsSection.kt`
-  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`, `ArcTunnelRenewalBlock.kt`
+  - `ui/components/` — `ServerStatusCard.kt`, `ConnectionInfoCard.kt`, `ServerLogsSection.kt`, `ArcTunnelRenewalBlock.kt`, `CalloutCard.kt`, `PrivacyModeCard.kt`, `BatteryOptimizationCard.kt`, `UpdateAvailableBanner.kt`, `TopBarParts.kt`, `LiveRegionChanges.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`, `DownloadSettings.kt`, `DownloadSettingsImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
