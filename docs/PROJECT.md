@@ -143,11 +143,13 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `mcp/` — `McpServer.kt`, `McpListenerRules.kt`, `McpListenerRulesImpl.kt`, `McpStatelessTransport.kt`, `InFlightToolCalls.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
-  - `ui/` — `MainActivity.kt`, `NetworkChangeWatcher.kt`
+  - `ui/` — `MainActivity.kt`, `ApprovalActivity.kt`, `ShareReceiverActivity.kt`, `NetworkChangeWatcher.kt`
+  - `ui/navigation/` — `Routes.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
-  - `ui/screens/` — `HomeScreen.kt`, `settings/ArcTunnelSettingsSection.kt`
-  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`, `ArcTunnelRenewalBlock.kt`
-  - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`
+  - `ui/screens/` — `MainScreen.kt`, `ServerTabScreen.kt`, `ServerScreen.kt`, `LogsScreen.kt`, `SettingsScreen.kt`, `AboutScreen.kt`, `AboutLinks.kt`, `ApprovalScreen.kt`
+  - `ui/screens/settings/` — `SettingsIndexScreen.kt`, `GeneralSettingsScreen.kt`, `AccessSettingsScreen.kt`, `SecuritySettingsScreen.kt`, `OAuthClientsScreen.kt`, `PermissionsSettingsScreen.kt`, `McpToolsSettingsScreen.kt`, `PrivacySettingsScreen.kt`, `StorageSettingsScreen.kt`, `TunnelSettingsScreen.kt`, `ArcTunnelSettingsSection.kt`, `ChannelSettingsScreen.kt`, `NotificationFilterScreen.kt`, `WifiMonitorScreen.kt`
+  - `ui/components/` — `ServerStatusCard.kt`, `ConnectionInfoCard.kt`, `ServerLogsSection.kt`, `ArcTunnelRenewalBlock.kt`, `CalloutCard.kt`, `PrivacyModeCard.kt`, `BatteryOptimizationCard.kt`, `UpdateAvailableBanner.kt`, `TopBarParts.kt`, `LiveRegionChanges.kt`
+  - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`, `AccessViewModel.kt`, `ApprovalViewModel.kt`, `ChannelViewModel.kt`, `LogsViewModel.kt`, `OAuthClientsViewModel.kt`, `PrivacyViewModel.kt`, `UpdateViewModel.kt`
   - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`, `DownloadSettings.kt`, `DownloadSettingsImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
   - `di/` — `AppModule.kt`
