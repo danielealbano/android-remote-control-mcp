@@ -105,4 +105,4 @@ Rules:
   - `./gradlew build` with no `^w: ` line;
   - `make test-e2e` with `--no-build-cache`, under the phone marker.
 - [x] Manual QA on the T70 with Reddit: the vote bar lists its actions; `perform_node_action` upvotes and undoes.
-- [ ] Code review loop; the PR says it improves the use of many apps, Reddit included.
+- [x] Code review loop; the PR says it improves the use of many apps, Reddit included.
