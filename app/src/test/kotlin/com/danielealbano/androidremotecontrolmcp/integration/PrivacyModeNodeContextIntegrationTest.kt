@@ -316,6 +316,81 @@ class PrivacyModeNodeContextIntegrationTest {
             }
         }
 
+    /**
+     * A web page holding an editable code field whose description names a credential. As read, the description is in
+     * the field's context, so its action label is a credential; get_screen_state redacts the WebView-merged tree, where
+     * the description is folded into the field's text and is no longer context, so it shows the label in clear.
+     */
+    private val webCodeField =
+        AccessibilityNodeData(
+            id = "node_code",
+            className = "android.widget.EditText",
+            contentDescription = "Security code",
+            bounds = BoundsData(100, 600, 900, 700),
+            editable = true,
+            enabled = true,
+            visible = true,
+            webRole = "textField",
+            actions = listOf("Reveal"),
+        )
+
+    private fun webPageWith(field: AccessibilityNodeData) =
+        treeOf(
+            AccessibilityNodeData(
+                id = "node_webroot",
+                className = "android.webkit.WebView",
+                bounds = BoundsData(0, 200, 1080, 2400),
+                enabled = true,
+                visible = true,
+                webRole = "rootWebArea",
+                children = listOf(field),
+            ),
+        )
+
+    @Test
+    fun `perform_node_action matches a web label as get_screen_state and as get_node_details show it`() =
+        runTest {
+            val deps = privacyDeps(webPageWith(webCodeField))
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_code") } returns webCodeField
+            coEvery {
+                deps.actionExecutor.performLabelledAction("node_code", any<List<WindowData>>(), "Reveal")
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val screen =
+                    client.callTool(name = "android_get_screen_state", arguments = emptyMap())
+                val screenLabel =
+                    Regex("^\\* node_code: (.*)$", RegexOption.MULTILINE)
+                        .find((screen.content[0] as TextContent).text)!!
+                        .groupValues[1]
+                val details =
+                    client.callTool(
+                        name = "android_get_node_details",
+                        arguments = mapOf("node_ids" to listOf("node_code")),
+                    )
+                val detailsLabel =
+                    stripUntrustedWarning((details.content[0] as TextContent).text)
+                        .lines()[1]
+                        .substringAfterLast('\t')
+                assertTrue(detailsLabel.startsWith("CREDENTIAL#"), detailsLabel)
+                assertNotEquals(detailsLabel, screenLabel)
+
+                for (label in listOf(screenLabel, detailsLabel)) {
+                    val result =
+                        client.callTool(
+                            name = "android_perform_node_action",
+                            arguments = mapOf("node_id" to "node_code", "action" to label),
+                        )
+                    val text = (result.content[0] as TextContent).text
+                    assertNotEquals(true, result.isError, text)
+                    assertEquals("Action '$label' performed on node 'node_code'", text)
+                }
+            }
+            coVerify(exactly = 2) {
+                deps.actionExecutor.performLabelledAction("node_code", any<List<WindowData>>(), "Reveal")
+            }
+        }
+
     @Test
     fun `wait_for_node redacts a credential field from its node context`() =
         runTest {

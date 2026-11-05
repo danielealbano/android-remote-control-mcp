@@ -79,14 +79,49 @@ class NodeActionMatcherTest {
         }
 
     @Test
-    fun `a native node matches only its labels as read and never redacts a merged tree`() =
+    fun `a native node on a screen with web content also matches in the merged form`() =
         runTest {
-            val result = resultOf(nativeNode)
+            val webText = AccessibilityNodeData(id = "node_text", text = "Hi", bounds = bounds, webRole = "staticText")
+            val webArea =
+                AccessibilityNodeData(
+                    id = "node_webroot",
+                    bounds = bounds,
+                    webRole = "rootWebArea",
+                    children = listOf(webText),
+                )
+            val host = AccessibilityNodeData(id = "node_host", bounds = bounds, children = listOf(webArea, nativeNode))
+            val result =
+                MultiWindowResult(windows = listOf(WindowData(windowId = 1, windowType = "APPLICATION", tree = host)))
+            val matcher = NodeActionMatcher(gateFor(result), WebViewNodeMerger())
+            val shown = matcher.shownLabels(result, nativeNode)
+
+            assertEquals(0, matcher.indexOf(result, nativeNode, shown, "Call [MERGED]"))
+        }
+
+    @Test
+    fun `on a screen without web content a label matches only as read, with one redaction`() =
+        runTest {
+            val host = AccessibilityNodeData(id = "node_host", bounds = bounds, children = listOf(nativeNode))
+            val result =
+                MultiWindowResult(windows = listOf(WindowData(windowId = 1, windowType = "APPLICATION", tree = host)))
             val gate = gateFor(result)
             val matcher = NodeActionMatcher(gate, WebViewNodeMerger())
             val shown = matcher.shownLabels(result, nativeNode)
 
             assertEquals(-1, matcher.indexOf(result, nativeNode, shown, "Call [MERGED]"))
+            coVerify(exactly = 1) { gate.nodeTexts(any(), any()) }
+        }
+
+    @Test
+    fun `a node without actions matches nothing and is never redacted in a merged tree`() =
+        runTest {
+            val bare = webNode.copy(actions = emptyList())
+            val result = resultOf(bare)
+            val gate = gateFor(result)
+            val matcher = NodeActionMatcher(gate, WebViewNodeMerger())
+            val shown = matcher.shownLabels(result, bare)
+
+            assertEquals(-1, matcher.indexOf(result, bare, shown, "Call [MERGED]"))
             coVerify(exactly = 1) { gate.nodeTexts(any(), any()) }
         }
 }

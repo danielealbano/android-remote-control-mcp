@@ -246,6 +246,37 @@ class RedactionEngineTest {
         }
 
     @Test
+    fun `redactTree gives labels back in the same pre-order across parents, children and windows`() =
+        runTest {
+            val config =
+                PrivacyModeConfig(
+                    enabled = true,
+                    disabledCategories = allExcept(PiiCategory.EMAILS),
+                    placeholderFormat = PlaceholderFormat.NUMBERED,
+                )
+            val firstWindow =
+                node(
+                    "parent",
+                    children = listOf(node("child").copy(actions = listOf("Upvote", "Downvote"))),
+                ).copy(actions = listOf("Mail a@b.com"))
+            val secondWindow = node("other").copy(actions = listOf("Mail c@d.com", "Share"))
+            val result =
+                MultiWindowResult(
+                    listOf(
+                        WindowData(windowId = 1, windowType = "APPLICATION", tree = firstWindow),
+                        WindowData(windowId = 2, windowType = "SYSTEM", tree = secondWindow),
+                    ),
+                )
+
+            val processed = engine.redactTree(result, config)
+
+            val (first, second) = processed.result.windows.map { it.tree }
+            assertEquals(listOf("Mail [EMAIL_1]"), first.actions)
+            assertEquals(listOf("Upvote", "Downvote"), first.children.single().actions)
+            assertEquals(listOf("Mail [EMAIL_2]", "Share"), second.actions)
+        }
+
+    @Test
     fun `redactTree uses nearest label context for editable fields`() =
         runTest {
             // NationalIdDetector only fires with a national-id cue in the context; the cue arrives via the
