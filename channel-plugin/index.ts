@@ -5,6 +5,7 @@ import { readFileSync, chmodSync, existsSync } from "fs";
 import { join } from "path";
 import { timingSafeEqual } from "crypto";
 import { homedir } from "os";
+import { parseEnvLines } from "./env.ts";
 
 // --- Config loading ---
 const STATE_DIR =
@@ -17,10 +18,9 @@ const ENV_FILE = join(STATE_DIR, ".env");
 try {
   if (existsSync(ENV_FILE)) {
     chmodSync(ENV_FILE, 0o600);
-    for (const line of readFileSync(ENV_FILE, "utf8").split("\n")) {
-      const m = line.match(/^(\w+)=(.*)$/);
-      if (m && process.env[m[1]] === undefined) {
-        process.env[m[1]] = m[2];
+    for (const [key, value] of parseEnvLines(readFileSync(ENV_FILE, "utf8"))) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
       }
     }
   }
