@@ -99,6 +99,7 @@ class McpToolRegistration
                 a.nodeCache,
                 privacy.privacyToolGate,
                 privacy.placeholderSubstitutor,
+                screen.webViewNodeMerger,
                 toolNamePrefix,
                 perms,
             )

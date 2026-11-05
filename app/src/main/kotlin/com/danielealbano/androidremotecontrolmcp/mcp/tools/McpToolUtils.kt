@@ -1,15 +1,19 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ContentBlock
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
@@ -525,9 +529,10 @@ internal object McpToolUtils {
     /**
      * Builds a JSON object representation of an [ElementInfo] for MCP node responses.
      *
-     * Shared by [FindNodesTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.FindNodesTool]
-     * and [WaitForNodeTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.WaitForNodeTool]
-     * to ensure consistent node serialization across tools.
+     * Shared by [FindNodesTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.FindNodesTool],
+     * [WaitForNodeTool][com.danielealbano.androidremotecontrolmcp.mcp.tools.WaitForNodeTool] and the
+     * ambiguous-selector candidates of [NodeTargetResolver] to ensure consistent node serialization
+     * across tools.
      */
     fun buildNodeJson(element: ElementInfo): JsonObject =
         buildJsonObject {
@@ -549,5 +554,34 @@ internal object McpToolUtils {
             put("enabled", element.enabled)
             put("visible", element.visible)
             put("password", element.password)
+            putJsonArray("actions") { element.actions.forEach { add(it) } }
         }
+
+    /**
+     * [elements] (read from [windows]) with Privacy Mode applied to their text, content description and action labels,
+     * redacted in one [PrivacyToolGate.nodeTexts] batch with each element's node context.
+     */
+    suspend fun redactElements(
+        privacyToolGate: PrivacyToolGate,
+        windows: List<WindowData>,
+        elements: List<ElementInfo>,
+    ): List<ElementInfo> {
+        val redacted =
+            privacyToolGate.nodeTexts(
+                windows,
+                elements.flatMap { element ->
+                    listOf(element.text to element.id, element.contentDescription to element.id) +
+                        element.actions.map { it to element.id }
+                },
+            )
+        // Each element owns its text and desc slots, then one slot per action label (never null: labels are not).
+        var offset = 0
+        return elements.map { element ->
+            val labels = redacted.subList(offset + 2, offset + 2 + element.actions.size).filterNotNull()
+            val safe =
+                element.copy(text = redacted[offset], contentDescription = redacted[offset + 1], actions = labels)
+            offset += 2 + element.actions.size
+            safe
+        }
+    }
 }

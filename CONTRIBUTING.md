@@ -98,7 +98,7 @@ make clean
 make test-unit
 ```
 
-Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, node finding, screenshot encoding, settings repository, network utilities, and all 58 MCP tool handlers.
+Runs JUnit 5 unit tests with MockK for mocking. Tests cover accessibility tree parsing, node finding, screenshot encoding, settings repository, network utilities, and all 59 MCP tool handlers.
 
 ### Integration Tests
 
@@ -168,7 +168,7 @@ graph TB
         subgraph McpServerService["McpServerService (Foreground Service)"]
             McpServer["McpServer (Ktor)"]
             McpServer -->|"Streamable HTTP /mcp"| SDK["SDK Server (MCP Kotlin SDK)"]
-            SDK -->|"58 MCP Tools"| Tools["Tool Handlers"]
+            SDK -->|"59 MCP Tools"| Tools["Tool Handlers"]
             TunnelMgr["TunnelManager (optional)"]
             TunnelMgr -->|"Cloudflare / ngrok"| PublicURL["Public HTTPS URL"]
         end

@@ -30,12 +30,12 @@ class PrivacyToolGate
 
         /**
          * Redacts each `(text, nodeId)` pair in one batch, where the text was read from the node `nodeId` of [windows]
-         * (its text or its content description). Each text gets that node's detection context (resource id, hint,
-         * label, content description, password and editable flags) from the same [ContextExtractor] calls [tree] makes
-         * for `get_screen_state`, run over [windows]: the nearest-label pass over the node's window, then the node's
-         * own context. `get_screen_state` runs them over the WebView-merged tree, so web content can get a slightly
-         * different context there. Null texts stay null and keep their slot; a node id that is not in [windows] gets
-         * an empty context.
+         * (its text, its content description or one of its action labels). Each text gets that node's detection
+         * context (resource id, hint, label, content description, password and editable flags) from the same
+         * [ContextExtractor] calls [tree] makes for `get_screen_state`, run over [windows]: the nearest-label pass over
+         * the node's window, then the node's own context. `get_screen_state` runs them over the WebView-merged tree,
+         * so web content can get a slightly different context there. Null texts stay null and keep their slot; a node
+         * id that is not in [windows] gets an empty context.
          */
         suspend fun nodeTexts(
             windows: List<WindowData>,

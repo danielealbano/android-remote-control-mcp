@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
@@ -127,6 +128,12 @@ class NodeTargetResolver
                 }
             }
 
+        /** The parsed node [nodeId] of [windows], or null when they do not hold it. */
+        fun nodeOf(
+            windows: List<WindowData>,
+            nodeId: String,
+        ): AccessibilityNodeData? = elementFinder.findNodeById(windows, nodeId)
+
         /** The nodes [selector] matches in [windows], in tree order; on-screen ones only when [onScreenOnly]. */
         fun matches(
             selector: NodeSelector,
@@ -139,7 +146,7 @@ class NodeTargetResolver
 
         /**
          * The error listing the first [MAX_CANDIDATES] of [matches] (found in [windows]), with Privacy Mode applied to
-         * their texts and the texts shortened like in `get_screen_state`.
+         * their texts and action labels, and the texts shortened like in `get_screen_state`.
          */
         suspend fun ambiguousResult(
             selector: NodeSelector,
@@ -148,21 +155,17 @@ class NodeTargetResolver
             onScreenOnly: Boolean,
         ): CallToolResult {
             val shown = matches.take(MAX_CANDIDATES)
-            val redacted =
-                privacyToolGate.nodeTexts(
-                    windows,
-                    shown.flatMap { listOf(it.text to it.id, it.contentDescription to it.id) },
-                )
+            val redacted = McpToolUtils.redactElements(privacyToolGate, windows, shown)
             val candidates =
                 buildJsonObject {
                     put(
                         "nodes",
                         buildJsonArray {
-                            shown.forEachIndexed { index, element ->
+                            redacted.forEach { element ->
                                 val safe =
                                     element.copy(
-                                        text = shorten(redacted[index * 2]),
-                                        contentDescription = shorten(redacted[index * 2 + 1]),
+                                        text = shorten(element.text),
+                                        contentDescription = shorten(element.contentDescription),
                                     )
                                 add(McpToolUtils.buildNodeJson(safe))
                             }

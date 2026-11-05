@@ -415,6 +415,38 @@ class WebViewNodeMergerTest {
         assertTrue(ids.contains("scroller"), "scrollable node must be preserved")
     }
 
+    @Test
+    @DisplayName("keeps a plain web node with labelled actions as an anchor, with its actions")
+    fun plainNodeWithActionsIsKeptWithItsActions() {
+        val voteBar =
+            node("bar", webRole = "genericContainer", text = "349 votes")
+                .copy(actions = listOf("Upvote", "Downvote"))
+        val kept = flatten(mergedWeb(webArea(voteBar))).single { it.id == "bar" }
+        assertEquals(listOf("Upvote", "Downvote"), kept.actions)
+        assertEquals("349 votes", kept.text)
+    }
+
+    @Test
+    @DisplayName("an interactive anchor keeps its actions")
+    fun anchorKeepsItsActions() {
+        val link = clickable(node("link", webRole = "link", desc = "Open")).copy(actions = listOf("Copy link"))
+        val anchor = mergedWeb(webArea(link)).children.single()
+        assertEquals(listOf("Copy link"), anchor.actions)
+    }
+
+    @Test
+    @DisplayName("an empty block with labelled actions is kept, where one without would be dropped")
+    fun emptyBlockWithActionsIsKept() {
+        val article =
+            node(
+                "article",
+                webRole = "article",
+                children = listOf(node("g", webRole = "genericContainer")),
+            ).copy(actions = listOf("Save"))
+        val kept = flatten(mergedWeb(webArea(article))).single { it.id == "article" }
+        assertEquals(listOf("Save"), kept.actions)
+    }
+
     // ── small-tree helpers ───────────────────────────────────────────────────
 
     /** Wraps [children] under a rootWebArea web entry, itself under a native host. */

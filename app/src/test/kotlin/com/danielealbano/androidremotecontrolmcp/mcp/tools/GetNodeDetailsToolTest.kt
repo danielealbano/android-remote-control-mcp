@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
@@ -11,6 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -138,9 +140,9 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_id\ttext\tdesc\tpassword", lines[0])
-            assertEquals("node_a\tHello World\tA button\tfalse", lines[1])
-            assertEquals("node_b\t-\t-\tfalse", lines[2])
+            assertEquals("node_id\ttext\tdesc\tpassword\tactions", lines[0])
+            assertEquals("node_a\tHello World\tA button\tfalse\t-", lines[1])
+            assertEquals("node_b\t-\t-\tfalse\t-", lines[2])
         }
 
     @Test
@@ -164,8 +166,8 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_a\tHello World\tA button\tfalse", lines[1])
-            assertEquals("node_missing\tnot_found\tnot_found\tnot_found", lines[2])
+            assertEquals("node_a\tHello World\tA button\tfalse\t-", lines[1])
+            assertEquals("node_missing\tnot_found\tnot_found\tnot_found\tnot_found", lines[2])
         }
 
     @Test
@@ -182,7 +184,7 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_b\t-\t-\tfalse", lines[1])
+            assertEquals("node_b\t-\t-\tfalse\t-", lines[1])
         }
 
     @Test
@@ -207,7 +209,7 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_special\tline1 line2 line3\tdesc with tabs\tfalse", lines[1])
+            assertEquals("node_special\tline1 line2 line3\tdesc with tabs\tfalse\t-", lines[1])
         }
 
     @Test
@@ -232,7 +234,62 @@ class GetNodeDetailsToolTest {
             val text = (result.content[0] as TextContent).text
 
             val lines = stripUntrustedWarning(text).lines()
-            assertEquals("node_pwd\t-\t-\ttrue", lines[1])
+            assertEquals("node_pwd\t-\t-\ttrue\t-", lines[1])
+        }
+
+    @Test
+    @DisplayName("lists the action labels in the actions column, redacted in the batch with each node's own slots")
+    fun listsRedactedActionLabels() =
+        runTest {
+            val voteBar =
+                AccessibilityNodeData(
+                    id = "node_bar",
+                    contentDescription = "349 votes",
+                    bounds = BoundsData(0, 0, 100, 100),
+                    actions = listOf("Upvote", "Downvote"),
+                )
+            val share =
+                AccessibilityNodeData(
+                    id = "node_share",
+                    text = "Share",
+                    bounds = BoundsData(0, 0, 100, 100),
+                    actions = listOf("Share post"),
+                )
+            every { mockElementFinder.findNodeById(sampleWindows, "node_bar") } returns voteBar
+            every { mockElementFinder.findNodeById(sampleWindows, "node_missing") } returns null
+            every { mockElementFinder.findNodeById(sampleWindows, "node_b") } returns sampleTree.children[1]
+            every { mockElementFinder.findNodeById(sampleWindows, "node_share") } returns share
+            val gate = mockk<PrivacyToolGate>()
+            coEvery { gate.nodeTexts(any(), any()) } answers {
+                secondArg<List<Pair<String?, String>>>().map { (text, _) -> text?.let { "R($it)" } }
+            }
+            val redactingTool =
+                GetNodeDetailsTool(
+                    mockTreeParser,
+                    mockElementFinder,
+                    mockAccessibilityServiceProvider,
+                    mockNodeCache,
+                    gate,
+                )
+
+            val params =
+                buildJsonObject {
+                    put(
+                        "node_ids",
+                        buildJsonArray {
+                            listOf("node_bar", "node_missing", "node_b", "node_share")
+                                .forEach { add(JsonPrimitive(it)) }
+                        },
+                    )
+                }
+            val result = redactingTool.execute(params)
+            val text = (result.content[0] as TextContent).text
+
+            val lines = stripUntrustedWarning(text).lines()
+            assertEquals("node_bar\t-\tR(349 votes)\tfalse\tR(Upvote)¦R(Downvote)", lines[1])
+            assertEquals("node_missing\tnot_found\tnot_found\tnot_found\tnot_found", lines[2])
+            assertEquals("node_b\t-\t-\tfalse\t-", lines[3])
+            assertEquals("node_share\tR(Share)\t-\tfalse\tR(Share post)", lines[4])
         }
 
     @Test

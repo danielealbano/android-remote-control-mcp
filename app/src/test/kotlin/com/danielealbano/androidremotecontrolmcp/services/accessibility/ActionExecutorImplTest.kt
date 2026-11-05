@@ -1157,4 +1157,93 @@ class ActionExecutorImplTest {
                 verify { mockService.getAccessibilityWindows() }
             }
     }
+
+    @Nested
+    @DisplayName("Labelled actions")
+    inner class LabelledActions {
+        private fun cachedNodeWith(vararg actions: AccessibilityNodeInfo.AccessibilityAction): CachedNode {
+            val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+            every { mockNode.actionList } returns actions.toList()
+            val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+            mockCacheHitWithIdentity(cachedNode, "node_target")
+            return cachedNode
+        }
+
+        @Test
+        @DisplayName("performs the listed action with the label on the cached node")
+        fun performsLabelledActionOnCachedNode() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode =
+                    cachedNodeWith(
+                        mockAction(AccessibilityNodeInfo.ACTION_CLICK, null),
+                        mockAction(CUSTOM_ACTION_ID, "Upvote"),
+                        mockAction(CUSTOM_ACTION_ID + 1, "Upvote"),
+                    )
+                every { cachedNode.node.performAction(CUSTOM_ACTION_ID) } returns true
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { cachedNode.node.performAction(CUSTOM_ACTION_ID) }
+                verify(exactly = 0) { cachedNode.node.performAction(CUSTOM_ACTION_ID + 1) }
+                verify(exactly = 0) { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("finds the live node through the windows on a cache miss")
+        fun findsLiveNodeOnCacheMiss() =
+            runTest {
+                setServiceInstance(mockService)
+                every { mockCache.get("node_target") } returns null
+                val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode.childCount } returns 0
+                every { mockRootNode.actionList } returns listOf(mockAction(CUSTOM_ACTION_ID, "Downvote"))
+                every { mockRootNode.performAction(CUSTOM_ACTION_ID) } returns true
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 10
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
+                val tree = AccessibilityNodeData(id = "node_target", bounds = BoundsData(0, 0, 100, 50))
+                val windows = listOf(WindowData(windowId = 10, windowType = "APPLICATION", tree = tree))
+
+                val result = executor.performLabelledAction("node_target", windows, "Downvote")
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { mockRootNode.performAction(CUSTOM_ACTION_ID) }
+            }
+
+        @Test
+        @DisplayName("fails without naming the label when the live node no longer offers it")
+        fun failsWhenLiveNodeNoLongerOffersIt() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode = cachedNodeWith(mockAction(CUSTOM_ACTION_ID, "Undo Upvote"))
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                val error = result.exceptionOrNull()
+                assertTrue(error is IllegalStateException)
+                assertEquals(
+                    "Node 'node_target' no longer offers the requested action; read the screen again",
+                    error?.message,
+                )
+                verify(exactly = 0) { cachedNode.node.performAction(any<Int>()) }
+            }
+
+        @Test
+        @DisplayName("fails without naming the label when the app refuses the action")
+        fun failsWhenAppRefusesAction() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode = cachedNodeWith(mockAction(CUSTOM_ACTION_ID, "Upvote"))
+                every { cachedNode.node.performAction(CUSTOM_ACTION_ID) } returns false
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                val error = result.exceptionOrNull()
+                assertTrue(error is IllegalStateException)
+                assertEquals("Action failed on node 'node_target'", error?.message)
+            }
+    }
 }

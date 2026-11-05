@@ -21,6 +21,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -327,5 +328,11 @@ class NodeTargetResolverTest {
                 assertTrue(text.contains("\"$shortened\""), text)
                 assertFalse(text.contains(long), text)
             }
+    }
+
+    @Test
+    fun `nodeOf returns the parsed node of the windows, or null when they do not hold it`() {
+        assertEquals("node_cancel", resolver.nodeOf(windows, "node_cancel")?.id)
+        assertNull(resolver.nodeOf(windows, "node_gone"))
     }
 }

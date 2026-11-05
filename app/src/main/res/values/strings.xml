@@ -79,6 +79,7 @@
     <string name="mcp_tool_find_nodes">Find Nodes</string>
     <string name="mcp_tool_click_node">Click Node</string>
     <string name="mcp_tool_long_click_node">Long Click Node</string>
+    <string name="mcp_tool_perform_node_action">Perform Node Action</string>
     <string name="mcp_tool_tap_node">Tap Node</string>
     <string name="mcp_tool_scroll_to_node">Scroll to Node</string>
     <string name="mcp_tool_scroll_node">Scroll Node</string>

@@ -27,6 +27,10 @@
             android:exported="true" />
 
         <activity
+            android:name=".CustomActionsActivity"
+            android:exported="true" />
+
+        <activity
             android:name=".TextFieldActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize" />

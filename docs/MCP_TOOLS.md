@@ -34,7 +34,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 59 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -42,7 +42,7 @@ The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_dismiss_keyboard` | 6 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35 |
+| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_perform_node_action`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35, 69 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
@@ -311,6 +311,7 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
    - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
+   - **Actions section** (only when a listed node has labelled accessibility actions, see [Node Actions Section](#node-actions-section)): `Nodes with actions:`, a blank line, then `* <node_id>: <label>¦<label>` per such node
    - **Hierarchy header**: `hierarchy:` (the header and its rows are left out with `include_hierarchy=false`)
    - **Hierarchy rows**: One line per kept node (node ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
 
@@ -319,6 +320,26 @@ With `include_offscreen=false`, nodes that are not on screen (flag `off`) get no
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 
 Node IDs are deterministic hashes that incorporate the window ID internally (e.g., `node_a1b2`). The window ID influences the hash via the `rootParentId` parameter passed to `parseTree()`, ensuring identical nodes in different windows produce different IDs.
+
+#### Node Actions Section
+
+Some apps expose controls only as accessibility actions of one node, not as nodes of their own: Reddit's post vote bar, for example, is a single node whose Upvote and Downvote buttons are its actions. Each window section lists the labels of its listed nodes' actions after the data rows and before `hierarchy:`, omitted when none has any. In a page, only that page's nodes are listed. Labels are separated by `¦` (U+00A6):
+
+```
+node_id	class	text	desc	res_id	bounds	flags
+node_36ac293b	View	-	349 votes, 28 comments	-	0,490,720,586	on,ena
+Nodes with actions:
+
+* node_36ac293b: Upvote¦Downvote¦Repost¦Share post
+hierarchy:
+node_36ac293b
+```
+
+- An action is listed when its label is not blank: custom actions, and standard ones the app labelled (for example a click labelled "Open post"), in the node's order.
+- Standard actions that take arguments are left out even when labelled (set text, set selection, set extended selection, set progress, scroll to position, scroll in a direction, move window, press and hold, movement and HTML element navigation): one performed by label gets no arguments.
+- In a label, tabs, line breaks and `¦` become spaces, and it is trimmed. Action ids are never shown.
+- With Privacy Mode on, labels are redacted like text and descriptions.
+- Run one with [`android_perform_node_action`](#android_perform_node_action), passing the label exactly as listed. An action has no position on screen: the tool runs it on the node itself, with no tap.
 
 #### Flags Reference
 
@@ -352,6 +373,7 @@ Nodes are **omitted** from the output when ALL of the following are true:
 - No `contentDescription`
 - No `resourceId`
 - Not `clickable`, `longClickable`, `scrollable`, or `editable`
+- No labelled accessibility actions (see [Node Actions Section](#node-actions-section))
 
 This filters out structural-only container nodes (e.g., bare `FrameLayout`, `LinearLayout`) that have no semantic value for LLM tool callers.
 
@@ -1084,7 +1106,7 @@ Each path is an array of point objects:
 
 ### Targeting a node
 
-The node tools (`click_node`, `long_click_node`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
+The node tools (`click_node`, `long_click_node`, `perform_node_action`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
 
 - `node_id`: a node ID from `get_screen_state` or `find_nodes`.
 - A selector: `by` (`text`, `content_desc`, `resource_id`, `class_name`) + `value`, with optional `exact_match` (default `false`: case-insensitive contains), the same semantics as `find_nodes`. The selector is matched in the tool's own fresh read of the screen, among **on-screen** nodes (`scroll_to_node` also matches off-screen nodes). With Privacy Mode on, pseudonym placeholders in `value` are matched against the real text.
@@ -1143,13 +1165,14 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "editable": false,
       "enabled": true,
       "visible": true,
-      "password": false
+      "password": false,
+      "actions": []
     }
   ]
 }
 ```
 
-`password` is the app's password-field marking, the `pwd` flag of `android_get_screen_state` (see [Flags Reference](#flags-reference)).
+`password` is the app's password-field marking, the `pwd` flag of `android_get_screen_state` (see [Flags Reference](#flags-reference)). `actions` lists the labels of the node's accessibility actions, in order, empty when it has none (see [Node Actions Section](#node-actions-section)); run one with [`android_perform_node_action`](#android_perform_node_action).
 
 **Example**:
 ```bash
@@ -1245,6 +1268,52 @@ curl -X POST http://localhost:8080/mcp \
 - **Node not found**: Node not found, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Node is not long-clickable or action failed
+
+---
+
+### `android_perform_node_action`
+
+Perform one of a node's labelled accessibility actions, by node ID or by a selector (see [Targeting a node](#targeting-a-node)), and the action's label exactly as listed under `Nodes with actions` of `android_get_screen_state` (see [Node Actions Section](#node-actions-section)), in `actions` of `android_find_nodes`, or in the `actions` column of `android_get_node_details`. Some apps expose controls only this way: Reddit's post vote bar is one node whose Upvote and Downvote buttons are its actions.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
+    "action": { "type": "string", "description": "The action's label, exactly as listed (case-sensitive)" }
+  },
+  "required": ["action"]
+}
+```
+
+- The tool reads the screen again, resolves the node and matches `action` against the node's labels as listed: exact, case-sensitive, and the first one wins when two labels are the same.
+- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label. On a screen with web content `get_screen_state` redacts labels in the merged page tree, where a node's context can differ slightly from the one `find_nodes` and `get_node_details` use (a web node's description is folded into its text, and an editable node's nearest label can change), so a label matches in either form.
+- The action runs on the node itself through accessibility, not as a tap, so it has no position on screen.
+
+**Output**: `"Action '<action>' performed on node '<node_id>'"`, once the app accepts the action.
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "android_perform_node_action", "arguments": { "node_id": "node_36ac293b", "action": "Upvote" } }
+  }'
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing, empty or non-string `action`; neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
+- **Permission denied**: Accessibility service not enabled
+- **Node not found**: `Node '<node_id>' not found` (not in the tool's read), `Node '<node_id>' not found in accessibility tree` (gone before the action ran), or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
+- **No such action**: The node lists no action with that label. The result's first line is the untrusted-content warning, then `Node '<node_id>' has no action with that label (case-sensitive). Its actions: <label>¦<label>`, or `Node '<node_id>' has no labelled actions`
+- **Action failed**: `Node '<node_id>' no longer offers the requested action; read the screen again` (the node changed since the read, e.g. "Upvote" became "Undo Upvote"), or `Action failed on node '<node_id>'` (the app refused it). Neither message repeats the label.
 
 ---
 
@@ -1777,7 +1846,8 @@ Wait until a node matching the specified criteria appears in the accessibility t
     "editable": false,
     "enabled": true,
     "visible": true,
-    "password": false
+    "password": false,
+    "actions": []
   }
 }
 ```
@@ -1876,7 +1946,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, and whether the app marks each node as a password field. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, whether the app marks each node as a password field, and the labels of its accessibility actions. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1917,20 +1987,21 @@ Retrieves full untruncated text and contentDescription for one or more nodes by 
     "content": [
       {
         "type": "text",
-        "text": "node_id\ttext\tdesc\tpassword\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\tfalse\nnode_2\t-\tFull content description for this node\tfalse"
+        "text": "node_id\ttext\tdesc\tpassword\tactions\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\tfalse\t-\nnode_2\t-\tFull content description for this node\tfalse\tUpvote¦Downvote"
       }
     ]
   }
 }
 ```
 
-**Output Format**: TSV with four columns:
+**Output Format**: TSV with five columns:
 - `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
 - `password`: `true` if the app marks the node as a password field (the `pwd` flag of `android_get_screen_state`, see [Flags Reference](#flags-reference)), `false` otherwise
+- `actions`: The labels of the node's accessibility actions, separated by `¦`, or `-` when it has none (see [Node Actions Section](#node-actions-section)); run one with [`android_perform_node_action`](#android_perform_node_action)
 
-If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc and password columns.
+If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc, password and actions columns.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `node_ids` parameter, `node_ids` is not an array, array is empty, or contains non-string values
