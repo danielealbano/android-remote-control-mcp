@@ -81,11 +81,8 @@ class RedactionEngine
                 val ref = refs[index]
                 when (ref.field) {
                     Field.TEXT -> byNode.text[ref.nodeId] = value
-
                     Field.DESCRIPTION -> byNode.description[ref.nodeId] = value
-
-                    // A node's labels are collected one after the other, in order, so appending keeps their order.
-                    Field.ACTION -> byNode.actions.getOrPut(ref.nodeId) { ArrayList() }.add(value)
+                    Field.ACTION -> byNode.labels.add(value)
                 }
             }
             val flaggedBounds = mutableListOf<BoundsData>()
@@ -123,7 +120,8 @@ class RedactionEngine
         ): AccessibilityNodeData {
             val newText = byNode.text[node.id] ?: node.text
             val newDesc = byNode.description[node.id] ?: node.contentDescription
-            val newActions = byNode.actions[node.id] ?: node.actions
+            // Before the children: this walk takes the labels in the order collectFields gave them.
+            val newActions = if (node.actions.isEmpty()) node.actions else byNode.takeLabels(node.actions.size)
             if (newText != node.text || newDesc != node.contentDescription || newActions != node.actions) {
                 flaggedBounds += node.bounds
             }
@@ -143,10 +141,22 @@ class RedactionEngine
             val field: Field,
         )
 
-        /** The redacted values of a tree, by node id: its text, its content description and its action labels. */
+        /**
+         * The redacted values of a tree: text and content description by node id, and the action labels in the
+         * pre-order [collectFields] walks, which [rebuild] repeats. Labels go by position, not by id: two nodes can
+         * share an id, and each must keep its own labels.
+         */
         private class RedactedFields {
             val text = HashMap<String, String>()
             val description = HashMap<String, String>()
-            val actions = HashMap<String, MutableList<String>>()
+            val labels = ArrayList<String>()
+            private var nextLabel = 0
+
+            /** The next [count] labels, in order. */
+            fun takeLabels(count: Int): List<String> {
+                val taken = labels.subList(nextLabel, nextLabel + count).toList()
+                nextLabel += count
+                return taken
+            }
         }
     }

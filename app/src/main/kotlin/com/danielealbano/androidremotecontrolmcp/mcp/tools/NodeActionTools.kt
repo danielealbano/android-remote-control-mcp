@@ -20,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.NodeActionLabels
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -292,12 +293,12 @@ class PerformNodeActionTool
         private val accessibilityServiceProvider: AccessibilityServiceProvider,
         private val nodeCache: AccessibilityNodeCache,
         private val targetResolver: NodeTargetResolver,
-        private val privacyToolGate: PrivacyToolGate,
+        private val matcher: NodeActionMatcher,
     ) {
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val target = targetResolver.parse(arguments)
-            // Matched as given against the labels as shown, which Privacy Mode redacts the same way on every read.
-            // Never reversed through PlaceholderSubstitutor: a masked value cannot be restored, so it would not match.
+            // Matched as given against the labels as shown ([NodeActionMatcher]). Never reversed through
+            // PlaceholderSubstitutor: a masked value cannot be restored, so it would not match.
             val action = McpToolUtils.requireString(arguments, PARAM_ACTION)
             if (action.isEmpty()) throw McpToolException.InvalidParams("Parameter '$PARAM_ACTION' must be non-empty")
 
@@ -312,8 +313,8 @@ class PerformNodeActionTool
                     ?: throw McpToolException.NodeNotFound("Node '$nodeId' not found")
 
             // One slot per label, in order, so the matched position is also that of the unredacted label.
-            val shown = privacyToolGate.nodeTexts(multiWindowResult.windows, node.actions.map { it to nodeId })
-            val index = shown.indexOf(action)
+            val shown = matcher.shownLabels(multiWindowResult, node)
+            val index = matcher.indexOf(multiWindowResult, node, shown, action)
             return if (index < 0) {
                 noMatchResult(nodeId, shown)
             } else {
@@ -1266,6 +1267,7 @@ fun registerNodeActionTools(
     nodeCache: AccessibilityNodeCache,
     privacyToolGate: PrivacyToolGate,
     substitutor: PlaceholderSubstitutor,
+    webViewNodeMerger: WebViewNodeMerger,
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
@@ -1289,7 +1291,7 @@ fun registerNodeActionTools(
             accessibilityServiceProvider,
             nodeCache,
             targetResolver,
-            privacyToolGate,
+            NodeActionMatcher(privacyToolGate, webViewNodeMerger),
         ).register(registrar, toolNamePrefix)
     }
     if (perms.isToolEnabled(TapNodeTool.TOOL_NAME)) {

@@ -326,6 +326,7 @@ object McpIntegrationTestHelper {
             deps.nodeCache,
             deps.privacyToolGate,
             deps.placeholderSubstitutor,
+            WebViewNodeMerger(),
             toolNamePrefix,
             perms,
         )

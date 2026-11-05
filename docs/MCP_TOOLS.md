@@ -1291,7 +1291,7 @@ Perform one of a node's labelled accessibility actions, by node ID or by a selec
 ```
 
 - The tool reads the screen again, resolves the node and matches `action` against the node's labels as listed: exact, case-sensitive, and the first one wins when two labels are the same.
-- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label.
+- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label. On web content `get_screen_state` redacts a label in the merged page tree, where the node's context differs slightly from the one `find_nodes` and `get_node_details` use, so a web node's label matches in either form.
 - The action runs on the node itself through accessibility, not as a tap, so it has no position on screen.
 
 **Output**: `"Action '<action>' performed on node '<node_id>'"`, once the app accepts the action.
@@ -1310,7 +1310,7 @@ curl -X POST http://localhost:8080/mcp \
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing, empty or non-string `action`; neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: `Node '<node_id>' not found`, or no on-screen node matches the selector
+- **Node not found**: `Node '<node_id>' not found` (not in the tool's read), `Node '<node_id>' not found in accessibility tree` (gone before the action ran), or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
 - **No such action**: The node lists no action with that label. The result's first line is the untrusted-content warning, then `Node '<node_id>' has no action with that label (case-sensitive). Its actions: <label>¦<label>`, or `Node '<node_id>' has no labelled actions`
 - **Action failed**: `Node '<node_id>' no longer offers the requested action; read the screen again` (the node changed since the read, e.g. "Upvote" became "Undo Upvote"), or `Action failed on node '<node_id>'` (the app refused it). Neither message repeats the label.

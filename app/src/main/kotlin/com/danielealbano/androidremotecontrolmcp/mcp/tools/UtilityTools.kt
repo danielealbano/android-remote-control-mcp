@@ -809,8 +809,8 @@ class GetNodeDetailsTool
                 description =
                     "Retrieve full untruncated text and description for nodes by node_id, " +
                         "whether the app marks each node as a password field, " +
-                        "and the labels of its accessibility actions " +
-                        "(run one with ${toolNamePrefix}perform_node_action). " +
+                        "and the labels of its accessibility actions (the actions column; run one with " +
+                        "${toolNamePrefix}perform_node_action). " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(
