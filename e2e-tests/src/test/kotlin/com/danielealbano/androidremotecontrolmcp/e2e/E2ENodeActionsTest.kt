@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.e2e
 
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.McpException
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import java.io.IOException
 
 /**
  * E2E test: node accessibility actions
@@ -118,8 +120,10 @@ class E2ENodeActionsTest {
                     val text = textOf(result)
                     if (condition(text)) return text
                 }
-            } catch (_: Exception) {
-                // Transient error, retry
+            } catch (_: IOException) {
+                // Transport hiccup, retry
+            } catch (_: McpException) {
+                // Protocol error while the app starts, retry
             }
             Thread.sleep(POLL_INTERVAL_MS)
         }

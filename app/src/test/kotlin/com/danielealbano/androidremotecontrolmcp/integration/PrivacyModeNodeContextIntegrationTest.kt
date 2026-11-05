@@ -380,6 +380,71 @@ class PrivacyModeNodeContextIntegrationTest {
             }
         }
 
+    @Test
+    fun `wait_for_node redacts action labels`() =
+        runTest {
+            mockkStatic(SystemClock::class)
+            try {
+                every { SystemClock.elapsedRealtime() } returns 0L
+                val deps = McpIntegrationTestHelper.createMockDependencies()
+                McpIntegrationTestHelper.setPrivacy(
+                    deps,
+                    deterministicEnabled,
+                    PrivacyModeStatus.ReadyDeterministicOnly,
+                )
+                val rootNode =
+                    McpIntegrationTestHelper.setupMultiWindowMock(
+                        deps = deps,
+                        tree = treeOf(contactRow),
+                        screenInfo = screenInfo,
+                        packageName = "com.example.app",
+                        activityName = ".MainActivity",
+                    )
+                // The raw poll matches on the root node's content description, then the full parse finds the row.
+                every { rootNode.contentDescription } returns "Contact"
+                every {
+                    deps.elementFinder.findElements(any<List<WindowData>>(), any(), any(), any())
+                } returns listOf(contactRow.toElementInfo())
+
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "android_wait_for_node",
+                            arguments = mapOf("by" to "content_desc", "value" to "Contact", "timeout" to 5000),
+                        )
+                    assertNotEquals(true, result.isError)
+                    val text = (result.content[0] as TextContent).text
+                    assertTrue(text.contains("\"actions\":[\"Mail "), text)
+                    assertEmailRedacted(text)
+                }
+            } finally {
+                unmockkStatic(SystemClock::class)
+            }
+        }
+
+    @Test
+    fun `ambiguous selector candidates redact action labels`() =
+        runTest {
+            val second = contactRow.copy(id = "node_contact_2", bounds = BoundsData(0, 420, 1080, 520))
+            val deps = privacyDeps(treeOf(contactRow, second))
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), any(), any(), any())
+            } returns listOf(contactRow.toElementInfo(), second.toElementInfo())
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_perform_node_action",
+                        arguments = mapOf("by" to "content_desc", "value" to "Contact", "action" to "Share"),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("node_contact_2") && text.contains("\"actions\":[\"Mail "), text)
+                assertEmailRedacted(text)
+            }
+            coVerify(exactly = 0) { deps.actionExecutor.performLabelledAction(any(), any(), any()) }
+        }
+
     // ─────────────────────────────────────────────────────────────────────
     // Type tools: "Field content" is the focused field's, read through the input connection
     // ─────────────────────────────────────────────────────────────────────

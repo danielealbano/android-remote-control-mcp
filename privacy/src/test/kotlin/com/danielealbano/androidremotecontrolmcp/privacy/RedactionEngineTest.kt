@@ -216,6 +216,36 @@ class RedactionEngineTest {
         }
 
     @Test
+    fun `redactTree keeps each node's own labels when two nodes share an id`() =
+        runTest {
+            val config =
+                PrivacyModeConfig(
+                    enabled = true,
+                    disabledCategories = allExcept(PiiCategory.EMAILS),
+                    placeholderFormat = PlaceholderFormat.NUMBERED,
+                )
+            val root =
+                node(
+                    "root",
+                    children =
+                        listOf(
+                            node("twin").copy(actions = listOf("Mail a@b.com")),
+                            node("twin", bounds = BoundsData(0, 20, 10, 30))
+                                .copy(actions = listOf("Upvote", "Downvote")),
+                        ),
+                )
+
+            val processed = engine.redactTree(tree(root), config)
+
+            val children =
+                processed.result.windows
+                    .single()
+                    .tree.children
+            assertEquals(listOf("Mail [EMAIL_1]"), children[0].actions)
+            assertEquals(listOf("Upvote", "Downvote"), children[1].actions)
+        }
+
+    @Test
     fun `redactTree uses nearest label context for editable fields`() =
         runTest {
             // NationalIdDetector only fires with a national-id cue in the context; the cue arrives via the

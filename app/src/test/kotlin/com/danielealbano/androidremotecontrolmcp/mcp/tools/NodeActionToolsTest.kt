@@ -21,6 +21,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementF
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
 import io.mockk.coEvery
@@ -42,6 +43,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -1615,7 +1617,7 @@ class NodeActionToolsTest {
             mockAccessibilityServiceProvider,
             mockNodeCache,
             NodeTargetResolver(realFinder, gate, substitutor),
-            gate,
+            NodeActionMatcher(gate, WebViewNodeMerger()),
         )
 
         private fun params(
@@ -1733,6 +1735,26 @@ class NodeActionToolsTest {
                     batch.captured,
                 )
                 coVerify(exactly = 1) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `with Privacy Mode an unlisted label returns the labels redacted, never the real ones`() =
+            runTest {
+                val contacts = voteBar.copy(id = "node_contacts", actions = listOf("Call Alice", "Share"))
+                val contactsTree = screenWith(contacts)
+                treesInOrder(contactsTree)
+                val gate = mockk<PrivacyToolGate>()
+                coEvery { gate.nodeTexts(any(), any()) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { (text, _) -> text?.replace("Alice", "[NAME_1]") }
+                }
+
+                val result = toolWith(gate).execute(params("node_contacts", "Call Bob"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertTrue(text.endsWith("Its actions: Call [NAME_1]¦Share"), text)
+                assertFalse(text.contains("Alice"), text)
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
             }
 
         @Test
