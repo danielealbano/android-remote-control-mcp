@@ -1291,7 +1291,7 @@ Perform one of a node's labelled accessibility actions, by node ID or by a selec
 ```
 
 - The tool reads the screen again, resolves the node and matches `action` against the node's labels as listed: exact, case-sensitive, and the first one wins when two labels are the same.
-- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label. On web content `get_screen_state` redacts a label in the merged page tree, where the node's context differs slightly from the one `find_nodes` and `get_node_details` use, so a web node's label matches in either form.
+- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label. On a screen with web content `get_screen_state` redacts labels in the merged page tree, where a node's context can differ slightly from the one `find_nodes` and `get_node_details` use (a web node's description is folded into its text, and an editable node's nearest label can change), so a label matches in either form.
 - The action runs on the node itself through accessibility, not as a tap, so it has no position on screen.
 
 **Output**: `"Action '<action>' performed on node '<node_id>'"`, once the app accepts the action.

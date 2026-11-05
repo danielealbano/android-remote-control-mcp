@@ -9,8 +9,9 @@ import javax.inject.Inject
 /**
  * Matches the action label a client sends to `perform_node_action` against a node's labels as the tools list them,
  * Privacy Mode applied. `find_nodes` and `get_node_details` redact them with the node's context in the windows as
- * read, `get_screen_state` in the WebView-merged tree, where a web node's context differs (its description is folded
- * into its text). A web node's label therefore matches in either form; a native node is the same in both.
+ * read, `get_screen_state` in the WebView-merged tree. On a screen with web content the two contexts can differ: a web
+ * node's description is folded into its text, and the nearest label of an editable node (native or web) can change
+ * as the merge drops and rewrites web text. A label therefore matches in either form.
  */
 class NodeActionMatcher
     @Inject
@@ -26,7 +27,7 @@ class NodeActionMatcher
 
         /**
          * The position in [node]'s actions of the first label shown as [action], or -1: among [shown] (its
-         * [shownLabels]), then, for a web node, among its labels as `get_screen_state` shows them.
+         * [shownLabels]), then among its labels as `get_screen_state` shows them, when the screen has web content.
          */
         suspend fun indexOf(
             result: MultiWindowResult,
@@ -35,8 +36,13 @@ class NodeActionMatcher
             action: String,
         ): Int {
             val index = shown.indexOf(action)
-            if (index >= 0 || node.webRole == null) return index
+            if (index >= 0 || node.actions.isEmpty()) return index
+            // Without web content the merge returns the same result: get_screen_state shows the labels as read.
             val merged = webViewNodeMerger.merge(result)
-            return privacyToolGate.nodeTexts(merged.windows, node.actions.map { it to node.id }).indexOf(action)
+            return if (merged === result) {
+                -1
+            } else {
+                privacyToolGate.nodeTexts(merged.windows, node.actions.map { it to node.id }).indexOf(action)
+            }
         }
     }
