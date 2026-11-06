@@ -328,6 +328,7 @@ class ToolPermissionsIntegrationTest {
                 "notification_action",
                 "notification_reply",
                 "get_screen_state",
+                "get_node_screenshots",
                 "get_location",
                 "get_shared_content",
                 "share_file_via_web",
