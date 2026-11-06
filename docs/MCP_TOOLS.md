@@ -483,7 +483,7 @@ Image numbers are 1-based and count the images only: image 1 is the first image 
 | `<id>: not found` | No node with this id in the first read |
 | `<id>: not captured: <reason>` | `it could not be shown on screen`, `it changed while the app scrolled` or `it disappeared while the app scrolled` |
 
-A parts line may go on with the `partial` or `may be partial` wording after a comma, when the node is still cut on the other axis at a part. It may then end with `; its start was not reached`, then with `; the node continues` (the node is longer than 3 parts), `; then it disappeared while the app scrolled` or `; then it changed while the app scrolled`.
+A parts line may go on with the `partial` or `may be partial` wording after a comma, when the node is still cut on the other axis at a part. It may then end with `; its start was not reached`, then with `; the node continues` (the node goes on past its last part: longer than 3 parts, or a drag that did not complete), `; then it disappeared while the app scrolled` or `; then it changed while the app scrolled`.
 
 Each screenshot is spaced at least 334 ms from the previous one, as for `android_get_screen_state`, so a call taking several screenshots takes at least that long per screenshot. There is no overall time limit: with `allow_scroll=true`, 100 nodes can take tens of seconds.
 
