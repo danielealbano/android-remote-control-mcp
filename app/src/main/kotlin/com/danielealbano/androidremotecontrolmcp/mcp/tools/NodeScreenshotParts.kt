@@ -41,8 +41,8 @@ internal class ShotParts(
             return if (images.isEmpty()) {
                 ShotOutcome.NotCaptured(lostReason?.reason ?: NOT_SHOWN_REASON)
             } else {
-                val ending =
-                    if (lostReason != null) lostNote(lostReason) else CONTINUES_NOTE.takeIf { axis.endEdge in lastEdges }
+                val continues = CONTINUES_NOTE.takeIf { axis.endEdge in lastEdges }
+                val ending = if (lostReason != null) lostNote(lostReason) else continues
                 ShotOutcome.Captured(images.toList(), wording, startNotReached, ending)
             }
         }

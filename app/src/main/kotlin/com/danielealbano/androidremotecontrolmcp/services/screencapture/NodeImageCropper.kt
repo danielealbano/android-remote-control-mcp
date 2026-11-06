@@ -48,7 +48,8 @@ class NodeImageCropper
         /**
          * The JPEG of [bounds] cropped from [bitmap], or null when nothing of it is on the bitmap. Never recycles
          * [bitmap]; recycles an intermediate only when it is not its input, as `createBitmap` returns an immutable
-         * source itself for a full-bitmap rect and `resizeBitmapProportional` returns its input when no resize is needed.
+         * source itself for a full-bitmap rect and `resizeBitmapProportional` returns its input when no resize is
+         * needed.
          */
         fun crop(
             bitmap: Bitmap,
