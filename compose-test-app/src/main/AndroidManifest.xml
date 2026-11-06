@@ -31,6 +31,14 @@
             android:exported="true" />
 
         <activity
+            android:name=".NodeScreenshotActivity"
+            android:exported="true" />
+
+        <activity
+            android:name=".NodeScreenshotComposeActivity"
+            android:exported="true" />
+
+        <activity
             android:name=".TextFieldActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize" />
