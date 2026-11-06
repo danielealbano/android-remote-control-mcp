@@ -61,7 +61,7 @@ internal class NodeScreenshotSession(
         scroller.track(found)
         try {
             val context = ShotContext(deps, scroller, capturer)
-            if (allowScroll) ShotRounds(context).run(found) else captureAsShown(context, found)
+            if (allowScroll) NodeScreenshotRounds(context).run(found) else captureAsShown(context, found)
         } catch (e: McpToolException) {
             // Node ids have changed by then: whatever ends the call must say so.
             throw if (scroller.scrolled) e.withScrolledNote() else e

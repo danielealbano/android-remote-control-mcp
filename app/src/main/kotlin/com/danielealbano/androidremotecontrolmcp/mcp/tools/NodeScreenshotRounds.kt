@@ -28,13 +28,24 @@ internal fun alignThreshold(
 ): Float = axis.extent(container) / ALIGN_MIN_DIVISOR
 
 /**
+ * Whether a seek goes forward: opposite to [firstMovement] (true when forward) since the target was last seen, as a
+ * forward movement means it left by the top or left; with none, forward unless the target's centre was before the
+ * container's.
+ */
+internal fun seekForward(
+    firstMovement: Boolean?,
+    targetCentre: Float,
+    containerCentre: Float,
+): Boolean = if (firstMovement != null) !firstMovement else targetCentre >= containerCentre
+
+/**
  * The `allow_scroll` flow. The on-screen targets that are whole are captured together first; then each round takes the
  * first pending target (by window, then tree pre-order) as its head: reaches it (shows it, or seeks it when Compose
  * dropped it from the tree), aligns it near the top of its list so the targets after it come into view with it, and
  * captures it with every other pending target that is whole on screen. A head still cut after its show goes to the
  * parts flow. The head always leaves the pending targets in its round, so there are at most as many rounds as targets.
  */
-internal class ShotRounds(
+internal class NodeScreenshotRounds(
     private val ctx: ShotContext,
 ) {
     /** A head right after its show: where it is and the edges its show moved it toward the start of. */
@@ -126,8 +137,11 @@ internal class ShotRounds(
         container: Ancestor,
     ): Boolean {
         val axis = container.axis
-        val first = ctx.scroller.firstMovement(seen.readSeq, axis)
-        return if (first != null) !first else axis.centre(seen.bounds) >= axis.centre(container.data.bounds)
+        return seekForward(
+            ctx.scroller.firstMovement(seen.readSeq, axis),
+            axis.centre(seen.bounds),
+            axis.centre(container.data.bounds),
+        )
     }
 
     private fun seekSegment(
