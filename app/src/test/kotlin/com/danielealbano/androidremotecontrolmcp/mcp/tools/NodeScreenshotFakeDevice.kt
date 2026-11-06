@@ -15,6 +15,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionEx
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.DragSegment
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollReach
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
@@ -88,6 +89,9 @@ internal class FakeDevice(
     val copies = mutableListOf<Bitmap>()
     val maskedWith = mutableListOf<List<BoundsData>>()
 
+    /** The bitmaps masking made, one per capture with flagged bounds. */
+    val maskedBitmaps = mutableListOf<Bitmap>()
+
     /** The read count at each screenshot. */
     val capturedAtRead = mutableListOf<Int>()
 
@@ -97,7 +101,7 @@ internal class FakeDevice(
     /** Nodes (by name) whose crop is empty. */
     val emptyCrops = mutableSetOf<String>()
 
-    /** The bounds Privacy Mode flags, by screen step. */
+    /** The bounds Privacy Mode flags in the tree read on each screen step (told apart by the id of its root). */
     val flagged = HashMap<Int, List<BoundsData>>()
 
     var bitmapConfig: Bitmap.Config = Bitmap.Config.ARGB_8888
@@ -286,10 +290,26 @@ internal class FakeDevice(
             capturedAtRead.add(reads)
             Result.success(bitmap)
         }
-        coEvery { privacyToolGate.tree(any()) } answers { ProcessedTree(firstArg(), flagged[step].orEmpty()) }
+        coEvery { privacyToolGate.tree(any()) } answers {
+            val tree = firstArg<MultiWindowResult>()
+            val rootId =
+                tree.windows
+                    .single()
+                    .tree.id
+            val readStep = rootId.substringAfter('@', "0").toInt()
+            ProcessedTree(tree, flagged[readStep].orEmpty())
+        }
+        // As ScreenshotRedactor: the capture itself when nothing is flagged, a new mutable bitmap otherwise.
+        val maskPool = List(BITMAP_POOL) { mockk<Bitmap>(relaxed = true) }
+        maskPool.forEach { every { it.config } returns Bitmap.Config.ARGB_8888 }
         every { screenshotRedactor.mask(any(), any(), any(), any()) } answers {
-            maskedWith.add(secondArg())
-            firstArg()
+            val bounds = secondArg<List<BoundsData>>()
+            maskedWith.add(bounds)
+            if (bounds.isEmpty()) {
+                firstArg()
+            } else {
+                maskPool[maskedBitmaps.size].also { maskedBitmaps.add(it) }
+            }
         }
         every { nodeImageCropper.crop(any(), any(), any(), any()) } answers {
             val name = nameAt(secondArg())

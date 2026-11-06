@@ -6,8 +6,11 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollReach
 import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -130,7 +133,9 @@ class NodeScreenshotSessionTest {
             // B is whole in the first read; A, a tall Compose node cut at the bottom, comes later in 2 parts.
             val device =
                 FakeDevice(
-                    screen(list(reach(down = true), row("B", 200), row("A", 1000, height = 1500, view = false))),
+                    screen(
+                        list(reach(down = true), row("B", 200, view = false), row("A", 1000, 1500, view = false)),
+                    ),
                     screen(list(reach(up = true, down = true), row("A", 200, height = 1500, view = false))),
                     screen(list(reach(up = true), row("A", -700, height = 1500, view = false))),
                 )
@@ -150,8 +155,9 @@ class NodeScreenshotSessionTest {
             val device =
                 FakeDevice(
                     screen(list(reach(down = true), row("R0", 200), row("R9", 2000))),
-                    screen(list(reach(up = true, down = true), row("R9", 1200))),
+                    screen(list(reach(up = true, down = true), row("R0", -600), row("R9", 1200))),
                 )
+            // The fake flags by the tree it is given, so a mask from another read's tree would not match.
             val first = listOf(BoundsData(1, 2, 3, 4))
             val second = listOf(BoundsData(5, 6, 7, 8))
             device.flagged[0] = first
@@ -160,6 +166,40 @@ class NodeScreenshotSessionTest {
             device.session().run(listOf("R0", "R9"), allowScroll = true)
 
             assertEquals(listOf(first, second), device.maskedWith)
+        }
+
+    @Test
+    fun `the crops are cut from the masked bitmap and both bitmaps are recycled`() =
+        runTest {
+            val device = FakeDevice(mixedScreen())
+            device.flagged[0] = listOf(BoundsData(0, 200, 100, 300))
+
+            device.session().run(listOf("A", "B"), allowScroll = false)
+
+            val masked = device.maskedBitmaps.single()
+            val capture = device.bitmaps.single()
+            verify(exactly = 2) { device.nodeImageCropper.crop(masked, any(), 720, 1600) }
+            verify(exactly = 0) { device.nodeImageCropper.crop(capture, any(), any(), any()) }
+            verify(exactly = 1) { masked.recycle() }
+            verify(exactly = 1) { capture.recycle() }
+        }
+
+    @Test
+    fun `a call cancelled between the screenshot and its crops still recycles the screenshot`() =
+        runTest {
+            val device = FakeDevice(mixedScreen())
+            val bitmap = mockk<Bitmap>(relaxed = true)
+            coEvery { device.screenCaptureProvider.captureScreenshotBitmap(null, null) } coAnswers {
+                currentCoroutineContext().cancel()
+                Result.success(bitmap)
+            }
+
+            val job = launch { device.session().run(listOf("A"), allowScroll = false) }
+            job.join()
+
+            assertTrue(job.isCancelled)
+            verify(exactly = 1) { bitmap.recycle() }
+            verify(exactly = 0) { device.nodeImageCropper.crop(any(), any(), any(), any()) }
         }
 
     @Test

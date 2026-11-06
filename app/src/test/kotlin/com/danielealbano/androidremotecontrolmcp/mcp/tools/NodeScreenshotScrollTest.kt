@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.DragSegment
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollReach
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /** The `allow_scroll` flow of [NodeScreenshotSession], on scripted screens ([FakeDevice]). */
+@OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("NodeScreenshotSession with allow_scroll")
 class NodeScreenshotScrollTest {
     /** View rows r0..r12 of [LIST], 200 px each, scrolled by [scrollY]. */
@@ -95,6 +97,8 @@ class NodeScreenshotScrollTest {
 
                 assertEquals(listOf(SCROLLED_NOTE, "r7: image 1", "r8: image 2", "r9: image 3"), shots.lines())
                 assertEquals(listOf(3), device.capturedAtRead)
+                // The show's settle (3 polls), then the failed drag's settle.
+                assertEquals(3 * ShotScroller.SHOW_POLL_MS + ShotScroller.DRAG_SETTLE_MS, testScheduler.currentTime)
             }
 
         @Test
@@ -178,23 +182,6 @@ class NodeScreenshotScrollTest {
                     listOf(SCROLLED_NOTE, "H1: image 1", "H2: not captured: it changed while the app scrolled"),
                     shots.lines(),
                 )
-            }
-
-        @Test
-        fun `a pending target missing from a read is not captured from it but is handled as a later head`() =
-            runTest {
-                val device =
-                    FakeDevice(
-                        screen(list(reach(down = true), row("H", 1600), row("P", 1800))),
-                        screen(list(middle, row("H", 1200), row("P", 1400))),
-                        screen(list(middle, row("H", 275))),
-                        screen(list(middle, row("H", -625), row("P", 600))),
-                    )
-
-                val shots = device.shoot("H", "P")
-
-                assertEquals(listOf(SCROLLED_NOTE, "H: image 1", "P: image 2"), shots.lines())
-                assertEquals(listOf("c1/H", "c2/P"), shots.images)
             }
     }
 
@@ -293,60 +280,37 @@ class NodeScreenshotScrollTest {
         @Test
         fun `a carousel dropped with its row is sought on the outer list and found again as a new node`() =
             runTest {
+                // H1, a tall Compose node, holds carousel C whose item H2 is cut by C's right edge. H1's show moves
+                // the content up 200 px, its part 2 drags it up 900 px: H2, last seen below the list's centre, leaves
+                // by the top with C. The forward drag says to seek backward, where its last place alone would say
+                // forward.
                 fun h1(
-                    bounds: BoundsData,
+                    top: Int,
                     vararg children: FakeNode,
-                ) = FakeNode("H1", bounds, children.toList())
+                ) = FakeNode("H1", clip(BoundsData(0, top, 720, top + 2000), LIST), children.toList())
 
                 fun carousel(
+                    top: Int,
                     live: String,
-                    reach: ScrollReach,
                     h2: FakeNode,
-                ) = FakeNode("C", BoundsData(0, 300, 720, 500), listOf(h2), reach = reach, live = live)
-                val right = reach(right = true)
+                    reach: ScrollReach = reach(right = true),
+                ) = FakeNode("C", BoundsData(0, top, 720, top + ROW), listOf(h2), reach = reach, live = live)
+
+                fun h2(
+                    top: Int,
+                    left: Int = 100,
+                    live: String = "H2",
+                ) = FakeNode("H2", BoundsData(left, top, 720, top + ROW), live = live)
                 val device =
                     FakeDevice(
+                        screen(list(middle, h1(400, carousel(1100, "C", h2(1100))))),
+                        screen(list(middle, h1(200, carousel(900, "C", h2(900))))),
+                        screen(list(middle, h1(-700))),
+                        screen(list(middle, h1(200, carousel(900, "C2", h2(900, live = "H2b"))))),
                         screen(
                             list(
                                 middle,
-                                h1(
-                                    BoundsData(0, 1000, 720, 1400),
-                                    FakeNode(
-                                        "C",
-                                        BoundsData(0, 1100, 720, 1300),
-                                        listOf(FakeNode("H2", BoundsData(100, 1100, 720, 1300))),
-                                        reach = right,
-                                    ),
-                                ),
-                            ),
-                        ),
-                        screen(
-                            list(
-                                middle,
-                                h1(LIST, carousel("C", right, FakeNode("H2", BoundsData(100, 300, 720, 500)))),
-                            ),
-                        ),
-                        screen(list(middle, h1(BoundsData(0, 200, 720, 1300)))),
-                        screen(
-                            list(
-                                middle,
-                                h1(
-                                    LIST,
-                                    carousel("C2", right, FakeNode("H2", BoundsData(100, 300, 720, 500), live = "H2b")),
-                                ),
-                            ),
-                        ),
-                        screen(
-                            list(
-                                middle,
-                                h1(
-                                    LIST,
-                                    carousel(
-                                        "C2",
-                                        reach(left = true, right = true),
-                                        FakeNode("H2", BoundsData(20, 300, 720, 500), live = "H2b"),
-                                    ),
-                                ),
+                                h1(200, carousel(900, "C2", h2(900, 20, "H2b"), reach(left = true, right = true))),
                             ),
                         ),
                     )
@@ -357,12 +321,27 @@ class NodeScreenshotScrollTest {
                     listOf(SCROLLED_NOTE, "H1: images 1-2: 2 overlapping parts, in order", "H2: image 3"),
                     shots.lines(),
                 )
-                // Part 2 of H1 dragged forward, so H2 left by the top: it is sought backward, on the outer list.
                 assertEquals(
                     listOf(DragSegment(360f, 1250f, 360f, 350f), DragSegment(360f, 350f, 360f, 1250f)),
                     device.drags,
                 )
                 assertEquals(listOf("H1", "H2b"), device.shows)
+            }
+
+        @Test
+        fun `a pending target dropped from the read of a capture is captured later as a head`() =
+            runTest {
+                val device =
+                    droppedBelow(
+                        screen(list(middle, row("H2", 500, view = false, live = "H2b"))),
+                        screen(list(middle, row("H2", 500, view = false, live = "H2b"))),
+                    )
+
+                val shots = device.shoot("H1", "H2")
+
+                assertEquals(listOf("c1/H1", "c2/H2"), shots.images)
+                // H1 from the read after its show, where H2 was gone; H2 from the read after its own show.
+                assertEquals(listOf(2, 4), device.capturedAtRead)
             }
 
         @Test
@@ -464,6 +443,30 @@ class NodeScreenshotScrollTest {
                 assertEquals(listOf(SCROLLED_NOTE, "H1: image 1", "H2: image 2"), shots.lines())
                 assertEquals(listOf(DragSegment(360f, 1300f, 360f, 700f)), device.drags)
             }
+    }
+
+    @Nested
+    @DisplayName("Seek direction")
+    inner class SeekDirection {
+        @Test
+        fun `a forward movement since the target was seen means seeking backward, wherever it was`() {
+            assertEquals(false, seekForward(firstMovement = true, targetCentre = 1000f, containerCentre = 800f))
+        }
+
+        @Test
+        fun `a backward movement since the target was seen means seeking forward, wherever it was`() {
+            assertEquals(true, seekForward(firstMovement = false, targetCentre = 300f, containerCentre = 800f))
+        }
+
+        @Test
+        fun `with no movement a target before the container's centre is sought backward`() {
+            assertEquals(false, seekForward(firstMovement = null, targetCentre = 300f, containerCentre = 800f))
+        }
+
+        @Test
+        fun `with no movement a target past the container's centre is sought forward`() {
+            assertEquals(true, seekForward(firstMovement = null, targetCentre = 1000f, containerCentre = 800f))
+        }
     }
 
     @Nested

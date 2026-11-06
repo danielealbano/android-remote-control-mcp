@@ -89,6 +89,15 @@ class NodeCutRuleTest {
         }
 
         @Test
+        fun `right after a show a node cut on both axes stays cut only on the axis it fills`() {
+            val box = ScrollContainer(list, all)
+
+            val edges = cut(BoundsData(300, 200, 720, 1400), box, justShown = true)
+
+            assertEquals(setOf(Edge.TOP, Edge.BOTTOM), edges.keys)
+        }
+
+        @Test
         fun `edges moved toward the start are cleared right after a show only`() {
             val pager = ScrollContainer(BoundsData(0, 0, 720, 1600), ScrollReach(false, false, true, true))
             val node = BoundsData(0, 200, 720, 1400)
