@@ -21,7 +21,6 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -718,28 +717,9 @@ class GetNodeDetailsTool
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
     ) {
-        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // 1. Parse "node_ids" parameter — required, JSON array of strings
-            val idsElement =
-                arguments?.get("node_ids")
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_ids'")
-            val idsArray =
-                (idsElement as? JsonArray)
-                    ?: throw McpToolException.InvalidParams("Parameter 'node_ids' must be an array of strings")
-            if (idsArray.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_ids' must not be empty")
-            }
-            val ids =
-                idsArray.map { element ->
-                    val primitive =
-                        (element as? JsonPrimitive)
-                            ?: throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
-                    if (!primitive.isString) {
-                        throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
-                    }
-                    primitive.content
-                }
+            val ids = McpToolUtils.requireNodeIds(arguments)
 
             // 2. Get fresh multi-window snapshot
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)

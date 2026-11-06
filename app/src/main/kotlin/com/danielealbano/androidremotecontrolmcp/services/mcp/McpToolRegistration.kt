@@ -147,6 +147,8 @@ class McpToolRegistration
                 screen.webViewNodeMerger,
                 privacy.privacyToolGate,
                 privacy.screenshotRedactor,
+                accessibility.actionExecutor,
+                screen.nodeImageCropper,
                 toolNamePrefix,
                 perms,
             )

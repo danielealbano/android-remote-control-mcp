@@ -8,10 +8,12 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ContentBlock
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -345,6 +347,30 @@ internal object McpToolUtils {
     }
 
     /**
+     * Extracts the required `node_ids` parameter: a non-empty JSON array of strings.
+     *
+     * @throws McpToolException.InvalidParams if it is missing, not an array, empty, or holds a non-string.
+     */
+    fun requireNodeIds(params: JsonObject?): List<String> {
+        val element = params?.get(PARAM_NODE_IDS)
+        val array = element as? JsonArray
+        val nonString = array?.any { (it as? JsonPrimitive)?.isString != true } == true
+        val error =
+            when {
+                element == null -> "Missing required parameter '$PARAM_NODE_IDS'"
+                array == null -> "Parameter '$PARAM_NODE_IDS' must be an array of strings"
+                array.isEmpty() -> "Parameter '$PARAM_NODE_IDS' must not be empty"
+                nonString -> "Each element in '$PARAM_NODE_IDS' must be a string"
+                else -> null
+            }
+        if (error != null) throw McpToolException.InvalidParams(error)
+        return array.orEmpty().map { it.jsonPrimitive.content }
+    }
+
+    /** The parameter of the tools taking node ids. */
+    const val PARAM_NODE_IDS = "node_ids"
+
+    /**
      * Validates that [value] is >= 0.
      *
      * @throws McpToolException.InvalidParams if validation fails.
@@ -460,6 +486,21 @@ internal object McpToolUtils {
                     TextContent(text = "$UNTRUSTED_CONTENT_WARNING\n$text"),
                     ImageContent(data = imageData, mimeType = imageMimeType),
                 ),
+        )
+
+    /**
+     * Creates a [CallToolResult] with [UNTRUSTED_CONTENT_WARNING] prepended to [text] as its only text item, then one
+     * [ImageContent] per entry of [images], in order.
+     */
+    fun untrustedTextAndImagesResult(
+        text: String,
+        images: List<String>,
+        imageMimeType: String,
+    ): CallToolResult =
+        CallToolResult(
+            content =
+                listOf<ContentBlock>(TextContent(text = "$UNTRUSTED_CONTENT_WARNING\n$text")) +
+                    images.map { ImageContent(data = it, mimeType = imageMimeType) },
         )
 
     /**

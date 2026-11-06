@@ -16,6 +16,7 @@ import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.NodeImageCropper
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -39,7 +40,7 @@ class AccessibilityToolDeps
     )
 
 /** What the screen introspection tools capture and format with. */
-class ScreenToolDeps
+data class ScreenToolDeps
     @Inject
     constructor(
         val screenCaptureProvider: ScreenCaptureProvider,
@@ -48,6 +49,7 @@ class ScreenToolDeps
         val screenshotEncoder: ScreenshotEncoder,
         val screenStateSnapshotCache: ScreenStateSnapshotCache,
         val webViewNodeMerger: WebViewNodeMerger,
+        val nodeImageCropper: NodeImageCropper,
     )
 
 /** Privacy Mode as the tools apply it to what they return and accept. */

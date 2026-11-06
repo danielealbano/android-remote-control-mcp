@@ -76,6 +76,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                     R.string.mcp_tool_get_screen_state,
                     listOf(ParamEntry("include_screenshot", R.string.mcp_tool_param_include_screenshot)),
                 ),
+                ToolEntry("get_node_screenshots", R.string.mcp_tool_get_node_screenshots),
             ),
         ),
         ToolCategory(
