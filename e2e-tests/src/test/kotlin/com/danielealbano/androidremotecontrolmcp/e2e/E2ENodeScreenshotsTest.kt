@@ -51,7 +51,11 @@ class E2ENodeScreenshotsTest {
 
     private fun JsonObject.isVisible(): Boolean = getValue("visible").jsonPrimitive.boolean
 
-    private fun JsonObject.edge(name: String): Int = getValue("bounds").jsonObject.getValue(name).jsonPrimitive.int
+    private fun JsonObject.edge(name: String): Int =
+        getValue("bounds")
+            .jsonObject
+            .getValue(name)
+            .jsonPrimitive.int
 
     /** The nodes whose content description is [desc] (or contains it, when not [exact]). */
     private suspend fun findByDesc(
@@ -104,7 +108,14 @@ class E2ENodeScreenshotsTest {
         while (System.currentTimeMillis() < deadline) {
             last = read()
             val ids = last?.mapValues { (_, node) -> node.nodeId() }
-            stableReads = if (ids != null && ids == previous) stableReads + 1 else if (ids != null) 1 else 0
+            stableReads =
+                if (ids != null && ids == previous) {
+                    stableReads + 1
+                } else if (ids != null) {
+                    1
+                } else {
+                    0
+                }
             previous = ids
             if (last != null && stableReads == STABLE_READS) return last
             Thread.sleep(POLL_MS)
@@ -119,8 +130,10 @@ class E2ENodeScreenshotsTest {
         launchAndSettle(E2ETestApps::launchNodeScreenshotComposeTestApp) { byDesc("compose_row_0", "compose_tall") }
 
     /** The line of [id] in 2 or 3 parts, with no note: the group is the number of parts. */
-    private fun twoOrThreeParts(id: String): Regex =
-        Regex("^${Regex.escape(id)}: images 1-([23]): \\1 overlapping parts, in order$")
+    private fun twoOrThreeParts(id: String): Regex {
+        val node = Regex.escape(id)
+        return Regex("^$node: images 1-([23]): \\1 overlapping parts, in order$")
+    }
 
     private suspend fun shoot(
         ids: List<String>,

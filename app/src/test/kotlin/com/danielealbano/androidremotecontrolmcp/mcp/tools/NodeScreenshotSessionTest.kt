@@ -22,8 +22,9 @@ import org.junit.jupiter.api.assertThrows
 /** The list most scripted screens scroll: its visible extent E is 1200. */
 internal val LIST = BoundsData(0, 200, 720, 1400)
 
+/** The root of a scripted screen: [FAKE_SCREEN] holding [children]. */
 internal fun screen(vararg children: FakeNode): FakeNode =
-    FakeNode("root", BoundsData(0, 0, 720, 1600), children.toList())
+    FakeNode("root", BoundsData(0, 0, FAKE_SCREEN.width, FAKE_SCREEN.height), children.toList())
 
 internal fun list(
     reach: ScrollReach,

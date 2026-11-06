@@ -43,7 +43,7 @@ internal class ShotRounds(
         val movedTowardStart: Set<Edge>,
     )
 
-    private val parts = ShotParts(ctx)
+    private val parts = NodeScreenshotParts(ctx)
 
     suspend fun run(targets: List<ShotTarget>) {
         val first = ctx.current
@@ -105,7 +105,11 @@ internal class ShotRounds(
         var dragging = true
         while (dragging && presence !is Presence.Present && drags < MAX_SEEK_DRAGS) {
             drags++
-            val bounds = ctx.current.idOf(container.node)?.let { ctx.current.data(it) }?.bounds
+            val bounds =
+                ctx.current
+                    .idOf(container.node)
+                    ?.let { ctx.current.data(it) }
+                    ?.bounds
             val result = ctx.scroller.drag(bounds?.let { seekSegment(it, axis, forward) }, axis, forward)
             if (result != DragResult.REFUSED) presence = ctx.find(head)
             dragging = result == DragResult.DONE

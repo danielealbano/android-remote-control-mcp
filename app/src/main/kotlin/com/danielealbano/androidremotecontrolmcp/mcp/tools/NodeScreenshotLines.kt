@@ -72,7 +72,10 @@ internal fun singleOutcome(
     image: String?,
     wording: CutWording?,
 ): ShotOutcome =
-    if (image != null) ShotOutcome.Captured(listOf(image), wording) else ShotOutcome.NotCaptured(NOT_SHOWN_REASON)
+    when (image) {
+        null -> ShotOutcome.NotCaptured(NOT_SHOWN_REASON)
+        else -> ShotOutcome.Captured(listOf(image), wording)
+    }
 
 /** The note ending the parts of a node lost after them. */
 internal fun lostNote(reason: GoneReason): String = "then ${reason.reason}"

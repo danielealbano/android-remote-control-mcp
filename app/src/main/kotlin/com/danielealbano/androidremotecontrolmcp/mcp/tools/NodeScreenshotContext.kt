@@ -31,7 +31,7 @@ internal sealed interface Sighting {
 internal class ShotContext(
     private val deps: NodeScreenshotDeps,
     val scroller: ShotScroller,
-    val capturer: ShotCapturer,
+    val capturer: NodeScreenshotCapture,
 ) {
     val current: ReadIndex get() = scroller.current
 

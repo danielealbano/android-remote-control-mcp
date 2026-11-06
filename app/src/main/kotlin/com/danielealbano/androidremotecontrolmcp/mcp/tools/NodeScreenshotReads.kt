@@ -25,12 +25,13 @@ internal enum class Axis(
     fun start(bounds: BoundsData): Int = if (this == VERTICAL) bounds.top else bounds.left
 
     /** The extent of [bounds] on this axis. */
-    fun extent(bounds: BoundsData): Int =
-        if (this == VERTICAL) bounds.bottom - bounds.top else bounds.right - bounds.left
+    fun extent(bounds: BoundsData): Int = end(bounds) - start(bounds)
+
+    /** The end (bottom or right) of [bounds] on this axis. */
+    fun end(bounds: BoundsData): Int = if (this == VERTICAL) bounds.bottom else bounds.right
 
     /** The centre of [bounds] on this axis. */
-    fun centre(bounds: BoundsData): Float =
-        if (this == VERTICAL) (bounds.top + bounds.bottom) / 2f else (bounds.left + bounds.right) / 2f
+    fun centre(bounds: BoundsData): Float = (start(bounds) + end(bounds)) / 2f
 
     fun owns(edge: Edge): Boolean = edge == startEdge || edge == endEdge
 
@@ -89,12 +90,14 @@ internal class ReadIndex(
     /** The scrollable ancestors of [id], nearest first, the node itself excluded. */
     fun scrollableAncestors(id: String): List<Ancestor> {
         val ancestors = mutableListOf<Ancestor>()
-        var parent = read.nodes[id]?.parentId
-        while (parent != null) {
-            val cached = read.nodes[parent] ?: break
-            val data = dataById[parent] ?: break
-            if (data.scrollable) ancestors.add(Ancestor(cached.node, data, ScrollReach.of(cached.node)))
-            parent = cached.parentId
+        var parentId = read.nodes[id]?.parentId
+        while (parentId != null) {
+            val cached = read.nodes[parentId]
+            val data = dataById[parentId]
+            if (cached != null && data?.scrollable == true) {
+                ancestors.add(Ancestor(cached.node, data, ScrollReach.of(cached.node)))
+            }
+            parentId = cached?.parentId
         }
         return ancestors
     }

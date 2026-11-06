@@ -25,7 +25,9 @@ class NodeScreenshotActivity : ComponentActivity() {
                 orientation = LinearLayout.VERTICAL
                 for (index in 0 until ROW_COUNT) {
                     addView(row(index))
-                    if (index == TALL_TWO_AFTER) addView(block("tall_two", windowHeight * TALL_TWO_SCREENS, TALL_TWO_COLOR))
+                    if (index == TALL_TWO_AFTER) {
+                        addView(block("tall_two", windowHeight * TALL_TWO_SCREENS, TALL_TWO_COLOR))
+                    }
                     if (index == TALL_LONG_AFTER) {
                         addView(block("tall_long", windowHeight * TALL_LONG_SCREENS, TALL_LONG_COLOR))
                     }
@@ -70,8 +72,10 @@ class NodeScreenshotActivity : ComponentActivity() {
             }
         }
 
-    private fun dpToPx(dp: Float): Int =
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics).toInt()
+    private fun dpToPx(dp: Float): Int {
+        val px = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics)
+        return px.toInt()
+    }
 
     private companion object {
         const val ROW_COUNT = 40

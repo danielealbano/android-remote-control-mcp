@@ -14,7 +14,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * the read's flagged nodes before any crop, as `get_screen_state` does; the mask, the copy, the crops and the encodes
  * run on the Default dispatcher.
  */
-internal class ShotCapturer(
+internal class NodeScreenshotCapture(
     private val deps: NodeScreenshotDeps,
 ) {
     /** How many screenshots were taken. */

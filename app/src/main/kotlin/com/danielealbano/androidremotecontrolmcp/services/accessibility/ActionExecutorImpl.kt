@@ -469,8 +469,9 @@ class ActionExecutorImpl
         }
 
         /**
-         * The service to drag with, or why nothing may be dispatched: invalid coordinates, no service, or a drag shorter
-         * than [MIN_DRAG_TOUCH_SLOPS] touch slops, which would not scroll and whose held end would make it a long press.
+         * The service to drag with, or why nothing may be dispatched: invalid coordinates, no service, or a drag
+         * shorter than [MIN_DRAG_TOUCH_SLOPS] touch slops, which would not scroll and whose held end would make it a
+         * long press.
          */
         private fun dragService(
             fromX: Float,

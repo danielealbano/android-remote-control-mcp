@@ -9,7 +9,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.dragSegm
  * from the container's start is aligned first, so part 1 is not a sliver. Each part's capture also takes the other
  * pending targets whole on screen. A failed drag ends its phase.
  */
-internal class ShotParts(
+internal class NodeScreenshotParts(
     private val ctx: ShotContext,
 ) {
     /** What the parts of one node add to its line. */
@@ -92,7 +92,12 @@ internal class ShotParts(
     ): Sighting {
         val seen = sighting as? Sighting.Seen ?: return sighting
         val target = seen.present.data.bounds
-        val container = seen.edges.takeIf { axis.startEdge !in it }?.get(axis.endEdge)?.data?.bounds
+        val container =
+            seen.edges
+                .takeIf { axis.startEdge !in it }
+                ?.get(axis.endEdge)
+                ?.data
+                ?.bounds
         val distance = container?.let { alignDistance(axis, it, target) } ?: 0f
         val segment =
             container
@@ -146,10 +151,11 @@ internal class ShotParts(
         forward: Boolean,
     ): DragResult {
         val container = seen.edges[edge]?.data?.bounds ?: return DragResult.REFUSED
+        val node = seen.present.data.bounds
         val segment =
             dragSegment(
                 container,
-                seen.present.data.bounds.centre(),
+                node.centre(),
                 DRAG_FRACTION * axis.extent(container),
                 axis.direction(forward),
                 ctx.screen(),

@@ -386,7 +386,9 @@ class McpToolUtilsTest {
 
         @Test
         fun `rejects an empty array`() {
-            assertEquals("Parameter 'node_ids' must not be empty", error(buildJsonObject { putJsonArray("node_ids") {} }))
+            val empty = buildJsonObject { putJsonArray("node_ids") {} }
+
+            assertEquals("Parameter 'node_ids' must not be empty", error(empty))
         }
 
         @Test

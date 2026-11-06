@@ -51,7 +51,7 @@ internal class NodeScreenshotSession(
         allowScroll: Boolean,
     ): NodeScreenshots {
         val scroller = ShotScroller(deps.actionExecutor, read)
-        val capturer = ShotCapturer(deps)
+        val capturer = NodeScreenshotCapture(deps)
         val first = scroller.readAgain()
         val targets =
             nodeIds.associateWith { id ->

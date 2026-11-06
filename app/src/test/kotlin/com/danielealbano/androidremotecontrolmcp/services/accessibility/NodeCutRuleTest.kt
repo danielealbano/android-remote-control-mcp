@@ -140,7 +140,8 @@ class NodeCutRuleTest {
 
         @Test
         fun `directional actions give exactly those directions`() {
-            val node = container(android.R.id.accessibilityActionScrollDown, android.R.id.accessibilityActionScrollRight)
+            val node =
+                container(android.R.id.accessibilityActionScrollDown, android.R.id.accessibilityActionScrollRight)
 
             assertEquals(ScrollReach(up = false, down = true, left = false, right = true), ScrollReach.of(node))
         }
@@ -174,7 +175,9 @@ class NodeCutRuleTest {
 
         @Test
         fun `no scroll action reaches nowhere`() {
-            assertEquals(ScrollReach(up = false, down = false, left = false, right = false), ScrollReach.of(container()))
+            val none = ScrollReach(up = false, down = false, left = false, right = false)
+
+            assertEquals(none, ScrollReach.of(container()))
         }
     }
 
