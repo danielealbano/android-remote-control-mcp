@@ -13,11 +13,15 @@ import io.mockk.slot
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -344,6 +348,64 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // requireNodeIds
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("requireNodeIds")
+    inner class RequireNodeIdsTests {
+        private fun error(params: JsonObject?): String? =
+            assertThrows<McpToolException.InvalidParams> { McpToolUtils.requireNodeIds(params) }.message
+
+        @Test
+        fun `returns the ids in order`() {
+            val params =
+                buildJsonObject {
+                    putJsonArray("node_ids") {
+                        add("b")
+                        add("a")
+                    }
+                }
+
+            assertEquals(listOf("b", "a"), McpToolUtils.requireNodeIds(params))
+        }
+
+        @Test
+        fun `rejects a missing parameter`() {
+            assertEquals("Missing required parameter 'node_ids'", error(null))
+            assertEquals("Missing required parameter 'node_ids'", error(buildJsonObject {}))
+        }
+
+        @Test
+        fun `rejects a value that is not an array`() {
+            assertEquals(
+                "Parameter 'node_ids' must be an array of strings",
+                error(buildJsonObject { put("node_ids", "a") }),
+            )
+        }
+
+        @Test
+        fun `rejects an empty array`() {
+            assertEquals("Parameter 'node_ids' must not be empty", error(buildJsonObject { putJsonArray("node_ids") {} }))
+        }
+
+        @Test
+        fun `rejects an element that is not a string`() {
+            val number =
+                buildJsonObject {
+                    putJsonArray("node_ids") {
+                        add("a")
+                        add(1)
+                    }
+                }
+            val obj = buildJsonObject { putJsonArray("node_ids") { addJsonObject {} } }
+
+            assertEquals("Each element in 'node_ids' must be a string", error(number))
+            assertEquals("Each element in 'node_ids' must be a string", error(obj))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // optionalString
     // ─────────────────────────────────────────────────────────────────────
 
@@ -616,6 +678,31 @@ class McpToolUtilsTest {
             assertTrue(text.text.endsWith("info"))
             assertEquals("imgdata", image.data)
             assertEquals("image/png", image.mimeType)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // untrustedTextAndImagesResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("untrustedTextAndImagesResult")
+    inner class UntrustedTextAndImagesResultTests {
+        @Test
+        fun `gives one text item with the warning first, then the images in order`() {
+            val result = McpToolUtils.untrustedTextAndImagesResult("lines", listOf("one", "two"), "image/jpeg")
+
+            assertEquals(3, result.content.size)
+            assertEquals("${McpToolUtils.UNTRUSTED_CONTENT_WARNING}\nlines", (result.content[0] as TextContent).text)
+            assertEquals(listOf("one", "two"), result.content.drop(1).map { (it as ImageContent).data })
+            assertTrue(result.content.drop(1).all { (it as ImageContent).mimeType == "image/jpeg" })
+        }
+
+        @Test
+        fun `gives the text item alone when there is no image`() {
+            val result = McpToolUtils.untrustedTextAndImagesResult("lines", emptyList(), "image/jpeg")
+
+            assertEquals(1, result.content.size)
         }
     }
 
