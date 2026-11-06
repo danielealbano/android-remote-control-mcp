@@ -55,6 +55,19 @@ internal fun row(
         live = live,
     )
 
+/** A web paragraph cut at both ends of [LIST] whatever scrolls: its show moves nothing. */
+internal fun endlessWebParagraph(): FakeDevice =
+    FakeDevice(
+        screen(
+            FakeNode(
+                "web",
+                LIST,
+                listOf(FakeNode("W", LIST, webRole = "paragraph")),
+                reach = reach(up = true, down = true),
+            ),
+        ),
+    )
+
 /** The lines of the reply, scrolled note included. */
 internal fun NodeScreenshots.lines(): List<String> = text.split("\n")
 
@@ -252,19 +265,6 @@ class NodeScreenshotSessionTest {
             assertEquals("Screenshot encoding failed", error.message)
             verify(exactly = 1) { device.bitmaps.single().recycle() }
         }
-
-    /** A web paragraph cut at both ends whatever scrolls: its show moves nothing. */
-    private fun endlessWebParagraph(): FakeDevice =
-        FakeDevice(
-            screen(
-                FakeNode(
-                    "web",
-                    LIST,
-                    listOf(FakeNode("W", LIST, webRole = "paragraph")),
-                    reach = reach(up = true, down = true),
-                ),
-            ),
-        )
 
     @Test
     fun `an error after a drag carries the scrolled note and keeps its class`() =

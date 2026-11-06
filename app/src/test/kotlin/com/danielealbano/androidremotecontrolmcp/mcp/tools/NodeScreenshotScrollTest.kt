@@ -656,12 +656,6 @@ class NodeScreenshotScrollTest {
                 assertEquals(listOf(SCROLLED_NOTE, "A: image 1; the node continues"), shots.lines())
                 assertEquals(1, shots.captures)
             }
-
-        /** A web paragraph cut at both ends whatever scrolls. */
-        private fun endlessWebParagraph(): FakeDevice =
-            FakeDevice(
-                screen(FakeNode("web", LIST, listOf(FakeNode("W", LIST, webRole = "paragraph")), reach = middle)),
-            )
     }
 
     companion object {
