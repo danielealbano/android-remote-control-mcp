@@ -35,7 +35,12 @@ internal class NodeScreenshotCapture(
                 throw McpToolException.ActionFailed("Screenshot capture failed")
             }
         captures++
-        return withContext(Dispatchers.Default) { cropAll(bitmap, flagged, screen, bounds) }
+        // Recycled here, not in cropAll: a cancellation before the Default block starts would skip that block.
+        try {
+            return withContext(Dispatchers.Default) { cropAll(bitmap, flagged, screen, bounds) }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun cropAll(
@@ -64,14 +69,13 @@ internal class NodeScreenshotCapture(
         } finally {
             copy?.takeIf { it !== masked }?.recycle()
             masked?.takeIf { it !== bitmap }?.recycle()
-            bitmap.recycle()
         }
     }
 
-    /** Runs [block]; any failure but a cancellation becomes "Screenshot encoding failed", logged. */
+    /** Runs [block]; any exception but a cancellation becomes "Screenshot encoding failed", logged; errors pass. */
     private inline fun <T> encoding(block: () -> T): T =
         runCatching(block).getOrElse { e ->
-            if (e is CancellationException) throw e
+            if (e is CancellationException || e !is Exception) throw e
             Log.e(TAG, "Screenshot encoding failed", e)
             throw McpToolException.ActionFailed("Screenshot encoding failed")
         }
