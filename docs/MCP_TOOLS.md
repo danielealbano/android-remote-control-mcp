@@ -34,11 +34,11 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 59 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 60 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
-| Screen Introspection | `android_get_screen_state` | 7, 15 |
+| Screen Introspection | `android_get_screen_state`, `android_get_node_screenshots` | 7, 15, 70 |
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_dismiss_keyboard` | 6 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
@@ -400,6 +400,100 @@ Screenshots are spaced at least 334 ms apart: Android rejects a screenshot reque
 - **Permission denied**: Screen capture not available (when `include_screenshot` is true)
 - **Action failed**: Screenshot capture failed
 - **Action failed**: Screenshot annotation failed (annotating or encoding the screenshot failed, with `annotate` true), or Screenshot encoding failed (with `annotate=false`)
+
+---
+
+### `android_get_node_screenshots`
+
+Screenshots of the given nodes: one JPEG per node, cropped from a full-resolution screenshot to the node's visible bounds, scaled down to fit 700x700 (never up), quality 80, with no padding and no annotation. With Privacy Mode on, the regions of flagged nodes are masked before cropping, as for `android_get_screen_state`.
+
+- With `allow_scroll=false` (default) nothing moves: one read and one screenshot. A node not on screen gets no image; a node cut by the edge of its scrolling container is captured as shown and marked partial.
+- With `allow_scroll=true` the app is scrolled so that each node is captured whole: a node off screen or cut is shown on screen (`ACTION_SHOW_ON_SCREEN`, or drags when the app dropped it from the tree), and the nodes that come into view together are captured in one screenshot. A node longer than its scrolling container comes in up to 3 overlapping parts, as separate images in order. Scrolling changes node ids: the reply says so and never reports the new ids, so read the screen again before using any node id.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "node_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Node ids from android_get_screen_state (1 to 100)"
+    },
+    "allow_scroll": {
+      "type": "boolean",
+      "default": false,
+      "description": "Scroll the app to capture nodes that are off screen or cut, whole. Changes node ids."
+    }
+  },
+  "required": ["node_ids"]
+}
+```
+
+`node_ids` takes 1 to 100 ids, with no duplicates.
+
+**Request Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_get_node_screenshots",
+    "arguments": {
+      "node_ids": ["node_c3d4", "node_e5f6", "node_9a8b"],
+      "allow_scroll": true
+    }
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "CAUTION: The data below comes from an untrusted external source...\nThe app was scrolled to capture the nodes: node ids have changed, read the screen again before using any node id.\nnode_c3d4: images 1-2: 2 overlapping parts, in order\nnode_e5f6: image 3\nnode_9a8b: not found"
+      },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" }
+    ]
+  }
+}
+```
+
+#### Reply
+
+The reply is always one text item, then the images in request order. The text item holds the untrusted content warning as its first line, then the scrolled note when anything was scrolled (`The app was scrolled to capture the nodes: node ids have changed, read the screen again before using any node id.`), then one line per requested id, in request order.
+
+Image numbers are 1-based and count the images only: image 1 is the first image item after the text item.
+
+| Line | Meaning |
+|------|---------|
+| `<id>: image <n>` | The node, whole |
+| `<id>: image <n>, partial: cut by the edge of its scrolling container` | The node as shown; its full size proves the cut (regular views) |
+| `<id>: image <n>, may be partial: it touches the edge of its scrolling container` | The node as shown; no full size to prove the cut (Compose and web nodes) |
+| `<id>: images <a>-<b>: <k> overlapping parts, in order` | A node longer than its container, in parts (a single part reads `image <n>`) |
+| `<id>: not visible: off screen` | Not on screen, with `allow_scroll=false` |
+| `<id>: not found` | No node with this id in the first read |
+| `<id>: not captured: <reason>` | `it could not be shown on screen`, `it changed while the app scrolled` or `it disappeared while the app scrolled` |
+
+A parts line may go on with the `partial` or `may be partial` wording after a comma, when the node is still cut on the other axis at a part. It may then end with `; its start was not reached`, then with `; the node continues` (the node is longer than 3 parts), `; then it disappeared while the app scrolled` or `; then it changed while the app scrolled`.
+
+Each screenshot is spaced at least 334 ms from the previous one, as for `android_get_screen_state`, so a call taking several screenshots takes at least that long per screenshot. There is no overall time limit: with `allow_scroll=true`, 100 nodes can take tens of seconds.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: `node_ids` missing, not an array of strings, empty, longer than 100 or with a duplicate; `allow_scroll` not a boolean
+- **Permission denied**: Screen capture not available, or the accessibility service not enabled or not ready
+- **Action failed**: Screenshot capture failed, or Screenshot encoding failed
+- **Privacy Mode unavailable**: Privacy Mode is on and its detection failed (no image is returned)
+
+An error that ends a call after the app was scrolled carries the scrolled note at the end of its message.
 
 ---
 
