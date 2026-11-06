@@ -1,16 +1,26 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.graphics.Rect
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkConstructor
+import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.spyk
+import io.mockk.unmockkConstructor
+import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -1245,5 +1255,134 @@ class ActionExecutorImplTest {
                 assertTrue(error is IllegalStateException)
                 assertEquals("Action failed on node 'node_target'", error?.message)
             }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Nested
+    @DisplayName("dragAndHold")
+    inner class DragAndHold {
+        private val hold = mockk<GestureDescription.StrokeDescription>()
+        private val added = mutableListOf<GestureDescription.StrokeDescription?>()
+        private val callbacks = mutableListOf<AccessibilityService.GestureResultCallback>()
+
+        @BeforeEach
+        fun setUpGestures() {
+            setServiceInstance(mockService)
+            mockkStatic(ViewConfiguration::class)
+            val viewConfiguration = mockk<ViewConfiguration> { every { scaledTouchSlop } returns TOUCH_SLOP }
+            every { ViewConfiguration.get(any()) } returns viewConfiguration
+            mockkConstructor(GestureDescription.Builder::class, GestureDescription.StrokeDescription::class)
+            every { anyConstructed<GestureDescription.Builder>().addStroke(any()) } answers {
+                added.add(firstArg())
+                self as GestureDescription.Builder
+            }
+            every { anyConstructed<GestureDescription.Builder>().build() } returns mockk()
+            every {
+                anyConstructed<GestureDescription.StrokeDescription>().continueStroke(any(), any(), any(), any())
+            } returns hold
+        }
+
+        @AfterEach
+        fun tearDownGestures() {
+            unmockkConstructor(GestureDescription.Builder::class, GestureDescription.StrokeDescription::class)
+            unmockkStatic(ViewConfiguration::class)
+        }
+
+        /** Each dispatch completes with the next of [outcomes]: true completes, false cancels. */
+        private fun dispatchesComplete(vararg outcomes: Boolean) {
+            every { mockService.dispatchGesture(any(), any(), any()) } answers {
+                val callback = secondArg<AccessibilityService.GestureResultCallback>()
+                callbacks.add(callback)
+                if (outcomes[callbacks.size - 1]) callback.onCompleted(firstArg()) else callback.onCancelled(firstArg())
+                true
+            }
+        }
+
+        @Test
+        fun `a drag moves then holds still, as the continuation of the same stroke`() =
+            runTest {
+                dispatchesComplete(true, true)
+
+                val result = executor.dragAndHold(360f, 1250f, 360f, 350f)
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+                assertEquals(hold, added[1])
+            }
+
+        @Test
+        fun `invalid coordinates fail with IllegalArgumentException and dispatch nothing`() =
+            runTest {
+                val result = executor.dragAndHold(-1f, 100f, 360f, 350f)
+
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                verify(exactly = 0) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `no accessibility service fails with IllegalStateException`() =
+            runTest {
+                setServiceInstance(null)
+
+                val result = executor.dragAndHold(360f, 1250f, 360f, 350f)
+
+                assertTrue(result.exceptionOrNull() is IllegalStateException)
+            }
+
+        @Test
+        fun `a drag shorter than two touch slops fails with IllegalArgumentException and dispatches nothing`() =
+            runTest {
+                val result = executor.dragAndHold(360f, 800f, 360f, 800f - 2 * TOUCH_SLOP + 1)
+
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                verify(exactly = 0) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a failing move is returned as a plain RuntimeException with no hold dispatched`() =
+            runTest {
+                dispatchesComplete(false)
+
+                val error = executor.dragAndHold(360f, 1250f, 360f, 350f).exceptionOrNull()
+
+                assertEquals(RuntimeException::class.java, error?.javaClass)
+                verify(exactly = 1) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a failing hold is returned`() =
+            runTest {
+                dispatchesComplete(true, false)
+
+                val error = executor.dragAndHold(360f, 1250f, 360f, 350f).exceptionOrNull()
+
+                assertEquals(RuntimeException::class.java, error?.javaClass)
+                assertTrue(error?.message?.contains("hold") == true)
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a cancellation during the move still dispatches the hold`() =
+            runTest {
+                every { mockService.dispatchGesture(any(), any(), any()) } answers {
+                    callbacks.add(secondArg())
+                    true
+                }
+
+                val job = launch { executor.dragAndHold(360f, 1250f, 360f, 350f) }
+                runCurrent()
+                job.cancel()
+                callbacks[0].onCompleted(null)
+                runCurrent()
+                callbacks[1].onCompleted(null)
+                advanceUntilIdle()
+
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+                assertTrue(job.isCancelled)
+            }
+    }
+
+    companion object {
+        private const val TOUCH_SLOP = 8
     }
 }

@@ -120,6 +120,7 @@
     <string name="mcp_tool_get_shared_content">Get Shared Content</string>
     <string name="mcp_tool_share_file_via_web">Share File via Web</string>
     <string name="mcp_tool_get_screen_state">Get screen state</string>
+    <string name="mcp_tool_get_node_screenshots">Get node screenshots</string>
     <string name="mcp_tool_save_camera_video">Save Camera Video</string>
     <string name="mcp_tool_get_location">Get Location</string>
     <string name="mcp_tool_param_include_screenshot">Include screenshot</string>

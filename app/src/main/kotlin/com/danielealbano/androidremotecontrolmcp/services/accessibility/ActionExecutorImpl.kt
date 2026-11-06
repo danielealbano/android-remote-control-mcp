@@ -5,12 +5,16 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.coroutines.resume
+import kotlin.math.hypot
 
 /**
  * Executes accessibility actions on nodes and the screen.
@@ -419,6 +423,80 @@ class ActionExecutorImpl
                     val adjustedStartX =
                         startX.coerceAtLeast(endX + MIN_SCROLL_DISTANCE).coerceIn(0f, screenWidth)
                     swipe(adjustedStartX, centerY, endX, centerY)
+                }
+            }
+        }
+
+        /**
+         * Drags from (fromX, fromY) to (toX, toY), then holds still before lifting: the held end stops the content
+         * where the finger stopped, while a drag lifted in motion lets it glide on. Both strokes run non-cancellable,
+         * as a cancellation between them would leave the injected pointer down; that is bounded by the strokes plus
+         * one [GESTURE_TIMEOUT_MS] per stroke.
+         */
+        override suspend fun dragAndHold(
+            fromX: Float,
+            fromY: Float,
+            toX: Float,
+            toY: Float,
+        ): Result<Unit> {
+            val service = dragService(fromX, fromY, toX, toY).getOrElse { return Result.failure(it) }
+            val description = "dragAndHold($fromX,$fromY -> $toX,$toY)"
+            return withContext(NonCancellable) {
+                val move =
+                    GestureDescription.StrokeDescription(
+                        Path().apply {
+                            moveTo(fromX, fromY)
+                            lineTo(toX, toY)
+                        },
+                        0L,
+                        ActionExecutor.DRAG_MOVE_MS,
+                        true,
+                    )
+                val moved = dispatchGesture(service, GestureDescription.Builder().addStroke(move).build(), description)
+                if (moved.isFailure) {
+                    moved
+                } else {
+                    val hold =
+                        move.continueStroke(
+                            Path().apply { moveTo(toX, toY) },
+                            0L,
+                            ActionExecutor.DRAG_HOLD_MS,
+                            false,
+                        )
+                    dispatchGesture(service, GestureDescription.Builder().addStroke(hold).build(), "$description hold")
+                }
+            }
+        }
+
+        /**
+         * The service to drag with, or why nothing may be dispatched: invalid coordinates, no service, or a drag
+         * shorter than [MIN_DRAG_TOUCH_SLOPS] touch slops, which would not scroll and whose held end would make it a
+         * long press.
+         */
+        private fun dragService(
+            fromX: Float,
+            fromY: Float,
+            toX: Float,
+            toY: Float,
+        ): Result<McpAccessibilityService> {
+            val invalid = (validateCoordinates(fromX, fromY) ?: validateCoordinates(toX, toY))?.exceptionOrNull()
+            val service = McpAccessibilityService.instance
+            val length = hypot(toX - fromX, toY - fromY)
+            return when {
+                invalid != null -> {
+                    Result.failure(invalid)
+                }
+
+                service == null -> {
+                    Result.failure(IllegalStateException("Accessibility service is not available"))
+                }
+
+                length < MIN_DRAG_TOUCH_SLOPS * ViewConfiguration.get(service).scaledTouchSlop -> {
+                    Result.failure(IllegalArgumentException("Drag of ${length}px is too short to scroll"))
+                }
+
+                else -> {
+                    Result.success(service)
                 }
             }
         }
@@ -1026,5 +1104,6 @@ class ActionExecutorImpl
             private const val PINCH_BASE_DISTANCE = 100f
             private const val MIN_SCROLL_DISTANCE = 1f
             private const val GESTURE_TIMEOUT_MS = 10_000L
+            private const val MIN_DRAG_TOUCH_SLOPS = 2
         }
     }

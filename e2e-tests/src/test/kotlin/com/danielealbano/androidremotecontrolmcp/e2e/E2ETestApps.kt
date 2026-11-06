@@ -4,8 +4,8 @@ import com.danielealbano.androidremotecontrolmcp.e2e.AndroidContainerSetup.execA
 
 /**
  * Drives the helper apps installed in the redroid container for E2E tests: the calculator and the compose test
- * app (Compose screen, long list, vote bar, text field and WebView activities), plus `uiautomator` node counts and
- * logcat dumps.
+ * app (Compose screen, long list, node screenshot lists, vote bar, text field and WebView activities), plus
+ * `uiautomator` node counts and logcat dumps.
  */
 object E2ETestApps {
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
@@ -94,6 +94,44 @@ object E2ETestApps {
                 "$COMPOSE_TEST_PACKAGE/.LongListActivity",
             )
         println("[E2E Setup] launchLongListTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the node screenshot list (40 view rows and two tall blocks in a ScrollView) from a fresh process, at its
+     * top.
+     */
+    fun launchNodeScreenshotTestApp() {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.NodeScreenshotActivity",
+            )
+        println("[E2E Setup] launchNodeScreenshotTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the node screenshot Compose column (4 rows, then a block cut at the bottom of the screen) from a fresh
+     * process, at its top.
+     */
+    fun launchNodeScreenshotComposeTestApp() {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.NodeScreenshotComposeActivity",
+            )
+        println("[E2E Setup] launchNodeScreenshotComposeTestApp result: $result")
         Thread.sleep(2_000)
     }
 

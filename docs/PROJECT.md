@@ -131,8 +131,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `app/src/main/java/com/danielealbano/androidremotecontrolmcp/mcp/Http2RequestAuthority.java` — the only Java source, because Kotlin cannot reach the Ktor internal class it reads (see "Public base URL")
 - `app/src/main/kotlin/com/danielealbano/androidremotecontrolmcp/`
   - `McpApplication.kt` — Application class (Hilt setup)
-  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`, `CompactTreeFormatter.kt`, `ScreenStateFormatOptions.kt`, `AccessibilityNodeCache.kt`, `AccessibilityNodeCacheImpl.kt`
-  - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`, `ScreenshotAnnotator.kt`, `ScreenshotPacer.kt`, `ApiLevelProvider.kt`
+  - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`, `CompactTreeFormatter.kt`, `ScreenStateFormatOptions.kt`, `AccessibilityNodeCache.kt`, `AccessibilityNodeCacheImpl.kt`, `NodeCutRule.kt`, `DragSegment.kt`
+  - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`, `ScreenshotAnnotator.kt`, `ScreenshotPacer.kt`, `ApiLevelProvider.kt`, `NodeImageCropper.kt`
   - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`, `DownloadHttpClient.kt`, `LocalNetworkAddress.kt`, `LocalNetworkBlockingSocketFactory.kt`
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
   - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
@@ -141,7 +141,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `TunnelListenerHost.kt`, `TunnelClientAddresses.kt`, `TunnelTlsContext.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `services/tunnel/arctunnel/` — free E2E tunnel client (`android-remote-control-mcp-tunneld` protocol v2): `ArcTunnelServiceStatus.kt`, `ArcTunnelServiceStatusWatcher.kt`, `ArcTunnelServiceAlerts.kt`, `ArcTunnelHosts.kt`, `ArcTunnelEnv.kt`, `ArcTunnelPem.kt`, `ArcTunnelSockets.kt`, `ArcTunnelWire.kt`, `ArcTunnelFrames.kt`, `ArcTunnelCsr.kt`, `ArcTunnelSessions.kt`, `ArcTunnelKeyStore.kt`, `AndroidArcTunnelKeyStore.kt`, `ArcTunnelIdentity.kt`, `ArcTunnelNet.kt`, `ArcTunnelHttp.kt`, `ArcTunnelDialBack.kt`, `ArcTunnelKeepalive.kt`, `ArcTunnelEnrollRetry.kt`, `ArcTunnelIssueRetry.kt`, `ArcTunnelEnroller.kt`, `ArcTunnelIdentityStore.kt`, `ArcTunnelBackoff.kt`, `ArcTunnelLocalConnect.kt`, `ArcTunnelSplice.kt`, `ArcTunnelWatchdog.kt`, `ArcTunnelControlEvents.kt`, `ArcTunnelOpenHandler.kt`, `ArcTunnelControl.kt`, `ArcTunnelMoveTarget.kt`, `ArcTunnelEnrollment.kt`, `ArcTunnelEnrollmentFlow.kt`, `ArcTunnelStartTracker.kt`, `ArcTunnelEnrollmentImpl.kt`, `ArcTunnelEnrollService.kt`, `ArcTunnelRenewals.kt`, `ArcTunnelRenewalsImpl.kt`, `ArcTunnelCtNotifier.kt`, `ArcTunnelCtAlerts.kt`, `ArcTunnelCtMonitor.kt`, `ArcTunnelCertSwap.kt`, `ArcTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpListenerRules.kt`, `McpListenerRulesImpl.kt`, `McpStatelessTransport.kt`, `InFlightToolCalls.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `GetNodeScreenshotsTool.kt`, `NodeScreenshotSession.kt`, `NodeScreenshotReads.kt`, `NodeScreenshotScroller.kt`, `NodeScreenshotCapture.kt`, `NodeScreenshotContext.kt`, `NodeScreenshotRounds.kt`, `NodeScreenshotParts.kt`, `NodeScreenshotLines.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`, `ApprovalActivity.kt`, `ShareReceiverActivity.kt`, `NetworkChangeWatcher.kt`
   - `ui/navigation/` — `Routes.kt`
@@ -210,15 +210,16 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 59 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 60 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
-### 1. Screen Introspection Tools (1 tool)
+### 1. Screen Introspection Tools (2 tools)
 
 | Tool | Description | Parameters | Output |
 |------|-------------|------------|--------|
 | `android_get_screen_state` | Returns consolidated screen state: app info, screen dimensions, and a compact filtered flat TSV list of UI nodes | `include_screenshot` (boolean, optional, default false), `annotate` (boolean, optional, default true; false = plain, still privacy-masked screenshot), `cursor` (string, optional), `include_offscreen` (boolean, optional, default true), `include_hierarchy` (boolean, optional, default true) | `TextContent` with compact TSV (text/desc truncated to 100 chars, comma-separated abbreviated flags with on/off visibility). Optionally includes `ImageContent` with a low-resolution JPEG screenshot (700px max), annotated with red bounding boxes and node ID labels unless `annotate=false`. |
+| `android_get_node_screenshots` | One JPEG per given node (max 700px, quality 80, no padding), cropped from a full-resolution screenshot and Privacy Mode masked; images in request order | `node_ids` (array of 1 to 100 strings, no duplicates), `allow_scroll` (boolean, optional, default false: nothing moves, off-screen nodes get no image and cut ones are captured as shown and marked partial; true: the app is scrolled to capture nodes whole, a node longer than its container in up to 3 overlapping parts, node ids change) | One `TextContent` (untrusted content warning, a note when the app was scrolled, one line per requested id saying which image(s) it got or why none; image numbers count the images only, from 1), then one `ImageContent` per image |
 
 **Error**: Returns `CallToolResult(isError = true)` if accessibility permission not granted or screen capture not available.
 
@@ -842,7 +843,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 59 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 60 tools
 
 ---
 

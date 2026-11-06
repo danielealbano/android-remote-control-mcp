@@ -39,6 +39,7 @@ class McpToolRegistrationTest {
                 deps.screenshotEncoder,
                 deps.screenStateSnapshotCache,
                 WebViewNodeMerger(),
+                deps.nodeImageCropper,
             ),
             PrivacyToolDeps(deps.privacyToolGate, deps.placeholderSubstitutor, ScreenshotRedactor()),
             DeviceToolDeps(

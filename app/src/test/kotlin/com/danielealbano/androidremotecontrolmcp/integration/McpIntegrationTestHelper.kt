@@ -78,6 +78,7 @@ import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.NodeImageCropper
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -239,6 +240,7 @@ object McpIntegrationTestHelper {
             typeInputController = mockk(relaxed = true),
             screenshotAnnotator = mockk(relaxed = true),
             screenshotEncoder = mockk(relaxed = true),
+            nodeImageCropper = mockk(relaxed = true),
             cameraProvider = mockk(relaxed = true),
             nodeCache = mockk(relaxed = true),
             screenStateSnapshotCache = ScreenStateSnapshotCacheImpl(),
@@ -295,6 +297,8 @@ object McpIntegrationTestHelper {
             WebViewNodeMerger(),
             deps.privacyToolGate,
             ScreenshotRedactor(),
+            deps.actionExecutor,
+            deps.nodeImageCropper,
             toolNamePrefix,
             perms,
         )
@@ -637,6 +641,7 @@ data class MockDependencies(
     val typeInputController: TypeInputController,
     val screenshotAnnotator: ScreenshotAnnotator,
     val screenshotEncoder: ScreenshotEncoder,
+    val nodeImageCropper: NodeImageCropper,
     val cameraProvider: CameraProvider,
     val nodeCache: AccessibilityNodeCache,
     val screenStateSnapshotCache: ScreenStateSnapshotCache,
