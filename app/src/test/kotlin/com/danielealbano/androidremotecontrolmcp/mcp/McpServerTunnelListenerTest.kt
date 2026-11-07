@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
@@ -32,7 +33,9 @@ import java.net.URI
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPrivateKey
 import java.security.spec.ECParameterSpec
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.SocketFactory
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -50,12 +53,13 @@ class McpServerTunnelListenerTest {
             .build()
     private val material = TunnelTlsMaterial(held.keyPair.private, listOf(held.certificate))
     private lateinit var server: McpServer
+    private val serverLog = RecordingServerLogRepository()
 
     @BeforeEach
     fun setUp() {
         server =
             McpServer(
-                ServerConfig(port = freePort(), bindingAddress = BindingAddress.LOCALHOST),
+                ServerConfig(port = freePort(), bindingAddress = BindingAddress.LOCALHOST, bearerToken = TOKEN),
                 null,
                 mockk<Server>(relaxed = true),
                 mockk(relaxed = true),
@@ -66,7 +70,7 @@ class McpServerTunnelListenerTest {
                     mockk(relaxed = true),
                     mockk(relaxed = true),
                 ),
-                RecordingServerLogRepository(),
+                serverLog,
                 InFlightToolCalls(),
                 null,
             )
@@ -218,14 +222,202 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
 
-        val body =
-            okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), PROTECTED_RESOURCE).use {
-                assertEquals(Protocol.HTTP_2, it.protocol)
-                it.body.string()
-            }
+        val body = http2Body(port, PROTECTED_RESOURCE)
 
         assertTrue(body.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), body)
     }
+
+    /** What a public client sends through the tunnel on port 443: an authority with no port. */
+    @Test
+    fun `an HTTP-2 authority with no port gives URLs with no port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, PUBLIC_HOST)
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), metadata)
+        assertTrue(metadata.contains("\"authorization_servers\":[\"https://$PUBLIC_HOST\"]"), metadata)
+    }
+
+    @Test
+    fun `an HTTP-2 authority naming port 443 gives URLs with no port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, "$PUBLIC_HOST:$HTTPS_DEFAULT_PORT")
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), metadata)
+    }
+
+    @Test
+    fun `an HTTP-2 authority with a port keeps that port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val metadata = http2Body(port, PROTECTED_RESOURCE, "$PUBLIC_HOST:$PUBLIC_PORT")
+
+        assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST:$PUBLIC_PORT/mcp\""), metadata)
+    }
+
+    @Test
+    fun `HTTP-1-1 and HTTP-2 give the same URLs for the same host`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        for (host in listOf(PUBLIC_HOST, "$PUBLIC_HOST:$PUBLIC_PORT", "$LOOPBACK:$port")) {
+            val overHttp1 =
+                okHttpGet(port, listOf(Protocol.HTTP_1_1), PROTECTED_RESOURCE, host).use { it.body.string() }
+
+            assertEquals(overHttp1, http2Body(port, PROTECTED_RESOURCE, host), host)
+        }
+    }
+
+    /** Nothing on the way to this listener sets or strips these headers, so any client could put them there. */
+    @Test
+    fun `a client cannot choose the address it shows through the tunnel listener`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                    .hostnameVerifier { _, _ -> true }
+                    .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                    .build()
+            val request =
+                Request
+                    .Builder()
+                    .url("https://$LOOPBACK:$port/mcp")
+                    .header("CF-Connecting-IP", SPOOFED)
+                    .header("X-Forwarded-For", SPOOFED)
+                    .build()
+
+            client.newCall(request).execute().use {
+                assertEquals(protocol, it.protocol)
+                assertEquals(HTTP_UNAUTHORIZED, it.code)
+            }
+
+            assertEquals(
+                "Authentication failed from unknown",
+                serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+                "$protocol",
+            )
+        }
+    }
+
+    /** As the splice does: the local port of the socket is known, and held, before any byte reaches the listener. */
+    @Test
+    fun `the tunnel listener reports the relay's address for the connection`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val holds = CopyOnWriteArrayList<AutoCloseable>()
+            val sockets =
+                boundSockets(LOOPBACK) { localPort -> holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS) }
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .socketFactory(sockets)
+                    .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                    .hostnameVerifier { _, _ -> true }
+                    .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                    .build()
+            val request =
+                Request
+                    .Builder()
+                    .url("https://$LOOPBACK:$port/mcp")
+                    .header("CF-Connecting-IP", SPOOFED)
+                    .header("X-Forwarded-For", SPOOFED)
+                    .build()
+
+            client.newCall(request).execute().use {
+                assertEquals(protocol, it.protocol)
+                assertEquals(HTTP_UNAUTHORIZED, it.code)
+            }
+
+            assertEquals(
+                "Authentication failed from $RELAY_ADDRESS",
+                serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+                "$protocol",
+            )
+            holds.forEach { it.close() }
+            client.connectionPool.evictAll()
+        }
+    }
+
+    /** An app on the phone that binds the port of a live splice on another loopback address. */
+    @Test
+    fun `a connection from another loopback address does not get the address held for its port`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val holds = CopyOnWriteArrayList<AutoCloseable>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .socketFactory(
+                    boundSockets(OTHER_LOOPBACK) { localPort ->
+                        holds += server.clientAddresses.hold(localPort, RELAY_ADDRESS)
+                    },
+                ).sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                .hostnameVerifier { _, _ -> true }
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$port/mcp")
+                .build()
+
+        client.newCall(request).execute().use { assertEquals(HTTP_UNAUTHORIZED, it.code) }
+
+        assertEquals(
+            "Authentication failed from unknown",
+            serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message,
+        )
+        holds.forEach { it.close() }
+    }
+
+    /** Sockets bound before connecting, so their local port is known before any byte reaches the listener. */
+    private fun boundSockets(
+        source: String,
+        onBound: (localPort: Int) -> Unit,
+    ): SocketFactory =
+        object : SocketFactory() {
+            override fun createSocket(): Socket =
+                Socket().apply {
+                    bind(InetSocketAddress(source, 0))
+                    onBound(localPort)
+                }
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: String,
+                port: Int,
+                localHost: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                host: InetAddress,
+                port: Int,
+            ): Socket = error("not used by OkHttp")
+
+            override fun createSocket(
+                address: InetAddress,
+                port: Int,
+                localAddress: InetAddress,
+                localPort: Int,
+            ): Socket = error("not used by OkHttp")
+        }
 
     @Test
     fun `HTTP-1-1 requests see the https scheme`() {
@@ -262,6 +454,7 @@ class McpServerTunnelListenerTest {
         port: Int,
         protocols: List<Protocol>,
         path: String,
+        publicHost: String? = null,
     ): Response {
         val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
         val client =
@@ -275,9 +468,22 @@ class McpServerTunnelListenerTest {
             Request
                 .Builder()
                 .url("https://$LOOPBACK:$port$path")
+                // OkHttp sends this as `Host` over HTTP/1.1 and as `:authority` over HTTP/2.
+                .apply { publicHost?.let { header("Host", it) } }
                 .build()
         return client.newCall(request).execute()
     }
+
+    /** The body of a GET that really went over HTTP/2, so `:authority` is what the server read. */
+    private fun http2Body(
+        port: Int,
+        path: String,
+        publicHost: String? = null,
+    ): String =
+        okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), path, publicHost).use {
+            assertEquals(Protocol.HTTP_2, it.protocol)
+            it.body.string()
+        }
 
     /** One HTTP/1.1 GET over a TLS socket that offers no ALPN; returns the raw response. */
     private fun rawGet(
@@ -349,6 +555,14 @@ class McpServerTunnelListenerTest {
     }
 
     private companion object {
+        const val PUBLIC_HOST = "name.d.tunnel.example"
+        const val PUBLIC_PORT = 8443
+        const val HTTPS_DEFAULT_PORT = 443
+        const val TOKEN = "tunnel-listener-test-token"
+        const val SPOOFED = "198.51.100.6"
+        const val RELAY_ADDRESS = "203.0.113.10"
+        const val OTHER_LOOPBACK = "127.0.0.2"
+        const val HTTP_UNAUTHORIZED = 401
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50
         const val TIMEOUT_MS = 5_000

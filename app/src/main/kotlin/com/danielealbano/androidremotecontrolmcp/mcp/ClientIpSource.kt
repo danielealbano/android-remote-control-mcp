@@ -1,0 +1,108 @@
+package com.danielealbano.androidremotecontrolmcp.mcp
+
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
+import io.ktor.http.Headers
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
+import io.ktor.server.plugins.origin
+import io.ktor.util.AttributeKey
+import io.netty.util.NetUtil
+
+/**
+ * What a listener trusts for the address of the client behind a request. The address and a location looked up from it
+ * show on the OAuth approval screen, so they MUST NOT come from anything the client can set. See "Client address" in
+ * docs/PROJECT.md for what each tunnel was measured to deliver.
+ */
+enum class ClientIpSource {
+    /** The relay's `client_addr` for this connection, held in [TunnelClientAddresses], or none. No header counts. */
+    FREE_TUNNEL,
+
+    /** The socket peer: nothing in front of this listener sets a header that can be trusted. */
+    SOCKET_PEER,
+
+    /** `CF-Connecting-IP`: Cloudflare sets it, and refuses a request from a client that sends its own. */
+    CLOUDFLARE,
+
+    /** The last `X-Forwarded-For` value: ngrok passes on what the client sent and adds the real address after it. */
+    NGROK,
+    ;
+
+    companion object {
+        /** The source for a plain HTTP listener, the only kind a Cloudflare or ngrok tunnel forwards to. */
+        fun of(config: ServerConfig): ClientIpSource =
+            if (!config.tunnelEnabled) {
+                SOCKET_PEER
+            } else {
+                when (config.tunnelProvider) {
+                    // The free tunnel has its own listener, so this one only sees direct clients.
+                    TunnelProviderType.ARC_TUNNEL -> SOCKET_PEER
+
+                    TunnelProviderType.CLOUDFLARE -> CLOUDFLARE
+
+                    TunnelProviderType.NGROK -> NGROK
+                }
+            }
+    }
+}
+
+internal val ClientIpSourceKey = AttributeKey<ClientIpSource>("ClientIpSource")
+internal val TunnelClientIpKey = AttributeKey<String>("TunnelClientIp")
+private const val IPV4_LOOPBACK_PREFIX = "127."
+private const val SPLICE_SOURCE_ADDRESS = "127.0.0.1"
+private val IPV6_LOOPBACK = setOf("::1", "0:0:0:0:0:0:0:1")
+private const val NON_LITERAL_CHARS = "%[]"
+
+/** Sets what [clientIp] trusts on every request of this listener. Runs before anything can read the address. */
+fun Application.markClientIpSource(source: ClientIpSource) {
+    intercept(ApplicationCallPipeline.Setup) { call.attributes.put(ClientIpSourceKey, source) }
+}
+
+/**
+ * Looks up the public client of every request of the free E2E tunnel's listener, by its connection's remote port. Only
+ * for the splice's own source address: another app could bind that port on another loopback address.
+ */
+fun Application.resolveTunnelClients(addresses: TunnelClientAddresses) {
+    intercept(ApplicationCallPipeline.Setup) {
+        val origin = call.request.origin
+        if (origin.remoteAddress == SPLICE_SOURCE_ADDRESS) {
+            addresses.clientIpOf(origin.remotePort)?.let { call.attributes.put(TunnelClientIpKey, it) }
+        }
+    }
+}
+
+/**
+ * The address of the client behind this request, or `null` when there is none. Headers count only from a loopback peer:
+ * a tunnel's own process connects over loopback, and any other peer is the client itself.
+ */
+fun ApplicationCall.clientIp(): String? {
+    val source = attributes.getOrNull(ClientIpSourceKey) ?: ClientIpSource.SOCKET_PEER
+    val peer = request.origin.remoteAddress.takeIf { it.isNotEmpty() }
+    return when {
+        source == ClientIpSource.FREE_TUNNEL -> attributes.getOrNull(TunnelClientIpKey)
+        peer != null && isLoopback(peer) -> forwardedAddress(source, request.headers) ?: peer
+        else -> peer
+    }
+}
+
+private fun forwardedAddress(
+    source: ClientIpSource,
+    headers: Headers,
+): String? =
+    when (source) {
+        ClientIpSource.FREE_TUNNEL, ClientIpSource.SOCKET_PEER -> null
+        ClientIpSource.CLOUDFLARE -> headers["CF-Connecting-IP"]
+        ClientIpSource.NGROK -> headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')
+    }?.trim()?.takeIf { isIpLiteral(it) }
+
+/** `NetUtil` stops reading an IPv6 address at a `%`, so any text could follow it, and accepts one in brackets. */
+private fun isIpLiteral(value: String): Boolean =
+    value.none { it in NON_LITERAL_CHARS } && (NetUtil.isValidIpV4Address(value) || NetUtil.isValidIpV6Address(value))
+
+private fun isLoopback(address: String): Boolean {
+    val host = address.substringBefore('%')
+    return host.startsWith(IPV4_LOOPBACK_PREFIX) || host in IPV6_LOOPBACK
+}

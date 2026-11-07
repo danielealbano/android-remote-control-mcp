@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.screens
 
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelStatusPage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -26,6 +27,11 @@ class AboutLegalNoticesTest {
 
         assertTrue(links.isNotEmpty()) { "AboutLinks declares no URL constant" }
         links.forEach { link -> assertTrue(link.startsWith("https://")) { "$link is not an https URL" } }
+    }
+
+    @Test
+    fun `the tunnel status link opens the page the app reads its status from`() {
+        assertEquals(ArcTunnelStatusPage.PAGE_URL, AboutLinks.TUNNEL_STATUS_URL)
     }
 
     @Test

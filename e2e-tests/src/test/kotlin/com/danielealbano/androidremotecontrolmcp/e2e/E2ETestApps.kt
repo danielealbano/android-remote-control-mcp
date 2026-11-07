@@ -4,7 +4,8 @@ import com.danielealbano.androidremotecontrolmcp.e2e.AndroidContainerSetup.execA
 
 /**
  * Drives the helper apps installed in the redroid container for E2E tests: the calculator and the compose test
- * app (Compose screen, long list and WebView activities), plus `uiautomator` node counts and logcat dumps.
+ * app (Compose screen, long list, node screenshot lists, vote bar, text field and WebView activities), plus
+ * `uiautomator` node counts and logcat dumps.
  */
 object E2ETestApps {
     private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
@@ -97,6 +98,87 @@ object E2ETestApps {
     }
 
     /**
+     * Launch the node screenshot list (40 view rows and two tall blocks in a ScrollView) from a fresh process, at its
+     * top.
+     */
+    fun launchNodeScreenshotTestApp() {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.NodeScreenshotActivity",
+            )
+        println("[E2E Setup] launchNodeScreenshotTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the node screenshot Compose column (4 rows, then a block cut at the bottom of the screen) from a fresh
+     * process, at its top.
+     */
+    fun launchNodeScreenshotComposeTestApp() {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.NodeScreenshotComposeActivity",
+            )
+        println("[E2E Setup] launchNodeScreenshotComposeTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the vote bar activity (a node with only the custom actions "Upvote" and "Downvote", and a "Votes: <n>"
+     * counter) from a fresh process, so the counter starts at 0.
+     */
+    fun launchCustomActionsTestApp() {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-S",
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.CustomActionsActivity",
+            )
+        println("[E2E Setup] launchCustomActionsTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
+     * Launch the text field test activity in a new task, so its field starts empty: [field] is "compose" for a
+     * Compose text field or "view" for a classic EditText. The previous activity is finished, not its process killed:
+     * killing a process whose field holds an input session can leave the accessibility input method without one for
+     * the next field.
+     */
+    fun launchTextFieldTestApp(field: String) {
+        val result =
+            execAdb(
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "--activity-clear-task",
+                "--es",
+                "field",
+                field,
+                "-n",
+                "$COMPOSE_TEST_PACKAGE/.TextFieldActivity",
+            )
+        println("[E2E Setup] launchTextFieldTestApp($field) result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
      * Launch the WebView test activity using am start.
      */
     fun launchWebViewTestApp() {
@@ -152,7 +234,9 @@ object E2ETestApps {
      * merge: a node is kept if it has non-empty text / content-desc / resource-id, or is clickable /
      * long-clickable / scrollable. Comparing the collapsed `get_screen_state` count against THIS
      * baseline (rather than the raw total) isolates the merge's contribution from the structural-only
-     * filtering that `get_screen_state` always applies.
+     * filtering that `get_screen_state` always applies. The keep-filter also keeps a node with labelled
+     * accessibility actions, which a `uiautomator` dump does not show: the baseline holds only while the
+     * page's web nodes carry no labelled actions.
      */
     fun uiAutomatorKeptNodeCount(): Int {
         execAdb("shell", "uiautomator", "dump", "/sdcard/uidump.xml")

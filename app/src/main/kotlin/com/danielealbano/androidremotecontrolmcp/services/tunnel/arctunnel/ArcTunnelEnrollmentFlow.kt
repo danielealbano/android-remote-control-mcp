@@ -58,8 +58,7 @@ internal class ArcTunnelEnrollmentFlow(
         if (saved != null && keys.hasKey(saved.identityAlias) && !identityCertificateExpired(saved)) {
             val resumed = restoreArcTunnelIdentity(env, saved, keys, net)
             if (certificateMissingOrExpired(resumed)) {
-                enroller.issue(resumed, null)
-                withContext(Dispatchers.IO) { store.save(resumed) }
+                enroller.issue(resumed, null) { store.save(resumed) }
             }
             return resumed
         }
@@ -69,8 +68,7 @@ internal class ArcTunnelEnrollmentFlow(
         forget(env, store)
         val (identity, issueNonce) = enroller.enroll(net, env.hosts)
         withContext(Dispatchers.IO) { store.save(identity) }
-        enroller.issue(identity, issueNonce)
-        withContext(Dispatchers.IO) { store.save(identity) }
+        enroller.issue(identity, issueNonce) { store.save(identity) }
         return identity
     }
 

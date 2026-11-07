@@ -99,6 +99,7 @@ class McpToolRegistration
                 a.nodeCache,
                 privacy.privacyToolGate,
                 privacy.placeholderSubstitutor,
+                screen.webViewNodeMerger,
                 toolNamePrefix,
                 perms,
             )
@@ -146,6 +147,8 @@ class McpToolRegistration
                 screen.webViewNodeMerger,
                 privacy.privacyToolGate,
                 privacy.screenshotRedactor,
+                accessibility.actionExecutor,
+                screen.nodeImageCropper,
                 toolNamePrefix,
                 perms,
             )

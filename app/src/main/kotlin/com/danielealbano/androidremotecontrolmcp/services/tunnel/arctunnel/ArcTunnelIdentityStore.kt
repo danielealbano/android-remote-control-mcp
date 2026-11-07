@@ -6,6 +6,13 @@ import kotlinx.serialization.Serializable
 import java.io.File
 import java.io.IOException
 
+/**
+ * Marks a saved certificate as checked by [ArcTunnelRenewals.checkSavedChain]: it was renewed, or there was nothing to
+ * renew. Every certificate saved after an issuance carries the current value. To force the check again on the phones
+ * holding an older certificate, raise it and adapt the check.
+ */
+const val ARC_TUNNEL_CERT_CHECK = 1
+
 @Serializable
 data class ArcTunnelSavedIdentity(
     val name: String,
@@ -21,6 +28,7 @@ data class ArcTunnelSavedIdentity(
     @SerialName("ct_flagged") val ctFlagged: List<String> = emptyList(),
     @SerialName("ct_alert_pubkey") val ctAlertPubkey: String = "",
     @SerialName("ct_last_check_ms") val ctLastCheckMs: Long = 0,
+    @SerialName("cert_check") val certCheck: Int = 0,
 )
 
 class ArcTunnelIdentityStore(
@@ -49,6 +57,7 @@ class ArcTunnelIdentityStore(
                 ctFlagged = previous?.ctFlagged.orEmpty(),
                 ctAlertPubkey = previous?.ctAlertPubkey.orEmpty(),
                 ctLastCheckMs = previous?.ctLastCheckMs ?: 0L,
+                certCheck = ARC_TUNNEL_CERT_CHECK,
             ),
         )
     }
@@ -80,6 +89,13 @@ class ArcTunnelIdentityStore(
     fun clearCtAlert() {
         val current = load() ?: return
         write(current.copy(ctAlertPubkey = ""))
+    }
+
+    /** Marks the saved certificate as checked, with nothing to renew. */
+    @Synchronized
+    fun markCertChecked() {
+        val current = load() ?: return
+        write(current.copy(certCheck = ARC_TUNNEL_CERT_CHECK))
     }
 
     /** The saved identity, or null when there is none or the file cannot be read (logged). */

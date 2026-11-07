@@ -55,6 +55,17 @@ class NodeActionIntegrationTest {
                 ),
         )
 
+    private val voteBar =
+        AccessibilityNodeData(
+            id = "node_bar",
+            contentDescription = "349 votes",
+            bounds = BoundsData(0, 1000, 1080, 1100),
+            visible = true,
+            actions = listOf("Upvote", "Downvote"),
+        )
+
+    private val voteTree = sampleTree.copy(children = sampleTree.children + voteBar)
+
     @BeforeEach
     fun setUp() {
         McpIntegrationTestHelper.mockAndroidLog()
@@ -204,6 +215,7 @@ class NodeActionIntegrationTest {
                         "tap_node",
                         "scroll_to_node",
                         "scroll_node",
+                        "perform_node_action",
                         "type_append_text",
                         "type_insert_text",
                         "type_replace_text",
@@ -234,7 +246,89 @@ class NodeActionIntegrationTest {
                 )
                 assertEquals(listOf("direction"), tools.getValue("android_scroll_node").inputSchema.required)
                 assertEquals(listOf("direction"), tools.getValue("android_scroll_to_node").inputSchema.required)
+                assertEquals(listOf("action"), tools.getValue("android_perform_node_action").inputSchema.required)
             }
+        }
+
+    @Test
+    fun `find_nodes lists each node's action labels`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, voteTree, sampleScreenInfo)
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), FindBy.CONTENT_DESC, "votes", false)
+            } returns
+                listOf(
+                    ElementInfo(
+                        id = "node_bar",
+                        contentDescription = "349 votes",
+                        bounds = voteBar.bounds,
+                        visible = true,
+                        actions = listOf("Upvote", "Downvote"),
+                    ),
+                )
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_find_nodes",
+                        arguments = mapOf("by" to "content_desc", "value" to "votes"),
+                    )
+                assertNotEquals(true, result.isError)
+
+                val parsed =
+                    Json.parseToJsonElement(stripUntrustedWarning((result.content[0] as TextContent).text)).jsonObject
+                val actions = parsed["nodes"]!!.jsonArray[0].jsonObject["actions"]!!.jsonArray
+                assertEquals(listOf("Upvote", "Downvote"), actions.map { it.jsonPrimitive.content })
+            }
+        }
+
+    @Test
+    fun `perform_node_action performs the labelled action through the stack`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, voteTree, sampleScreenInfo)
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_bar") } returns voteBar
+            coEvery {
+                deps.actionExecutor.performLabelledAction("node_bar", any<List<WindowData>>(), "Upvote")
+            } returns Result.success(Unit)
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_perform_node_action",
+                        arguments = mapOf("node_id" to "node_bar", "action" to "Upvote"),
+                    )
+                assertNotEquals(true, result.isError)
+                assertEquals(
+                    "Action 'Upvote' performed on node 'node_bar'",
+                    (result.content[0] as TextContent).text,
+                )
+            }
+            coVerify(exactly = 1) {
+                deps.actionExecutor.performLabelledAction("node_bar", any<List<WindowData>>(), "Upvote")
+            }
+        }
+
+    @Test
+    fun `perform_node_action with an unlisted label returns an untrusted error listing the labels`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, voteTree, sampleScreenInfo)
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_bar") } returns voteBar
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_perform_node_action",
+                        arguments = mapOf("node_id" to "node_bar", "action" to "Repost"),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
+                assertTrue(text.endsWith("Its actions: Upvote¦Downvote"), text)
+            }
+            coVerify(exactly = 0) { deps.actionExecutor.performLabelledAction(any(), any(), any()) }
         }
 
     @Test

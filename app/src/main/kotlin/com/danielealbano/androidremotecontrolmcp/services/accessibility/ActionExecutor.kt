@@ -66,6 +66,22 @@ interface ActionExecutor {
         windows: List<WindowData>,
     ): Result<Unit>
 
+    /**
+     * Performs the first action of the live node [nodeId] listed with [label] ([NodeActionLabels]). The failures
+     * never name the label: with Privacy Mode on it is the unredacted one.
+     */
+    suspend fun performLabelledAction(
+        nodeId: String,
+        windows: List<WindowData>,
+        label: String,
+    ): Result<Unit>
+
+    /** Gives input focus to the node [nodeId] (ACTION_FOCUS), for a field a click did not focus. */
+    suspend fun focusNode(
+        nodeId: String,
+        windows: List<WindowData>,
+    ): Result<Unit>
+
     suspend fun setTextOnNode(
         nodeId: String,
         text: String,
@@ -106,6 +122,21 @@ interface ActionExecutor {
         direction: ScrollDirection,
         amount: ScrollAmount = ScrollAmount.MEDIUM,
         variancePercent: Float = DEFAULT_SCROLL_VARIANCE_PERCENT,
+    ): Result<Unit>
+
+    /**
+     * Drags from (fromX, fromY) to (toX, toY) in [DRAG_MOVE_MS], then holds still for [DRAG_HOLD_MS] before lifting,
+     * so the content stops with the finger instead of gliding on.
+     *
+     * Fails with [IllegalArgumentException] (invalid coordinates, or a drag shorter than twice the touch slop, which
+     * would not scroll) or [IllegalStateException] (no accessibility service) before dispatching anything; a failure
+     * once dispatched is any other exception.
+     */
+    suspend fun dragAndHold(
+        fromX: Float,
+        fromY: Float,
+        toX: Float,
+        toY: Float,
     ): Result<Unit>
 
     suspend fun pressBack(): Result<Unit>
@@ -150,5 +181,11 @@ interface ActionExecutor {
         internal const val DEFAULT_GESTURE_DURATION_MS = 300L
         internal const val DEFAULT_SCROLL_VARIANCE_PERCENT = 0.05f
         internal const val MAX_SCROLL_VARIANCE_PERCENT = 0.20f
+
+        /** How long the finger of [dragAndHold] moves; measured on a real phone. */
+        internal const val DRAG_MOVE_MS = 600L
+
+        /** How long the finger of [dragAndHold] holds still before lifting; measured on a real phone. */
+        internal const val DRAG_HOLD_MS = 300L
     }
 }

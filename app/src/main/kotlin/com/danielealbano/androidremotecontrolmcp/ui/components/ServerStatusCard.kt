@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +41,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMc
 
 private const val STATUS_DOT_SIZE_DP = 12
 private const val ANIMATION_DURATION_MS = 300
+private const val BUTTON_PROGRESS_SIZE_DP = 16
 
 @Composable
 fun ServerStatusCard(
@@ -53,6 +56,7 @@ fun ServerStatusCard(
     modifier: Modifier = Modifier,
     mcpStartBlockedMessage: String? = null,
     channelStatusKnown: Boolean = true,
+    mcpBusy: Boolean = false,
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
@@ -76,6 +80,7 @@ fun ServerStatusCard(
                 transientStatus = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Stopping,
                 buttonEnabled = mcpStartStopButtonEnabled(serverStatus, startEnabled, mcpStartBlockedMessage != null),
                 onButtonClick = if (serverStatus is ServerStatus.Running) onMcpStopClick else onMcpStartClick,
+                busy = mcpBusy,
             )
             if (mcpStartBlockedVisible(serverStatus, mcpStartBlockedMessage)) {
                 Text(
@@ -142,6 +147,7 @@ private fun ServiceRow(
     transientStatus: Boolean = false,
     buttonEnabled: Boolean,
     onButtonClick: () -> Unit,
+    busy: Boolean = false,
 ) {
     // Spoken: the action and the service ("Stop MCP Server"); the service and its status as one ("MCP Server, Running")
     val buttonDescription =
@@ -199,6 +205,15 @@ private fun ServiceRow(
             onClick = onButtonClick,
             enabled = buttonEnabled,
         ) {
+            if (busy) {
+                // Decorative: the button still is what it says, and what is going on is written on the screen
+                CircularProgressIndicator(
+                    modifier = Modifier.size(BUTTON_PROGRESS_SIZE_DP.dp).clearAndSetSemantics {},
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             // On the text: the button reads its content, and the description replaces the bare "Stop"
             Text(
                 text = stringResource(if (running) R.string.server_action_stop else R.string.server_action_start),

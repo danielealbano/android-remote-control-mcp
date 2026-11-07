@@ -1,16 +1,26 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.graphics.Rect
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkConstructor
+import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.spyk
+import io.mockk.unmockkConstructor
+import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -1034,6 +1044,61 @@ class ActionExecutorImplTest {
             }
 
         @Test
+        @DisplayName("focusNode performs ACTION_FOCUS on the cached node")
+        fun focusNodePerformsActionFocusOnCachedNode() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) } returns true
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }
+            }
+
+        @Test
+        @DisplayName("focusNode fails without acting when the node is not focusable")
+        fun focusNodeFailsWhenNodeNotFocusable() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns false
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+                verify(exactly = 0) { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }
+            }
+
+        @Test
+        @DisplayName("focusNode fails when ACTION_FOCUS fails")
+        fun focusNodeFailsWhenActionFocusFails() =
+            runTest {
+                // Arrange
+                setServiceInstance(mockService)
+                val cachedNode = CachedNode(mockk(relaxed = true), depth = 1, index = 0, parentId = "root")
+                mockCacheHitWithIdentity(cachedNode, "node_target")
+                every { cachedNode.node.isFocusable } returns true
+                every { cachedNode.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) } returns false
+
+                // Act
+                val result = executor.focusNode("node_target", emptyList())
+
+                // Assert
+                assertTrue(result.isFailure)
+            }
+
+        @Test
         @DisplayName("clickNode action fails via cached node")
         fun clickNodeActionFailsViaCachedNode() =
             runTest {
@@ -1101,5 +1166,223 @@ class ActionExecutorImplTest {
                 assertTrue(result.isSuccess)
                 verify { mockService.getAccessibilityWindows() }
             }
+    }
+
+    @Nested
+    @DisplayName("Labelled actions")
+    inner class LabelledActions {
+        private fun cachedNodeWith(vararg actions: AccessibilityNodeInfo.AccessibilityAction): CachedNode {
+            val mockNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+            every { mockNode.actionList } returns actions.toList()
+            val cachedNode = CachedNode(mockNode, depth = 1, index = 0, parentId = "root")
+            mockCacheHitWithIdentity(cachedNode, "node_target")
+            return cachedNode
+        }
+
+        @Test
+        @DisplayName("performs the listed action with the label on the cached node")
+        fun performsLabelledActionOnCachedNode() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode =
+                    cachedNodeWith(
+                        mockAction(AccessibilityNodeInfo.ACTION_CLICK, null),
+                        mockAction(CUSTOM_ACTION_ID, "Upvote"),
+                        mockAction(CUSTOM_ACTION_ID + 1, "Upvote"),
+                    )
+                every { cachedNode.node.performAction(CUSTOM_ACTION_ID) } returns true
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { cachedNode.node.performAction(CUSTOM_ACTION_ID) }
+                verify(exactly = 0) { cachedNode.node.performAction(CUSTOM_ACTION_ID + 1) }
+                verify(exactly = 0) { mockService.getAccessibilityWindows() }
+            }
+
+        @Test
+        @DisplayName("finds the live node through the windows on a cache miss")
+        fun findsLiveNodeOnCacheMiss() =
+            runTest {
+                setServiceInstance(mockService)
+                every { mockCache.get("node_target") } returns null
+                val mockRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+                every { mockRootNode.childCount } returns 0
+                every { mockRootNode.actionList } returns listOf(mockAction(CUSTOM_ACTION_ID, "Downvote"))
+                every { mockRootNode.performAction(CUSTOM_ACTION_ID) } returns true
+                val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
+                every { mockWindowInfo.id } returns 10
+                every { mockWindowInfo.root } returns mockRootNode
+                every { mockService.getAccessibilityWindows() } returns listOf(mockWindowInfo)
+                val tree = AccessibilityNodeData(id = "node_target", bounds = BoundsData(0, 0, 100, 50))
+                val windows = listOf(WindowData(windowId = 10, windowType = "APPLICATION", tree = tree))
+
+                val result = executor.performLabelledAction("node_target", windows, "Downvote")
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 1) { mockRootNode.performAction(CUSTOM_ACTION_ID) }
+            }
+
+        @Test
+        @DisplayName("fails without naming the label when the live node no longer offers it")
+        fun failsWhenLiveNodeNoLongerOffersIt() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode = cachedNodeWith(mockAction(CUSTOM_ACTION_ID, "Undo Upvote"))
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                val error = result.exceptionOrNull()
+                assertTrue(error is IllegalStateException)
+                assertEquals(
+                    "Node 'node_target' no longer offers the requested action; read the screen again",
+                    error?.message,
+                )
+                verify(exactly = 0) { cachedNode.node.performAction(any<Int>()) }
+            }
+
+        @Test
+        @DisplayName("fails without naming the label when the app refuses the action")
+        fun failsWhenAppRefusesAction() =
+            runTest {
+                setServiceInstance(mockService)
+                val cachedNode = cachedNodeWith(mockAction(CUSTOM_ACTION_ID, "Upvote"))
+                every { cachedNode.node.performAction(CUSTOM_ACTION_ID) } returns false
+
+                val result = executor.performLabelledAction("node_target", emptyList(), "Upvote")
+
+                val error = result.exceptionOrNull()
+                assertTrue(error is IllegalStateException)
+                assertEquals("Action failed on node 'node_target'", error?.message)
+            }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Nested
+    @DisplayName("dragAndHold")
+    inner class DragAndHold {
+        private val hold = mockk<GestureDescription.StrokeDescription>()
+        private val added = mutableListOf<GestureDescription.StrokeDescription?>()
+        private val callbacks = mutableListOf<AccessibilityService.GestureResultCallback>()
+
+        @BeforeEach
+        fun setUpGestures() {
+            setServiceInstance(mockService)
+            mockkStatic(ViewConfiguration::class)
+            val viewConfiguration = mockk<ViewConfiguration> { every { scaledTouchSlop } returns TOUCH_SLOP }
+            every { ViewConfiguration.get(any()) } returns viewConfiguration
+            mockkConstructor(GestureDescription.Builder::class, GestureDescription.StrokeDescription::class)
+            every { anyConstructed<GestureDescription.Builder>().addStroke(any()) } answers {
+                added.add(firstArg())
+                self as GestureDescription.Builder
+            }
+            every { anyConstructed<GestureDescription.Builder>().build() } returns mockk()
+            every {
+                anyConstructed<GestureDescription.StrokeDescription>().continueStroke(any(), any(), any(), any())
+            } returns hold
+        }
+
+        @AfterEach
+        fun tearDownGestures() {
+            unmockkConstructor(GestureDescription.Builder::class, GestureDescription.StrokeDescription::class)
+            unmockkStatic(ViewConfiguration::class)
+        }
+
+        /** Each dispatch completes with the next of [outcomes]: true completes, false cancels. */
+        private fun dispatchesComplete(vararg outcomes: Boolean) {
+            every { mockService.dispatchGesture(any(), any(), any()) } answers {
+                val callback = secondArg<AccessibilityService.GestureResultCallback>()
+                callbacks.add(callback)
+                if (outcomes[callbacks.size - 1]) callback.onCompleted(firstArg()) else callback.onCancelled(firstArg())
+                true
+            }
+        }
+
+        @Test
+        fun `a drag moves then holds still, as the continuation of the same stroke`() =
+            runTest {
+                dispatchesComplete(true, true)
+
+                val result = executor.dragAndHold(360f, 1250f, 360f, 350f)
+
+                assertTrue(result.isSuccess)
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+                assertEquals(hold, added[1])
+            }
+
+        @Test
+        fun `invalid coordinates fail with IllegalArgumentException and dispatch nothing`() =
+            runTest {
+                val result = executor.dragAndHold(-1f, 100f, 360f, 350f)
+
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                verify(exactly = 0) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `no accessibility service fails with IllegalStateException`() =
+            runTest {
+                setServiceInstance(null)
+
+                val result = executor.dragAndHold(360f, 1250f, 360f, 350f)
+
+                assertTrue(result.exceptionOrNull() is IllegalStateException)
+            }
+
+        @Test
+        fun `a drag shorter than two touch slops fails with IllegalArgumentException and dispatches nothing`() =
+            runTest {
+                val result = executor.dragAndHold(360f, 800f, 360f, 800f - 2 * TOUCH_SLOP + 1)
+
+                assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+                verify(exactly = 0) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a failing move is returned as a plain RuntimeException with no hold dispatched`() =
+            runTest {
+                dispatchesComplete(false)
+
+                val error = executor.dragAndHold(360f, 1250f, 360f, 350f).exceptionOrNull()
+
+                assertEquals(RuntimeException::class.java, error?.javaClass)
+                verify(exactly = 1) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a failing hold is returned`() =
+            runTest {
+                dispatchesComplete(true, false)
+
+                val error = executor.dragAndHold(360f, 1250f, 360f, 350f).exceptionOrNull()
+
+                assertEquals(RuntimeException::class.java, error?.javaClass)
+                assertTrue(error?.message?.contains("hold") == true)
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a cancellation during the move still dispatches the hold`() =
+            runTest {
+                every { mockService.dispatchGesture(any(), any(), any()) } answers {
+                    callbacks.add(secondArg())
+                    true
+                }
+
+                val job = launch { executor.dragAndHold(360f, 1250f, 360f, 350f) }
+                runCurrent()
+                job.cancel()
+                callbacks[0].onCompleted(null)
+                runCurrent()
+                callbacks[1].onCompleted(null)
+                advanceUntilIdle()
+
+                verify(exactly = 2) { mockService.dispatchGesture(any(), any(), any()) }
+                assertTrue(job.isCancelled)
+            }
+    }
+
+    companion object {
+        private const val TOUCH_SLOP = 8
     }
 }

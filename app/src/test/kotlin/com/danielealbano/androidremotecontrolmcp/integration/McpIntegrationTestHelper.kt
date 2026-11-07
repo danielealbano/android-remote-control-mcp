@@ -10,10 +10,12 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfi
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.ClientIpSource
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.effectiveBaseUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpBasePlugins
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpStatelessTransport
+import com.danielealbano.androidremotecontrolmcp.mcp.markClientIpSource
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStoreImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenServiceImpl
@@ -63,6 +65,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
@@ -75,6 +78,7 @@ import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.NodeImageCropper
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -84,6 +88,7 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentI
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
+import com.danielealbano.androidremotecontrolmcp.testutil.readNodesOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -115,6 +120,25 @@ object McpIntegrationTestHelper {
     const val TEST_BASE_URL = "http://localhost:8080"
 
     /**
+     * Puts input focus on the node [nodeId] as the type tools see it: the FOCUS_INPUT search from [rootNode] (returned
+     * by [setupMultiWindowMock], whose Unit functions such as recycle() are no-ops) finds an editable node, and it is
+     * the node of [nodeId] in the tree reads ([MockDependencies.readNodes]).
+     *
+     * @return The focused node mock.
+     */
+    fun focusInputOn(
+        deps: MockDependencies,
+        rootNode: AccessibilityNodeInfo,
+        nodeId: String,
+    ): AccessibilityNodeInfo {
+        val focusedNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        every { focusedNode.isEditable } returns true
+        every { rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } returns focusedNode
+        deps.readNodes[nodeId] = CachedNode(focusedNode, depth = 1, index = 0, parentId = "node_root")
+        return focusedNode
+    }
+
+    /**
      * Configures multi-window mocking on the given [MockDependencies].
      *
      * Sets up [AccessibilityServiceProvider.getAccessibilityWindows] to return
@@ -136,7 +160,8 @@ object McpIntegrationTestHelper {
         activityName: String = ".MainActivity",
         windowId: Int = 0,
     ): AccessibilityNodeInfo {
-        val mockRootNode = mockk<AccessibilityNodeInfo>()
+        // Unit functions (recycle) are no-ops; every value-returning call is still stubbed explicitly below.
+        val mockRootNode = mockk<AccessibilityNodeInfo>(relaxUnitFun = true)
         val mockWindowInfo = mockk<AccessibilityWindowInfo>(relaxed = true)
 
         every { deps.accessibilityServiceProvider.isReady() } returns true
@@ -164,7 +189,10 @@ object McpIntegrationTestHelper {
         every { deps.accessibilityServiceProvider.getCurrentPackageName() } returns packageName
         every { deps.accessibilityServiceProvider.getCurrentActivityName() } returns activityName
         every { deps.accessibilityServiceProvider.getScreenInfo() } returns screenInfo
-        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId", any()) } returns tree
+        every { deps.treeParser.parseTree(mockRootNode, "root_w$windowId", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>().putAll(readNodesOf(tree, deps.readNodes))
+            tree
+        }
         return mockRootNode
     }
 
@@ -212,6 +240,7 @@ object McpIntegrationTestHelper {
             typeInputController = mockk(relaxed = true),
             screenshotAnnotator = mockk(relaxed = true),
             screenshotEncoder = mockk(relaxed = true),
+            nodeImageCropper = mockk(relaxed = true),
             cameraProvider = mockk(relaxed = true),
             nodeCache = mockk(relaxed = true),
             screenStateSnapshotCache = ScreenStateSnapshotCacheImpl(),
@@ -225,7 +254,7 @@ object McpIntegrationTestHelper {
             privacyModeManager = manager,
             piiModelInference = piiModelInference,
             pseudonymStore = pseudonymStore,
-            privacyToolGate = PrivacyToolGate(pipeline),
+            privacyToolGate = PrivacyToolGate(pipeline, ContextExtractor()),
             placeholderSubstitutor = PlaceholderSubstitutor(pseudonymStore),
             serverLog = RecordingServerLogRepository(),
         )
@@ -268,6 +297,8 @@ object McpIntegrationTestHelper {
             WebViewNodeMerger(),
             deps.privacyToolGate,
             ScreenshotRedactor(),
+            deps.actionExecutor,
+            deps.nodeImageCropper,
             toolNamePrefix,
             perms,
         )
@@ -299,6 +330,7 @@ object McpIntegrationTestHelper {
             deps.nodeCache,
             deps.privacyToolGate,
             deps.placeholderSubstitutor,
+            WebViewNodeMerger(),
             toolNamePrefix,
             perms,
         )
@@ -523,6 +555,7 @@ object McpIntegrationTestHelper {
         bearerTokenEnabled: Boolean = false,
         bearerToken: String = "",
         publicUrlOverride: String = "",
+        clientIpSource: ClientIpSource? = null,
         testBlock: suspend io.ktor.server.testing.ApplicationTestBuilder.(OAuthTestContext) -> Unit,
     ) {
         val sdkServer = createSdkServer(deps)
@@ -545,6 +578,7 @@ object McpIntegrationTestHelper {
 
         testApplication {
             application {
+                clientIpSource?.let { markClientIpSource(it) }
                 // Full production wiring WITH CORS in front of the real OAuth routes, so the
                 // OAuth-flow tests verify OAuth and CORS coexist end-to-end.
                 installMcpBasePlugins {
@@ -607,6 +641,7 @@ data class MockDependencies(
     val typeInputController: TypeInputController,
     val screenshotAnnotator: ScreenshotAnnotator,
     val screenshotEncoder: ScreenshotEncoder,
+    val nodeImageCropper: NodeImageCropper,
     val cameraProvider: CameraProvider,
     val nodeCache: AccessibilityNodeCache,
     val screenStateSnapshotCache: ScreenStateSnapshotCache,
@@ -622,6 +657,12 @@ data class MockDependencies(
     val pseudonymStore: PseudonymStore,
     val privacyToolGate: PrivacyToolGate,
     val placeholderSubstitutor: PlaceholderSubstitutor,
+    /**
+     * The node references, by id, that every tree read set up by [McpIntegrationTestHelper.setupMultiWindowMock]
+     * returns with its tree (those of the nodes in it); [McpIntegrationTestHelper.focusInputOn] adds the focused
+     * field's.
+     */
+    val readNodes: MutableMap<String, CachedNode> = mutableMapOf(),
     val serverLog: RecordingServerLogRepository = RecordingServerLogRepository(),
     /** The running tool calls, shared by the tool registration and the transport as in production. */
     val inFlightToolCalls: InFlightToolCalls = InFlightToolCalls(),

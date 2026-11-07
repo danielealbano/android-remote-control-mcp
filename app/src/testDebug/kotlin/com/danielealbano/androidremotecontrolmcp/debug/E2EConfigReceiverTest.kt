@@ -18,6 +18,9 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelNet
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelPem
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelSavedIdentity
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,6 +37,7 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import okhttp3.tls.HeldCertificate
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -508,6 +512,55 @@ class E2EConfigReceiverTest {
         }
         assertTrue(encodedJson.contains("\"tunnel_provider\":\"android-remote-control-mcp-tunneld\""), encodedJson)
         assertTrue(encodedJson.contains("\"bearer_token_enabled\""), encodedJson)
+    }
+
+    @Test
+    fun `chain probe answers the counts and the trust checks, whole chain first`() {
+        val chain =
+            List(2) {
+                HeldCertificate
+                    .Builder()
+                    .commonName("certificate $it")
+                    .build()
+                    .certificate
+            }
+        val saved =
+            ArcTunnelSavedIdentity(
+                name = "name",
+                baseAddress = "example.test",
+                identityAlias = "identity",
+                tlsAlias = "tls",
+                identityChain = "",
+                publicChain = ArcTunnelPem.chainPem(chain),
+            )
+        val net = mockk<ArcTunnelNet>()
+        every { net.reachesTrustedRoot(chain) } returns true
+        every { net.reachesTrustedRoot(chain.take(1)) } returns false
+        coEvery { mockSettingsRepository.getServerConfig() } returns ServerConfig()
+        every { mockArcTunnelEnrollment.store(any()) } returns mockk { every { load() } returns saved }
+        every { mockArcTunnelEnrollment.net(any()) } returns net
+        var encodedJson = ""
+        every { Base64.encodeToString(any(), Base64.NO_WRAP) } answers {
+            encodedJson = String(firstArg<ByteArray>())
+            MARKER
+        }
+        val pending = mockk<BroadcastReceiver.PendingResult>(relaxed = true)
+        val spy = spyk(receiver)
+        every { spy.goAsync() } returns pending
+
+        spy.onReceive(mockContext, actionIntent(E2EConfigReceiver.ACTION_E2E_ARC_TUNNEL_CHAIN_PROBE))
+
+        verify(timeout = VERIFY_TIMEOUT_MS) { pending.finish() }
+        verifyOrder {
+            net.reachesTrustedRoot(chain)
+            net.reachesTrustedRoot(chain.take(1))
+            pending.setResultData(MARKER)
+        }
+        assertEquals(
+            """{"saved_certificates":2,"factory_certificates":2,"parsed_certificates":2,""" +
+                """"whole_reaches_root":true,"leaf_reaches_root":false}""",
+            encodedJson,
+        )
     }
 
     private fun stored(): ServerConfig = ServerConfig(arcTunnelEdgeOverride = EDGE, arcTunnelTrustedCaPem = PEM)

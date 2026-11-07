@@ -51,6 +51,7 @@ object AndroidContainerSetup {
     internal const val E2E_STOP_ACTION = "$E2E_ACTION_BASE.E2E_STOP_SERVER"
     internal const val E2E_ARC_ENROLL_ACTION = "$E2E_ACTION_BASE.E2E_ARC_TUNNEL_ENROLL"
     internal const val E2E_ARC_QUERY_ACTION = "$E2E_ACTION_BASE.E2E_ARC_TUNNEL_QUERY"
+    internal const val E2E_ARC_CHAIN_PROBE_ACTION = "$E2E_ACTION_BASE.E2E_ARC_TUNNEL_CHAIN_PROBE"
     internal const val MAIN_COMPONENT = "$APP_PACKAGE/$MAIN_ACTIVITY_CLASS"
     private const val ARC_POLL_INTERVAL_MS = 1_000L
     private const val BROADCAST_DATA_PREFIX = "data=\""
@@ -646,14 +647,23 @@ object AndroidContainerSetup {
     }
 
     /** One status query; the receiver answers with Base64 JSON in the broadcast result data. */
-    fun queryArcTunnel(serial: String = adbSerial): E2EArcTunnelStatus {
-        val out =
-            execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_ARC_QUERY_ACTION, "-n", E2E_RECEIVER_COMPONENT)
+    fun queryArcTunnel(serial: String = adbSerial): E2EArcTunnelStatus =
+        E2EArcTunnelStatus.parse(broadcastResult(E2E_ARC_QUERY_ACTION, serial))
+
+    /** The certificate chain handling on the device's own Conscrypt, in the real app process, over the saved chain. */
+    fun probeArcTunnelChain(serial: String = adbSerial): E2EArcTunnelChainProbe =
+        E2EArcTunnelChainProbe.parse(broadcastResult(E2E_ARC_CHAIN_PROBE_ACTION, serial))
+
+    private fun broadcastResult(
+        action: String,
+        serial: String,
+    ): String {
+        val out = execAdbOn(serial, "shell", "am", "broadcast", "-a", action, "-n", E2E_RECEIVER_COMPONENT)
         val line =
             out.lines().firstOrNull { it.contains(BROADCAST_DATA_PREFIX) }
                 ?: throw IllegalStateException("No result data in: $out")
         val b64 = line.substringAfter(BROADCAST_DATA_PREFIX).substringBefore('"')
-        return E2EArcTunnelStatus.parse(String(Base64.getDecoder().decode(b64)))
+        return String(Base64.getDecoder().decode(b64))
     }
 
     /** Polls [queryArcTunnel] until [predicate] holds; the last status is in the failure message. */

@@ -580,6 +580,18 @@ class AdbConfigHandlerTest {
             }
 
         @Test
+        @DisplayName("arc_tunnel_status_check_enabled is applied")
+        fun arcTunnelStatusCheckApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_STATUS_CHECK_ENABLED, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelStatusCheckEnabled(false) }
+            }
+
+        @Test
         @DisplayName("arc_tunnel_ct_check_enabled is applied")
         fun arcTunnelCtCheckApplied() =
             runTest {

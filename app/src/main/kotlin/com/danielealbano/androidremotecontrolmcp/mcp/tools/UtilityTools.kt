@@ -15,12 +15,12 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.NodeActionLabels
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -267,11 +267,9 @@ class WaitForNodeTool
                             Log.d(TAG, "wait_for_node: found after ${elapsed}ms ($attemptCount attempts)")
 
                             val redactedElement =
-                                element.copy(
-                                    text = privacyToolGate.text(element.text, "node text"),
-                                    contentDescription =
-                                        privacyToolGate.text(element.contentDescription, "node description"),
-                                )
+                                McpToolUtils
+                                    .redactElements(privacyToolGate, multiWindowResult.windows, listOf(element))
+                                    .single()
                             val resultJson =
                                 buildJsonObject {
                                     put("found", true)
@@ -705,7 +703,9 @@ class WaitForIdleTool
 /**
  * MCP tool: get_node_details
  *
- * Retrieves full (untruncated) text and contentDescription for a list of node_ids.
+ * Retrieves full (untruncated) text and contentDescription for a list of node_ids, plus
+ * whether the app marks each node as a password field (`true`/`false` in the `password` column)
+ * and the labels of its accessibility actions (the `actions` column, [NodeActionLabels.SEPARATOR]-joined).
  * Use after get_screen_state when text or desc columns were truncated.
  */
 class GetNodeDetailsTool
@@ -717,53 +717,41 @@ class GetNodeDetailsTool
         private val nodeCache: AccessibilityNodeCache,
         private val privacyToolGate: PrivacyToolGate,
     ) {
-        @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // 1. Parse "node_ids" parameter — required, JSON array of strings
-            val idsElement =
-                arguments?.get("node_ids")
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'node_ids'")
-            val idsArray =
-                (idsElement as? JsonArray)
-                    ?: throw McpToolException.InvalidParams("Parameter 'node_ids' must be an array of strings")
-            if (idsArray.isEmpty()) {
-                throw McpToolException.InvalidParams("Parameter 'node_ids' must not be empty")
-            }
-            val ids =
-                idsArray.map { element ->
-                    val primitive =
-                        (element as? JsonPrimitive)
-                            ?: throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
-                    if (!primitive.isString) {
-                        throw McpToolException.InvalidParams("Each element in 'node_ids' must be a string")
-                    }
-                    primitive.content
-                }
+            val ids = McpToolUtils.requireNodeIds(arguments)
 
             // 2. Get fresh multi-window snapshot
             val multiWindowResult = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
-            // 3. Resolve nodes and batch-redact their text/desc in one model pass.
+            // 3. Resolve nodes and batch-redact their text, desc and action labels in one model pass, each with its
+            //    node's context. Every node contributes its text and desc slots, then one slot per action label.
             val nodes = ids.map { id -> id to elementFinder.findNodeById(multiWindowResult.windows, id) }
             val redacted =
-                privacyToolGate.texts(
-                    nodes.flatMap { (_, node) ->
-                        listOf(node?.text to "node text", node?.contentDescription to "node description")
+                privacyToolGate.nodeTexts(
+                    multiWindowResult.windows,
+                    nodes.flatMap { (id, node) ->
+                        listOf(node?.text to id, node?.contentDescription to id) +
+                            node?.actions.orEmpty().map { it to id }
                     },
                 )
 
             // 4. Build TSV output
             val sb = StringBuilder()
-            sb.append("node_id\ttext\tdesc\n")
+            sb.append("node_id\ttext\tdesc\tpassword\tactions\n")
 
-            nodes.forEachIndexed { index, (id, node) ->
+            var offset = 0
+            for ((id, node) in nodes) {
+                val actionCount = node?.actions?.size ?: 0
                 if (node != null) {
-                    val text = sanitizeForTsv(redacted[index * 2])
-                    val desc = sanitizeForTsv(redacted[index * 2 + 1])
-                    sb.append("$id\t$text\t$desc\n")
+                    val text = sanitizeForTsv(redacted[offset])
+                    val desc = sanitizeForTsv(redacted[offset + 1])
+                    val actions = actionsColumn(redacted.subList(offset + 2, offset + 2 + actionCount))
+                    sb.append("$id\t$text\t$desc\t${node.isPassword}\t$actions\n")
                 } else {
-                    sb.append("$id\tnot_found\tnot_found\n")
+                    sb.append("$id\tnot_found\tnot_found\tnot_found\tnot_found\n")
                 }
+                offset += 2 + actionCount
             }
 
             Log.d(TAG, "get_node_details: node_ids=${ids.size}")
@@ -787,6 +775,10 @@ class GetNodeDetailsTool
             return if (sanitized.isEmpty()) "-" else sanitized
         }
 
+        /** The `actions` column: the labels (already sanitized when parsed) joined, or "-" when there are none. */
+        private fun actionsColumn(labels: List<String?>): String =
+            if (labels.isEmpty()) "-" else labels.joinToString(NodeActionLabels.SEPARATOR) { it.orEmpty() }
+
         fun register(
             registrar: LoggedToolRegistrar,
             toolNamePrefix: String,
@@ -795,7 +787,10 @@ class GetNodeDetailsTool
                 toolName = TOOL_NAME,
                 name = "$toolNamePrefix$TOOL_NAME",
                 description =
-                    "Retrieve full untruncated text and description for nodes by node_id. " +
+                    "Retrieve full untruncated text and description for nodes by node_id, " +
+                        "whether the app marks each node as a password field, " +
+                        "and the labels of its accessibility actions (the actions column; run one with " +
+                        "${toolNamePrefix}perform_node_action). " +
                         "Use after ${toolNamePrefix}get_screen_state when text or desc was truncated.",
                 inputSchema =
                     ToolSchema(

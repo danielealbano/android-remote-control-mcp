@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.SurroundingText
 import com.danielealbano.androidremotecontrolmcp.data.model.PlaceholderFormat
 import com.danielealbano.androidremotecontrolmcp.data.model.PrivacyModeConfig
@@ -95,7 +96,7 @@ class PrivacyModeIntegrationTest {
                 ),
         )
 
-    private fun MockDependencies.setupTree(tree: AccessibilityNodeData) {
+    private fun MockDependencies.setupTree(tree: AccessibilityNodeData): AccessibilityNodeInfo =
         McpIntegrationTestHelper.setupMultiWindowMock(
             deps = this,
             tree = tree,
@@ -103,7 +104,6 @@ class PrivacyModeIntegrationTest {
             packageName = "com.example.app",
             activityName = ".MainActivity",
         )
-    }
 
     @Test
     fun `privacy disabled leaves output untouched`() =
@@ -360,7 +360,7 @@ class PrivacyModeIntegrationTest {
                             ),
                         ),
                 )
-            deps.setupTree(editTree)
+            McpIntegrationTestHelper.focusInputOn(deps, deps.setupTree(editTree), "node_edit")
             coEvery { deps.actionExecutor.clickNode("node_edit", any<List<WindowData>>()) } returns Result.success(Unit)
             every { deps.typeInputController.isReady() } returns true
             every { deps.typeInputController.setSelection(any(), any()) } returns true

@@ -76,6 +76,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                     R.string.mcp_tool_get_screen_state,
                     listOf(ParamEntry("include_screenshot", R.string.mcp_tool_param_include_screenshot)),
                 ),
+                ToolEntry("get_node_screenshots", R.string.mcp_tool_get_node_screenshots),
             ),
         ),
         ToolCategory(
@@ -112,6 +113,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                 ToolEntry("find_nodes", R.string.mcp_tool_find_nodes),
                 ToolEntry("click_node", R.string.mcp_tool_click_node),
                 ToolEntry("long_click_node", R.string.mcp_tool_long_click_node),
+                ToolEntry("perform_node_action", R.string.mcp_tool_perform_node_action),
                 ToolEntry("tap_node", R.string.mcp_tool_tap_node),
                 ToolEntry("scroll_to_node", R.string.mcp_tool_scroll_to_node),
                 ToolEntry("scroll_node", R.string.mcp_tool_scroll_node),

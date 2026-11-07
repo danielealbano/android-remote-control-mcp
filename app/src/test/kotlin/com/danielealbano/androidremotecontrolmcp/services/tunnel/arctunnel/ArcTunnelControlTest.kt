@@ -113,7 +113,8 @@ class ArcTunnelControlTest {
             ),
             { localPort },
             events,
-            localConnectWindowMs = LOCAL_WINDOW_MS,
+            { _, _ -> AutoCloseable {} },
+            LOCAL_WINDOW_MS,
         )
 
     private fun start(
@@ -153,7 +154,8 @@ class ArcTunnelControlTest {
     private fun open(addr: String): ByteArray =
         ArcTunnelTestServer.frame(
             ArcTunnelFrames.OPEN,
-            """{"token":"t","addr":"$addr","use_https":false,"use_mtls":false}""",
+            """{"token":"t","addr":"$addr","use_https":false,"use_mtls":false,""" +
+                """"client_addr":"198.51.100.7:52144"}""",
         )
 
     private fun nudge(nonce: String): ByteArray {

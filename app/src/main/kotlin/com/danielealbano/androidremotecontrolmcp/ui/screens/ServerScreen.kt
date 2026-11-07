@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.screens
 
 import android.content.ClipData
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlert
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceProblem
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelStatusPage
 import com.danielealbano.androidremotecontrolmcp.ui.ApprovalActivity
 import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizationCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
@@ -104,6 +107,7 @@ fun ServerScreen(
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
     val channelEnabled by channelViewModel.channelEnabled.collectAsStateWithLifecycle()
     val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
+    val tunnelServiceProblem by arcTunnelViewModel.serviceProblem.collectAsStateWithLifecycle()
     val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) }
@@ -146,6 +150,8 @@ fun ServerScreen(
                 )
                 Spacer(Modifier.height(16.dp))
             }
+
+            ArcTunnelServiceProblemCard(tunnelServiceProblem)
 
             ArcTunnelCtAlertCard(
                 alert = ctAlert,
@@ -198,6 +204,7 @@ fun ServerScreen(
                 onChannelStopClick = { channelViewModel.stopChannel() },
                 startEnabled = isAccessibilityEnabled,
                 mcpStartBlockedMessage = listenerCheck.startError,
+                mcpBusy = renewal.inProgress,
             )
 
             Spacer(Modifier.height(16.dp))
@@ -284,6 +291,38 @@ private fun NetworkAccessSuggestionCard(
             Text(stringResource(R.string.server_network_access_suggestion_other_tunnels))
         }
     }
+}
+
+/** What the tunnel service's status page reports; nothing unless it reports a problem. */
+@Composable
+private fun ArcTunnelServiceProblemCard(problem: ArcTunnelServiceProblem?) {
+    if (problem == null) return
+    val context = LocalContext.current
+    CalloutCard(
+        icon = Icons.Default.Warning,
+        title = stringResource(R.string.server_arc_tunnel_status_title),
+        body =
+            if (problem.affected.isEmpty()) {
+                stringResource(R.string.server_arc_tunnel_status_body, problem.state)
+            } else {
+                stringResource(
+                    R.string.server_arc_tunnel_status_body_affected,
+                    problem.state,
+                    problem.affected.joinToString(", "),
+                )
+            },
+    ) {
+        TextButton(
+            onClick = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ArcTunnelStatusPage.PAGE_URL)))
+                }
+            },
+        ) {
+            Text(stringResource(R.string.server_arc_tunnel_status_action))
+        }
+    }
+    Spacer(Modifier.height(16.dp))
 }
 
 /** The Certificate Transparency banner; nothing when there is no alert. */

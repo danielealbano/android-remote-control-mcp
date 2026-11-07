@@ -11,6 +11,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.MultiWindowResult
@@ -22,6 +23,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewN
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.countKeptNodes
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.formatMultiWindowPage
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.NodeImageCropper
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
@@ -315,6 +317,10 @@ class GetScreenStateHandler
                         "list alone is not sufficient to understand the screen layout). " +
                         "Includes a hierarchy section showing node nesting via indentation " +
                         "(leave it out with include_hierarchy=false). " +
+                        "Nodes whose controls the app exposes as labelled accessibility actions (e.g. a vote " +
+                        "bar's Upvote) are listed under 'Nodes with actions'; perform one with " +
+                        "${toolNamePrefix}perform_node_action. " +
+                        "For a close look at given nodes, use ${toolNamePrefix}get_node_screenshots. " +
                         "Large screens are split into pages of 200 nodes: the response includes a " +
                         "'page:N/total' line and a cursor; call again with that cursor to fetch the " +
                         "next page. You do NOT need to fetch every page — stop once you have found " +
@@ -380,6 +386,8 @@ fun registerScreenIntrospectionTools(
     webViewNodeMerger: WebViewNodeMerger,
     privacyToolGate: PrivacyToolGate,
     screenshotRedactor: ScreenshotRedactor,
+    actionExecutor: ActionExecutor,
+    nodeImageCropper: NodeImageCropper,
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
@@ -401,6 +409,21 @@ fun registerScreenIntrospectionTools(
             toolNamePrefix,
             includeScreenshotParamEnabled = perms.isParamEnabled(GetScreenStateHandler.TOOL_NAME, "include_screenshot"),
         )
+    }
+    if (perms.isToolEnabled(GetNodeScreenshotsTool.TOOL_NAME)) {
+        GetNodeScreenshotsTool(
+            NodeScreenshotDeps(
+                treeParser,
+                accessibilityServiceProvider,
+                nodeCache,
+                actionExecutor,
+                screenCaptureProvider,
+                screenshotRedactor,
+                nodeImageCropper,
+                webViewNodeMerger,
+                privacyToolGate,
+            ),
+        ).register(registrar, toolNamePrefix)
     }
 }
 

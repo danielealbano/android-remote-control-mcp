@@ -34,6 +34,7 @@ class ElementFinderTest {
         editable: Boolean = false,
         enabled: Boolean = true,
         visible: Boolean = true,
+        isPassword: Boolean = false,
         children: List<AccessibilityNodeData> = emptyList(),
     ): AccessibilityNodeData =
         AccessibilityNodeData(
@@ -49,6 +50,7 @@ class ElementFinderTest {
             editable = editable,
             enabled = enabled,
             visible = visible,
+            isPassword = isPassword,
             children = children,
         )
 
@@ -296,6 +298,70 @@ class ElementFinderTest {
 
             // Assert
             assertEquals(3, results.size)
+        }
+    }
+
+    @Nested
+    @DisplayName("ElementInfo mapping")
+    inner class ElementInfoMapping {
+        @Test
+        @DisplayName("maps every ElementInfo field, password and actions included")
+        fun mapsEveryElementInfoFieldPasswordIncluded() {
+            // Arrange
+            val passwordField =
+                createNode(
+                    id = "node_pwd",
+                    className = "android.widget.EditText",
+                    text = "•••",
+                    contentDescription = "Password",
+                    resourceId = "com.example:id/password",
+                    bounds = BoundsData(10, 20, 300, 80),
+                    clickable = true,
+                    longClickable = true,
+                    editable = true,
+                    isPassword = true,
+                ).copy(actions = listOf("Show password"))
+            val tree = createNode(id = "node_root", children = listOf(passwordField))
+
+            // Act
+            val results = finder.findElements(tree, FindBy.RESOURCE_ID, "com.example:id/password", exactMatch = true)
+
+            // Assert
+            assertEquals(
+                listOf(
+                    ElementInfo(
+                        id = "node_pwd",
+                        text = "•••",
+                        contentDescription = "Password",
+                        resourceId = "com.example:id/password",
+                        className = "android.widget.EditText",
+                        bounds = BoundsData(10, 20, 300, 80),
+                        clickable = true,
+                        longClickable = true,
+                        scrollable = false,
+                        editable = true,
+                        enabled = true,
+                        visible = true,
+                        password = true,
+                        actions = listOf("Show password"),
+                    ),
+                ),
+                results,
+            )
+        }
+
+        @Test
+        @DisplayName("reports password false for a regular field")
+        fun reportsPasswordFalseForRegularField() {
+            // Arrange
+            val tree = buildSampleTree()
+
+            // Act
+            val results = finder.findElements(tree, FindBy.RESOURCE_ID, "com.calculator:id/display", exactMatch = true)
+
+            // Assert
+            assertEquals(1, results.size)
+            assertEquals(false, results[0].password)
         }
     }
 

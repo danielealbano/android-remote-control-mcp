@@ -50,6 +50,7 @@ class AccessibilityTreeParserTest {
         visibleToUser: Boolean = true,
         childCount: Int = 0,
         children: List<AccessibilityNodeInfo> = emptyList(),
+        actions: List<AccessibilityNodeInfo.AccessibilityAction> = emptyList(),
     ): AccessibilityNodeInfo {
         val node = mockk<AccessibilityNodeInfo>(relaxed = true)
         every { node.className } returns className
@@ -64,6 +65,7 @@ class AccessibilityTreeParserTest {
         every { node.isEnabled } returns enabled
         every { node.isVisibleToUser } returns visibleToUser
         every { node.childCount } returns childCount
+        every { node.actionList } returns actions
 
         val rectSlot = slot<Rect>()
         every { node.getBoundsInScreen(capture(rectSlot)) } answers {
@@ -698,6 +700,60 @@ class AccessibilityTreeParserTest {
             val result = parser.parseTree(node)
 
             assertNull(result.labeledByText)
+        }
+    }
+
+    @Nested
+    @DisplayName("actions")
+    inner class Actions {
+        @Test
+        @DisplayName("parseTree lists the labelled actions of every node")
+        fun parseTreeListsLabelledActions() {
+            val child =
+                createMockNode(
+                    actions =
+                        listOf(
+                            mockAction(CUSTOM_ACTION_ID, "Upvote"),
+                            mockAction(AccessibilityNodeInfo.ACTION_SET_TEXT, "Edit"),
+                            mockAction(CUSTOM_ACTION_ID + 1, "Downvote"),
+                        ),
+                )
+            val root =
+                createMockNode(
+                    childCount = 1,
+                    children = listOf(child),
+                    actions = listOf(mockAction(AccessibilityNodeInfo.ACTION_CLICK, "Open post")),
+                )
+
+            val result = parser.parseTree(root)
+
+            assertEquals(listOf("Open post"), result.actions)
+            assertEquals(listOf("Upvote", "Downvote"), result.children.single().actions)
+        }
+
+        @Test
+        @DisplayName("a node without labelled actions has none")
+        fun nodeWithoutLabelledActionsHasNone() {
+            val node = createMockNode(actions = listOf(mockAction(AccessibilityNodeInfo.ACTION_CLICK, null)))
+
+            assertTrue(parser.parseTree(node).actions.isEmpty())
+        }
+
+        @Test
+        @DisplayName("the leaf built at the maximum depth keeps its actions")
+        fun maxDepthLeafKeepsActions() {
+            val node = createMockNode(actions = listOf(mockAction(CUSTOM_ACTION_ID, "Upvote")))
+
+            val result =
+                parser.parseNode(
+                    node = node,
+                    depth = AccessibilityTreeParser.MAX_TREE_DEPTH,
+                    index = 0,
+                    parentId = "root",
+                    recycleNode = false,
+                )
+
+            assertEquals(listOf("Upvote"), result.actions)
         }
     }
 }

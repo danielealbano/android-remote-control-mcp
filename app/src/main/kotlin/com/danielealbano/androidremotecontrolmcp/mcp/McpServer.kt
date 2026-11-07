@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthRouteDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsContext
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
@@ -84,6 +85,7 @@ class McpServer(
 
     @Volatile
     private var tunnelListener: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+    override val clientAddresses = TunnelClientAddresses()
 
     /** Test seam: the random loopback port source of the tunnel listener. */
     internal var tunnelPortChooser: () -> Int = ::randomPort
@@ -199,7 +201,7 @@ class McpServer(
             factory = Netty,
             port = port,
             host = host,
-            module = { configureApplication() },
+            module = { configureApplication(ClientIpSource.of(config)) },
         )
 
     private fun createHttpsServer(): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
@@ -217,7 +219,8 @@ class McpServer(
                     port = config.port
                 }
             },
-            module = { configureApplication() },
+            // A tunnel never forwards to this listener: Cloudflare and ngrok get their own plain HTTP one.
+            module = { configureApplication(ClientIpSource.SOCKET_PEER) },
         )
     }
 
@@ -290,12 +293,17 @@ class McpServer(
                 }
             },
             module = {
-                configureApplication()
+                // Nothing on the way here sets or strips a header, as TLS ends on the phone, and the peer is loopback.
+                resolveTunnelClients(clientAddresses)
+                configureApplication(ClientIpSource.FREE_TUNNEL)
                 intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
             },
         )
 
-    private fun io.ktor.server.application.Application.configureApplication() {
+    private fun io.ktor.server.application.Application.configureApplication(clientIpSource: ClientIpSource) {
+        captureHttp2Authority()
+        markClientIpSource(clientIpSource)
+
         // Base plugins in the canonical order (ContentNegotiation → CORS → auth). CORS MUST precede
         // auth so browser preflight OPTIONS (no Authorization header) are answered by CORS instead of
         // being failed closed by auth. The order lives in installMcpBasePlugins so it stays consistent

@@ -1,10 +1,27 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import io.mockk.slot
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -331,6 +348,66 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // requireNodeIds
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("requireNodeIds")
+    inner class RequireNodeIdsTests {
+        private fun error(params: JsonObject?): String? =
+            assertThrows<McpToolException.InvalidParams> { McpToolUtils.requireNodeIds(params) }.message
+
+        @Test
+        fun `returns the ids in order`() {
+            val params =
+                buildJsonObject {
+                    putJsonArray("node_ids") {
+                        add("b")
+                        add("a")
+                    }
+                }
+
+            assertEquals(listOf("b", "a"), McpToolUtils.requireNodeIds(params))
+        }
+
+        @Test
+        fun `rejects a missing parameter`() {
+            assertEquals("Missing required parameter 'node_ids'", error(null))
+            assertEquals("Missing required parameter 'node_ids'", error(buildJsonObject {}))
+        }
+
+        @Test
+        fun `rejects a value that is not an array`() {
+            assertEquals(
+                "Parameter 'node_ids' must be an array of strings",
+                error(buildJsonObject { put("node_ids", "a") }),
+            )
+        }
+
+        @Test
+        fun `rejects an empty array`() {
+            val empty = buildJsonObject { putJsonArray("node_ids") {} }
+
+            assertEquals("Parameter 'node_ids' must not be empty", error(empty))
+        }
+
+        @Test
+        fun `rejects an element that is not a string`() {
+            val number =
+                buildJsonObject {
+                    putJsonArray("node_ids") {
+                        add("a")
+                        add(1)
+                    }
+                }
+            val obj = buildJsonObject { putJsonArray("node_ids") { addJsonObject {} } }
+
+            assertEquals("Each element in 'node_ids' must be a string", error(number))
+            assertEquals("Each element in 'node_ids' must be a string", error(obj))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // optionalString
     // ─────────────────────────────────────────────────────────────────────
 
@@ -607,6 +684,31 @@ class McpToolUtilsTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // untrustedTextAndImagesResult
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("untrustedTextAndImagesResult")
+    inner class UntrustedTextAndImagesResultTests {
+        @Test
+        fun `gives one text item with the warning first, then the images in order`() {
+            val result = McpToolUtils.untrustedTextAndImagesResult("lines", listOf("one", "two"), "image/jpeg")
+
+            assertEquals(3, result.content.size)
+            assertEquals("${McpToolUtils.UNTRUSTED_CONTENT_WARNING}\nlines", (result.content[0] as TextContent).text)
+            assertEquals(listOf("one", "two"), result.content.drop(1).map { (it as ImageContent).data })
+            assertTrue(result.content.drop(1).all { (it as ImageContent).mimeType == "image/jpeg" })
+        }
+
+        @Test
+        fun `gives the text item alone when there is no image`() {
+            val result = McpToolUtils.untrustedTextAndImagesResult("lines", emptyList(), "image/jpeg")
+
+            assertEquals(1, result.content.size)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // untrustedImageResult
     // ─────────────────────────────────────────────────────────────────────
 
@@ -693,5 +795,124 @@ class McpToolUtilsTest {
         fun handlesSlugWithUnderscores() {
             assertEquals("android-remote-control-mcp-work_phone", McpToolUtils.buildServerName("work_phone"))
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // buildNodeJson
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("buildNodeJson")
+    inner class BuildNodeJsonTests {
+        private fun element(password: Boolean) =
+            ElementInfo(
+                id = "node_pwd",
+                className = "android.widget.EditText",
+                bounds = BoundsData(0, 0, 100, 50),
+                editable = true,
+                password = password,
+            )
+
+        @Test
+        @DisplayName("reports password true for a password field")
+        fun reportsPasswordTrueForPasswordField() {
+            val json = McpToolUtils.buildNodeJson(element(password = true))
+            assertEquals(true, json["password"]?.jsonPrimitive?.boolean)
+        }
+
+        @Test
+        @DisplayName("reports password false for a regular field")
+        fun reportsPasswordFalseForRegularField() {
+            val json = McpToolUtils.buildNodeJson(element(password = false))
+            assertEquals(false, json["password"]?.jsonPrimitive?.boolean)
+        }
+
+        @Test
+        @DisplayName("lists the action labels in order")
+        fun listsActionLabelsInOrder() {
+            val withActions = element(password = false).copy(actions = listOf("Upvote", "Downvote"))
+            val json = McpToolUtils.buildNodeJson(withActions)
+            assertEquals(listOf("Upvote", "Downvote"), json["actions"]?.jsonArray?.map { it.jsonPrimitive.content })
+        }
+
+        @Test
+        @DisplayName("reports an empty actions array for a node without actions")
+        fun reportsEmptyActionsArray() {
+            val json = McpToolUtils.buildNodeJson(element(password = false))
+            assertEquals(0, json["actions"]?.jsonArray?.size)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // redactElements
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("redactElements")
+    inner class RedactElementsTests {
+        private val windows =
+            listOf(
+                WindowData(
+                    windowId = 1,
+                    windowType = "APPLICATION",
+                    tree = AccessibilityNodeData(id = "node_root", bounds = BoundsData(0, 0, 1, 1)),
+                ),
+            )
+
+        private fun element(
+            id: String,
+            text: String?,
+            actions: List<String>,
+        ) = ElementInfo(
+            id = id,
+            text = text,
+            contentDescription = "desc $id",
+            bounds = BoundsData(0, 0, 1, 1),
+            actions = actions,
+        )
+
+        @Test
+        @DisplayName("redacts text, description and labels in one batch, each in its own slot")
+        fun redactsEveryFieldInOneBatch() =
+            runTest {
+                val gate = mockk<PrivacyToolGate>()
+                val batch = slot<List<Pair<String?, String>>>()
+                coEvery { gate.nodeTexts(windows, capture(batch)) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { (text, _) -> text?.let { "R($it)" } }
+                }
+                val elements =
+                    listOf(
+                        element("node_a", "Alice", listOf("Call Alice", "Mail Alice")),
+                        element("node_b", null, emptyList()),
+                        element("node_c", "Carol", listOf("Upvote")),
+                    )
+
+                val redacted = McpToolUtils.redactElements(gate, windows, elements)
+
+                coVerify(exactly = 1) { gate.nodeTexts(windows, any()) }
+                assertEquals(
+                    listOf(
+                        "Alice" to "node_a",
+                        "desc node_a" to "node_a",
+                        "Call Alice" to "node_a",
+                        "Mail Alice" to "node_a",
+                        null to "node_b",
+                        "desc node_b" to "node_b",
+                        "Carol" to "node_c",
+                        "desc node_c" to "node_c",
+                        "Upvote" to "node_c",
+                    ),
+                    batch.captured,
+                )
+                assertEquals(
+                    listOf(
+                        element("node_a", "R(Alice)", listOf("R(Call Alice)", "R(Mail Alice)"))
+                            .copy(contentDescription = "R(desc node_a)"),
+                        element("node_b", null, emptyList()).copy(contentDescription = "R(desc node_b)"),
+                        element("node_c", "R(Carol)", listOf("R(Upvote)")).copy(contentDescription = "R(desc node_c)"),
+                    ),
+                    redacted,
+                )
+            }
     }
 }

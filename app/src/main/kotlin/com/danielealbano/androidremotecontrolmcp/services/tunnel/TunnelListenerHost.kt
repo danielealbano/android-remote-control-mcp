@@ -11,6 +11,9 @@ class TunnelTlsMaterial(
 
 /** A host able to serve the MCP application on a loopback TLS listener for a tunnel provider. */
 interface TunnelListenerHost {
+    /** The public client each connection to the listener serves. */
+    val clientAddresses: TunnelClientAddresses
+
     /**
      * Starts the listener on `127.0.0.1`: on [port] when given, otherwise on a random free port. [onRequest]
      * runs once per HTTP request received through it. Returns the bound port.

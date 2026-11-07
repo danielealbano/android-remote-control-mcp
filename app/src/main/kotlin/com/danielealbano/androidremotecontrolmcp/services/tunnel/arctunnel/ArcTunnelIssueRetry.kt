@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import java.io.IOException
 import java.security.ProviderException
 
@@ -43,6 +45,8 @@ object ArcTunnelIssueRetry {
         while (true) {
             val attempt = runCatching { issue(current ?: freshNonce().also { current = it }) }
             val failure = attempt.exceptionOrNull() ?: return
+            // A refusal can arrive together with a cancellation: announce no retry that will not happen.
+            currentCoroutineContext().ensureActive()
             if (failure is ProviderException && keygen < KEYGEN_RETRIES) {
                 keygen++
                 onRetry(keygen, KEYGEN_WAIT_MS, failure)

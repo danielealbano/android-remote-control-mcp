@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.assertThrows
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("ArcTunnelHttp")
 class ArcTunnelHttpTest {
@@ -169,6 +172,30 @@ class ArcTunnelHttpTest {
         } finally {
             release.countDown()
         }
+    }
+
+    @Test
+    fun `an answer read in full is returned even if a cancellation lands right after it`() {
+        server.enqueue(ArcTunnelTestServer.json("""{"nonce":"kept"}"""))
+        val caller = AtomicReference<Job>()
+        val client =
+            net
+                .serverClient()
+                .newBuilder()
+                .addInterceptor(ArcTunnelTestServer.atEndOfBody { caller.get().cancel() })
+                .build()
+        val nonce = AtomicReference<String>()
+
+        runBlocking {
+            val job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) { nonce.set(getNonce(client).nonce) }
+            caller.set(job)
+            job.start()
+            withTimeout(TimeUnit.SECONDS.toMillis(BLOCK_S)) { job.join() }
+
+            assertTrue(job.isCancelled)
+        }
+
+        assertEquals("kept", nonce.get())
     }
 
     @Test

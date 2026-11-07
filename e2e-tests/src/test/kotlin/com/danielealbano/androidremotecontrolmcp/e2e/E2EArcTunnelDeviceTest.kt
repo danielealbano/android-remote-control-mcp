@@ -2,6 +2,8 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeAll
@@ -77,6 +79,17 @@ class E2EArcTunnelDeviceTest {
                 client.close()
             }
         }
+
+    /** A real CA's chain against the phone's own roots, in the real app process. */
+    @Test
+    fun `the phone's trust manager needs the intermediates of its real chain`() {
+        val probe = AndroidContainerSetup.probeArcTunnelChain(requireNotNull(serial))
+
+        assertTrue(probe.savedCertificates >= 2, "$probe")
+        assertEquals(probe.savedCertificates, probe.parsedCertificates, "$probe")
+        assertTrue(probe.wholeReachesRoot, "$probe")
+        assertFalse(probe.leafReachesRoot, "a leaf must not pass after its intermediates did: $probe")
+    }
 
     /** The token never reaches a log: a failed broadcast is reported without the command line. */
     private fun setBearer(

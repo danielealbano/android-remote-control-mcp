@@ -8,6 +8,9 @@ interface ArcTunnelSettings {
     /** Updates the Certificate Transparency check toggle of the free E2E tunnel. */
     suspend fun updateArcTunnelCtCheckEnabled(enabled: Boolean)
 
+    /** Updates the toggle of the public tunnel service's status check. */
+    suspend fun updateArcTunnelStatusCheckEnabled(enabled: Boolean)
+
     /**
      * Debug/E2E only: points the tunnel client at [edgeOverride] (`host:port`, empty = none) trusting
      * [trustedCaPem].

@@ -56,6 +56,15 @@ class ArcTunnelSettingsImplTest {
         }
 
     @Test
+    fun `updates arc tunnel status check enabled`() =
+        testScope.runTest {
+            settings.updateArcTunnelStatusCheckEnabled(false)
+
+            assertEquals(false, dataStore.data.first()[ARC_TUNNEL_STATUS_CHECK_ENABLED_KEY])
+            assertEquals(listOf("Free E2E tunnel status check disabled"), settingsMessages())
+        }
+
+    @Test
     fun `updates arc tunnel ct check enabled`() =
         testScope.runTest {
             settings.updateArcTunnelCtCheckEnabled(false)

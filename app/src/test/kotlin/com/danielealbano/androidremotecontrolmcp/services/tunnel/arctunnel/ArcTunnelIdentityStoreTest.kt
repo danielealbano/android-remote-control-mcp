@@ -93,6 +93,50 @@ class ArcTunnelIdentityStoreTest {
     }
 
     @Test
+    fun `save marks the certificate as checked`() {
+        store.save(ArcTunnelTestIdentity.create(keys, net))
+
+        assertEquals(ARC_TUNNEL_CERT_CHECK, requireNotNull(store.load()).certCheck)
+    }
+
+    @Test
+    fun `a record saved before the check existed is not marked`() {
+        store.save(ArcTunnelTestIdentity.create(keys, net))
+        file().writeText(file().readText().replace(Regex(""","cert_check":\d+"""), ""))
+
+        assertEquals(0, requireNotNull(store.load()).certCheck)
+    }
+
+    @Test
+    fun `markCertChecked marks an older record and keeps the rest of it`() {
+        store.save(ArcTunnelTestIdentity.create(keys, net))
+        store.mergeCtCheck("7", listOf("a"), "a", 70L)
+        val before = requireNotNull(store.load())
+        file().writeText(file().readText().replace(Regex(""","cert_check":\d+"""), ""))
+
+        store.markCertChecked()
+
+        assertEquals(before, store.load())
+    }
+
+    @Test
+    fun `markCertChecked with nothing saved writes nothing`() {
+        store.markCertChecked()
+
+        assertFalse(file().exists())
+    }
+
+    @Test
+    fun `the CT updates keep the marker`() {
+        store.save(ArcTunnelTestIdentity.create(keys, net))
+
+        store.mergeCtCheck("1", listOf("a"), "a", 1L)
+        store.clearCtAlert()
+
+        assertEquals(ARC_TUNNEL_CERT_CHECK, requireNotNull(store.load()).certCheck)
+    }
+
+    @Test
     fun `holds compares the name`() {
         val identity = ArcTunnelTestIdentity.create(keys, net)
         store.save(identity)

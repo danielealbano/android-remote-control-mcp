@@ -79,6 +79,10 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalsImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlerts
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlertsImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatusImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.AppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.BuildConfigAppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseChecker
@@ -341,4 +345,12 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelCtAlerts(impl: ArcTunnelCtAlertsImpl): ArcTunnelCtAlerts
+
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelServiceStatus(impl: ArcTunnelServiceStatusImpl): ArcTunnelServiceStatus
+
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelServiceAlerts(impl: ArcTunnelServiceAlertsImpl): ArcTunnelServiceAlerts
 }

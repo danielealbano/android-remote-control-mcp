@@ -14,11 +14,22 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceProblem
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -34,8 +45,9 @@ sealed class ArcTunnelUrlState {
 }
 
 /**
- * UI state and actions of the free E2E tunnel provider (enrollment, URL, CT toggle, CT alert). ONE instance is
- * created at `MainScreen` level and passed to the Server and Settings screens (shared enrollment request).
+ * UI state and actions of the free E2E tunnel provider (enrollment, URL, CT toggle, CT alert, status check toggle,
+ * service problem). ONE instance is created at `MainScreen` level and passed to the Server and Settings screens
+ * (shared enrollment request).
  */
 @HiltViewModel
 class ArcTunnelViewModel
@@ -45,6 +57,7 @@ class ArcTunnelViewModel
         private val enrollment: ArcTunnelEnrollment,
         private val renewals: ArcTunnelRenewals,
         private val ctAlerts: ArcTunnelCtAlerts,
+        private val serviceStatus: ArcTunnelServiceStatus,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _baseAddressInput = MutableStateFlow(ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
@@ -63,6 +76,34 @@ class ArcTunnelViewModel
         val enrollmentState: StateFlow<ArcTunnelEnrollmentState> = enrollment.state
 
         val ctAlert: StateFlow<ArcTunnelCtAlert?> = ctAlerts.alert
+
+        /**
+         * A problem reported by the status page of the public tunnel service, for the Server screen. It only concerns a
+         * phone with a saved identity on that service, the free tunnel on and selected, and this check left on. It is
+         * only refreshed while this is collected, so while that screen is visible. A refresh reuses the last answer
+         * until [ArcTunnelServiceStatus] may ask the page again, so reopening the screen never shortens that interval.
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val serviceProblem: StateFlow<ArcTunnelServiceProblem?> =
+            combine(settingsRepository.serverConfig, _url) { config, url ->
+                config.arcTunnelStatusCheckEnabled &&
+                    config.tunnelEnabled &&
+                    config.tunnelProvider == TunnelProviderType.ARC_TUNNEL &&
+                    config.arcTunnelBaseAddress == ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS &&
+                    url is ArcTunnelUrlState.Enrolled
+            }.distinctUntilChanged()
+                .flatMapLatest<Boolean, ArcTunnelServiceProblem?> { relevant ->
+                    if (relevant) {
+                        flow {
+                            while (true) {
+                                emit(serviceStatus.currentProblem())
+                                delay(SERVICE_STATUS_REFRESH_MS)
+                            }
+                        }
+                    } else {
+                        flowOf(null)
+                    }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), null)
 
         @Volatile
         private var env: ArcTunnelEnv = ArcTunnelEnv(ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
@@ -108,7 +149,7 @@ class ArcTunnelViewModel
                 var previous: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle
                 renewals.state.collect { state ->
                     // A tunnel-start renewal that ended may have saved the certificate (and so the URL).
-                    if (previous is ArcTunnelRenewalState.Renewing) refreshUrl()
+                    if (previous.inProgress && !state.inProgress) refreshUrl()
                     previous = state
                 }
             }
@@ -126,6 +167,10 @@ class ArcTunnelViewModel
             val value = _baseAddressInput.value
             if (!ArcTunnelHosts.isValidBaseAddress(value) || value == persisted) return
             viewModelScope.launch(ioDispatcher) { settingsRepository.updateArcTunnelBaseAddress(value) }
+        }
+
+        fun updateStatusCheckEnabled(enabled: Boolean) {
+            viewModelScope.launch(ioDispatcher) { settingsRepository.updateArcTunnelStatusCheckEnabled(enabled) }
         }
 
         fun updateCtCheckEnabled(enabled: Boolean) {
@@ -190,5 +235,9 @@ class ArcTunnelViewModel
             val url = enrollment.savedUrl(env)
             _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
             if (url != null) _enrollmentRequested.value = false
+        }
+
+        private companion object {
+            const val SERVICE_STATUS_REFRESH_MS = 60_000L
         }
     }

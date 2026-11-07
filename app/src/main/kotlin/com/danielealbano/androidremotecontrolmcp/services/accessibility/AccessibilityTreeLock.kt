@@ -11,9 +11,10 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
  * the id→node cache populated from that torn snapshot, flaky node-id resolution for later actions.
  *
  * Every fresh-read choke point holds this monitor for the whole clear+read+populate critical section:
- * `getFreshWindows` (get_screen_state / find_nodes / node action re-reads), `rawNodeExists`
- * (wait_for_node), `generateCurrentFingerprint` (wait_for_idle), and `findFocusedEditableNode`
- * (press_key). This satisfies the project rule that accessibility tree access MUST be serialized.
+ * `getFreshRead`, which `getFreshWindows` wraps (get_screen_state / find_nodes / node action
+ * re-reads / the type tools' reads), `rawNodeExists` (wait_for_node), `generateCurrentFingerprint`
+ * (wait_for_idle), and `findFocusedEditableNode` (press_key / the type tools' input focus wait).
+ * This satisfies the project rule that accessibility tree access MUST be serialized.
  *
  * A plain JVM monitor (not a coroutine `Mutex`) is used deliberately: these reads are synchronous,
  * blocking binder calls invoked from non-suspending functions, so `synchronized` matches the

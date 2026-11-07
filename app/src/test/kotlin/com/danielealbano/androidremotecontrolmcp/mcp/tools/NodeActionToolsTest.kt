@@ -4,17 +4,24 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.danielealbano.androidremotecontrolmcp.data.model.PlaceholderFormat
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.privacy.PiiCategory
+import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
+import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.CachedNode
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
 import io.mockk.coEvery
@@ -22,6 +29,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verifyOrder
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -35,6 +43,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -180,6 +190,46 @@ class NodeActionToolsTest {
             maxObserved.get(),
             "concurrent getFreshWindows reads overlapped the framework-cache critical section",
         )
+    }
+
+    @Test
+    @DisplayName("getFreshRead returns the node references it populated the node cache with")
+    fun getFreshReadReturnsTheNodesItPopulatedTheCacheWith() {
+        val node = CachedNode(mockk(), depth = 1, index = 0, parentId = "node_root")
+        every { mockTreeParser.parseTree(mockRootNode, "root_w0", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>()["node_abc"] = node
+            sampleTree
+        }
+        val populated = slot<Map<String, CachedNode>>()
+        every { mockNodeCache.populate(capture(populated)) } returns Unit
+
+        val read = getFreshRead(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+
+        assertEquals(mapOf("node_abc" to node), read.nodes)
+        assertEquals(populated.captured, read.nodes)
+        assertEquals(sampleWindows, read.result.windows)
+    }
+
+    @Test
+    @DisplayName("getFreshRead fallback path returns the node references of the active window root")
+    fun getFreshReadFallbackPathReturnsTheNodesOfTheActiveWindowRoot() {
+        every { mockAccessibilityServiceProvider.getAccessibilityWindows() } returns emptyList()
+        val fallbackRootNode = mockk<AccessibilityNodeInfo>(relaxed = true)
+        every { mockAccessibilityServiceProvider.getRootNode() } returns fallbackRootNode
+        every { fallbackRootNode.windowId } returns 42
+        val node = CachedNode(mockk(), depth = 1, index = 0, parentId = "node_root")
+        every { mockTreeParser.parseTree(fallbackRootNode, "root_w42", any()) } answers {
+            thirdArg<MutableMap<String, CachedNode>>()["node_abc"] = node
+            sampleTree
+        }
+        val populated = slot<Map<String, CachedNode>>()
+        every { mockNodeCache.populate(capture(populated)) } returns Unit
+
+        val read = getFreshRead(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+
+        assertTrue(read.result.degraded)
+        assertEquals(mapOf("node_abc" to node), read.nodes)
+        assertEquals(populated.captured, read.nodes)
     }
 
     @Nested
@@ -1269,6 +1319,37 @@ class NodeActionToolsTest {
             }
 
         @Test
+        fun `by selector two matches after scrolling list the candidates redacted from the read after the scroll`() =
+            runTest {
+                val twins =
+                    screenWith(
+                        leaf("node_twin_1", "Row 30", visible = true),
+                        leaf("node_twin_2", "Row 30", visible = true, bounds = BoundsData(0, 200, 100, 300)),
+                    )
+                treesInOrder(before, twins)
+                val redactingGate = mockk<PrivacyToolGate>()
+                coEvery { redactingGate.nodeTexts(windowsOf(twins), any()) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { pair -> pair.first?.let { "[REDACTED]" } }
+                }
+                val redactingTool =
+                    ScrollToNodeTool(
+                        mockTreeParser,
+                        realFinder,
+                        mockActionExecutor,
+                        mockAccessibilityServiceProvider,
+                        mockNodeCache,
+                        NodeTargetResolver(realFinder, redactingGate, PrivacyToolTestDoubles.identitySubstitutor()),
+                    )
+
+                val result = redactingTool.execute(bySelector("Row 30"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertTrue(text.contains("node_twin_1") && text.contains("node_twin_2"), text)
+                assertTrue(text.contains("[REDACTED]") && !text.contains("\"Row 30\""), text)
+            }
+
+        @Test
         fun `by selector a target not in the tree is node not found with the scroll_node hint`() =
             runTest {
                 treesInOrder(before)
@@ -1506,6 +1587,234 @@ class NodeActionToolsTest {
                     mockActionExecutor.scrollNode("node_list", ScrollDirection.DOWN, any())
                     mockActionExecutor.scrollNode("node_list_moved", ScrollDirection.DOWN, any())
                 }
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // perform_node_action
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PerformNodeActionTool")
+    inner class PerformNodeActionToolTests {
+        private val voteBar =
+            AccessibilityNodeData(
+                id = "node_bar",
+                contentDescription = "349 votes",
+                bounds = BoundsData(0, 500, 1080, 600),
+                visible = true,
+                actions = listOf("Upvote", "Downvote"),
+            )
+        private val title = leaf("node_title", "Post title", visible = true)
+        private val tree = screenWith(title, voteBar)
+
+        private fun toolWith(
+            gate: PrivacyToolGate = PrivacyToolTestDoubles.passthroughGate(),
+            substitutor: PlaceholderSubstitutor = PrivacyToolTestDoubles.identitySubstitutor(),
+        ) = PerformNodeActionTool(
+            mockTreeParser,
+            mockActionExecutor,
+            mockAccessibilityServiceProvider,
+            mockNodeCache,
+            NodeTargetResolver(realFinder, gate, substitutor),
+            NodeActionMatcher(gate, WebViewNodeMerger()),
+        )
+
+        private fun params(
+            nodeId: String,
+            action: String,
+        ) = buildJsonObject {
+            put("node_id", nodeId)
+            put("action", action)
+        }
+
+        @Test
+        fun `performs the action by its label and reports it`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Downvote")
+                } returns Result.success(Unit)
+
+                val result = toolWith().execute(params("node_bar", "Downvote"))
+
+                assertEquals("Action 'Downvote' performed on node 'node_bar'", extractTextContent(result))
+                assertNotEquals(true, result.isError)
+            }
+
+        @Test
+        fun `targets the node by a selector like click_node`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.success(Unit)
+                val bySelector =
+                    buildJsonObject {
+                        put("by", "content_desc")
+                        put("value", "349 votes")
+                        put("action", "Upvote")
+                    }
+
+                val text = extractTextContent(toolWith().execute(bySelector))
+
+                assertEquals("Action 'Upvote' performed on node 'node_bar'", text)
+            }
+
+        @Test
+        fun `an unknown node_id is node not found before any matching`() =
+            runTest {
+                treesInOrder(tree)
+
+                val e =
+                    assertThrows<McpToolException.NodeNotFound> { toolWith().execute(params("node_gone", "Upvote")) }
+
+                assertEquals("Node 'node_gone' not found", e.message)
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a label the node does not list returns an untrusted error listing its labels, case-sensitively`() =
+            runTest {
+                treesInOrder(tree)
+
+                val result = toolWith().execute(params("node_bar", "upvote"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
+                assertTrue(
+                    text.endsWith(
+                        "Node 'node_bar' has no action with that label (case-sensitive). Its actions: Upvote¦Downvote",
+                    ),
+                    text,
+                )
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a node without labelled actions says so`() =
+            runTest {
+                treesInOrder(tree)
+
+                val result = toolWith().execute(params("node_title", "Upvote"))
+
+                assertEquals(true, result.isError)
+                assertTrue(extractTextContent(result).endsWith("Node 'node_title' has no labelled actions"))
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `with Privacy Mode the label is matched as shown, unreversed, and the first unredacted match runs`() =
+            runTest {
+                val contacts =
+                    voteBar.copy(id = "node_contacts", actions = listOf("Call Alice", "Call Bob", "Share"))
+                val contactsTree = screenWith(contacts)
+                treesInOrder(contactsTree)
+                val gate = mockk<PrivacyToolGate>()
+                val batch = slot<List<Pair<String?, String>>>()
+                coEvery { gate.nodeTexts(windowsOf(contactsTree), capture(batch)) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { (text, _) ->
+                        text?.replace(Regex("Alice|Bob"), "[NAME_1]")
+                    }
+                }
+                // The store resolves [NAME_1], so a tool that reversed the placeholder would look for "Call Alice".
+                val store = PseudonymStore()
+                store.placeholderFor("Alice", PiiCategory.NAMES, PlaceholderFormat.NUMBERED)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_contacts", windowsOf(contactsTree), "Call Alice")
+                } returns Result.success(Unit)
+
+                val tool = toolWith(gate, PlaceholderSubstitutor(store))
+
+                val result = tool.execute(params("node_contacts", "Call [NAME_1]"))
+
+                assertEquals("Action 'Call [NAME_1]' performed on node 'node_contacts'", extractTextContent(result))
+                assertEquals(
+                    listOf("Call Alice" to "node_contacts", "Call Bob" to "node_contacts", "Share" to "node_contacts"),
+                    batch.captured,
+                )
+                coVerify(exactly = 1) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `with Privacy Mode an unlisted label returns the labels redacted, never the real ones`() =
+            runTest {
+                val contacts = voteBar.copy(id = "node_contacts", actions = listOf("Call Alice", "Share"))
+                val contactsTree = screenWith(contacts)
+                treesInOrder(contactsTree)
+                val gate = mockk<PrivacyToolGate>()
+                coEvery { gate.nodeTexts(any(), any()) } answers {
+                    secondArg<List<Pair<String?, String>>>().map { (text, _) -> text?.replace("Alice", "[NAME_1]") }
+                }
+
+                val result = toolWith(gate).execute(params("node_contacts", "Call Bob"))
+
+                val text = extractTextContent(result)
+                assertEquals(true, result.isError)
+                assertTrue(text.endsWith("Its actions: Call [NAME_1]¦Share"), text)
+                assertFalse(text.contains("Alice"), text)
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a missing, empty or non-string action is invalid params`() =
+            runTest {
+                treesInOrder(tree)
+                val tool = toolWith()
+
+                assertThrows<McpToolException.InvalidParams> {
+                    tool.execute(buildJsonObject { put("node_id", "node_bar") })
+                }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params("node_bar", "")) }
+                assertThrows<McpToolException.InvalidParams> {
+                    tool.execute(
+                        buildJsonObject {
+                            put("node_id", "node_bar")
+                            put("action", 7)
+                        },
+                    )
+                }
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
+            }
+
+        @Test
+        fun `a label gone from the live node reports the executor's label-free message`() =
+            runTest {
+                treesInOrder(tree)
+                val gone = "Node 'node_bar' no longer offers the requested action; read the screen again"
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.failure(IllegalStateException(gone))
+
+                val e =
+                    assertThrows<McpToolException.ActionFailed> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                assertEquals(gone, e.message)
+            }
+
+        @Test
+        fun `an action the app refuses is action failed with the executor's text`() =
+            runTest {
+                treesInOrder(tree)
+                coEvery {
+                    mockActionExecutor.performLabelledAction("node_bar", windowsOf(tree), "Upvote")
+                } returns Result.failure(IllegalStateException("Action failed on node 'node_bar'"))
+
+                val e =
+                    assertThrows<McpToolException.ActionFailed> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                assertEquals("Action failed on node 'node_bar'", e.message)
+            }
+
+        @Test
+        fun `accessibility not ready is permission denied and performs nothing`() =
+            runTest {
+                every { mockAccessibilityServiceProvider.isReady() } returns false
+
+                assertThrows<McpToolException.PermissionDenied> { toolWith().execute(params("node_bar", "Upvote")) }
+
+                coVerify(exactly = 0) { mockActionExecutor.performLabelledAction(any(), any(), any()) }
             }
     }
 }

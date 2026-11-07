@@ -102,7 +102,7 @@ graph TB
      d. Creates `McpServer` with config, keystore, SDK `Server` (MCP Kotlin SDK) and the port of the Cloudflare/ngrok loopback listener when one is needed (`McpListenerRules.tunnelListenerPort`)
      e. Starts Ktor: the main listener on the chosen address and port (HTTP by default, HTTPS if enabled) and the Cloudflare/ngrok loopback listener (plain HTTP on `127.0.0.1:<tunnel local port>`), each bind probed first so a taken port fails the start at once
      f. Updates `ServerStatus.Running` via companion-level StateFlow
-     g. If tunnel enabled: starts `TunnelManager` with the same `ServerConfig` and the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, renews a missing or expired certificate (shown in the UI through `ArcTunnelRenewals`), opens the loopback TLS listener and the control stream; Cloudflare/ngrok: forward to `http://localhost:<tunnel local port>`)
+     g. If tunnel enabled: starts `TunnelManager` with the same `ServerConfig` and the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, renews a missing or expired certificate, or a saved chain the once-only check finds incomplete (both shown in the UI through `ArcTunnelRenewals`), opens the loopback TLS listener and the control stream; Cloudflare/ngrok: forward to `http://localhost:<tunnel local port>`)
      h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence

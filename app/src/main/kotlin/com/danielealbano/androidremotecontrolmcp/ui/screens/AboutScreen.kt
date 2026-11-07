@@ -28,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -197,6 +199,12 @@ fun AboutScreen(
                 AboutLinks.THIRD_PARTY_LICENSES_URL,
             )
             AboutLinkItem(R.string.about_link_issues, Icons.Default.ReportProblem, AboutLinks.ISSUES_URL)
+            AboutLinkItem(R.string.about_link_tunnel_status, Icons.Default.MonitorHeart, AboutLinks.TUNNEL_STATUS_URL)
+            AboutLinkItem(
+                R.string.about_link_tunnel_server_repository,
+                Icons.Default.Dns,
+                AboutLinks.TUNNEL_SERVER_REPOSITORY_URL,
+            )
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
@@ -230,6 +238,12 @@ fun AboutScreen(
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.PRIVACY_MODEL_URL)))
                         }
                     },
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.about_attribution_android_robot),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(Modifier.height(24.dp))

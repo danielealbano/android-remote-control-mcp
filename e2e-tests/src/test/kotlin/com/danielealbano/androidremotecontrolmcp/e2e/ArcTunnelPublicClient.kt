@@ -5,6 +5,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.InetAddress
+import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
@@ -21,13 +22,64 @@ object ArcTunnelPublicClient {
         stack: ArcTunnelStack,
         fqdn: String,
         path: String,
+        edgePort: Int = ArcTunnelStack.EDGE_HOST_PORT,
     ): String {
-        val socket: SSLSocket = stack.connectTls(fqdn)
+        val socket: SSLSocket = stack.connectTls(fqdn, edgePort)
         socket.use {
             it.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\nConnection: close\r\n\r\n".toByteArray())
             it.outputStream.flush()
             return it.inputStream.readNBytes(READ_LIMIT).decodeToString()
         }
+    }
+
+    /** The certificates a client receives from the phone; a chain that does not reach the root fails the handshake. */
+    fun servedChain(
+        stack: ArcTunnelStack,
+        fqdn: String,
+    ): List<X509Certificate> {
+        stack.connectTls(fqdn).use { socket ->
+            return socket.session.peerCertificates.map { it as X509Certificate }
+        }
+    }
+
+    /**
+     * One public connection that stays open between requests, through the edge on [edgePort]: it stays spliced to
+     * the phone through the control connection that was serving when it opened.
+     */
+    class KeepAlive(
+        stack: ArcTunnelStack,
+        private val fqdn: String,
+        edgePort: Int,
+    ) : AutoCloseable {
+        private val socket: SSLSocket = stack.connectTls(fqdn, edgePort)
+        private val input = socket.inputStream.buffered()
+
+        /** `GET [path]`: the response's status line. */
+        fun get(path: String): String {
+            socket.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\n\r\n".toByteArray())
+            socket.outputStream.flush()
+            val status = readLine()
+            var contentLength = 0
+            var header = readLine()
+            while (header.isNotEmpty()) {
+                val (name, value) = header.split(':', limit = 2)
+                if (name.equals("Content-Length", ignoreCase = true)) contentLength = value.trim().toInt()
+                header = readLine()
+            }
+            input.readNBytes(contentLength)
+            return status
+        }
+
+        override fun close() {
+            socket.close()
+        }
+
+        private fun readLine(): String =
+            generateSequence { input.read() }
+                .takeWhile { it >= 0 && it != '\n'.code }
+                .map { it.toChar() }
+                .joinToString("")
+                .removeSuffix("\r")
     }
 
     /** The public URL of [fqdn] on the local relay port. */

@@ -34,15 +34,15 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 60 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
-| Screen Introspection | `android_get_screen_state` | 7, 15 |
+| Screen Introspection | `android_get_screen_state`, `android_get_node_screenshots` | 7, 15, 70 |
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_dismiss_keyboard` | 6 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35 |
+| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_perform_node_action`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35, 69 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
@@ -268,7 +268,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
     "content": [
       {
         "type": "text",
-        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena\nhierarchy:\nnode_a1b2\nnode_c3d4"
+        "text": "note:structural-only nodes are omitted from the tree\nnote:certain elements are custom and will not be properly reported, if needed or if tools are not working as expected set include_screenshot=true to see the screen and take what you see into account\nnote:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled pwd=password\nnote:offscreen items require scroll_to_node before interaction\nscreen:1080x2400 density:420 orientation:portrait\n--- window:42 type:APPLICATION pkg:com.android.calculator2 title:Calculator activity:.Calculator layer:0 focused:true ---\nnode_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\nnode_a1b2\tTextView\tCalculator\t-\tcom.android.calculator2:id/title\t100,50,500,120\ton,ena\nnode_c3d4\tButton\t7\t-\tcom.android.calculator2:id/digit_7\t50,800,270,1000\ton,clk,ena\nhierarchy:\nnode_a1b2\nnode_c3d4"
       }
     ]
   }
@@ -304,13 +304,14 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
 2. **Note lines** (global):
    - `note:structural-only nodes are omitted from the tree`
    - `note:certain elements are custom and will not be properly reported...`
-   - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
+   - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled pwd=password`
    - `note:offscreen items require scroll_to_node before interaction`; with `include_offscreen=false` it is replaced by `note:offscreen nodes are not listed (include_offscreen=false); call without it, or scroll, to see them`
 3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
 4. **Per-window sections** (repeated for each window):
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
    - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
+   - **Actions section** (only when a listed node has labelled accessibility actions, see [Node Actions Section](#node-actions-section)): `Nodes with actions:`, a blank line, then `* <node_id>: <label>¦<label>` per such node
    - **Hierarchy header**: `hierarchy:` (the header and its rows are left out with `include_hierarchy=false`)
    - **Hierarchy rows**: One line per kept node (node ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
 
@@ -319,6 +320,26 @@ With `include_offscreen=false`, nodes that are not on screen (flag `off`) get no
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 
 Node IDs are deterministic hashes that incorporate the window ID internally (e.g., `node_a1b2`). The window ID influences the hash via the `rootParentId` parameter passed to `parseTree()`, ensuring identical nodes in different windows produce different IDs.
+
+#### Node Actions Section
+
+Some apps expose controls only as accessibility actions of one node, not as nodes of their own: Reddit's post vote bar, for example, is a single node whose Upvote and Downvote buttons are its actions. Each window section lists the labels of its listed nodes' actions after the data rows and before `hierarchy:`, omitted when none has any. In a page, only that page's nodes are listed. Labels are separated by `¦` (U+00A6):
+
+```
+node_id	class	text	desc	res_id	bounds	flags
+node_36ac293b	View	-	349 votes, 28 comments	-	0,490,720,586	on,ena
+Nodes with actions:
+
+* node_36ac293b: Upvote¦Downvote¦Repost¦Share post
+hierarchy:
+node_36ac293b
+```
+
+- An action is listed when its label is not blank: custom actions, and standard ones the app labelled (for example a click labelled "Open post"), in the node's order.
+- Standard actions that take arguments are left out even when labelled (set text, set selection, set extended selection, set progress, scroll to position, scroll in a direction, move window, press and hold, movement and HTML element navigation): one performed by label gets no arguments.
+- In a label, tabs, line breaks and `¦` become spaces, and it is trimmed. Action ids are never shown.
+- With Privacy Mode on, labels are redacted like text and descriptions.
+- Run one with [`android_perform_node_action`](#android_perform_node_action), passing the label exactly as listed. An action has no position on screen: the tool runs it on the node itself, with no tap.
 
 #### Flags Reference
 
@@ -335,8 +356,11 @@ Only flags that are `true` are included. The `on`/`off` flag is always first.
 | `scr`  | scrollable    |
 | `edt`  | editable      |
 | `ena`  | enabled       |
+| `pwd`  | password      |
 
 Example: `on,clk,ena` means onscreen + clickable + enabled.
+
+`pwd` is the app's own marking of a password field (Android `AccessibilityNodeInfo.isPassword`), reported as is. Any app can set it on any field, and a field without it can still take a password, so it is a hint, not a check that a field is safe to type a credential into. The same flag is the `password` value of `android_find_nodes`, `android_wait_for_node` and `android_get_node_details`.
 
 #### Class Name Simplification
 
@@ -349,6 +373,7 @@ Nodes are **omitted** from the output when ALL of the following are true:
 - No `contentDescription`
 - No `resourceId`
 - Not `clickable`, `longClickable`, `scrollable`, or `editable`
+- No labelled accessibility actions (see [Node Actions Section](#node-actions-section))
 
 This filters out structural-only container nodes (e.g., bare `FrameLayout`, `LinearLayout`) that have no semantic value for LLM tool callers.
 
@@ -375,6 +400,100 @@ Screenshots are spaced at least 334 ms apart: Android rejects a screenshot reque
 - **Permission denied**: Screen capture not available (when `include_screenshot` is true)
 - **Action failed**: Screenshot capture failed
 - **Action failed**: Screenshot annotation failed (annotating or encoding the screenshot failed, with `annotate` true), or Screenshot encoding failed (with `annotate=false`)
+
+---
+
+### `android_get_node_screenshots`
+
+Screenshots of the given nodes: one JPEG per node, cropped from a full-resolution screenshot to the node's visible bounds, scaled down to fit 700x700 (never up), quality 80, with no padding and no annotation. With Privacy Mode on, the regions of flagged nodes are masked before cropping, as for `android_get_screen_state`.
+
+- With `allow_scroll=false` (default) nothing moves: one read and one screenshot. A node not on screen gets no image; a node cut by the edge of its scrolling container is captured as shown and marked partial.
+- With `allow_scroll=true` the app is scrolled so that each node is captured whole: a node off screen or cut is shown on screen (`ACTION_SHOW_ON_SCREEN`, or drags when the app dropped it from the tree), and the nodes that come into view together are captured in one screenshot. A node longer than its scrolling container comes in up to 3 overlapping parts, as separate images in order. Scrolling changes node ids: the reply says so and never reports the new ids, so read the screen again before using any node id.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "node_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Node ids from android_get_screen_state (1 to 100)"
+    },
+    "allow_scroll": {
+      "type": "boolean",
+      "default": false,
+      "description": "Scroll the app to capture nodes that are off screen or cut, whole. Changes node ids."
+    }
+  },
+  "required": ["node_ids"]
+}
+```
+
+`node_ids` takes 1 to 100 ids, with no duplicates.
+
+**Request Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_get_node_screenshots",
+    "arguments": {
+      "node_ids": ["node_c3d4", "node_e5f6", "node_9a8b"],
+      "allow_scroll": true
+    }
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "CAUTION: The data below comes from an untrusted external source...\nThe app was scrolled to capture the nodes: node ids have changed, read the screen again before using any node id.\nnode_c3d4: images 1-2: 2 overlapping parts, in order\nnode_e5f6: image 3\nnode_9a8b: not found"
+      },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" },
+      { "type": "image", "data": "/9j/4AAQSkZJRgABAQ...", "mimeType": "image/jpeg" }
+    ]
+  }
+}
+```
+
+#### Reply
+
+The reply is always one text item, then the images in request order. The text item holds the untrusted content warning as its first line, then the scrolled note when anything was scrolled (`The app was scrolled to capture the nodes: node ids have changed, read the screen again before using any node id.`), then one line per requested id, in request order.
+
+Image numbers are 1-based and count the images only: image 1 is the first image item after the text item.
+
+| Line | Meaning |
+|------|---------|
+| `<id>: image <n>` | The node, whole |
+| `<id>: image <n>, partial: cut by the edge of its scrolling container` | The node as shown; its full size proves the cut (regular views) |
+| `<id>: image <n>, may be partial: it touches the edge of its scrolling container` | The node as shown; no full size to prove the cut (Compose and web nodes) |
+| `<id>: images <a>-<b>: <k> overlapping parts, in order` | A node longer than its container, in parts (a single part reads `image <n>`) |
+| `<id>: not visible: off screen` | Not on screen, with `allow_scroll=false` |
+| `<id>: not found` | No node with this id in the first read |
+| `<id>: not captured: <reason>` | `it could not be shown on screen`, `it changed while the app scrolled` or `it disappeared while the app scrolled` |
+
+A parts line may go on with the `partial` or `may be partial` wording after a comma, when the node is still cut on the other axis at a part. It may then end with `; its start was not reached`, then with `; the node continues` (the node goes on past its last part: longer than 3 parts, or a drag that did not complete), `; then it disappeared while the app scrolled` or `; then it changed while the app scrolled`.
+
+Each screenshot is spaced at least 334 ms from the previous one, as for `android_get_screen_state`, so a call taking several screenshots takes at least that long per screenshot. There is no overall time limit: with `allow_scroll=true`, 100 nodes can take tens of seconds.
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: `node_ids` missing, not an array of strings, empty, longer than 100 or with a duplicate; `allow_scroll` not a boolean
+- **Permission denied**: Screen capture not available, or the accessibility service not enabled or not ready
+- **Action failed**: Screenshot capture failed, or Screenshot encoding failed
+- **Privacy Mode unavailable**: Privacy Mode is on and its detection failed (no image is returned)
+
+An error that ends a call after the app was scrolled carries the scrolled note at the end of its message.
 
 ---
 
@@ -1081,7 +1200,7 @@ Each path is an array of point objects:
 
 ### Targeting a node
 
-The node tools (`click_node`, `long_click_node`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
+The node tools (`click_node`, `long_click_node`, `perform_node_action`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
 
 - `node_id`: a node ID from `get_screen_state` or `find_nodes`.
 - A selector: `by` (`text`, `content_desc`, `resource_id`, `class_name`) + `value`, with optional `exact_match` (default `false`: case-insensitive contains), the same semantics as `find_nodes`. The selector is matched in the tool's own fresh read of the screen, among **on-screen** nodes (`scroll_to_node` also matches off-screen nodes). With Privacy Mode on, pseudonym placeholders in `value` are matched against the real text.
@@ -1138,11 +1257,16 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "longClickable": false,
       "scrollable": false,
       "editable": false,
-      "enabled": true
+      "enabled": true,
+      "visible": true,
+      "password": false,
+      "actions": []
     }
   ]
 }
 ```
+
+`password` is the app's password-field marking, the `pwd` flag of `android_get_screen_state` (see [Flags Reference](#flags-reference)). `actions` lists the labels of the node's accessibility actions, in order, empty when it has none (see [Node Actions Section](#node-actions-section)); run one with [`android_perform_node_action`](#android_perform_node_action).
 
 **Example**:
 ```bash
@@ -1238,6 +1362,52 @@ curl -X POST http://localhost:8080/mcp \
 - **Node not found**: Node not found, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Node is not long-clickable or action failed
+
+---
+
+### `android_perform_node_action`
+
+Perform one of a node's labelled accessibility actions, by node ID or by a selector (see [Targeting a node](#targeting-a-node)), and the action's label exactly as listed under `Nodes with actions` of `android_get_screen_state` (see [Node Actions Section](#node-actions-section)), in `actions` of `android_find_nodes`, or in the `actions` column of `android_get_node_details`. Some apps expose controls only this way: Reddit's post vote bar is one node whose Upvote and Downvote buttons are its actions.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
+    "action": { "type": "string", "description": "The action's label, exactly as listed (case-sensitive)" }
+  },
+  "required": ["action"]
+}
+```
+
+- The tool reads the screen again, resolves the node and matches `action` against the node's labels as listed: exact, case-sensitive, and the first one wins when two labels are the same.
+- With Privacy Mode on, the labels are listed redacted, and `action` is matched against them as given: pseudonym placeholders in it are not turned back into real text. The action that runs is the one behind the matching label. On a screen with web content `get_screen_state` redacts labels in the merged page tree, where a node's context can differ slightly from the one `find_nodes` and `get_node_details` use (a web node's description is folded into its text, and an editable node's nearest label can change), so a label matches in either form.
+- The action runs on the node itself through accessibility, not as a tap, so it has no position on screen.
+
+**Output**: `"Action '<action>' performed on node '<node_id>'"`, once the app accepts the action.
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "android_perform_node_action", "arguments": { "node_id": "node_36ac293b", "action": "Upvote" } }
+  }'
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing, empty or non-string `action`; neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
+- **Permission denied**: Accessibility service not enabled
+- **Node not found**: `Node '<node_id>' not found` (not in the tool's read), `Node '<node_id>' not found in accessibility tree` (gone before the action ran), or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
+- **No such action**: The node lists no action with that label. The result's first line is the untrusted-content warning, then `Node '<node_id>' has no action with that label (case-sensitive). Its actions: <label>¦<label>`, or `Node '<node_id>' has no labelled actions`
+- **Action failed**: `Node '<node_id>' no longer offers the requested action; read the screen again` (the node changed since the read, e.g. "Upvote" became "Undo Upvote"), or `Action failed on node '<node_id>'` (the app refused it). Neither message repeats the label.
 
 ---
 
@@ -1372,6 +1542,8 @@ curl -X POST http://localhost:8080/mcp \
 
 Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools take their target as `node_id` or as a selector (`by` + `value`, optional `exact_match`; see [Targeting a node](#targeting-a-node)), click the node to focus it, and return the field content after the operation for verification.
 
+A type tool types into, and reads back, the field that has input focus. After the click it waits (up to 500 ms) until input focus is on the target node or on an editable field inside it (a wrapper that hands focus to an inner field); when it is not there, it gives that field input focus and waits again, and when another field still has the focus, it fails without typing anything. It then waits until the field's input connection answers. The tools read the whole field, in 10,000-character pieces when it is longer, so positions are right on fields of any length, including Compose text fields, which do not report where their text starts. The returned field content is that focused field's content, read through the input connection, so a password field returns its real characters: with Privacy Mode on it is redacted with the focused field's own context, and as a password whenever its editor's input type is a password. When the content cannot be read it is `(unable to read field content)`.
+
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
 ### `android_type_append_text`
@@ -1428,7 +1600,7 @@ Type text character by character at the end of a text field. Uses natural InputC
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
-- **Action failed**: Click failed, input connection not ready (node may not be editable), cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready (node may not be editable), input focus not on the target node or a field inside it, unable to read text from the node, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
@@ -1488,13 +1660,13 @@ Type text character by character at a specific position in a text field. Uses na
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, cursor positioning failed, typing failed (input connection lost)
 
 ---
 
 ### `android_type_replace_text`
 
-Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it, then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
+Find and replace text in a field by typing the replacement naturally. Finds the first occurrence of search text, selects and deletes it (committing empty text over the selection, then checking that the field changed), then types new_text character by character via InputConnection. If `new_text` is empty, only deletes the found text (delete-only mode).
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1548,13 +1720,13 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, text selection failed, deletion failed (input connection lost, or the field reads back unchanged), cursor positioning failed, typing failed (input connection lost)
 
 ---
 
 ### `android_type_clear_text`
 
-Clear all text from a field naturally using select-all + delete. Uses InputConnection operations (indistinguishable from user action). If the field is already empty, returns success without performing any action.
+Clear all text from a field with select-all and delete through the InputConnection, like an input method, then check that the text is gone (a field that reformats its text can read back non-empty; the field content shows it). If the field is already empty, returns success without performing any action.
 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
@@ -1602,7 +1774,7 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
+- **Action failed**: Click failed, input connection not ready, input focus not on the target node or a field inside it, unable to read text from the node, select-all failed, deletion failed (input connection lost, or the field reads back unchanged)
 
 ---
 
@@ -1763,10 +1935,18 @@ Wait until a node matching the specified criteria appears in the accessibility t
     "className": "android.widget.TextView",
     "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
     "clickable": false,
-    "enabled": true
+    "longClickable": false,
+    "scrollable": false,
+    "editable": false,
+    "enabled": true,
+    "visible": true,
+    "password": false,
+    "actions": []
   }
 }
 ```
+
+`node` has the same fields as each entry of the `nodes` array of `android_find_nodes`.
 
 **Timeout behavior**: When the timeout expires without finding the node, a **non-error** `CallToolResult` is returned with an informational message (e.g., `{"found": false, "elapsedMs": 5000, "attempts": 10}`). This is not a tool error — the caller should check the `found` field.
 
@@ -1860,7 +2040,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_get_node_details`
 
-Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
+Retrieves full untruncated text and contentDescription for one or more nodes by their node_ids, whether the app marks each node as a password field, and the labels of its accessibility actions. Use this tool when `android_get_screen_state` shows truncated values (ending with `...truncated`) and you need the full content.
 
 **Input Schema**:
 ```json
@@ -1901,19 +2081,21 @@ Retrieves full untruncated text and contentDescription for one or more nodes by 
     "content": [
       {
         "type": "text",
-        "text": "node_id\ttext\tdesc\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\nnode_2\t-\tFull content description for this node"
+        "text": "node_id\ttext\tdesc\tpassword\tactions\nnode_1\tThis is a very long text value that was truncated in get_screen_state but is returned in full here\t-\tfalse\t-\nnode_2\t-\tFull content description for this node\tfalse\tUpvote¦Downvote"
       }
     ]
   }
 }
 ```
 
-**Output Format**: TSV with three columns:
+**Output Format**: TSV with five columns:
 - `node_id`: The node ID
 - `text`: Full untruncated text (or `-` if null/empty)
 - `desc`: Full untruncated contentDescription (or `-` if null/empty)
+- `password`: `true` if the app marks the node as a password field (the `pwd` flag of `android_get_screen_state`, see [Flags Reference](#flags-reference)), `false` otherwise
+- `actions`: The labels of the node's accessibility actions, separated by `¦`, or `-` when it has none (see [Node Actions Section](#node-actions-section)); run one with [`android_perform_node_action`](#android_perform_node_action)
 
-If a node ID is not found in the current accessibility tree, the row shows `not_found` for both text and desc columns.
+If a node ID is not found in the current accessibility tree, the row shows `not_found` for the text, desc, password and actions columns.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `node_ids` parameter, `node_ids` is not an array, array is empty, or contains non-string values

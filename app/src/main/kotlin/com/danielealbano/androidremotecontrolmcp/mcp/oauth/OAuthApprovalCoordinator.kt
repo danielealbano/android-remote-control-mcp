@@ -15,7 +15,7 @@ enum class ApprovalState { PENDING, APPROVED, DENIED, EXPIRED }
  * @property matchCode 2-digit confirmation code shown in the browser and the app (unique among pending).
  * @property expiresAtMs Approval window deadline.
  * @property logoUri DCR `logo_uri` of the requesting client (SSRF-guarded at render), else null.
- * @property clientIp Best-effort source IP of the request (forwarded header or socket peer), else null.
+ * @property clientIp Source IP of the request, from what its listener trusts (`ClientIpSource`), else null.
  * @property clientGeo Offline geolocation of [clientIp] (country/city), else null.
  */
 data class PendingApproval(

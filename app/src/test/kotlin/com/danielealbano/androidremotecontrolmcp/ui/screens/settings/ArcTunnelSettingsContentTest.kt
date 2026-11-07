@@ -14,6 +14,7 @@ class ArcTunnelSettingsContentTest {
             tunnelEnabled = true,
             enabled = true,
             ctCheckEnabled = true,
+            statusCheckEnabled = true,
             baseAddress = "arc-tunnel.io",
             baseAddressValid = true,
             url = ArcTunnelUrlState.NotEnrolled,
@@ -66,6 +67,15 @@ class ArcTunnelSettingsContentTest {
             ready.copy(enrollmentState = ArcTunnelEnrollmentState.Enrolling),
             ready.copy(enrollmentState = ArcTunnelEnrollmentState.Failed("x")),
         ).forEach { assertFalse(arcTunnelSetUpVisible(it), it.toString()) }
+    }
+
+    @Test
+    fun `the status link and setting show for the public service only`() {
+        assertTrue(arcTunnelIsPublicService("arc-tunnel.io"))
+        assertTrue(arcTunnelIsPublicService(" arc-tunnel.io "))
+        assertFalse(arcTunnelIsPublicService("tunnel.example.org"))
+        assertFalse(arcTunnelIsPublicService("sub.arc-tunnel.io"))
+        assertFalse(arcTunnelIsPublicService(""))
     }
 
     private companion object {

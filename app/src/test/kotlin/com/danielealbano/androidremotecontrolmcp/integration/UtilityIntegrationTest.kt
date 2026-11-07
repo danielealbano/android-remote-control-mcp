@@ -172,9 +172,35 @@ class UtilityIntegrationTest {
 
                 val textContent = (result.content[0] as TextContent).text
                 val lines = stripUntrustedWarning(textContent).split("\n")
-                assertEquals("node_id\ttext\tdesc", lines[0])
-                assertEquals("node_a\tHello World\tA button", lines[1])
-                assertEquals("node_b\t-\t-", lines[2])
+                assertEquals("node_id\ttext\tdesc\tpassword\tactions", lines[0])
+                assertEquals("node_a\tHello World\tA button\tfalse\t-", lines[1])
+                assertEquals("node_b\t-\t-\tfalse\t-", lines[2])
+            }
+        }
+
+    @Test
+    fun `get_node_details lists a node's action labels in the actions column`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
+            val voteBar =
+                AccessibilityNodeData(
+                    id = "node_bar",
+                    contentDescription = "349 votes",
+                    bounds = BoundsData(0, 500, 1080, 600),
+                    actions = listOf("Upvote", "Downvote"),
+                )
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_bar") } returns voteBar
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_node_details",
+                        arguments = mapOf("node_ids" to listOf("node_bar")),
+                    )
+                assertNotEquals(true, result.isError)
+                val lines = stripUntrustedWarning((result.content[0] as TextContent).text).split("\n")
+                assertEquals("node_bar\t-\t349 votes\tfalse\tUpvote¦Downvote", lines[1])
             }
         }
 

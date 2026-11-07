@@ -1,6 +1,8 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import java.io.IOException
 import java.security.ProviderException
 
@@ -30,6 +32,8 @@ object ArcTunnelEnrollRetry {
         while (true) {
             val attempt = runCatching { enroll(nonce ?: freshNonce().also { nonce = it }) }
             val failure = attempt.exceptionOrNull() ?: return attempt.getOrThrow()
+            // A refusal can arrive together with a cancellation: announce no retry that will not happen.
+            currentCoroutineContext().ensureActive()
             val wait = waitMs(failure)
             if (wait == null || retry >= RETRIES) throw failure
             retry++

@@ -88,7 +88,8 @@ interface TypeInputController {
 
     /**
      * Sends a key event to the focused text field.
-     * Used for DELETE key after selection.
+     * Not currently used by any tool: the type tools delete through [commitText], since a DEL key event can be lost
+     * by Compose text fields.
      *
      * @param event The KeyEvent to send.
      * @return true if the IC was available and the call was dispatched, false if IC unavailable.
@@ -107,4 +108,12 @@ interface TypeInputController {
         beforeLength: Int,
         afterLength: Int,
     ): Boolean
+
+    /**
+     * Whether the editor of the current input connection is a password input: its `EditorInfo.inputType` is a text
+     * or number password variation. It describes the field [getSurroundingText] reads, whichever node was targeted.
+     *
+     * @return true for a password input, false otherwise or when no input has started.
+     */
+    fun isPasswordInput(): Boolean
 }

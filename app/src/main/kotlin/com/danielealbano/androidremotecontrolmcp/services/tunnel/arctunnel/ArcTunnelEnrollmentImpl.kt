@@ -33,7 +33,7 @@ class ArcTunnelEnrollmentImpl
         private val requestInFlight = AtomicBoolean(false)
         private val stores = ConcurrentHashMap<String, ArcTunnelIdentityStore>()
         private val nets = ConcurrentHashMap<ArcTunnelEnv, ArcTunnelNet>()
-        private val enroller = ArcTunnelEnroller(keys)
+        private val enroller = ArcTunnelEnroller(keys, serverLog)
         private val flow = ArcTunnelEnrollmentFlow(keys, enroller)
 
         /** One store instance per environment, so its `@Synchronized` methods really serialize all writers. */
@@ -42,7 +42,10 @@ class ArcTunnelEnrollmentImpl
                 ArcTunnelIdentityStore(File(context.filesDir, STORE_DIR), env.hosts, keys)
             }
 
-        /** One network layer (one connection pool) per environment, shared by requests and sessions. */
+        /**
+         * One network layer per environment, shared by requests and sessions; its connection pool serves the requests,
+         * each control connection has its own.
+         */
         override fun net(env: ArcTunnelEnv): ArcTunnelNet =
             nets.getOrPut(env) { ArcTunnelNet(env.trustedCaPem, ArcTunnelEdgeOverride.parse(env.edgeOverride)) }
 
@@ -110,17 +113,39 @@ class ArcTunnelEnrollmentImpl
         override suspend fun renew(
             identity: ArcTunnelIdentity,
             nonce: String?,
+            onCertificateReceived: () -> Unit,
         ) {
             mutex.withLock {
                 val store = store(ArcTunnelEnv(identity.hosts.baseAddress))
                 check(store.holds(identity)) { "identity ${identity.name} was forgotten; renewal skipped" }
-                enroller.issue(identity, nonce)
-                if (store.holds(identity)) {
-                    withContext(Dispatchers.IO) { store.save(identity) }
-                    // The saved name has a certificate now: a setup failure still shown for it is over.
-                    val failed = _state.value as? ArcTunnelEnrollmentState.Failed
-                    if (failed != null) _state.compareAndSet(failed, ArcTunnelEnrollmentState.Idle)
+                enroller.issue(identity, nonce, onCertificateReceived) { saveRenewed(store, identity) }
+            }
+        }
+
+        /**
+         * Runs whatever happened to the caller. A failing save does not fail the renewal: the new certificate is in use
+         * and a retry would spend another. The next tunnel start works from the record as it was.
+         */
+        private fun saveRenewed(
+            store: ArcTunnelIdentityStore,
+            identity: ArcTunnelIdentity,
+        ) {
+            val saved =
+                runCatching {
+                    store.holds(identity).also { holds -> if (holds) store.save(identity) }
                 }
+            saved.onFailure {
+                val reason = it.message ?: it.javaClass.simpleName
+                Log.e(TAG, "the renewed certificate could not be saved", it)
+                serverLog.log(
+                    ServerLogEntry.Type.TUNNEL,
+                    "Free E2E tunnel certificate renewed but could not be saved, in use until the next start: $reason",
+                )
+            }
+            if (saved.getOrDefault(false)) {
+                // The saved name has a certificate now: a setup failure still shown for it is over.
+                val failed = _state.value as? ArcTunnelEnrollmentState.Failed
+                if (failed != null) _state.compareAndSet(failed, ArcTunnelEnrollmentState.Idle)
             }
         }
 

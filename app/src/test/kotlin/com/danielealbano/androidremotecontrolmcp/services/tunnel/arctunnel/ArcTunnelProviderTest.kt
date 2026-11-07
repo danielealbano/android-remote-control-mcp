@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelClientAddresses
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.coEvery
@@ -59,6 +60,8 @@ class ArcTunnelProviderTest {
     private val renewals = mockk<ArcTunnelRenewals>(relaxed = true)
     private val host = mockk<TunnelListenerHost>()
     private val ctAlerts = mockk<ArcTunnelCtAlerts>(relaxed = true)
+    private val serviceStatus = mockk<ArcTunnelServiceStatus>()
+    private val serviceAlerts = mockk<ArcTunnelServiceAlerts>(relaxed = true)
     private val serverLog = RecordingServerLogRepository()
     private val peers = ArcTunnelTestPeers()
     private val onRequest = AtomicReference<() -> Unit>()
@@ -90,7 +93,11 @@ class ArcTunnelProviderTest {
             secondArg<Int?>() ?: LISTENER_PORT
         }
         every { host.stopTlsListener() } just runs
-        provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog)
+        every { host.clientAddresses } returns TunnelClientAddresses()
+        every { serviceAlerts.canShow() } returns true
+        every { serviceAlerts.clear() } just runs
+        coEvery { serviceStatus.currentProblem() } returns null
+        provider = ArcTunnelProvider(enrollment, renewals, keys, ctAlerts, serverLog, serviceStatus, serviceAlerts)
     }
 
     @AfterEach
@@ -199,6 +206,101 @@ class ArcTunnelProviderTest {
             assertEquals(TunnelProviderType.ARC_TUNNEL, connected.providerType)
             coVerify(exactly = 1) { enrollment.readyIdentity(any()) }
             verify(exactly = 1) { host.startTlsListener(any(), null, any()) }
+        }
+
+    /** The public base address: the test server's certificate is not for it, so the tunnel never gets to Connected. */
+    private val publicService = config.copy(arcTunnelBaseAddress = ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS)
+
+    @Test
+    fun `on the public service a reported problem notifies, and stopping removes it`() =
+        runBlocking {
+            val problem = ArcTunnelServiceProblem("degraded", listOf("Tunnels"))
+            coEvery { serviceStatus.currentProblem() } returns problem
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            verify(timeout = BUDGET_MS) { serviceAlerts.show(problem) }
+
+            provider.stop()
+
+            verify(timeout = BUDGET_MS) { serviceAlerts.clear() }
+        }
+
+    @Test
+    fun `a renewal waiting for the user still notifies about a reported problem`() =
+        runBlocking {
+            val problem = ArcTunnelServiceProblem("degraded", listOf("ACME Certificate Issuing"))
+            coEvery { serviceStatus.currentProblem() } returns problem
+            coEvery { enrollment.readyIdentity(any()) } returns expiredIdentity()
+            coEvery { renewals.renewForStart(any()) } throws IllegalStateException("acme_unavailable")
+            coEvery { renewals.awaitRetry() } coAnswers { awaitCancellation() }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            assertEquals("acme_unavailable", awaitError().message)
+            verify(timeout = BUDGET_MS) { serviceAlerts.show(problem) }
+            verify(exactly = 0) { host.startTlsListener(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a start that fails removes the notification`() =
+        runBlocking {
+            val posted = CompletableDeferred<Unit>()
+            coEvery { serviceStatus.currentProblem() } returns ArcTunnelServiceProblem("degraded", emptyList())
+            every { serviceAlerts.show(any()) } answers { posted.complete(Unit) }
+            coEvery { renewals.checkSavedChain(any()) } coAnswers {
+                posted.await()
+                error("chain check failed")
+            }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+
+            assertEquals("chain check failed", awaitError().message)
+            verify(timeout = BUDGET_MS) { serviceAlerts.clear() }
+        }
+
+    @Test
+    fun `a phone with no identity never asks the status page`() =
+        runBlocking {
+            // Slow enough that a watcher started before the identity read would have asked by then.
+            coEvery { enrollment.readyIdentity(any()) } coAnswers {
+                delay(NOTHING_ASKED_MS)
+                null
+            }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService)
+            awaitError()
+            delay(NOTHING_ASKED_MS)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+        }
+
+    @Test
+    fun `with the setting off the status page is never asked`() =
+        runBlocking {
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, publicService.copy(arcTunnelStatusCheckEnabled = false))
+            awaitThat { listenerStarts.get() > 0 }
+            delay(NOTHING_ASKED_MS)
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
+        }
+
+    @Test
+    fun `a self-hosted base address never asks the status page`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            coVerify(exactly = 0) { serviceStatus.currentProblem() }
         }
 
     @Test
@@ -427,6 +529,56 @@ class ArcTunnelProviderTest {
             startBound()
 
             coVerify(exactly = 0) { renewals.renewForStart(any()) }
+        }
+
+    @Test
+    fun `a valid certificate has its saved chain checked before the listener starts`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.hold())
+
+            startBound()
+
+            coVerifyOrder {
+                renewals.checkSavedChain(identity)
+                host.startTlsListener(any(), null, any())
+            }
+        }
+
+    @Test
+    fun `a certificate renewed at start is not checked again`() =
+        runBlocking {
+            val expired = expiredIdentity()
+            coEvery { enrollment.readyIdentity(any()) } returns expired
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            coVerify(exactly = 0) { renewals.checkSavedChain(any()) }
+        }
+
+    @Test
+    fun `a stop during the saved chain check cancels it and no listener starts`() =
+        runBlocking {
+            val checking = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            coEvery { renewals.checkSavedChain(any()) } coAnswers {
+                checking.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            withTimeout(BUDGET_MS) { checking.await() }
+            provider.stop()
+
+            assertTrue(cancelled.isCompleted)
+            verify(exactly = 0) { host.startTlsListener(any(), any(), any()) }
         }
 
     @Test
@@ -674,6 +826,7 @@ class ArcTunnelProviderTest {
     }
 
     private companion object {
+        const val NOTHING_ASKED_MS = 300L
         const val LOCAL_PORT = 8080
         const val LISTENER_PORT = 50_000
         const val BACKLOG = 50

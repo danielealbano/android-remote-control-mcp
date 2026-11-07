@@ -2,12 +2,15 @@ package com.danielealbano.androidremotecontrolmcp.mcp
 
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
@@ -15,10 +18,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.security.KeyStore
 
@@ -37,6 +43,7 @@ class McpServerListenersTest {
     private val mainPort = ports[0]
     private val tunnelPort = ports[1]
     private var server: McpServer? = null
+    private val serverLog = RecordingServerLogRepository()
     private val client = OkHttpClient()
 
     @AfterEach
@@ -47,22 +54,39 @@ class McpServerListenersTest {
     private fun start(
         localhostTunnelPort: Int?,
         https: Boolean = false,
-    ): McpServer = newServer(localhostTunnelPort, https).also { it.start() }
+        oauth: Boolean = false,
+        tunnel: TunnelProviderType? = null,
+        network: Boolean = false,
+    ): McpServer {
+        val created = newServer(localhostTunnelPort, https, oauth = oauth, tunnel = tunnel, network = network)
+        created.start()
+        return created
+    }
 
     private fun newServer(
         localhostTunnelPort: Int?,
         https: Boolean = false,
         specificAddress: String? = null,
+        oauth: Boolean = false,
+        tunnel: TunnelProviderType? = null,
+        network: Boolean = false,
     ): McpServer {
         val config =
             ServerConfig(
                 port = mainPort,
-                bindingAddress = if (specificAddress == null) BindingAddress.LOCALHOST else BindingAddress.SPECIFIC,
+                bindingAddress =
+                    when {
+                        specificAddress != null -> BindingAddress.SPECIFIC
+                        network -> BindingAddress.NETWORK
+                        else -> BindingAddress.LOCALHOST
+                    },
                 specificBindAddress = specificAddress.orEmpty(),
                 bearerToken = TOKEN,
                 bearerTokenEnabled = true,
-                oauthEnabled = false,
+                oauthEnabled = oauth,
                 httpsEnabled = https,
+                tunnelEnabled = tunnel != null,
+                tunnelProvider = tunnel ?: TunnelProviderType.ARC_TUNNEL,
             )
         return McpServer(
             config,
@@ -76,7 +100,7 @@ class McpServerListenersTest {
                 mockk(relaxed = true),
                 mockk(relaxed = true),
             ),
-            RecordingServerLogRepository(),
+            serverLog,
             InFlightToolCalls(),
             localhostTunnelPort,
         ).also { server = it }
@@ -191,6 +215,154 @@ class McpServerListenersTest {
         assertTrue(NetworkUtils.isPortAvailable(tunnelPort, LOOPBACK))
     }
 
+    /** A router forwarding public port 443 to the phone's HTTPS port: the client names no port. */
+    @Test
+    fun `an HTTPS main listener gives URLs with no port to a host with no port, on both HTTP versions`() {
+        start(localhostTunnelPort = null, https = true, oauth = true)
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val metadata = httpsMetadata(protocol, PUBLIC_HOST)
+
+            assertTrue(metadata.contains("\"resource\":\"https://$PUBLIC_HOST/mcp\""), "$protocol: $metadata")
+        }
+    }
+
+    /** A client connecting directly names the port, here the listener's own, and needs it back. */
+    @Test
+    fun `an HTTPS main listener keeps a port the client names, on both HTTP versions`() {
+        start(localhostTunnelPort = null, https = true, oauth = true)
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val metadata = httpsMetadata(protocol, "$LAN_ADDRESS:$mainPort")
+
+            assertTrue(
+                metadata.contains("\"resource\":\"https://$LAN_ADDRESS:$mainPort/mcp\""),
+                "$protocol: $metadata",
+            )
+        }
+    }
+
+    @Test
+    fun `behind Cloudflare the logged address is CF-Connecting-IP`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.CLOUDFLARE)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $SPOOFED_CF", lastAuthFailure())
+    }
+
+    @Test
+    fun `behind ngrok the logged address is the last X-Forwarded-For value`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.NGROK)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $NGROK_ADDED", lastAuthFailure())
+    }
+
+    @Test
+    fun `with no tunnel the logged address is the socket peer`() {
+        start(localhostTunnelPort = null)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+    }
+
+    @Test
+    fun `the free tunnel selected does not make the main listener trust a header`() {
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.ARC_TUNNEL)
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$mainPort/mcp", client)
+
+        assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure())
+    }
+
+    @Test
+    fun `an HTTPS main listener trusts no header, as no tunnel forwards to it`() {
+        start(localhostTunnelPort = tunnelPort, https = true, tunnel = TunnelProviderType.CLOUDFLARE)
+        val trusting = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val httpsClient =
+            client.newBuilder().sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager)
+
+        for (protocol in listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) {
+            val pinned = httpsClient.protocols(listOf(protocol, Protocol.HTTP_1_1).distinct()).build()
+            failAuthenticationWithSpoofedHeaders("https://$LOOPBACK:$mainPort/mcp", pinned, protocol)
+            assertEquals("Authentication failed from $LOOPBACK", lastAuthFailure(), "$protocol")
+        }
+
+        failAuthenticationWithSpoofedHeaders("http://$LOOPBACK:$tunnelPort/mcp", client)
+        assertEquals("Authentication failed from $SPOOFED_CF", lastAuthFailure())
+    }
+
+    /** A LAN client: the peer is not loopback, so it is the client itself even with a tunnel on. */
+    @Test
+    fun `a client on another address cannot choose the address it shows`() {
+        val addresses =
+            NetworkInterface
+                .getNetworkInterfaces()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.asSequence() }
+                .filterIsInstance<Inet4Address>()
+                .map { requireNotNull(it.hostAddress) }
+                .toList()
+        assumeTrue(addresses.isNotEmpty(), "this machine has no non-loopback IPv4 address")
+        start(localhostTunnelPort = null, tunnel = TunnelProviderType.CLOUDFLARE, network = true)
+
+        failAuthenticationWithSpoofedHeaders("http://${addresses.first()}:$mainPort/mcp", client)
+
+        // With several interfaces the kernel may pick another of them as the source.
+        val logged = lastAuthFailure().substringAfter("from ")
+        assertTrue(logged in addresses, "$logged is not one of $addresses")
+    }
+
+    /** What ngrok delivers: what the client sent, then the real address on a line of its own. */
+    private fun failAuthenticationWithSpoofedHeaders(
+        url: String,
+        httpClient: OkHttpClient,
+        protocol: Protocol? = null,
+    ) {
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .header("CF-Connecting-IP", SPOOFED_CF)
+                .addHeader("X-Forwarded-For", SPOOFED_XFF)
+                .addHeader("X-Forwarded-For", NGROK_ADDED)
+                .build()
+        httpClient.newCall(request).execute().use {
+            assertEquals(HTTP_UNAUTHORIZED, it.code)
+            protocol?.let { expected -> assertEquals(expected, it.protocol) }
+        }
+    }
+
+    private fun lastAuthFailure(): String = serverLog.entries.last { it.type == ServerLogEntry.Type.AUTH }.message
+
+    /** OkHttp sends the host as `Host` over HTTP/1.1 and as `:authority` over HTTP/2. */
+    private fun httpsMetadata(
+        protocol: Protocol,
+        host: String,
+    ): String {
+        val trusting = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val httpsClient =
+            client
+                .newBuilder()
+                .sslSocketFactory(trusting.sslSocketFactory(), trusting.trustManager)
+                .protocols(listOf(protocol, Protocol.HTTP_1_1).distinct())
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$mainPort/.well-known/oauth-protected-resource")
+                .header("Host", host)
+                .build()
+        return httpsClient.newCall(request).execute().use {
+            assertEquals(protocol, it.protocol)
+            it.body.string()
+        }
+    }
+
     private fun status(
         httpClient: OkHttpClient,
         url: String,
@@ -227,6 +399,11 @@ class McpServerListenersTest {
     private companion object {
         const val LOOPBACK = "127.0.0.1"
         const val IPV6_LOOPBACK = "::1"
+        const val PUBLIC_HOST = "myphone.ddns.example"
+        const val LAN_ADDRESS = "192.168.1.5"
+        const val SPOOFED_CF = "198.51.100.6"
+        const val SPOOFED_XFF = "198.51.100.7"
+        const val NGROK_ADDED = "203.0.113.10"
         const val BACKLOG = 50
         const val STOP_TIMEOUT_MS = 1_000L
         const val TOKEN = "listener-test-token"
