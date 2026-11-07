@@ -19,6 +19,12 @@ class ServerLogEntryTypeTest {
     }
 
     @Test
+    fun `SHELL keeps id 8`() {
+        assertEquals(8.toByte(), ServerLogEntry.Type.SHELL.id)
+        assertEquals(ServerLogEntry.Type.SHELL, ServerLogEntry.Type.fromId(8.toByte()))
+    }
+
+    @Test
     fun `fromId maps every id and returns null for unknown`() {
         ServerLogEntry.Type.entries.forEach { type ->
             assertEquals(type, ServerLogEntry.Type.fromId(type.id))

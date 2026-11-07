@@ -2,6 +2,10 @@ package com.danielealbano.androidremotecontrolmcp.di
 
 import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManager
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManagerImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectoryImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuApi
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuApiImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuProviderSwitch
@@ -37,4 +41,12 @@ abstract class ShellModule {
 
     @Binds
     abstract fun bindShizukuStatusProvider(impl: ShizukuStatusProviderImpl): ShizukuStatusProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindShellProcessManager(impl: ShellProcessManagerImpl): ShellProcessManager
+
+    @Binds
+    @Singleton
+    abstract fun bindShellScratchDirectory(impl: ShellScratchDirectoryImpl): ShellScratchDirectory
 }

@@ -2078,14 +2078,14 @@ with `locate()` stubbed.
 cleanup at exit, audit of every elevated command) for all backends, so the tools stay thin.
 
 **Acceptance criteria:**
-- [ ] A start beyond the running limit is refused; a start before `open()` or after `shutdown()` is refused; finished processes beyond the live retention setting are dropped in the order they finished (the earliest-finished first); the call that starts, reads or kills a process always works on that process even if it was dropped from the table meanwhile.
-- [ ] Output is pumped by a dedicated daemon thread per process into a buffer sized by the setting at start; the header gives pgid and uid.
-- [ ] At exit the process group is killed, output drained (≤ 2 s), the backend released.
-- [ ] A background timeout kills the process (`timed_out`); a kill gives `killed`, also when requested before the spawn finished or before the header arrived (it is applied, to the whole group, when the header arrives; a command stuck before its header, for example behind a pending root prompt, stays `running` until then); a start failure gives `failed` and an `ActionFailed` naming the backend; a caller cancelled during the spawn or the wait gets its process killed.
-- [ ] Every elevated command reaching the manager is written to the `SHELL` log, always in this order: the start (grant, process, backend, command, justification) as soon as the process is registered, then either "did not start" (reason) or the end (state, exit code), ends at shutdown included; a command refused before registration is logged as not started (reason, command, justification).
-- [ ] `shutdown()` refuses new starts, kills and ends every process, releases every backend and cancels all watchers; a failing watcher is logged and never crashes the app.
-- [ ] The scratch folder is `<externalCacheDir>/shell`, emptied on `reset()` without ever following a symbolic link (an entry the app cannot delete is logged and left, the rest is still deleted) and created group-accessible; `ShellProcessManager` and `ShellScratchDirectory` are interfaces bound in `ShellModule`.
-- [ ] Server log has a `SHELL` type (id 8) shown as a chip and label.
+- [x] A start beyond the running limit is refused; a start before `open()` or after `shutdown()` is refused; finished processes beyond the live retention setting are dropped in the order they finished (the earliest-finished first); the call that starts, reads or kills a process always works on that process even if it was dropped from the table meanwhile.
+- [x] Output is pumped by a dedicated daemon thread per process into a buffer sized by the setting at start; the header gives pgid and uid.
+- [x] At exit the process group is killed, output drained (≤ 2 s), the backend released.
+- [x] A background timeout kills the process (`timed_out`); a kill gives `killed`, also when requested before the spawn finished or before the header arrived (it is applied, to the whole group, when the header arrives; a command stuck before its header, for example behind a pending root prompt, stays `running` until then); a start failure gives `failed` and an `ActionFailed` naming the backend; a caller cancelled during the spawn or the wait gets its process killed.
+- [x] Every elevated command reaching the manager is written to the `SHELL` log, always in this order: the start (grant, process, backend, command, justification) as soon as the process is registered, then either "did not start" (reason) or the end (state, exit code), ends at shutdown included; a command refused before registration is logged as not started (reason, command, justification).
+- [x] `shutdown()` refuses new starts, kills and ends every process, releases every backend and cancels all watchers; a failing watcher is logged and never crashes the app.
+- [x] The scratch folder is `<externalCacheDir>/shell`, emptied on `reset()` without ever following a symbolic link (an entry the app cannot delete is logged and left, the rest is still deleted) and created group-accessible; `ShellProcessManager` and `ShellScratchDirectory` are interfaces bound in `ShellModule`.
+- [x] Server log has a `SHELL` type (id 8) shown as a chip and label.
 
 ### Task 4.1 — `SHELL` server log type
 
@@ -2118,7 +2118,7 @@ and add the entry after `PRIVACY(TYPE_ID_PRIVACY),`:
 `ServerLogEntry.Type.PRIVACY,` in the multi-type `when` branch.
 
 **Definition of Done:**
-- [ ] Enum id 8 never reused; chip, label and list branch added.
+- [x] Enum id 8 never reused; chip, label and list branch added.
 
 ### Task 4.2 — Process model, table, audit and watcher
 
@@ -2529,7 +2529,7 @@ internal class ShellProcessWatcher(
 ```
 
 **Definition of Done:**
-- [ ] Files created exactly as above.
+- [x] Files created exactly as above.
 
 ### Task 4.3 — `ShellProcessManagerImpl` and `ShellScratchDirectoryImpl`
 
@@ -2889,7 +2889,7 @@ elevated commands.
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 4.4 — Tests
 
@@ -3081,7 +3081,7 @@ case); a second `@TempDir` as an outside folder holding `keep.txt`; links made w
 | `no external storage` | cache folder null → `path()` and `reset()` null |
 
 **Definition of Done:**
-- [ ] `FakeShellBackend` created exactly as above; tests written as listed (not run yet).
+- [x] `FakeShellBackend` created exactly as above; tests written as listed (not run yet).
 
 ---
 
