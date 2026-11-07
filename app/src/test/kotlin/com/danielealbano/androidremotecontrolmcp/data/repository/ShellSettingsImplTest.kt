@@ -172,25 +172,14 @@ class ShellSettingsImplTest {
     @EnumSource(ShellLimit::class)
     fun `every limit accepts min and max and refuses outside`(limit: ShellLimit) =
         testScope.runTest {
-            when (limit) {
-                ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> {
-                    settings.updateShellLimit(ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES, 1440).getOrThrow()
+            val first =
+                when (limit) {
+                    ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> mapOf(BACKGROUND_MAX to 1440)
+                    ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> mapOf(BACKGROUND_DEFAULT to 1)
+                    in MINIMUMS.keys -> MINIMUMS.filterKeys { it != limit }
+                    else -> emptyMap()
                 }
-
-                ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> {
-                    settings.updateShellLimit(ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES, 1).getOrThrow()
-                }
-
-                ShellLimit.MAX_RUNNING_PROCESSES, ShellLimit.MAX_FINISHED_PROCESSES, ShellLimit.OUTPUT_BUFFER_KIB -> {
-                    MINIMUMS.filterKeys { it != limit }.forEach { (other, value) ->
-                        settings.updateShellLimit(other, value).getOrThrow()
-                    }
-                }
-
-                else -> {
-                    Unit
-                }
-            }
+            first.forEach { (other, value) -> settings.updateShellLimit(other, value).getOrThrow() }
 
             assertTrue(settings.updateShellLimit(limit, limit.min).isSuccess)
             assertTrue(settings.updateShellLimit(limit, limit.max).isSuccess)
@@ -286,6 +275,8 @@ class ShellSettingsImplTest {
         }
 
     private companion object {
+        val BACKGROUND_DEFAULT = ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES
+        val BACKGROUND_MAX = ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES
         val MINIMUMS =
             mapOf(
                 ShellLimit.MAX_RUNNING_PROCESSES to 1,
