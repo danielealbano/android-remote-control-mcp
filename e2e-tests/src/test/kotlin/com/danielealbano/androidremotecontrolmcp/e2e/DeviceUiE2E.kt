@@ -23,7 +23,6 @@ object DeviceUiE2E {
         AndroidContainerSetup.execAdb("shell", "input", "tap", x, y)
     }
 
-    /** Swipes from the text to the right screen edge: a swipe across the text alone is too short to dismiss its row. */
     fun swipeAwayWhenVisible(text: String) {
         val bounds = awaitVisible(text)
         val y = "${(bounds[1] + bounds[3]) / 2}"
@@ -38,7 +37,7 @@ object DeviceUiE2E {
     }
 
     private fun isNotificationPosted(tag: String): Boolean =
-        AndroidContainerSetup.execAdb("shell", "dumpsys", "notification").contains("tag=$tag ")
+        AndroidContainerSetup.execAdb("shell", "cmd", "notification", "list").contains("|$tag|")
 
     private fun screenWidth(): Int {
         val size = AndroidContainerSetup.execAdb("shell", "wm", "size")

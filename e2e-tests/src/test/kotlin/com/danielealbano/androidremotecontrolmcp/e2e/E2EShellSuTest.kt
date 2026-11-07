@@ -26,7 +26,6 @@ class E2EShellSuTest {
         ShizukuE2E.uninstall()
         TestSuE2E.install()
         ShellE2E.configure(*ShellE2E.switches(elevation = true, autoAllow = true))
-        // Shizuku reaches only an app process started with elevation on (its provider enabled).
         AndroidContainerSetup.execAdb("shell", "am", "force-stop", AndroidContainerSetup.APP_PACKAGE)
         ShellE2E.restartServer()
     }
