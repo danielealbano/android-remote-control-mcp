@@ -8,9 +8,8 @@ import javax.inject.Inject
 
 private const val MIN_SHIZUKU_VERSION = 13
 private const val NOT_RUNNING_REASON =
-    "Shizuku is not running, or has not connected to the app yet (it connects when Shizuku starts and when the app " +
-        "process starts; if Shizuku was already running when elevation was turned on, force-stop and reopen the app " +
-        "or restart Shizuku)"
+    "Shizuku is not running, or has not connected to the app yet (it connects only to an app process started while " +
+        "elevation was on: after turning elevation on, force-stop and reopen the app)"
 
 sealed interface ShizukuState {
     data object NotInstalled : ShizukuState

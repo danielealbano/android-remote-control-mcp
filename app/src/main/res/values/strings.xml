@@ -579,7 +579,7 @@
     <string name="shell_elevation_switch_description">Lets an MCP client ask to run a single command as the adb shell user through Shizuku (as root when Shizuku runs as root) or, when Shizuku is not usable, as root through su. Off by default.</string>
     <string name="shell_shizuku_label">Shizuku</string>
     <string name="shell_shizuku_not_installed">Not installed</string>
-    <string name="shell_shizuku_not_running">Not running, or not connected yet. If Shizuku was already running when you turned this on, force-stop and reopen this app or restart Shizuku.</string>
+    <string name="shell_shizuku_not_running">Not running, or not connected yet. After turning this on, force-stop and reopen this app so Shizuku can connect.</string>
     <string name="shell_shizuku_outdated">Too old (version 13 or later needed), update Shizuku</string>
     <string name="shell_shizuku_not_granted">Access not granted. If no prompt appears, allow this app in the Shizuku app.</string>
     <string name="shell_shizuku_ready">Ready, commands run as uid %1$d</string>
