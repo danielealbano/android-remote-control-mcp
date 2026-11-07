@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellAdbConfigApplier
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
@@ -564,6 +565,19 @@ class E2EConfigReceiverTest {
     }
 
     private fun stored(): ServerConfig = ServerConfig(arcTunnelEdgeOverride = EDGE, arcTunnelTrustedCaPem = PEM)
+
+    @Test
+    fun `handleConfigure applies shell_elevation_enabled`() =
+        runTest {
+            val intent = configureIntent()
+            every { intent.hasExtra(ShellAdbConfigApplier.EXTRA_ELEVATION_ENABLED) } returns true
+            every { intent.getBooleanExtra(ShellAdbConfigApplier.EXTRA_ELEVATION_ENABLED, false) } returns true
+
+            receiver.onReceive(mockContext, intent)
+            Thread.sleep(COROUTINE_WAIT_MS)
+
+            coVerify { mockSettingsRepository.updateShellElevationEnabled(true) }
+        }
 
     companion object {
         private const val COROUTINE_WAIT_MS = 200L

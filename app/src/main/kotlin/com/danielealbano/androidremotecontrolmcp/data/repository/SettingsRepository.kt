@@ -26,7 +26,8 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository :
     EventChannelSettings,
     ArcTunnelSettings,
-    DownloadSettings {
+    DownloadSettings,
+    ShellSettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.

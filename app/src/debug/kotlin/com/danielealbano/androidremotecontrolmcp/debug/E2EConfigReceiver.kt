@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import com.danielealbano.androidremotecontrolmcp.services.mcp.isServerActive
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellAdbConfigApplier
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
@@ -163,6 +164,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
             applyAuthFlags(intent)
             applyDownloadSettings(intent)
             applyTunnelSettings(intent)
+            ShellAdbConfigApplier(settingsRepository).apply(intent)
             val storageLocationId = intent.getStringExtra(EXTRA_STORAGE_LOCATION_ID)
             if (!storageLocationId.isNullOrEmpty()) {
                 if (storageLocationProvider.isLocationAuthorized(storageLocationId)) {

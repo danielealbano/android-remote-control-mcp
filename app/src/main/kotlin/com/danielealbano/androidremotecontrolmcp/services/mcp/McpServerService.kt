@@ -36,6 +36,7 @@ import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellLifecycle
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
@@ -108,6 +109,8 @@ class McpServerService : Service() {
     @Inject lateinit var pseudonymStore: PseudonymStore
 
     @Inject lateinit var nerCache: NerCache
+
+    @Inject lateinit var shellLifecycle: ShellLifecycle
 
     /** Config of the currently running server; used to build capability-link base URLs. */
     @Volatile
@@ -182,6 +185,7 @@ class McpServerService : Service() {
             activeConfig = config
             // Listener settings the UI refuses to start with fail every other start (ADB, boot) the same way
             listenerRules.check(config).startError?.let { throw IllegalStateException(it) }
+            shellLifecycle.onServerStart()
             val toolNamePrefix = McpToolUtils.buildToolNamePrefix(config.deviceSlug)
             Log.i(
                 TAG,
@@ -391,6 +395,7 @@ class McpServerService : Service() {
         approvalObserverJob?.cancel()
         approvalObserverJob = null
         OAuthApprovalNotifier.cancel(this)
+        shellLifecycle.onServerStopping()
 
         // Stop tunnel first (with ANR-safe timeout).
         // Worst-case blocking time: START_JOIN_TIMEOUT_MS (5s) + the stop flag write (2s) + TUNNEL_STOP_TIMEOUT_MS
@@ -412,6 +417,7 @@ class McpServerService : Service() {
         }
         mcpServer = null
         serverActive.set(false)
+        shellLifecycle.onServerStop()
 
         // Cancel coroutine scope
         coroutineScope.cancel()

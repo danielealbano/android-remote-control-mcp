@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization") version libs.versions.kotlin.get()
@@ -75,9 +77,58 @@ dependencies {
     testRuntimeOnly("org.slf4j:slf4j-simple:2.0.18")
 }
 
+fun compareVersions(
+    left: String,
+    right: String,
+): Int {
+    val a = left.split('.').map { it.toIntOrNull() ?: 0 }
+    val b = right.split('.').map { it.toIntOrNull() ?: 0 }
+    return a.zip(b).map { (x, y) -> x.compareTo(y) }.firstOrNull { it != 0 } ?: a.size.compareTo(b.size)
+}
+
+fun ndkClang(): File {
+    val properties = Properties()
+    rootProject
+        .file("local.properties")
+        .takeIf { it.isFile }
+        ?.inputStream()
+        ?.use(properties::load)
+    val sdk =
+        listOfNotNull(
+            System.getenv("ANDROID_HOME"),
+            System.getenv("ANDROID_SDK_ROOT"),
+            properties.getProperty("sdk.dir"),
+        ).map(::File)
+            .firstOrNull { File(it, "ndk").isDirectory }
+            ?: error("Android NDK not found: set ANDROID_HOME or sdk.dir and install an NDK")
+    val ndk =
+        File(sdk, "ndk")
+            .listFiles { file -> file.isDirectory }
+            .orEmpty()
+            .maxWithOrNull { a, b -> compareVersions(a.name, b.name) }
+            ?: error("No NDK in ${File(sdk, "ndk")}")
+    return File(ndk, "toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android33-clang")
+}
+
+val testSuBinary = layout.buildDirectory.file("testsu/x86_64/su")
+
+val compileTestSu =
+    tasks.register<Exec>("compileTestSu") {
+        val source = file("src/test/native/testsu.c")
+        inputs.file(source)
+        outputs.file(testSuBinary)
+        doFirst {
+            val output = testSuBinary.get().asFile
+            output.parentFile.mkdirs()
+            commandLine(ndkClang().absolutePath, "-O2", "-o", output.absolutePath, source.absolutePath)
+        }
+    }
+
 tasks.withType<Test> {
     // Ensure both the main app and compose test app APKs are built before E2E tests run.
     dependsOn(":app:assembleGmsDebug", ":compose-test-app:assembleDebug")
+    dependsOn(compileTestSu)
+    systemProperty("e2e.testSu", testSuBinary.get().asFile.absolutePath)
 
     useJUnitPlatform()
 

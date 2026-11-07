@@ -86,10 +86,22 @@ class ExportedComponentsManifestTest {
         }
     }
 
+    @Test
+    fun `the Shizuku provider ships disabled and gated`() {
+        val provider =
+            componentsIn(MAIN_MANIFEST).firstOrNull { it.name == SHIZUKU_PROVIDER }
+                ?: error("$SHIZUKU_PROVIDER is not declared in $MAIN_MANIFEST")
+
+        assertEquals("false", provider.enabled)
+        assertTrue(provider.exported)
+        assertEquals(INTERACT_ACROSS_USERS_FULL, provider.permission)
+    }
+
     private data class Component(
         val name: String,
         val exported: Boolean,
         val permission: String?,
+        val enabled: String?,
     )
 
     private fun componentsIn(relativePath: String): List<Component> {
@@ -108,6 +120,7 @@ class ExportedComponentsManifestTest {
                     name = element.getAttribute("android:name"),
                     exported = element.getAttribute("android:exported") == "true",
                     permission = element.getAttribute("android:permission").ifEmpty { null },
+                    enabled = element.getAttribute("android:enabled").ifEmpty { null },
                 )
             }
         }
@@ -122,6 +135,8 @@ class ExportedComponentsManifestTest {
         const val MAIN_MANIFEST = "src/main/AndroidManifest.xml"
         const val DEBUG_MANIFEST = "src/debug/AndroidManifest.xml"
         const val DUMP = "android.permission.DUMP"
+        const val SHIZUKU_PROVIDER = "rikka.shizuku.ShizukuProvider"
+        const val INTERACT_ACROSS_USERS_FULL = "android.permission.INTERACT_ACROSS_USERS_FULL"
 
         val COMPONENT_TAGS = listOf("activity", "activity-alias", "service", "receiver", "provider")
 

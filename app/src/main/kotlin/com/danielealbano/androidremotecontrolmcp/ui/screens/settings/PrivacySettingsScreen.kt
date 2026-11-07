@@ -223,6 +223,11 @@ fun PrivacySettingsScreen(
                 text = stringResource(R.string.privacy_disclaimer),
                 style = MaterialTheme.typography.bodySmall,
             )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.privacy_shell_not_covered),
+                style = MaterialTheme.typography.bodySmall,
+            )
 
             Spacer(Modifier.height(16.dp))
 

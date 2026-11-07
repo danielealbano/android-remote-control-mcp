@@ -3,18 +3,22 @@ package com.danielealbano.androidremotecontrolmcp
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppIconCache
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuProviderSwitchImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlertsImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateCheckScheduler
 import com.danielealbano.androidremotecontrolmcp.startup.runFlavorStartupMigrations
+import com.jakewharton.processphoenix.ProcessPhoenix
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import rikka.shizuku.ShizukuProvider
 import javax.inject.Inject
 import androidx.work.Configuration as WorkConfiguration
 
@@ -41,8 +45,15 @@ class McpApplication :
             .build()
     }
 
+    override fun attachBaseContext(base: Context) {
+        ShizukuProvider.disableAutomaticSuiInitialization()
+        super.attachBaseContext(base)
+        ShizukuProviderSwitchImpl.recordProcessStart(base)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        if (ProcessPhoenix.isPhoenixProcess(this)) return
         // Flavor-specific one-time migrations (gms: geofence config → dedicated key), launched eagerly
         // on a background coroutine (non-blocking — must never stall onCreate). No-op in foss.
         runFlavorStartupMigrations(this)
@@ -52,7 +63,10 @@ class McpApplication :
         appIconCache.preload()
         // Apply the one-time auth-model migration eagerly so the UI Flow reflects the migrated model
         // promptly at startup (idempotent; the server start path also guarantees it via getServerConfig()).
-        CoroutineScope(Dispatchers.IO).launch { settingsRepository.ensureAuthModelMigrated() }
+        CoroutineScope(Dispatchers.IO).launch {
+            settingsRepository.ensureAuthModelMigrated()
+            settingsRepository.syncShizukuProvider()
+        }
         UpdateCheckScheduler.schedulePeriodic(this)
         Log.i(TAG, "Application initialized, notification channels created")
     }
@@ -103,6 +117,15 @@ class McpApplication :
                 description = "Alert when a certificate for the free E2E tunnel name was issued to another key"
             }
 
+        val elevationApprovalChannel =
+            NotificationChannel(
+                ELEVATION_APPROVAL_CHANNEL_ID,
+                getString(R.string.notification_channel_elevation_approval_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = getString(R.string.notification_channel_elevation_approval_description)
+            }
+
         notificationManager.createNotificationChannel(mcpServerChannel)
         notificationManager.createNotificationChannel(oauthApprovalChannel)
         notificationManager.createNotificationChannel(
@@ -116,6 +139,7 @@ class McpApplication :
         )
         notificationManager.createNotificationChannel(updateChannel)
         notificationManager.createNotificationChannel(arcTunnelAlertChannel)
+        notificationManager.createNotificationChannel(elevationApprovalChannel)
     }
 
     companion object {
@@ -125,5 +149,6 @@ class McpApplication :
         const val UPDATE_CHANNEL_ID = "update_channel"
         const val ARC_TUNNEL_ALERT_CHANNEL_ID = "arc_tunnel_alert_channel"
         const val ARC_TUNNEL_STATUS_CHANNEL_ID = "arc_tunnel_status_channel"
+        const val ELEVATION_APPROVAL_CHANNEL_ID = "shell_elevation_approval_channel"
     }
 }

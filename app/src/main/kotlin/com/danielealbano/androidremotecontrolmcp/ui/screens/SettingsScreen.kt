@@ -20,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.Permissions
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.PrivacySettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.SecuritySettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.SettingsIndexScreen
+import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.ShellSettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.StorageSettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.TunnelSettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.WifiMonitorScreen
@@ -90,6 +91,9 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToPermissions = { navController.navigate(SettingsRoute.Permissions.route) },
             )
+        }
+        composable(SettingsRoute.Shell.route) {
+            ShellSettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoute.Permissions.route) {
             PermissionsSettingsScreen(

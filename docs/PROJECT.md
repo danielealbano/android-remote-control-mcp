@@ -107,6 +107,8 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **Android Log**: Logging (standard Android Log class)
 - **Accompanist**: Compose utilities (permissions handling)
 - **Google Play Services Location**: Device location via FusedLocationProviderClient
+- **Shizuku API**: 13.1.5 (`dev.rikka.shizuku:api`, `dev.rikka.shizuku:provider`, MIT), optional elevated shell commands through a Shizuku UserService; `rikka.shizuku.ShizukuProvider` is declared disabled and enabled only while elevated commands are allowed, and Sui auto-initialization is turned off
+- **ProcessPhoenix**: 3.0.0 (`com.jakewharton:process-phoenix`, Apache-2.0), the Shell settings' Restart app button: relaunches the app without a force-stop (which would turn off its accessibility service) so Shizuku can connect after elevated commands are turned on; `McpApplication` skips its startup work in the library's `:phoenix` process
 
 ### Testing
 
@@ -140,21 +142,24 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/mcp/` — `McpServerService.kt`, `McpToolRegistration.kt`, `McpToolDependencies.kt`, `ServerStartTracker.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `TunnelListenerHost.kt`, `TunnelClientAddresses.kt`, `TunnelTlsContext.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `services/tunnel/arctunnel/` — free E2E tunnel client (`android-remote-control-mcp-tunneld` protocol v2): `ArcTunnelServiceStatus.kt`, `ArcTunnelServiceStatusWatcher.kt`, `ArcTunnelServiceAlerts.kt`, `ArcTunnelHosts.kt`, `ArcTunnelEnv.kt`, `ArcTunnelPem.kt`, `ArcTunnelSockets.kt`, `ArcTunnelWire.kt`, `ArcTunnelFrames.kt`, `ArcTunnelCsr.kt`, `ArcTunnelSessions.kt`, `ArcTunnelKeyStore.kt`, `AndroidArcTunnelKeyStore.kt`, `ArcTunnelIdentity.kt`, `ArcTunnelNet.kt`, `ArcTunnelHttp.kt`, `ArcTunnelDialBack.kt`, `ArcTunnelKeepalive.kt`, `ArcTunnelEnrollRetry.kt`, `ArcTunnelIssueRetry.kt`, `ArcTunnelEnroller.kt`, `ArcTunnelIdentityStore.kt`, `ArcTunnelBackoff.kt`, `ArcTunnelLocalConnect.kt`, `ArcTunnelSplice.kt`, `ArcTunnelWatchdog.kt`, `ArcTunnelControlEvents.kt`, `ArcTunnelOpenHandler.kt`, `ArcTunnelControl.kt`, `ArcTunnelMoveTarget.kt`, `ArcTunnelEnrollment.kt`, `ArcTunnelEnrollmentFlow.kt`, `ArcTunnelStartTracker.kt`, `ArcTunnelEnrollmentImpl.kt`, `ArcTunnelEnrollService.kt`, `ArcTunnelRenewals.kt`, `ArcTunnelRenewalsImpl.kt`, `ArcTunnelCtNotifier.kt`, `ArcTunnelCtAlerts.kt`, `ArcTunnelCtMonitor.kt`, `ArcTunnelCertSwap.kt`, `ArcTunnelProvider.kt`
+  - `services/shell/` — shell tools: `CommandPatterns.kt`, `ShellScript.kt`, `ShellOutputBuffer.kt`, `ShellBackend.kt`, `AppShellBackend.kt`, `SuShellBackend.kt`, `ShizukuApi.kt`, `ShizukuStatus.kt`, `ShizukuProviderSwitch.kt`, `AppRestarter.kt`, `ShellProcessHost.kt`, `ShellUserService.kt` (runs in the helper process Shizuku starts), `ShizukuShellBackend.kt`, `ElevatedShellSelector.kt`, `ShellProcess.kt`, `ShellProcessTable.kt`, `ShellAudit.kt`, `ShellProcessWatcher.kt`, `ShellProcessManager.kt`, `ShellScratchDirectory.kt`, `ShellCommandAuthorizer.kt`, `ShellLifecycle.kt`, `ShellAdbConfigApplier.kt`
+  - `services/shell/approval/` — `ElevationApproval.kt`, `ElevationApprovalNotifierImpl.kt`, `ElevationApprovalReceiver.kt`
   - `mcp/` — `McpServer.kt`, `McpListenerRules.kt`, `McpListenerRulesImpl.kt`, `McpStatelessTransport.kt`, `InFlightToolCalls.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `GetNodeScreenshotsTool.kt`, `NodeScreenshotSession.kt`, `NodeScreenshotReads.kt`, `NodeScreenshotScroller.kt`, `NodeScreenshotCapture.kt`, `NodeScreenshotContext.kt`, `NodeScreenshotRounds.kt`, `NodeScreenshotParts.kt`, `NodeScreenshotLines.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `GetNodeScreenshotsTool.kt`, `NodeScreenshotSession.kt`, `NodeScreenshotReads.kt`, `NodeScreenshotScroller.kt`, `NodeScreenshotCapture.kt`, `NodeScreenshotContext.kt`, `NodeScreenshotRounds.kt`, `NodeScreenshotParts.kt`, `NodeScreenshotLines.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`, `ShellToolParams.kt`, `ShellToolJson.kt`, `ShellToolDescriptions.kt`, `ShellTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
-  - `ui/` — `MainActivity.kt`, `ApprovalActivity.kt`, `ShareReceiverActivity.kt`, `NetworkChangeWatcher.kt`
+  - `ui/` — `MainActivity.kt`, `ApprovalActivity.kt`, `ShareReceiverActivity.kt`, `NetworkChangeWatcher.kt`, `ElevationApprovalActivity.kt`
   - `ui/navigation/` — `Routes.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
-  - `ui/screens/` — `MainScreen.kt`, `ServerTabScreen.kt`, `ServerScreen.kt`, `LogsScreen.kt`, `SettingsScreen.kt`, `AboutScreen.kt`, `AboutLinks.kt`, `ApprovalScreen.kt`
-  - `ui/screens/settings/` — `SettingsIndexScreen.kt`, `GeneralSettingsScreen.kt`, `AccessSettingsScreen.kt`, `SecuritySettingsScreen.kt`, `OAuthClientsScreen.kt`, `PermissionsSettingsScreen.kt`, `McpToolsSettingsScreen.kt`, `PrivacySettingsScreen.kt`, `StorageSettingsScreen.kt`, `TunnelSettingsScreen.kt`, `ArcTunnelSettingsSection.kt`, `ChannelSettingsScreen.kt`, `NotificationFilterScreen.kt`, `WifiMonitorScreen.kt`
+  - `ui/screens/` — `MainScreen.kt`, `ServerTabScreen.kt`, `ServerScreen.kt`, `LogsScreen.kt`, `SettingsScreen.kt`, `AboutScreen.kt`, `AboutLinks.kt`, `ApprovalScreen.kt`, `ElevationApprovalScreen.kt`
+  - `ui/screens/settings/` — `SettingsIndexScreen.kt`, `GeneralSettingsScreen.kt`, `AccessSettingsScreen.kt`, `SecuritySettingsScreen.kt`, `OAuthClientsScreen.kt`, `PermissionsSettingsScreen.kt`, `McpToolsSettingsScreen.kt`, `PrivacySettingsScreen.kt`, `StorageSettingsScreen.kt`, `TunnelSettingsScreen.kt`, `ArcTunnelSettingsSection.kt`, `ChannelSettingsScreen.kt`, `NotificationFilterScreen.kt`, `WifiMonitorScreen.kt`, `ShellSettingsScreen.kt`, `ShellElevationSection.kt`
   - `ui/components/` — `ServerStatusCard.kt`, `ConnectionInfoCard.kt`, `ServerLogsSection.kt`, `ArcTunnelRenewalBlock.kt`, `CalloutCard.kt`, `PrivacyModeCard.kt`, `BatteryOptimizationCard.kt`, `UpdateAvailableBanner.kt`, `TopBarParts.kt`, `LiveRegionChanges.kt`
-  - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`, `AccessViewModel.kt`, `ApprovalViewModel.kt`, `ChannelViewModel.kt`, `LogsViewModel.kt`, `OAuthClientsViewModel.kt`, `PrivacyViewModel.kt`, `UpdateViewModel.kt`
-  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`, `DownloadSettings.kt`, `DownloadSettingsImpl.kt`
-  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
-  - `di/` — `AppModule.kt`
+  - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`, `AccessViewModel.kt`, `ApprovalViewModel.kt`, `ChannelViewModel.kt`, `LogsViewModel.kt`, `OAuthClientsViewModel.kt`, `PrivacyViewModel.kt`, `UpdateViewModel.kt`, `ShellSettingsViewModel.kt`, `ShellLimitEditor.kt`, `ElevationApprovalViewModel.kt`
+  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`, `DownloadSettings.kt`, `DownloadSettingsImpl.kt`, `ShellSettings.kt`, `ShellSettingsImpl.kt`
+  - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`, `ShellConfig.kt`
+  - `di/` — `AppModule.kt`, `ShellModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`, `RecentsUtils.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
+- `app/src/main/aidl/com/danielealbano/androidremotecontrolmcp/services/shell/` — `IShellService.aidl`, `IShellProcessCallback.aidl` (Shizuku UserService interface)
 - `app/src/main/AndroidManifest.xml`
 - `app/src/debug/` — `AndroidManifest.xml` (debug overlay), `kotlin/.../debug/E2EConfigReceiver.kt`, `E2EArcTunnelStatus.kt`, `E2EArcTunnelChainProbe.kt`, `E2EArcTunnelLabels.kt`
 - `app/src/test/kotlin/` — Unit tests and JVM-based integration tests
@@ -210,7 +215,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 60 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 65 tools across 15 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -388,6 +393,20 @@ The MCP server exposes 60 tools across 14 categories. For full JSON-RPC schemas,
 
 **Errors**: `android_get_shared_content` has no specific errors — an empty inbox is a normal (non-error) response. `android_share_file_via_web` returns `McpToolException.InvalidParams` for missing/invalid `location_id` or `path`, and `McpToolException.ActionFailed` if the file is not found, the location is not authorized, or the file exceeds the size limit.
 
+### 15. Shell Tools (5 tools)
+
+| Tool | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `android_shell_exec` | Run a command with `/system/bin/sh -c` and wait for it, at most the foreground limit; then it continues in the background | `command` (string), `workdir` (string, absolute) | `envs` (object of strings), `elevated` (boolean, default false), `justification` (string, required when elevated) |
+| `android_shell_start` | Start a command in the background and return its `process_id` | `command`, `workdir` | `envs`, `elevated`, `justification`, `timeout_minutes` (integer, default and maximum from the settings) |
+| `android_shell_output` | Read a process's output from an offset, with its state and exit code | `process_id` (integer) | `offset` (integer, default 0), `wait_seconds` (integer, default 0) |
+| `android_shell_kill` | Stop a process and its process group | `process_id` (integer) | — |
+| `android_shell_list` | List running and kept finished processes | — | — |
+
+**Model**: one command per call, no persistent shell, no PTY, stdin closed, stdout and stderr combined; leftovers in the process group are stopped when a command exits; scratch folder `<external cache>/shell`, emptied at every server start (entries the app cannot delete stay), `noexec`. Elevated commands (off by default) run through Shizuku, else `su`, after the blocklist, auto-allow, allowlist or an approval on the phone; every elevated command is logged. Shell tools are outside Privacy Mode; results carry the untrusted-content warning. Normal commands run as the app user and can change the app's own settings and use any `su` grant or Shizuku access the app holds; a client with the notification, accessibility or intent tools can approve its own elevation request (both by design, see [MCP_TOOLS.md](MCP_TOOLS.md#15-shell-tools)).
+
+**Errors**: `McpToolException.InvalidParams` for invalid parameters, an unknown `process_id` or an offset outside the output; `McpToolException.PermissionDenied` for blocklist, elevation and approval refusals and when no elevated backend is usable; `McpToolException.ActionFailed` for the running limit, a stopped server and a command that could not start.
+
 ---
 
 ## Android-Specific Conventions
@@ -423,6 +442,8 @@ The MCP server exposes 60 tools across 14 categories. For full JSON-RPC schemas,
 - **RECORD_AUDIO**: Runtime permission required for video recording with audio. Requested via UI permission launcher
 - **ACCESS_FINE_LOCATION**: Runtime permission required for device location. Requested via UI permission launcher
 - **ACCESS_COARSE_LOCATION**: Declared in manifest (implied by ACCESS_FINE_LOCATION). Provides location fallback
+- **Shizuku** (`moe.shizuku.manager.permission.API_V23`, declared by the Shizuku client library): optional, only for elevated shell commands; requested from Settings → Shell → Grant access through Shizuku's own dialog, or granted in the Shizuku app
+- **su**: optional, only for elevated shell commands; granted by the root manager when the app first runs `su`
 - Always check permission state before operations; return `CallToolResult(isError = true)` if permission missing
 
 ### Storage Access Framework (SAF) — User-Managed Locations
@@ -563,7 +584,7 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### Integration Tests
 
 - **Framework**: Ktor `testApplication`, JUnit 5, MockK
-- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 11 tool categories, error code propagation
+- **Scope**: Full HTTP stack (authentication, JSON-RPC protocol, tool dispatch) via in-process Ktor test server; all 15 tool categories, error code propagation
 - **Mocking**: Mock Android services (`ActionExecutor`, `AccessibilityServiceProvider`, `ScreenCaptureProvider`, `AccessibilityTreeParser`, `ElementFinder`, `TypeInputController`, `StorageLocationProvider`, `FileOperationProvider`, `AppManager`, `CameraProvider`, `LocationProvider`) via interfaces; real SDK `Server` behind the production stateless endpoint (`installMcpStatelessTransport`) and `BearerTokenAuth`
 - **Infrastructure**: `McpIntegrationTestHelper` configures `testApplication` with same routing as production `McpServer`; uses SDK `Client` + `StreamableHttpClientTransport` for type-safe MCP communication
 - **Real engine**: `ToolCallCancellationNettyIntegrationTest` serves the endpoint on a real Netty engine, as the in-process test engine has no connection to close, and checks that a client closing its HTTP/1.1 connection or resetting its HTTP/2 (h2c) stream cancels the running tool call and leaves no session behind. `StatelessSessionCleanupIntegrationTest` also runs on it, with bearer authentication on, and checks that every POST reaching the transport leaves no SDK session behind, whether the transport refuses it (each of its refusals, with its status) or answers it, that 150 refused POSTs do not stop a later tool call, that 32 tool calls running at once are all answered and cleaned up, and that requests refused by authentication or as GET or DELETE never open a session
@@ -573,8 +594,8 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### E2E Tests
 
 - **Framework**: Testcontainers Kotlin (`redroid/redroid:14.0.0-latest`), JUnit 5, MCP Kotlin SDK Client
-- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found), `android_download_from_url` cancellation (the client closing its request, `notifications/cancelled`: the device stops downloading and leaves no file), the free E2E tunnel against a local tunnel server stack (`E2EArcTunnelTest`: enrollment, `/health` over HTTP/2 and over HTTP/1.1 without ALPN, the OAuth metadata naming the `https` URL over HTTP/1.1, the whole OAuth flow on a mix of HTTP versions with a port-less public host, `tools/list` through the tunnel, the certificate chain handling on redroid's own Conscrypt (a Let's Encrypt shaped bundle kept whole by `parseChain`, a bare leaf refused by the trust check), a saved chain cut to the leaf renewed once at tunnel start, and a node drain: the phone moves to the second node on `MOVE`, a connection in flight through the draining node finishes, a reconnect to the draining node moves again, and the tunnel still serves once the first node has exited) and, when a phone is attached, against production (`E2EArcTunnelDeviceTest`, skipped otherwise), the server's listeners (`E2EListenersTest`: a Specific IP is the only address the server listens on, an address the device does not have fails the start with `Error: <address> is not an address of this device`, an address with a zone index (`2001:db8::7%3`) fails it with `Error: Remove the zone index (%3): this address does not need one`, and Start works again without a stop, and a Cloudflare/ngrok tunnel gets its plain HTTP listener on `127.0.0.1:<tunnel local port>`, which requires the same authentication)
-- **Infrastructure**: `SharedAndroidContainer` singleton shares one container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` (trust-all CIO by default, or an injected OkHttp client for the tunnel tests); `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast` (incl. the tunnel edge override, trusted CA, a status query and a certificate chain probe); `ArcTunnelStack` runs the tunnel server stack (Valkey, MinIO, Pebble + challtestsrv, `ghcr.io/danielealbano/android-remote-control-mcp-tunneld:latest`, always pulled, never built) with ACME `tls-alpn-01`, and `ArcTunnelHostRelay` exposes the edge to the phone through the container's gateway IP, on the port the edge listens on (the server derives the addresses it gives the phone from `--public-ip` and its `--listen` port); for the drain the stack starts a second node with its own relay and port, which adopts the first node's reserved certificates
+- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found), `android_download_from_url` cancellation (the client closing its request, `notifications/cancelled`: the device stops downloading and leaves no file), the free E2E tunnel against a local tunnel server stack (`E2EArcTunnelTest`: enrollment, `/health` over HTTP/2 and over HTTP/1.1 without ALPN, the OAuth metadata naming the `https` URL over HTTP/1.1, the whole OAuth flow on a mix of HTTP versions with a port-less public host, `tools/list` through the tunnel, the certificate chain handling on redroid's own Conscrypt (a Let's Encrypt shaped bundle kept whole by `parseChain`, a bare leaf refused by the trust check), a saved chain cut to the leaf renewed once at tunnel start, and a node drain: the phone moves to the second node on `MOVE`, a connection in flight through the draining node finishes, a reconnect to the draining node moves again, and the tunnel still serves once the first node has exited) and, when a phone is attached, against production (`E2EArcTunnelDeviceTest`, skipped otherwise), the server's listeners (`E2EListenersTest`: a Specific IP is the only address the server listens on, an address the device does not have fails the start with `Error: <address> is not an address of this device`, an address with a zone index (`2001:db8::7%3`) fails it with `Error: Remove the zone index (%3): this address does not need one`, and Start works again without a stop, and a Cloudflare/ngrok tunnel gets its plain HTTP listener on `127.0.0.1:<tunnel local port>`, which requires the same authentication), and the shell tools (`E2EShellTest`: commands as the app user, exit codes, `workdir` and `envs`, moving to the background at the foreground limit, start/list/kill, paging, scripts in the scratch folder and its wipe at server start, a server stop killing a running command, leftover cleanup, the blocklist, the running limit and the refusal of elevated commands while elevation is off; `E2EShellShizukuTest`: the Shizuku provider following the elevation switch and restored at app start, Shizuku not installed, not running, not allowed, and allowed as the adb shell user and as root, elevation turned on after the app started connecting Shizuku only after Restart app, back-to-back commands, the scratch folder shared both ways, binaries in `/data/local/tmp`, the helper stopping after the job, a background elevated process keeping the helper until killed, the app dying, and Shizuku stopping mid-command with no process left behind; `E2EShellPermissionTest`: elevation off, auto-allow, blocklist, allowlist, approval from the notification, denial from the modal and by dismissing the notification, a server stop answering a pending approval, the approval timeout and notifications off; `E2EShellSuTest`: a test-only setuid `su` built with the NDK, used when Shizuku is absent, exit codes, kill, and Shizuku's priority)
+- **Infrastructure**: `SharedAndroidContainer` singleton shares one container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` (trust-all CIO by default, or an injected OkHttp client for the tunnel tests); `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast` (incl. the tunnel edge override, trusted CA, a status query and a certificate chain probe); `ArcTunnelStack` runs the tunnel server stack (Valkey, MinIO, Pebble + challtestsrv, `ghcr.io/danielealbano/android-remote-control-mcp-tunneld:latest`, always pulled, never built) with ACME `tls-alpn-01`, and `ArcTunnelHostRelay` exposes the edge to the phone through the container's gateway IP, on the port the edge listens on (the server derives the addresses it gives the phone from `--public-ip` and its `--listen` port); for the drain the stack starts a second node with its own relay and port, which adopts the first node's reserved certificates; `ShizukuE2E` downloads Shizuku v13.6.0 once into `e2e-tests/build/e2e-cache/` (SHA-256 checked) and starts it as the adb shell user through the stock `/system/xbin/su` or as root; the `compileTestSu` Gradle task builds the test `su` with the newest NDK in the `ndk` folder of the first of `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `sdk.dir` (`local.properties`) that has one, so the e2e tests need an NDK
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
 
@@ -695,8 +716,17 @@ Tunnel architecture:
 
 ### Permission Security
 
-Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` (free E2E tunnel enrollment foreground service), `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), `CAMERA` (camera tools, runtime), `RECORD_AUDIO` (video recording with audio, runtime), `ACCESS_FINE_LOCATION` (device location, runtime), `ACCESS_COARSE_LOCATION` (location fallback, declared), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
+Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` (free E2E tunnel enrollment foreground service), `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), `CAMERA` (camera tools, runtime), `RECORD_AUDIO` (video recording with audio, runtime), `ACCESS_FINE_LOCATION` (device location, runtime), `ACCESS_COARSE_LOCATION` (location fallback, declared), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker), `moe.shizuku.manager.permission.API_V23` (optional elevated shell commands through Shizuku, declared by the Shizuku client library and granted in the Shizuku app). Display clear explanations before requesting.
 Per-location read/write/delete permissions are enforced by `FileOperationProvider` — see the Storage Location Permissions section above.
+
+### Elevated Shell Commands
+
+- **Off by default**: elevated commands run only while Settings → Shell → Allow elevated commands is on; each one is a single command with a justification
+- **Rules**: the blocklist applies to every command and compares text only (the same action written another way is not refused); auto-allow, the allowlist (whole-command patterns whose `*` never crosses `;`, `&`, `|`, `` ` ``, `$`, `(`, `)`, `<`, `>` or a line break; `envs` are not checked) or an approval on the phone let an elevated command run; the approval notification's actions require the device to be unlocked, it is `VISIBILITY_PRIVATE` (a secure lock screen hides the command only when the phone's lock screen setting hides sensitive notification content), and dismissing it denies
+- **Shizuku**: `rikka.shizuku.ShizukuProvider` is declared `android:enabled="false"` and enabled only while elevation is on; Sui auto-initialization is disabled before any provider starts; the UserService (`ShellUserService`, non-daemon, in a helper process Shizuku starts as its own user) accepts `start` and `kill` only from the app's uid (`destroy` is Shizuku's teardown call) and is unbound once the manager has released every elevated Shizuku process
+- **Process groups**: every command runs in its own session; the whole group is killed when the command exits, when it is killed and when the server stops
+- **Audit**: every elevated command (refused, started, not started, ended) is written to the server log with its justification and command; the server log keeps at most the first 500 bytes of each entry and masks UUID-shaped text, so the end of a long command can be missing (the justification is written first)
+- **By design**: normal commands run as the app user, so they can change the app's own settings and use any `su` grant or Shizuku access the app holds; a client with the notification, accessibility or intent tools (`android_send_intent` reaches the approval receiver) can approve its own elevation request; if the app process dies, elevated `su` commands whose root shell a root manager daemon started (for example Magisk) can keep running, with no timeout and unknown to the next server start; a process that leaves the command's process group (for example with `setsid`) is not stopped at exit, by `android_shell_kill`, by a timeout or at server stop, is not listed, and keeps the elevated user after an elevated command
 
 ### Code Security
 
@@ -752,6 +782,22 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **Swipe Duration**: 300ms
 - **Gesture Duration**: 300ms
 - **Scroll Amount**: "medium" (50% of screen dimension)
+
+### Shell Defaults
+
+- **Shell tools**: Enabled, like every MCP tool (Settings → MCP Tools)
+- **Allow Elevated Commands**: Disabled
+- **Auto-allow Elevation**: Disabled
+- **Blocklist / Allowlist**: Empty
+- **Maximum Running Processes**: 16 (range 1-64); Android can stop child processes of apps when more than 32 run on the device; a normal command stopped this way ends with exit code 137 and no other notice.
+- **Finished Processes Kept**: 32 (range 0-256)
+- **Background Timeout, Default**: 30 minutes (from 1 minute up to the maximum)
+- **Background Timeout, Maximum**: 120 minutes (range 1-1440, not below the default)
+- **Approval Timeout**: 60 seconds (range 10-85)
+- **Foreground Wait Limit**: 90 seconds (range 10-90)
+- **Output per Call**: 64 KiB (range 4-256)
+- **Output Kept per Process**: 1024 KiB (range 64-16384); held in the app's memory for every running and every kept finished process; (running + kept) × output kept per process must not exceed 64 MiB (the defaults use 48 MiB)
+- All shell settings are read on every tool call (they apply at once, also while the server runs) and can be set from the UI, from ADB (`AdbConfigReceiver`) and from the debug e2e receiver
 
 ### Camera Defaults
 
@@ -843,7 +889,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 60 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 65 tools
 
 ---
 

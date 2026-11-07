@@ -132,6 +132,7 @@ private fun ServerLogEntryRow(entry: ServerLogEntry) {
         ServerLogEntry.Type.CHANNEL,
         ServerLogEntry.Type.SETTINGS,
         ServerLogEntry.Type.PRIVACY,
+        ServerLogEntry.Type.SHELL,
         -> {
             Row(
                 modifier =
