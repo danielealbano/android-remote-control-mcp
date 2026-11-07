@@ -8,6 +8,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.MethodOrderer
@@ -56,6 +57,23 @@ class E2EShellShizukuTest {
     }
 
     private fun running(args: String): Boolean = StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
+
+    private fun appPid(): String = StorageE2E.shell("pidof ${AndroidContainerSetup.APP_PACKAGE} || true").trim()
+
+    private fun restartAppFromShellSettings() {
+        val before = appPid()
+        AndroidContainerSetup.execAdb("shell", "am", "start", "-n", AndroidContainerSetup.MAIN_COMPONENT)
+        DeviceUiE2E.tapWhenVisible("Settings")
+        DeviceUiE2E.tapWhenVisible("Shell")
+        DeviceUiE2E.tapWhenVisible("Restart app")
+        val deadline = System.currentTimeMillis() + LONG_WAIT_MS
+        while (appPid().let { it.isEmpty() || it == before } && System.currentTimeMillis() < deadline) {
+            Thread.sleep(POLL_MS)
+        }
+        assertNotEquals(before, appPid())
+        AndroidContainerSetup.waitForServerReady(SharedAndroidContainer.mcpServerUrl)
+        SharedAndroidContainer.refreshMcpClient()
+    }
 
     private fun noProcessWithin(
         args: String,
@@ -138,7 +156,7 @@ class E2EShellShizukuTest {
 
     @Test
     @Order(6)
-    fun `Shizuku already running when elevation is turned on connects only with a new app process`() =
+    fun `elevation turned on after the app started connects Shizuku after Restart app`() =
         runBlocking {
             ShellE2E.configure(*ShellE2E.switches(elevation = false, autoAllow = true))
             forceStopApp()
@@ -148,10 +166,9 @@ class E2EShellShizukuTest {
 
             val error = ShellE2E.callError("shell_exec", ShellE2E.run("id -u", elevated = true))
 
-            assertTrue(error.contains("Shizuku is not running"), error)
+            assertTrue(error.contains("tap Restart app"), error)
 
-            forceStopApp()
-            ShellE2E.restartServer()
+            restartAppFromShellSettings()
             ShellE2E.awaitElevatedReady()
         }
 
