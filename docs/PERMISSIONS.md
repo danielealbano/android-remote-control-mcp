@@ -74,6 +74,18 @@ adb shell settings put secure enabled_notification_listeners \
   <app-id>/com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 ```
 
+## Shizuku (optional elevated shell commands)
+
+Needed only for elevated shell commands through Shizuku. Grant it in the app (Settings → Shell → Grant access) or in the Shizuku app. From adb, grant the permission and then restart Shizuku, which reads it only when it starts:
+
+```bash
+adb shell pm grant <app-id> moe.shizuku.manager.permission.API_V23
+```
+
+Shizuku connects to the app when Shizuku starts or when the app process starts. If it was already running when elevated commands were turned on, force-stop and reopen the app or restart Shizuku.
+
+Elevated commands through `su` are granted by your root manager when the app first runs `su`.
+
 ## One-shot script
 
 The following script grants every runtime permission and enables both special-access services. Set `APP_ID` to match your installed build.

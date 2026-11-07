@@ -72,7 +72,19 @@ graph TB
             Ngrok -. "localhost:tunnel local port" .-> LocalL
             CF -. "or, same port, plain HTTP on 127.0.0.1" .-> HTTP
             Ngrok -. "or, same port, plain HTTP on 127.0.0.1" .-> HTTP
+            subgraph Shell["Shell tools"]
+                ShellAuth["ShellCommandAuthorizer\n(blocklist, elevation rules)"]
+                Approvals["ElevationApprovalCoordinator\n(notification + modal)"]
+                ShellMgr["ShellProcessManager"]
+                ShellAuth --> Approvals
+            end
         end
+
+        AppSh["/system/bin/sh\n(app user, normal commands)"]
+        subgraph ShizukuSrv["Shizuku server (adb shell user or root, optional)"]
+            ShellUserSvc["ShellUserService\n(shell helper process)"]
+        end
+        SuBin["su\n(root manager, optional)"]
 
         MainAct -->|"StateFlow (status)"| McpServerSvc
         SDK -->|"Singleton\n(companion object)"| AccSvc
@@ -80,6 +92,11 @@ graph TB
         SDK --> LocationProv
         SDK --> CameraSvc
         SDK --> NotifSvc
+        SDK --> ShellAuth
+        SDK --> ShellMgr
+        ShellMgr --> AppSh
+        ShellMgr -->|"elevated: AIDL + pipe"| ShellUserSvc
+        ShellMgr -->|"elevated: su -c"| SuBin
     end
 ```
 
@@ -97,7 +114,7 @@ graph TB
    - Sends `ACTION_START` intent to `McpServerService`
    - `McpServerService.onStartCommand()`:
      a. Calls `startForeground()` with notification (within 5 seconds)
-     b. Reads `ServerConfig` from `SettingsRepository`, and refuses the start with `ServerStatus.Error` when `McpListenerRules` refuses its listener settings (Specific IP, tunnel local port)
+     b. Reads `ServerConfig` from `SettingsRepository`, and refuses the start with `ServerStatus.Error` when `McpListenerRules` refuses its listener settings (Specific IP, tunnel local port), then empties the shell scratch folder and lets the shell process manager and the elevation approvals accept requests (`ShellLifecycle.onServerStart()`)
      c. Gets/creates SSL keystore from `CertificateManager` (only if HTTPS enabled)
      d. Creates `McpServer` with config, keystore, SDK `Server` (MCP Kotlin SDK) and the port of the Cloudflare/ngrok loopback listener when one is needed (`McpListenerRules.tunnelListenerPort`)
      e. Starts Ktor: the main listener on the chosen address and port (HTTP by default, HTTPS if enabled) and the Cloudflare/ngrok loopback listener (plain HTTP on `127.0.0.1:<tunnel local port>`), each bind probed first so a taken port fails the start at once
@@ -110,9 +127,9 @@ graph TB
 1. **User taps "Stop Server"** -> `MainViewModel.stopServer()` called
    - Sends `ACTION_STOP` intent to `McpServerService`
    - `McpServerService.onDestroy()` (a server start still in progress is cancelled and waited for first, at most 5 s, through `ServerStartTracker`):
-     a. Updates `ServerStatus.Stopping` via companion-level StateFlow
+     a. Updates `ServerStatus.Stopping` via companion-level StateFlow, then cancels pending elevation approvals, whose tool calls end at once with the refusal that the server is stopping (the answer is lost if the server closes the connection first) (`ShellLifecycle.onServerStopping()`)
      b. Stops tunnel (with 3s ANR-safe timeout) — tunnel stops BEFORE server
-     c. Stops Ktor server gracefully (1s grace + 5s timeout)
+     c. Stops Ktor server gracefully (1s grace + 5s timeout), then kills every shell process and ends it, logging the elevated ones (`ShellLifecycle.onServerStop()`); shell commands and elevation approvals are refused until the next start
      d. Cancels coroutine scope
      e. Clears singleton instance
      f. Updates `ServerStatus.Stopped` via companion-level StateFlow
@@ -148,6 +165,7 @@ graph TB
 | Dispatchers.IO        | DataStore reads/writes, Ktor server startup, network I/O, file operations (SAF) |
 | Dispatchers.Default   | Screenshot JPEG encoding, accessibility tree parsing    |
 | Ktor Netty threads    | HTTP request handling (NIO event loop)                  |
+| Shell threads         | Per running shell process a daemon output reader (`shell-pump-<id>`); for app and `su` commands also a daemon exit waiter (`shell-wait`); a short-lived `shell-su-kill` thread per `su` kill |
 
 ### Coroutine Scopes
 
@@ -158,6 +176,7 @@ graph TB
 | McpAccessibilityService| Custom `CoroutineScope`  | Service lifecycle            |
 | ArcTunnelEnrollService | Custom `CoroutineScope` (IO) | Service start to the end of the last request |
 | ArcTunnelProvider session | Custom `CoroutineScope` (IO + handler) | Tunnel start to stop (per session) |
+| ShellProcessManagerImpl | Custom `CoroutineScope` (IO + `SupervisorJob` + exception handler) | App process (singleton); its children are cancelled at server stop |
 
 ### Thread Safety
 
@@ -166,6 +185,9 @@ graph TB
 - `McpNotificationListenerService.instance`: `@Volatile` singleton
 - `McpServer.running`: `AtomicBoolean`
 - `InFlightToolCalls` (the running tool calls a `notifications/cancelled` can cancel): `synchronized`
+- `ShellProcessTable`, `ShellProcess` and `ShellOutputBuffer`: `synchronized`
+- `ShizukuShellBackend`: `Mutex` around bind, spawn and release; connection callbacks act only for the current binding
+- `ElevationApprovalCoordinatorImpl`: `ConcurrentHashMap` of pending answers plus a `StateFlow` of pending requests
 - Accessibility node access: Must be on main thread (Android requirement)
 
 ---
@@ -226,6 +248,37 @@ sequenceDiagram
         Tool->>Calls: Untrack
         Tool-->>Client: isError result "The client cancelled this tool call"
     end
+```
+
+### Elevated Shell Command
+
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant T as shell_exec or shell_start
+    participant A as ShellCommandAuthorizer
+    participant U as User on the phone
+    participant M as ShellProcessManager
+    participant S as ElevatedShellSelector
+    participant B as Shizuku helper or su
+    C->>T: tools/call with elevated true and a justification
+    T->>A: authorize the command
+    A->>A: blocklist, elevation switch, auto-allow, allowlist
+    alt approval needed
+        A->>U: approval notification (Approve and Deny need the phone unlocked, a tap opens the modal)
+        U-->>A: approve, deny, dismiss, or no answer before the timeout
+    end
+    A-->>T: grant, or refusal (refusals are logged)
+    T->>M: start the command with its grant
+    M->>S: select the elevated backend
+    S-->>M: Shizuku when ready, else su, else refusal
+    M->>B: spawn the launch script
+    B-->>M: header (process group, uid), output, exit code
+    M->>B: kill what is left in the process group
+    M-->>T: page (state, exit code, output)
+    T-->>C: JSON result after the untrusted-content warning
+    M->>B: release the backend
+    Note over M,B: the Shizuku helper is unbound when no elevated Shizuku process remains
 ```
 
 ---
@@ -299,8 +352,10 @@ flowchart TB
     SvcRead --> McpServer["McpServer\n(uses config for Ktor setup)"]
 ```
 
-Settings are read at server start time. Changing settings while the server is
-running requires a restart (UI disables config editing when server is running).
+Most settings are read at server start, and changing them requires a restart (the UI
+disables those fields while the server runs). Settings that tools read each time they
+run apply at once: for example the file tools' size limit, the download settings, the
+storage location permissions, the Privacy Mode settings and the shell settings.
 
 ---
 
@@ -323,6 +378,8 @@ running requires a restart (UI disables config editing when server is running).
 | ACCESS_COARSE_LOCATION   | Runtime       | Declared (implied by FINE)         | Device location fallback  |
 | SAF tree URI permissions | Special       | User grants via system file picker | File operations per storage location |
 | Notification Listener    | Special       | User enables in Settings > Notification access | Reading/interacting with notifications |
+| moe.shizuku.manager.permission.API_V23 | Runtime (Shizuku) | Shizuku app, or Settings → Shell → Grant access | Elevated shell commands through Shizuku (optional) |
+| su grant                 | Root manager  | Root manager prompt on first use   | Elevated shell commands through su (optional) |
 
 ---
 

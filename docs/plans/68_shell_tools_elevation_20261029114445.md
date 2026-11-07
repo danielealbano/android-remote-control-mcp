@@ -6300,9 +6300,9 @@ no capabilities and cannot enter the app's scratch folder)
 including the two documented behaviours (normal-command identity, self-approval).
 
 **Acceptance criteria:**
-- [ ] Every count says 65 tools / 15 categories; every new setting, ADB extra, permission, component, lifecycle step and the elevated flow is documented with the texts below; Mermaid diagrams validated with `mmdc`.
-- [ ] README "No Root Required" wording is unchanged (owner decision); elevation is described in a new subsection.
-- [ ] Normal-command identity and self-approval are documented in MCP_TOOLS, README and PROJECT.
+- [x] Every count says 65 tools / 15 categories; every new setting, ADB extra, permission, component, lifecycle step and the elevated flow is documented with the texts below; Mermaid diagrams validated with `mmdc`.
+- [x] README "No Root Required" wording is unchanged (owner decision); elevation is described in a new subsection.
+- [x] Normal-command identity and self-approval are documented in MCP_TOOLS, README and PROJECT.
 
 ### Task 10.1 — `docs/MCP_TOOLS.md`
 

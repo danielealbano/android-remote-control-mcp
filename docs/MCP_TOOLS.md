@@ -29,12 +29,13 @@ This document provides a comprehensive reference for all MCP tools available in 
 16. [Notification Tools](#12-notification-tools)
 17. [Location Tools](#13-location-tools)
 18. [Sharing Tools](#14-sharing-tools)
+19. [Shell Tools](#15-shell-tools)
 
 ---
 
 ## Overview
 
-The MCP server exposes 60 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 65 tools via the JSON-RPC 2.0 protocol, organized into 15 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -52,6 +53,7 @@ The MCP server exposes 60 tools via the JSON-RPC 2.0 protocol, organized into 14
 | Notification | `android_notification_list`, `android_notification_open`, `android_notification_dismiss`, `android_notification_snooze`, `android_notification_action`, `android_notification_reply` | 32 |
 | Location | `android_get_location` | 43 |
 | Sharing | `android_get_shared_content`, `android_share_file_via_web` | 48 |
+| Shell | `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` | 68 |
 
 ## Tool Naming Convention
 
@@ -3817,3 +3819,314 @@ Exposes an existing device file as a temporary capability URL. Use it to let an 
 
 - **Capability URLs are bearer links**: anyone holding the URL can fetch the file until it expires (1 hour). The random token is the only protection — treat returned URLs as sensitive.
 - **Privacy Mode**: when enabled, device-derived text (shared text, textual file contents, filenames) is redacted before being returned; inline images and served file bytes are not redacted.
+
+## 15. Shell Tools
+
+Shell tools run shell commands on the device, like the shell tools of coding-agent harnesses: one command per call, no persistent shell, no terminal (PTY), stdin closed. Every command runs with `/system/bin/sh -c`, and its stdout and stderr are combined into one output. `workdir` is required on every call and nothing is remembered between calls; `envs` sets environment variables for that command only. When a command exits, every process it left running in its process group is stopped. Results are JSON prefixed by the untrusted-content warning. Shell tools are outside Privacy Mode: commands and their output pass through unchanged.
+
+**File**: `app/src/main/kotlin/.../mcp/tools/ShellTools.kt`
+**Services**: `ShellProcessManager`, `ShellCommandAuthorizer`, `AppShellBackend`, `ShizukuShellBackend`, `SuShellBackend`
+**Permission**: None for normal commands. Elevated commands need Shizuku (`moe.shizuku.manager.permission.API_V23`, granted in the Shizuku app) or a `su` grant from the root manager.
+
+**Processes**: `android_shell_exec` waits for the command at most the foreground limit (Settings → Shell, default 90 seconds, range 10 to 90; waiting for an approval counts toward it). A command still running at the limit keeps running in the background and the call returns its `process_id`; if the client cancels the call or closes its request before it returns, the command is killed, so keep the foreground limit below the client's request timeout. `android_shell_start` returns without waiting for the command to end; an elevated command that needs approval first waits for the user's answer, at most the foreground limit. A background command is stopped after its timeout (default 30 minutes, at most the maximum setting, default 120 minutes; a command `android_shell_exec` moved to the background gets the default, counted from its start) or when the server stops. At most 16 processes run at the same time and the 32 most recently finished processes are kept (both configurable). Android can stop child processes of apps when more than 32 run on the device; a normal command stopped this way ends with exit code 137 and no other notice. Each process keeps the start and the end of its output when the output exceeds the buffer (default 1024 KiB), in the app's memory, for every running and every kept finished process; the settings keep (running + kept finished processes) × buffer at most 64 MiB; each call returns at most the per-call limit (default 64 KiB), and the next page starts at `next_offset`. `command`, `workdir` and `envs` together may take at most 100000 bytes once quoted for the shell, and `justification` at most 1000 characters.
+
+**Scratch folder**: `/storage/emulated/0/Android/data/<application id>/cache/shell`, emptied every time the server starts (entries the app cannot delete, for example ones an elevated command made unreadable to it, stay). Normal and elevated commands can both read and write it (normal commands run with `umask 0007`). It is mounted `noexec`: run scripts with `sh script.sh`; to run a binary, copy it to `/data/local/tmp` with an elevated command and run it from there. The file tools do not expose it.
+
+**Elevation**: off by default (Settings → Shell → Allow elevated commands). A command asks for it with `elevated: true` and a `justification`, for that single command. It runs through Shizuku when Shizuku 13 or later is running and has granted access to the app (as the adb shell user, uid 2000, or as root when Shizuku runs as root); otherwise through `su` (looked up in `PATH`, `/system/bin`, `/system/xbin`, `/sbin`, `/su/bin` and `/debug_ramdisk`) as root; otherwise the call fails and says why. The Shizuku helper process runs only while elevated Shizuku commands run. Shizuku connects to the app when Shizuku starts or when the app process starts: if it was already running when elevation was turned on, force-stop and reopen the app or restart Shizuku. The rules, in order:
+
+1. The blocklist refuses every matching command, elevated or not. A pattern must match the whole command (trimmed, case-sensitive) and `*` matches anything, so `*reboot*` refuses every command containing `reboot`. It compares text only: the same action written another way (quoting, variables, a script, `envs`) is not refused.
+2. With elevation off, every elevated command is refused.
+3. With auto-allow on, every elevated command runs without asking.
+4. Otherwise an elevated command matching the allowlist runs without asking. A pattern must match the whole command (trimmed, case-sensitive), and in allowlist patterns `*` never matches `;`, `&`, `|`, `` ` ``, `$`, `(`, `)`, `<`, `>` or a line break (`\r`, `\n`). `envs` are not checked against the allowlist.
+5. Otherwise the phone shows an approval notification with the justification and the command (first 500 characters). Its Approve and Deny buttons need the phone unlocked, tapping it opens a screen with the same choice, and dismissing it denies the command. The request waits at most the approval timeout (default 60 seconds, range 10 to 85) and never beyond the foreground limit, and it is cancelled when the server stops (the call then ends with `Refused: the MCP server is stopping, so the approval was cancelled.`, which reaches the client only if it is written before the server closes its connections, like the answer of any call running when the server stops). If the app cannot show notifications, the command is refused at once.
+
+Every elevated command is written to the server log (type Shell) with its justification and command: refusals, starts (how it was allowed, process, backend), commands that could not start, and ends (state, exit code). The server log keeps at most the first 500 bytes of each entry and masks UUID-shaped text, so the end of a long command can be missing from its entry (the justification is written before the command).
+
+**Process fields** (returned by `android_shell_exec`, `android_shell_start` and `android_shell_output`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `process_id` | integer | Id for `android_shell_output` and `android_shell_kill` |
+| `state` | string | `running`, `exited`, `killed`, `timed_out` or `failed` |
+| `exit_code` | integer \| null | Exit code once the command ended (`126` when `workdir` cannot be entered); `null` while running or when no code was reported |
+| `backend` | string | `app`, `shizuku` or `su` |
+| `uid` | integer \| null | Android user id the command runs as |
+| `failure` | string \| null | Why a process failed, for example `Shizuku stopped` or `The server stopped` |
+| `output` | string | Output from `output_offset` (UTF-8) |
+| `output_offset` | integer | Byte offset where `output` starts |
+| `next_offset` | integer | Offset to read from next |
+| `output_total_bytes` | integer | Bytes the command has written so far |
+| `output_dropped_bytes` | integer | Bytes skipped between the requested offset and `output_offset`, because only the start and the end of a large output are kept |
+| `has_more_output` | boolean | `true` when output after `next_offset` is available |
+
+**Process summary fields** (returned by `android_shell_kill` and, for each process, by `android_shell_list`): `process_id`, `state`, `exit_code`, `backend`, `uid`, `failure` as above, plus:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `command` | string | The command (first 200 characters) |
+| `elevated` | boolean | Whether the command runs elevated |
+| `started_at_ms` | integer | Start time (epoch milliseconds) |
+| `ended_at_ms` | integer \| null | End time (epoch milliseconds), `null` while running |
+| `output_total_bytes` | integer | Bytes the command has written so far |
+
+### `android_shell_exec`
+
+Runs a command and waits for it to end, at most the foreground limit.
+
+**Parameters**:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `command` | string | Yes | - | The command, run with `/system/bin/sh -c` |
+| `workdir` | string | Yes | - | Absolute path of the working directory |
+| `envs` | object | No | `{}` | Environment variables for this command only, as `"NAME": "value"` strings; names use letters, digits and underscores and do not start with a digit |
+| `elevated` | boolean | No | `false` | Run the command through Shizuku or `su` |
+| `justification` | string | When `elevated` is `true` | - | Why elevation is needed; shown to the user and logged (at most 1000 characters) |
+
+**Returns**: the process fields.
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_exec",
+    "arguments": {
+      "command": "id -u && ls",
+      "workdir": "/storage/emulated/0/Android/data/com.danielealbano.androidremotecontrolmcp/cache/shell"
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"process_id\":1,\"state\":\"exited\",\"exit_code\":0,\"backend\":\"app\",\"uid\":10123,\"failure\":null,\"output\":\"10123\\nnotes.txt\\n\",\"output_offset\":0,\"next_offset\":16,\"output_total_bytes\":16,\"output_dropped_bytes\":0,\"has_more_output\":false}" }
+    ]
+  }
+}
+```
+
+**Example Request (elevated)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_exec",
+    "arguments": {
+      "command": "dumpsys battery | head -3",
+      "workdir": "/data/local/tmp",
+      "elevated": true,
+      "justification": "Read the battery state"
+    }
+  }
+}
+```
+
+**Example Response (elevated)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"process_id\":2,\"state\":\"exited\",\"exit_code\":0,\"backend\":\"shizuku\",\"uid\":2000,\"failure\":null,\"output\":\"Current Battery Service state:\\n  AC powered: false\\n  USB powered: true\\n\",\"output_offset\":0,\"next_offset\":71,\"output_total_bytes\":71,\"output_dropped_bytes\":0,\"has_more_output\":false}" }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: `Missing required parameter: 'command'` (or `'workdir'`); `Parameter 'command' must be a string` (or `'workdir'`, `'justification'`; also with `, got: <value>`); `Parameter 'elevated' must be a boolean` (also `Parameter 'elevated' must be a boolean (true/false), got: '<value>'` or `…, got string: '<value>'`); `Parameter 'command' must be a non-empty string without NUL characters` (or `'workdir'`); `Parameter 'workdir' must be an absolute path, got: '<workdir>'`; `Parameter 'envs' must be an object whose values are strings`; `Parameter 'envs' entry '<name>' needs a name of letters, digits and underscores not starting with a digit, and a string value without NUL characters`; `Parameter 'justification' is required when 'elevated' is true`; `Parameter 'justification' must be at most 1000 characters, got: <length>`; `Parameters 'command', 'workdir' and 'envs' are too long together: <bytes> bytes once quoted for the shell, the limit is 100000`
+- **Permission denied**: `Refused: the command matches the shell blocklist pattern '<pattern>'.`; `Refused: elevated commands are disabled in the app's Shell settings.`; `Refused: the app cannot ask the user to approve this elevated command because its notifications are off.`; `Refused: the user denied this elevated command.`; `Refused: the user did not answer the approval request within <seconds> seconds.`; `Refused: the MCP server is stopping, so the approval was cancelled.`; `Elevated commands cannot run: <reason>, and su was not found.`, where `<reason>` is `Shizuku is not installed`, `Shizuku is not running, or has not connected to the app yet (it connects when Shizuku starts and when the app process starts; if Shizuku was already running when elevation was turned on, force-stop and reopen the app or restart Shizuku)`, `Shizuku is older than version 13 and must be updated` or `Shizuku has not granted access to the app (grant it in the app's Shell settings)`
+- **Action failed**: `<limit> shell processes are already running (the limit); wait for one to end or stop one with the shell kill tool`; `The MCP server is not running; the command did not start`; `The command could not start through <app|shizuku|su>: <reason>` (for example `Shizuku did not start the shell helper within 10 seconds` or `su was not found`)
+
+### `android_shell_start`
+
+Starts a command in the background and returns its `process_id` without waiting for it to end (an elevated command that needs approval first waits for the user's answer, at most the foreground limit).
+
+**Parameters**: the parameters of `android_shell_exec`, plus:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `timeout_minutes` | integer | No | The default background timeout (30) | Minutes after which the command is stopped, from 1 to the maximum background timeout (120 by default) |
+
+**Returns**: the process fields (normally `state` `running`).
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_start",
+    "arguments": {
+      "command": "logcat -v time",
+      "workdir": "/storage/emulated/0/Android/data/com.danielealbano.androidremotecontrolmcp/cache/shell",
+      "timeout_minutes": 5
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"process_id\":3,\"state\":\"running\",\"exit_code\":null,\"backend\":\"app\",\"uid\":null,\"failure\":null,\"output\":\"\",\"output_offset\":0,\"next_offset\":0,\"output_total_bytes\":0,\"output_dropped_bytes\":0,\"has_more_output\":false}" }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`): those of `android_shell_exec`, plus **Invalid params**: `Parameter 'timeout_minutes' must be between 1 and <maximum>, got: <value>`; `timeout_minutes` not an integer (`Parameter 'timeout_minutes' must be a number`, `…must be a number, got: '<value>'`, `…must be a number, got string: '<value>'` or `…must be an integer, got: '<value>'`).
+
+### `android_shell_output`
+
+Returns the output of a process from `offset`, at most the per-call limit, with its state and exit code.
+
+**Parameters**:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `process_id` | integer | Yes | - | The `process_id` returned by `android_shell_exec` or `android_shell_start` |
+| `offset` | integer | No | `0` | Byte offset to read from; continue with `next_offset` |
+| `wait_seconds` | integer | No | `0` | First wait up to this many seconds (0 to the foreground limit) for output after `offset` or for the process to end |
+
+**Returns**: the process fields.
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_output",
+    "arguments": {
+      "process_id": 3,
+      "offset": 0,
+      "wait_seconds": 10
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"process_id\":3,\"state\":\"running\",\"exit_code\":null,\"backend\":\"app\",\"uid\":10123,\"failure\":null,\"output\":\"--------- beginning of main\\n\",\"output_offset\":0,\"next_offset\":28,\"output_total_bytes\":28,\"output_dropped_bytes\":0,\"has_more_output\":false}" }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: `Missing required parameter: 'process_id'`; `process_id`, `offset` or `wait_seconds` not an integer (`Parameter '<name>' must be a number`, `…must be a number, got: '<value>'`, `…must be a number, got string: '<value>'` or `…must be an integer, got: '<value>'`; for `process_id` also `Parameter 'process_id' value exceeds integer range`); `Unknown process_id <id>: it never existed, the server restarted, or it was dropped from the finished list`; `Parameter 'offset' must be between 0 and <total>, got: <offset>`; `Parameter 'wait_seconds' must be between 0 and <limit>, got: <value>`
+
+### `android_shell_kill`
+
+Stops a process together with every process in its process group (SIGKILL), waits up to 2 seconds for it to end and returns its summary (`state` can still be `running` if it has not ended by then, for example while `su` waits for the root manager's prompt; the kill is applied as soon as the command starts).
+
+**Parameters**:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `process_id` | integer | Yes | - | The process to stop |
+
+**Returns**: the process summary fields.
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_kill",
+    "arguments": {
+      "process_id": 3
+    }
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"process_id\":3,\"state\":\"killed\",\"exit_code\":137,\"backend\":\"app\",\"uid\":10123,\"failure\":null,\"command\":\"logcat -v time\",\"elevated\":false,\"started_at_ms\":1761735600000,\"ended_at_ms\":1761735660000,\"output_total_bytes\":48210}" }
+    ]
+  }
+}
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: `Missing required parameter: 'process_id'`; `process_id` not an integer (`Parameter 'process_id' must be a number`, `…must be a number, got: '<value>'`, `…must be a number, got string: '<value>'`, `…must be an integer, got: '<value>'` or `Parameter 'process_id' value exceeds integer range`); `Unknown process_id <id>: it never existed, the server restarted, or it was dropped from the finished list`
+
+### `android_shell_list`
+
+Lists the running and the kept finished processes, oldest first.
+
+**Parameters**: None.
+
+**Returns**: `{"processes": [...]}`, one process summary per process.
+
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "tools/call",
+  "params": {
+    "name": "android_shell_list",
+    "arguments": {}
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "result": {
+    "content": [
+      { "type": "text", "text": "<untrusted-content warning>\n{\"processes\":[{\"process_id\":1,\"state\":\"exited\",\"exit_code\":0,\"backend\":\"app\",\"uid\":10123,\"failure\":null,\"command\":\"id -u && ls\",\"elevated\":false,\"started_at_ms\":1761735500000,\"ended_at_ms\":1761735500040,\"output_total_bytes\":16}]}" }
+    ]
+  }
+}
+```
+
+**Error Cases**: None specific.
+
+### Security Considerations
+
+- **Normal commands run as the app**: they can read and change everything the app can, including its own settings file (so a command can turn on elevation and auto-allow by editing it), and they can use any `su` grant or Shizuku access the app holds, for example by running `su -c` directly. The shell settings decide what the tools allow, not what a command can do. The five shell tools are on by default, like every MCP tool: turn them off in Settings → MCP Tools unless you trust every client of this server.
+- **Self-approval**: a client can approve its own elevation request through the notification tools or by sending the approval broadcast with `android_send_intent` (both work with the phone locked), or by tapping the screen through the accessibility tools. The approval is a check for the user, not a boundary against a client that has those tools.
+- **Leaving the process group**: a process that leaves the command's process group (for example with `setsid`) is not stopped at exit, by `android_shell_kill`, by a timeout or at server stop, and `android_shell_list` does not show it; after an elevated command it keeps the elevated user.
+- **App process death and `su`**: if the app process dies (crash, force stop, system kill) while elevated commands run through `su`, a root manager that starts the root shell from its own daemon (for example Magisk) can keep those commands running: they get no timeout and the next server start does not know them. Commands run through Shizuku are stopped (Shizuku stops the helper) and normal commands stop with the app.
+- **Elevated commands** run with the power of the adb shell user or of root.
+- **Authentication**: shell tools do not require authentication beyond the server's own; keep bearer token or OAuth authentication on whenever the server can be reached from other devices.
+- **Privacy Mode** does not apply to shell tools.
+- **Audit**: every elevated command is in the server log.
