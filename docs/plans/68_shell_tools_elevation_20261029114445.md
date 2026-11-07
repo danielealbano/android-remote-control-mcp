@@ -111,10 +111,10 @@ matches and no action removes code added to main since the plan was written; too
 before anything can switch it.
 
 **Acceptance criteria:**
-- [ ] `ServerConfig.shellConfig` exposes elevation, auto-allow, both pattern lists and the eight limits with the agreed defaults and ranges.
-- [ ] `SettingsRepository` extends `ShellSettings`; out-of-range limits, a background default above the max, a max below the default and a running, kept or output-per-process change that puts (running + finished kept) × output kept per process over 64 MiB are refused.
-- [ ] Turning elevation on/off enables/disables `rikka.shizuku.ShizukuProvider`; the app re-applies the state at startup.
-- [ ] Shizuku 13.1.5 libraries are dependencies of both flavors; the provider is declared disabled; Sui auto-initialization is disabled before providers start.
+- [x] `ServerConfig.shellConfig` exposes elevation, auto-allow, both pattern lists and the eight limits with the agreed defaults and ranges.
+- [x] `SettingsRepository` extends `ShellSettings`; out-of-range limits, a background default above the max, a max below the default and a running, kept or output-per-process change that puts (running + finished kept) × output kept per process over 64 MiB are refused.
+- [x] Turning elevation on/off enables/disables `rikka.shizuku.ShizukuProvider`; the app re-applies the state at startup.
+- [x] Shizuku 13.1.5 libraries are dependencies of both flavors; the provider is declared disabled; Sui auto-initialization is disabled before providers start.
 
 ### Task 1.1 — Dependencies, AIDL build feature, manifest provider, Sui opt-out
 
@@ -173,8 +173,8 @@ and add as the first member function of the class (before `onCreate`):
 ```
 
 **Definition of Done:**
-- [ ] Dependencies, `aidl = true` and the provider declared exactly as above.
-- [ ] `attachBaseContext` added exactly as above.
+- [x] Dependencies, `aidl = true` and the provider declared exactly as above.
+- [x] `attachBaseContext` added exactly as above.
 
 ### Task 1.2 — `ShellLimit` / `ShellConfig`
 
@@ -304,7 +304,7 @@ data class ShellConfig(
 ```
 
 **Definition of Done:**
-- [ ] Enum keys, defaults, ranges and the output memory cap exactly as above; `ServerConfig.shellConfig` added.
+- [x] Enum keys, defaults, ranges and the output memory cap exactly as above; `ServerConfig.shellConfig` added.
 
 ### Task 1.3 — `ShizukuProviderSwitch`
 
@@ -346,7 +346,7 @@ class ShizukuProviderSwitchImpl internal constructor(
 ```
 
 **Definition of Done:**
-- [ ] File created exactly as above.
+- [x] File created exactly as above.
 
 ### Task 1.4 — `ShellSettings` and `ShellSettingsImpl`
 
@@ -643,7 +643,7 @@ cannot interleave with a toggle). Replace the line
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 1.5 — Tests
 
@@ -703,7 +703,7 @@ instance; `attachBaseContext` is protected, so the test calls it through
 | `the Shizuku provider ships disabled and gated` | main manifest declares `rikka.shizuku.ShizukuProvider` with `android:enabled="false"`, `android:exported="true"`, `android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"` (read the `enabled` attribute in this test's own parser) |
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet).
+- [x] Tests written as listed (not run yet).
 
 ---
 

@@ -156,6 +156,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         toolPermissionsConfig = ToolPermissionsConfig.fromJsonOrDefault(prefs[TOOL_PERMISSIONS_KEY]),
         privacyModeConfig = PrivacyModeConfig.fromJsonOrDefault(prefs[PRIVACY_MODE_CONFIG_KEY]),
         hideFromRecents = prefs[HIDE_FROM_RECENTS_KEY] ?: false,
+        shellConfig = mapShellConfig(prefs),
     )
 }
 
@@ -309,10 +310,12 @@ class SettingsRepositoryImpl
         eventChannelSettings: EventChannelSettings,
         arcTunnelSettings: ArcTunnelSettings,
         downloadSettings: DownloadSettings,
+        shellSettings: ShellSettings,
     ) : SettingsRepository,
         EventChannelSettings by eventChannelSettings,
         ArcTunnelSettings by arcTunnelSettings,
-        DownloadSettings by downloadSettings {
+        DownloadSettings by downloadSettings,
+        ShellSettings by shellSettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)

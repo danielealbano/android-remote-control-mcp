@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
@@ -15,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import rikka.shizuku.ShizukuProvider
 import javax.inject.Inject
 import androidx.work.Configuration as WorkConfiguration
 
@@ -41,6 +43,11 @@ class McpApplication :
             .build()
     }
 
+    override fun attachBaseContext(base: Context) {
+        ShizukuProvider.disableAutomaticSuiInitialization()
+        super.attachBaseContext(base)
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Flavor-specific one-time migrations (gms: geofence config → dedicated key), launched eagerly
@@ -52,7 +59,10 @@ class McpApplication :
         appIconCache.preload()
         // Apply the one-time auth-model migration eagerly so the UI Flow reflects the migrated model
         // promptly at startup (idempotent; the server start path also guarantees it via getServerConfig()).
-        CoroutineScope(Dispatchers.IO).launch { settingsRepository.ensureAuthModelMigrated() }
+        CoroutineScope(Dispatchers.IO).launch {
+            settingsRepository.ensureAuthModelMigrated()
+            settingsRepository.syncShizukuProvider()
+        }
         UpdateCheckScheduler.schedulePeriodic(this)
         Log.i(TAG, "Application initialized, notification channels created")
     }
