@@ -30,6 +30,8 @@ class E2EShellPermissionTest {
             ShellE2E.configure(*ShellE2E.switches(elevation = true, autoAllow = true))
             ShizukuE2E.grant()
             ShizukuE2E.startAsShell()
+            // Shizuku reaches only an app process started with elevation on (its provider enabled).
+            AndroidContainerSetup.execAdb("shell", "am", "force-stop", AndroidContainerSetup.APP_PACKAGE)
             ShellE2E.restartServer()
             ShellE2E.awaitElevatedReady()
             ShellE2E.configure(*ShellE2E.switches(elevation = true, autoAllow = false))
