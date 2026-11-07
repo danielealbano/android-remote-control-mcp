@@ -7069,10 +7069,10 @@ storage location permissions, the Privacy Mode settings and the shell settings.
 **Why:** project Definition of Done; e2e always runs (owner rule); review cadence per owner.
 
 **Acceptance criteria:**
-- [ ] `make lint`, `make test-unit`, `./gradlew build`, the e2e suite and `mmdc` all clean, with no `^w: ` line in any of their logs.
-- [ ] Manual QA on the Realme T70 done and reported, including the `uiautomator` checks of the new screens.
-- [ ] code-reviewer (plan compliance) loop as defined in Task 11.3; nits fixed but not counted.
-- [ ] PR opened with the credit line and `Refs #191`; no AI attribution in commits, PR or code.
+- [x] `make lint`, `make test-unit`, `./gradlew build`, the e2e suite and `mmdc` all clean, with no `^w: ` line in any of their logs.
+- [x] Manual QA on the Realme T70 done and reported, including the `uiautomator` checks of the new screens.
+- [x] code-reviewer (plan compliance) loop as defined in Task 11.3; nits fixed but not counted.
+- [x] PR opened with the credit line and `Refs #191`; no AI attribution in commits, PR or code.
 
 ### Task 11.1 — Gates (each command once, output through `tee`)
 
@@ -7113,7 +7113,7 @@ A failing test or lint finding, even in code this plan does not touch, is fixed 
 fix only the affected command is run again.
 
 **Definition of Done:**
-- [ ] Every command above succeeded; both `grep '^w: '` commands printed nothing; `act --validate` printed `exit=0`; `/tmp/p68-e2e.log` shows `E2EShellTest`,
+- [x] Every command above succeeded; both `grep '^w: '` commands printed nothing; `act --validate` printed `exit=0`; `/tmp/p68-e2e.log` shows `E2EShellTest`,
   `E2EShellShizukuTest`, `E2EShellPermissionTest` and `E2EShellSuTest` run with no failure; every `exit=` line in
   `/tmp/p68-mmdc.log` shows `0`.
 
@@ -7147,7 +7147,7 @@ fix only the affected command is run again.
 9. The server log shows SHELL entries (refused, started, ended).
 
 **Definition of Done:**
-- [ ] Every step done on the T70 and the results (with the `uiautomator` dumps) reported to the owner.
+- [x] Every step done on the T70 and the results (with the `uiautomator` dumps) reported to the owner.
 
 ### Task 11.3 — Reviews and PR
 
@@ -7164,7 +7164,7 @@ fix only the affected command is run again.
   `Refs #191` (the issue is not closed by the PR); no AI attribution. Report the PR URL.
 
 **Definition of Done:**
-- [ ] Review loop finished as described; nothing uncommitted or unpushed; PR open with the credit line and `Refs #191`;
+- [x] Review loop finished as described; nothing uncommitted or unpushed; PR open with the credit line and `Refs #191`;
   PR URL reported.
 
 ## Review findings and implementation notes
@@ -7252,3 +7252,7 @@ fix only the affected command is run again.
   4 showed that a Shizuku started after such a runtime enable can still reach the app; other runs on redroid showed
   it cannot. The button can therefore show where starting Shizuku would also have been enough; a restart is harmless.
 - Nit: the comments added with the change were removed (Conventions: no comments beyond the plan's code).
+
+### Restart app change, review rounds 2 and 3
+
+- Opus round 2: zero findings. Fable round 1: zero findings. The review loop ended at b90fe84.
