@@ -7166,3 +7166,49 @@ fix only the affected command is run again.
 **Definition of Done:**
 - [ ] Review loop finished as described; nothing uncommitted or unpushed; PR open with the credit line and `Refs #191`;
   PR URL reported.
+
+## Review findings and implementation notes
+
+### Deviations from the plan's code (current main, compiler, lint)
+
+1. `e2e-tests/build.gradle.kts`: `import java.util.Properties` and `Properties()` (in a Gradle Kotlin script `java`
+   resolves to the Java extension, so `java.util.Properties()` does not compile), and
+   `tasks.register<Exec>("compileTestSu")` instead of the deprecated `by tasks.registering(Exec::class)`.
+2. `ShellSettingsImpl.kt`: the memory cap message is the constant `OVER_MEMORY_CAP_MESSAGE` (ktlint when-entry rule).
+3. `ShellSettingsViewModel.onCleared` does not call the empty `super.onCleared()` (Android lint `EmptySuperCall`).
+4. README: `### Optional Elevated Shell Commands` sits after `### No Root Required`, before the `### Trust Model`
+   section main added after the plan was written.
+5. `docs/PROJECT.md`: `ShellSettingsScreen.kt` and `ShellElevationSection.kt` are listed in the `ui/screens/settings/`
+   bullet main added after the plan was written.
+6. Test names Kotlin cannot compile (`:` or `/`): `missing or blank command or workdir`,
+   `a page spans the head-tail join when nothing was dropped`, `allowed - runs as the adb user`,
+   `binaries run from data local tmp through elevation`.
+7. Test choices where the plan's tables are silent: `E2EShellPermissionTest` collapses the notification shade after
+   the approve and dismiss tests; `ShellToolsIntegrationTest` "exec backgrounds at the foreground cap" pages from
+   `next_offset`; `ShizukuShellBackendTest` "a binding dropped while connecting" uses a 5 s bind timeout;
+   `ShellScratchDirectoryTest` uses two `@TempDir` fields; long lines reshaped for ktlint and detekt.
+8. Android lint `PluralsCandidate` on "Must be between %1$d and %2$d" is the same pattern as the existing storage
+   limit strings; left as they are.
+
+### Owner decisions (2026-11-07)
+
+- Not handled in this plan: a client approving its own elevation request through `android_send_intent`, and the
+  Shizuku connection needing an app restart.
+- Output memory: capped in total at 64 MiB as a settings check (see "Refresh").
+
+### Code review round 1 (opus): 3 CRITICAL (e2e failures), 2 nits
+
+- `E2EShellPermissionTest` dismiss: `DeviceUiE2E.swipeAwayWhenVisible` swiped only across the title text, too short
+  to dismiss the row; it now swipes from the text to the right screen edge (`wm size`). The test also opened the shade
+  before the notification was posted: on redroid a row added to an open shade stays in its heads-up add animation and
+  ignores swipes (taps still work). The test now waits for the notification in `dumpsys notification`
+  (`DeviceUiE2E.awaitNotificationPosted`) before opening the shade.
+- `E2EShellSuTest` "Shizuku has priority over su": Shizuku reaches only an app process started while elevation was
+  on; a `ShizukuProvider` enabled at runtime stays unreachable until the app process restarts, and restarting Shizuku
+  does not help. Owner: wording fix only. The Shizuku status text, the tool error, README, `docs/PERMISSIONS.md` and
+  `docs/MCP_TOOLS.md` say to force-stop and reopen the app after turning elevation on (no "or restart Shizuku").
+  `E2EShellSuTest` and `E2EShellPermissionTest` force-stop the app after turning elevation on. The test stays (owner).
+- `E2EShellTest` "scratch folder is noexec, scripts run": redroid mounts `Android/data` as an overlay without
+  `noexec`, so the copied binary runs there; on the T70 it exits 126 and a script runs (checked 2026-11-07). Owner:
+  drop the 126 check. The test is now `scripts run from the scratch folder`.
+- The two nits were fixed in commit 1703341.
