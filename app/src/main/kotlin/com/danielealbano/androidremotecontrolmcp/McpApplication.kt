@@ -113,6 +113,15 @@ class McpApplication :
                 description = "Alert when a certificate for the free E2E tunnel name was issued to another key"
             }
 
+        val elevationApprovalChannel =
+            NotificationChannel(
+                ELEVATION_APPROVAL_CHANNEL_ID,
+                getString(R.string.notification_channel_elevation_approval_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = getString(R.string.notification_channel_elevation_approval_description)
+            }
+
         notificationManager.createNotificationChannel(mcpServerChannel)
         notificationManager.createNotificationChannel(oauthApprovalChannel)
         notificationManager.createNotificationChannel(
@@ -126,6 +135,7 @@ class McpApplication :
         )
         notificationManager.createNotificationChannel(updateChannel)
         notificationManager.createNotificationChannel(arcTunnelAlertChannel)
+        notificationManager.createNotificationChannel(elevationApprovalChannel)
     }
 
     companion object {
@@ -135,5 +145,6 @@ class McpApplication :
         const val UPDATE_CHANNEL_ID = "update_channel"
         const val ARC_TUNNEL_ALERT_CHANNEL_ID = "arc_tunnel_alert_channel"
         const val ARC_TUNNEL_STATUS_CHANNEL_ID = "arc_tunnel_status_channel"
+        const val ELEVATION_APPROVAL_CHANNEL_ID = "shell_elevation_approval_channel"
     }
 }

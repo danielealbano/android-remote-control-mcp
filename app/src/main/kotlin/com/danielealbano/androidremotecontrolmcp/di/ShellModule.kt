@@ -2,6 +2,8 @@ package com.danielealbano.androidremotecontrolmcp.di
 
 import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellCommandAuthorizer
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellCommandAuthorizerImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManager
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManagerImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory
@@ -14,6 +16,10 @@ import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuStatusPro
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuStatusProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.SuShell
 import com.danielealbano.androidremotecontrolmcp.services.shell.SuShellBackend
+import com.danielealbano.androidremotecontrolmcp.services.shell.approval.ElevationApprovalCoordinator
+import com.danielealbano.androidremotecontrolmcp.services.shell.approval.ElevationApprovalCoordinatorImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.approval.ElevationApprovalNotifier
+import com.danielealbano.androidremotecontrolmcp.services.shell.approval.ElevationApprovalNotifierImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -49,4 +55,14 @@ abstract class ShellModule {
     @Binds
     @Singleton
     abstract fun bindShellScratchDirectory(impl: ShellScratchDirectoryImpl): ShellScratchDirectory
+
+    @Binds
+    @Singleton
+    abstract fun bindElevationApprovalCoordinator(impl: ElevationApprovalCoordinatorImpl): ElevationApprovalCoordinator
+
+    @Binds
+    abstract fun bindElevationApprovalNotifier(impl: ElevationApprovalNotifierImpl): ElevationApprovalNotifier
+
+    @Binds
+    abstract fun bindShellCommandAuthorizer(impl: ShellCommandAuthorizerImpl): ShellCommandAuthorizer
 }

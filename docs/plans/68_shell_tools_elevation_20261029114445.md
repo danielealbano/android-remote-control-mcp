@@ -3090,11 +3090,11 @@ case); a second `@TempDir` as an outside folder holding `keep.txt`; links made w
 **Why:** the user decides per command; refusals must reach the agent with the reason and be audited.
 
 **Acceptance criteria:**
-- [ ] Blocklist refuses any command; elevation off refuses elevated commands; auto-allow, allowlist, or an approval (notification actions requiring unlock, or the modal) let an elevated command run.
-- [ ] Notifications unavailable (permission, app switch or channel off) → immediate refusal; approval waits at most min(approval timeout, foreground budget).
-- [ ] Every elevated refusal is written to the `SHELL` log with command and justification (starts, start failures and ends are logged by the manager, US4).
-- [ ] Approve/Deny notification actions require the device to be unlocked; dismissing the notification denies the request; the notification is `VISIBILITY_PRIVATE`, so a secure lock screen hides its content only when the phone's lock screen setting hides sensitive notification content; the modal shows the justification and the command truncated to 500 characters.
-- [ ] When the server starts stopping (before Ktor stops), pending requests are cancelled and new ones refused until the next start, so each waiting call ends at once with the refusal that the server is stopping (the answer reaches the client only if it is written before the server closes its sessions, like the answer of any call running when the server stops); `ShellCommandAuthorizer` is an interface bound in `ShellModule`.
+- [x] Blocklist refuses any command; elevation off refuses elevated commands; auto-allow, allowlist, or an approval (notification actions requiring unlock, or the modal) let an elevated command run.
+- [x] Notifications unavailable (permission, app switch or channel off) → immediate refusal; approval waits at most min(approval timeout, foreground budget).
+- [x] Every elevated refusal is written to the `SHELL` log with command and justification (starts, start failures and ends are logged by the manager, US4).
+- [x] Approve/Deny notification actions require the device to be unlocked; dismissing the notification denies the request; the notification is `VISIBILITY_PRIVATE`, so a secure lock screen hides its content only when the phone's lock screen setting hides sensitive notification content; the modal shows the justification and the command truncated to 500 characters.
+- [x] When the server starts stopping (before Ktor stops), pending requests are cancelled and new ones refused until the next start, so each waiting call ends at once with the refusal that the server is stopping (the answer reaches the client only if it is written before the server closes its sessions, like the answer of any call running when the server stops); `ShellCommandAuthorizer` is an interface bound in `ShellModule`.
 
 ### Task 5.1 — Strings, channel and approval coordinator
 
@@ -3275,7 +3275,7 @@ class ElevationApprovalCoordinatorImpl
 ```
 
 **Definition of Done:**
-- [ ] Strings, channel and file added exactly as above.
+- [x] Strings, channel and file added exactly as above.
 
 ### Task 5.2 — Approval modal (ViewModel, screen, activity)
 
@@ -3445,7 +3445,7 @@ class ElevationApprovalActivity : ComponentActivity() {
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above; the activity is not shown over the lock screen (no `showWhenLocked`).
+- [x] Files created/modified exactly as above; the activity is not shown over the lock screen (no `showWhenLocked`).
 
 ### Task 5.3 — Notifier, receiver and bindings
 
@@ -3627,7 +3627,7 @@ after an answer.
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 5.4 — `ShellCommandAuthorizer`
 
@@ -3755,7 +3755,7 @@ class ShellCommandAuthorizerImpl
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 5.5 — Tests
 
@@ -3829,7 +3829,7 @@ default; `RecordingServerLogRepository`.
 | `notifications off` | `canNotify()` false → refused immediately, `approvals.request` never called |
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet).
+- [x] Tests written as listed (not run yet).
 
 ---
 

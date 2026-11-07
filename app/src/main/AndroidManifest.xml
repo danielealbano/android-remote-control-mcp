@@ -177,6 +177,15 @@
             android:exported="false"
             android:label="@string/approval_title" />
 
+        <activity
+            android:name=".ui.ElevationApprovalActivity"
+            android:exported="false"
+            android:label="@string/elevation_approval_title" />
+
+        <receiver
+            android:name=".services.shell.approval.ElevationApprovalReceiver"
+            android:exported="false" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

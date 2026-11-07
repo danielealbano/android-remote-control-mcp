@@ -538,4 +538,15 @@
     <string name="privacy_card_title">Worried about personal data?</string>
     <string name="privacy_card_action">Set up Privacy Mode</string>
     <string name="privacy_card_dismiss">Dismiss</string>
+    <string name="notification_channel_elevation_approval_name">Elevated command approvals</string>
+    <string name="notification_channel_elevation_approval_description">Asks you to approve elevated shell commands requested by an MCP client</string>
+    <string name="elevation_notification_title">Approve an elevated command?</string>
+    <string name="elevation_notification_details">Command: %1$s\n\nReason: %2$s</string>
+    <string name="elevation_approve">Approve</string>
+    <string name="elevation_deny">Deny</string>
+    <string name="elevation_approval_title">Elevated command</string>
+    <string name="elevation_approval_reason_label">Reason given by the client</string>
+    <string name="elevation_approval_command_label">Command</string>
+    <string name="elevation_approval_gone">This request is no longer pending.</string>
+    <string name="elevation_approval_close">Close</string>
 </resources>
