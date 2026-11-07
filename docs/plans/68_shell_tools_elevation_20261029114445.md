@@ -7243,3 +7243,12 @@ fix only the affected command is run again.
     app`: it taps the button through the UI, waits for a new app pid and the server, then for Shizuku.
   - Checked on the T70: after Restart app the accessibility service stays enabled and bound, the server comes back by
     itself, the app reopens on the home screen, and Shizuku is Ready (elevated `id -u` returns 2000).
+
+### Restart app change, review round 1 (opus): 1 CRITICAL, 1 nit
+
+- `E2EShellShizukuTest` order 1 restarts the app with the provider disabled behind it, so order 3 ("installed but not
+  running") would read `NeedsRestart` instead of "Shizuku is not running". Order 1 now ends with a force-stop and a
+  server restart, so orders 2 to 5 run in a process that started with the provider enabled. Before the change, order
+  4 showed that a Shizuku started after such a runtime enable can still reach the app; other runs on redroid showed
+  it cannot. The button can therefore show where starting Shizuku would also have been enough; a restart is harmless.
+- Nit: the comments added with the change were removed (Conventions: no comments beyond the plan's code).
