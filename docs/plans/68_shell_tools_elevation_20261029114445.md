@@ -7201,8 +7201,8 @@ fix only the affected command is run again.
 - `E2EShellPermissionTest` dismiss: `DeviceUiE2E.swipeAwayWhenVisible` swiped only across the title text, too short
   to dismiss the row; it now swipes from the text to the right screen edge (`wm size`). The test also opened the shade
   before the notification was posted: on redroid a row added to an open shade stays in its heads-up add animation and
-  ignores swipes (taps still work). The test now waits for the notification in `dumpsys notification`
-  (`DeviceUiE2E.awaitNotificationPosted`) before opening the shade.
+  ignores swipes (taps still work). The test now waits for the notification in `cmd notification list`
+  (`DeviceUiE2E.awaitNotificationPosted`, active notifications only) before opening the shade.
 - `E2EShellSuTest` "Shizuku has priority over su": Shizuku reaches only an app process started while elevation was
   on; a `ShizukuProvider` enabled at runtime stays unreachable until the app process restarts, and restarting Shizuku
   does not help. Owner: wording fix only. The Shizuku status text, the tool error, README, `docs/PERMISSIONS.md` and
@@ -7212,3 +7212,11 @@ fix only the affected command is run again.
   `noexec`, so the copied binary runs there; on the T70 it exits 126 and a script runs (checked 2026-11-07). Owner:
   drop the 126 check. The test is now `scripts run from the scratch folder`.
 - The two nits were fixed in commit 1703341.
+
+### Code review round 2 (opus): 2 WARNING, 1 nit
+
+- The wait for the approval notification read `dumpsys notification`, whose archive of removed notifications can
+  carry the same tag (empty on redroid 14, but not guaranteed): it now reads `cmd notification list`.
+- The Mermaid gate of Task 11.1 had not been run for the changed `docs/ARCHITECTURE.md` and `CONTRIBUTING.md`
+  blocks: run, every block exits 0.
+- Nit: comments added by the round 1 fixes removed (Conventions: no comments beyond the plan's code).
