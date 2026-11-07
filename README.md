@@ -186,7 +186,6 @@ is best-effort mitigation, not a guarantee.
 
 Shell tools are not covered: commands and their output pass through unchanged.
 
-
 The model is the [Ai4Privacy multilingual anonymiser](https://huggingface.co/ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii)
 (MIT license, Built with Llama), downloaded once on first enable (~150 MB) directly from the pinned
 Hugging Face revision and checksum-verified on device.

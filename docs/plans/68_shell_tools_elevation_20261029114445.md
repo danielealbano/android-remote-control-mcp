@@ -6638,7 +6638,7 @@ Lists the running and the kept finished processes, oldest first.
 ````
 
 **Definition of Done:**
-- [ ] Text added exactly as above.
+- [x] Text added exactly as above.
 
 ### Task 10.2 — `README.md`, `CONTRIBUTING.md`, `THIRD_PARTY_LICENSES.md`, `docs/PERMISSIONS.md`
 
@@ -6744,7 +6744,7 @@ Elevated commands through `su` are granted by your root manager when the app fir
 ````
 
 **Definition of Done:**
-- [ ] All edits applied exactly as above; no other wording changed.
+- [x] All edits applied exactly as above; no other wording changed.
 
 ### Task 10.3 — `docs/PROJECT.md` and `docs/ARCHITECTURE.md`
 
@@ -7059,7 +7059,7 @@ storage location permissions, the Privacy Mode settings and the shell settings.
 ```
 
 **Definition of Done:**
-- [ ] All edits applied exactly as above; both Mermaid blocks are the ones validated with `mmdc` (checked again in
+- [x] All edits applied exactly as above; both Mermaid blocks are the ones validated with `mmdc` (checked again in
   User Story 11).
 
 ---
