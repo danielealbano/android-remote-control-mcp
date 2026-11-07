@@ -5670,11 +5670,11 @@ Sharing category:
 run against a real Android with a real Shizuku and a real UserService.
 
 **Acceptance criteria:**
-- [ ] A test-only setuid `su` is compiled with the NDK by Gradle before the e2e tests and pushed to redroid by the `su` tests only.
-- [ ] Shizuku v13.6.0 is downloaded once (SHA-256 checked), installed, started as uid 2000 or root, stopped, granted and revoked by the tests.
-- [ ] Normal shell behaviour, the Shizuku states not installed, not running, not allowed and allowed (Outdated is unit tested), back-to-back Shizuku commands, the provider switch and its restore at app start, the app dying with elevated processes running, Shizuku stopping with elevated processes running (no process left), the permission model (incl. approval via notification action, deny via modal, deny by dismissing the notification, server stop while waiting, timeout, notifications off) and the su backend/priority are covered.
-- [ ] Every class restarts the server after its setup and restores the shell defaults, Shizuku absence, the test `su` absence and the notification permission in `@AfterAll`.
-- [ ] The stock redroid `su` (`/system/xbin/su`) is never overwritten or deleted, and `ShizukuE2E` calls it by absolute path (the test `su` in `/system/bin` comes first in `PATH`).
+- [x] A test-only setuid `su` is compiled with the NDK by Gradle before the e2e tests and pushed to redroid by the `su` tests only.
+- [x] Shizuku v13.6.0 is downloaded once (SHA-256 checked), installed, started as uid 2000 or root, stopped, granted and revoked by the tests.
+- [x] Normal shell behaviour, the Shizuku states not installed, not running, not allowed and allowed (Outdated is unit tested), back-to-back Shizuku commands, the provider switch and its restore at app start, the app dying with elevated processes running, Shizuku stopping with elevated processes running (no process left), the permission model (incl. approval via notification action, deny via modal, deny by dismissing the notification, server stop while waiting, timeout, notifications off) and the su backend/priority are covered.
+- [x] Every class restarts the server after its setup and restores the shell defaults, Shizuku absence, the test `su` absence and the notification permission in `@AfterAll`.
+- [x] The stock redroid `su` (`/system/xbin/su`) is never overwritten or deleted, and `ShizukuE2E` calls it by absolute path (the test `su` in `/system/bin` comes first in `PATH`).
 
 ### Task 9.1 — Test `su` and the Gradle task
 
@@ -5758,7 +5758,7 @@ and inside the existing `tasks.withType<Test> { ... }` block add after the `depe
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 9.2 — Shared e2e helpers
 
@@ -6198,7 +6198,7 @@ cannot run and which `ShizukuE2E` calls by absolute path); it is installed and r
 absent or is the test binary itself.
 
 **Definition of Done:**
-- [ ] Helpers created exactly as above.
+- [x] Helpers created exactly as above.
 
 ### Task 9.3 — E2E test classes
 
@@ -6279,7 +6279,7 @@ no capabilities and cannot enter the app's scratch folder)
 | `Shizuku has priority over su` | `ShizukuE2E.install()`, `grant()`, `startAsShell()`, `restartServer()`, `awaitElevatedReady(backend = "shizuku", workdir = "/")` (polls until a command runs through Shizuku with exit 0) → elevated `id -u` → backend `shizuku` |
 
 **Definition of Done:**
-- [ ] Four classes written as listed (not run yet).
+- [x] Four classes written as listed (not run yet).
 
 ### Task 9.4 — CI time for the new e2e classes
 
@@ -6290,7 +6290,7 @@ no capabilities and cannot enter the app's scratch folder)
 ```
 
 **Definition of Done:**
-- [ ] Only that value changed.
+- [x] Only that value changed.
 
 ---
 
