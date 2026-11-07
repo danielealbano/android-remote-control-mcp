@@ -82,7 +82,7 @@ Needed only for elevated shell commands through Shizuku. Grant it in the app (Se
 adb shell pm grant <app-id> moe.shizuku.manager.permission.API_V23
 ```
 
-Shizuku connects only to an app process started while elevated commands were on: after turning them on, force-stop and reopen the app.
+Shizuku connects only to an app process started while elevated commands were on: after turning them on, tap **Restart app** in Settings → Shell.
 
 Elevated commands through `su` are granted by your root manager when the app first runs `su`.
 
