@@ -4721,9 +4721,9 @@ inside `scope.launch`, add after `applyTunnelSettings(intent)`:
 usable, grants Shizuku access and tests `su` from the app.
 
 **Acceptance criteria:**
-- [ ] Settings → Shell: elevation switch; when on, Shizuku status (+ Grant access when not granted), `su` status (+ Test), auto-allow switch, and the allowlist editor only while auto-allow is off; the blocklist editor always; the eight limits with validation (required, number, range, background default ≤ max, max ≥ default, (running + finished kept) × output kept per process at most 64 MiB) under a note that kept output lives in the app's memory.
-- [ ] Changes apply live (no restart, editable while the server runs); limit edits are saved in the order typed; a timeout field refused because of the other one is saved again once the other one allows it, and a running, kept or output-per-process field refused for the memory cap once one of the other two allows it; the limit fields reload from the stored settings on resume; Shizuku/`su` status refreshes on resume and after a Shizuku permission result.
-- [ ] MCP Tools screen lists the five shell tools under "Shell"; Privacy screen says shell tools are not covered.
+- [x] Settings → Shell: elevation switch; when on, Shizuku status (+ Grant access when not granted), `su` status (+ Test), auto-allow switch, and the allowlist editor only while auto-allow is off; the blocklist editor always; the eight limits with validation (required, number, range, background default ≤ max, max ≥ default, (running + finished kept) × output kept per process at most 64 MiB) under a note that kept output lives in the app's memory.
+- [x] Changes apply live (no restart, editable while the server runs); limit edits are saved in the order typed; a timeout field refused because of the other one is saved again once the other one allows it, and a running, kept or output-per-process field refused for the memory cap once one of the other two allows it; the limit fields reload from the stored settings on resume; Shizuku/`su` status refreshes on resume and after a Shizuku permission result.
+- [x] MCP Tools screen lists the five shell tools under "Shell"; Privacy screen says shell tools are not covered.
 
 ### Task 8.1 — Strings, `ShellLimitEditor` and `ShellSettingsViewModel`
 
@@ -5107,7 +5107,7 @@ class ShellSettingsViewModel
 ```
 
 **Definition of Done:**
-- [ ] Strings added and files created exactly as above.
+- [x] Strings added and files created exactly as above.
 
 ### Task 8.2 — Screen, sections and navigation
 
@@ -5617,7 +5617,7 @@ Sharing category:
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above; every visible text comes from `strings.xml`.
+- [x] Files created/modified exactly as above; every visible text comes from `strings.xml`.
 
 ### Task 8.3 — Tests
 
@@ -5659,7 +5659,7 @@ Sharing category:
 | `listener removed on clear` | `onCleared` → `removePermissionResultListener` |
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet). No Robolectric/Compose UI tests (project rule); the screens are checked in
+- [x] Tests written as listed (not run yet). No Robolectric/Compose UI tests (project rule); the screens are checked in
   Task 11.2 with uiautomator dumps.
 
 ---

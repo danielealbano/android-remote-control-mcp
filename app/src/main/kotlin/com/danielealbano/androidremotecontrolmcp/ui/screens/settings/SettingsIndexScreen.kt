@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,66 +55,91 @@ fun SettingsIndexScreen(
     }
 }
 
+private class SettingsIndexEntry(
+    val icon: ImageVector,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
+    val route: String,
+)
+
+private val SETTINGS_INDEX_ENTRIES =
+    listOf(
+        SettingsIndexEntry(
+            icon = Icons.Default.Tune,
+            titleRes = R.string.settings_general_title,
+            subtitleRes = R.string.settings_general_subtitle,
+            route = SettingsRoute.General.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Key,
+            titleRes = R.string.settings_access_title,
+            subtitleRes = R.string.settings_access_subtitle,
+            route = SettingsRoute.Access.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Lock,
+            titleRes = R.string.settings_security_title,
+            subtitleRes = R.string.settings_security_subtitle,
+            route = SettingsRoute.Security.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Shield,
+            titleRes = R.string.settings_privacy_title,
+            subtitleRes = R.string.settings_privacy_subtitle,
+            route = SettingsRoute.Privacy.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Cloud,
+            titleRes = R.string.settings_tunnel_title,
+            subtitleRes = R.string.settings_tunnel_subtitle,
+            route = SettingsRoute.Tunnel.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Build,
+            titleRes = R.string.settings_mcp_tools_title,
+            subtitleRes = R.string.settings_mcp_tools_subtitle,
+            route = SettingsRoute.McpTools.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Terminal,
+            titleRes = R.string.settings_shell_title,
+            subtitleRes = R.string.settings_shell_subtitle,
+            route = SettingsRoute.Shell.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.AdminPanelSettings,
+            titleRes = R.string.settings_permissions_title,
+            subtitleRes = R.string.settings_permissions_subtitle,
+            route = SettingsRoute.Permissions.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.Folder,
+            titleRes = R.string.settings_storage_title,
+            subtitleRes = R.string.settings_storage_subtitle,
+            route = SettingsRoute.Storage.route,
+        ),
+        SettingsIndexEntry(
+            icon = Icons.Default.CellTower,
+            titleRes = R.string.event_channel_name,
+            subtitleRes = R.string.event_channel_subtitle,
+            route = SettingsRoute.ChannelSettings.route,
+        ),
+    )
+
 @Composable
 private fun SettingsEntriesColumn(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        SettingsEntry(
-            icon = Icons.Default.Tune,
-            title = stringResource(R.string.settings_general_title),
-            subtitle = stringResource(R.string.settings_general_subtitle),
-            onClick = { onNavigate(SettingsRoute.General.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Key,
-            title = stringResource(R.string.settings_access_title),
-            subtitle = stringResource(R.string.settings_access_subtitle),
-            onClick = { onNavigate(SettingsRoute.Access.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Lock,
-            title = stringResource(R.string.settings_security_title),
-            subtitle = stringResource(R.string.settings_security_subtitle),
-            onClick = { onNavigate(SettingsRoute.Security.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Shield,
-            title = stringResource(R.string.settings_privacy_title),
-            subtitle = stringResource(R.string.settings_privacy_subtitle),
-            onClick = { onNavigate(SettingsRoute.Privacy.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Cloud,
-            title = stringResource(R.string.settings_tunnel_title),
-            subtitle = stringResource(R.string.settings_tunnel_subtitle),
-            onClick = { onNavigate(SettingsRoute.Tunnel.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Build,
-            title = stringResource(R.string.settings_mcp_tools_title),
-            subtitle = stringResource(R.string.settings_mcp_tools_subtitle),
-            onClick = { onNavigate(SettingsRoute.McpTools.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.AdminPanelSettings,
-            title = stringResource(R.string.settings_permissions_title),
-            subtitle = stringResource(R.string.settings_permissions_subtitle),
-            onClick = { onNavigate(SettingsRoute.Permissions.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.Folder,
-            title = stringResource(R.string.settings_storage_title),
-            subtitle = stringResource(R.string.settings_storage_subtitle),
-            onClick = { onNavigate(SettingsRoute.Storage.route) },
-        )
-        SettingsEntry(
-            icon = Icons.Default.CellTower,
-            title = stringResource(R.string.event_channel_name),
-            subtitle = stringResource(R.string.event_channel_subtitle),
-            onClick = { onNavigate(SettingsRoute.ChannelSettings.route) },
-        )
+        SETTINGS_INDEX_ENTRIES.forEach { entry ->
+            SettingsEntry(
+                icon = entry.icon,
+                title = stringResource(entry.titleRes),
+                subtitle = stringResource(entry.subtitleRes),
+                onClick = { onNavigate(entry.route) },
+            )
+        }
     }
 }
 

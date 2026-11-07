@@ -63,6 +63,7 @@
     <string name="mcp_tools_category_notifications">Notifications</string>
     <string name="mcp_tools_category_location">Location</string>
     <string name="mcp_tools_category_sharing">Sharing</string>
+    <string name="mcp_tools_category_shell">Shell</string>
     <string name="mcp_tool_press_back">Press Back</string>
     <string name="mcp_tool_press_home">Press Home</string>
     <string name="mcp_tool_press_recents">Press Recents</string>
@@ -123,6 +124,11 @@
     <string name="mcp_tool_get_node_screenshots">Get node screenshots</string>
     <string name="mcp_tool_save_camera_video">Save Camera Video</string>
     <string name="mcp_tool_get_location">Get Location</string>
+    <string name="mcp_tool_shell_exec">Shell Exec</string>
+    <string name="mcp_tool_shell_start">Shell Start</string>
+    <string name="mcp_tool_shell_output">Shell Output</string>
+    <string name="mcp_tool_shell_kill">Shell Kill</string>
+    <string name="mcp_tool_shell_list">Shell List</string>
     <string name="mcp_tool_param_include_screenshot">Include screenshot</string>
     <string name="mcp_tool_param_audio">Include audio</string>
     <string name="mcp_tool_param_fresh_fix">Allow fresh GPS fix</string>
@@ -130,6 +136,8 @@
     <string name="settings_permissions_subtitle">Accessibility, camera, microphone</string>
     <string name="settings_storage_title">Storage</string>
     <string name="settings_storage_subtitle">Storage locations, file limits</string>
+    <string name="settings_shell_title">Shell</string>
+    <string name="settings_shell_subtitle">Shell commands, elevation, limits</string>
 
     <!-- About Screen -->
     <string name="about_version">v%1$s</string>
@@ -535,6 +543,7 @@
     <string name="privacy_format_hashed">Consistent — the same value always keeps the same placeholder (EMAIL#a1b2c)</string>
     <string name="privacy_format_numbered">Numbered — sequential per session ([EMAIL_1])</string>
     <string name="privacy_disclaimer">Detection is best-effort mitigation, not a guarantee. No detector catches all personal data; screenshots are masked only where flagged screen elements have bounds.</string>
+    <string name="privacy_shell_not_covered">Shell tools are not covered: commands and their output pass through unchanged.</string>
     <string name="privacy_card_title">Worried about personal data?</string>
     <string name="privacy_card_action">Set up Privacy Mode</string>
     <string name="privacy_card_dismiss">Dismiss</string>
@@ -549,4 +558,47 @@
     <string name="elevation_approval_command_label">Command</string>
     <string name="elevation_approval_gone">This request is no longer pending.</string>
     <string name="elevation_approval_close">Close</string>
+    <string name="shell_limits_title">Limits</string>
+    <string name="shell_limits_memory_note">Output is kept in the app\'s memory: up to the output kept per process for every running and every kept finished process, at most 64 MiB in all.</string>
+    <string name="shell_limit_max_running_processes">Maximum running processes</string>
+    <string name="shell_limit_max_finished_processes">Finished processes kept</string>
+    <string name="shell_limit_background_timeout_default_minutes">Background timeout, default (minutes)</string>
+    <string name="shell_limit_background_timeout_max_minutes">Background timeout, maximum (minutes)</string>
+    <string name="shell_limit_approval_timeout_seconds">Approval timeout (seconds)</string>
+    <string name="shell_limit_foreground_wait_seconds">Foreground wait limit (seconds)</string>
+    <string name="shell_limit_output_per_call_kib">Output per call (KiB)</string>
+    <string name="shell_limit_output_buffer_kib">Output kept per process (KiB)</string>
+    <string name="shell_limit_error_required">Required</string>
+    <string name="shell_limit_error_not_a_number">Must be a number</string>
+    <string name="shell_limit_error_out_of_range">Must be between %1$d and %2$d</string>
+    <string name="shell_limit_error_above_max">Must not exceed the maximum background timeout</string>
+    <string name="shell_limit_error_below_default">Must not be below the default background timeout</string>
+    <string name="shell_limit_error_over_memory_cap">Running plus kept processes times the output kept per process must not exceed %1$d MiB</string>
+    <string name="shell_elevation_title">Elevated commands</string>
+    <string name="shell_elevation_switch">Allow elevated commands</string>
+    <string name="shell_elevation_switch_description">Lets an MCP client ask to run a single command as the adb shell user through Shizuku (as root when Shizuku runs as root) or, when Shizuku is not usable, as root through su. Off by default.</string>
+    <string name="shell_shizuku_label">Shizuku</string>
+    <string name="shell_shizuku_not_installed">Not installed</string>
+    <string name="shell_shizuku_not_running">Not running, or not connected yet. If Shizuku was already running when you turned this on, force-stop and reopen this app or restart Shizuku.</string>
+    <string name="shell_shizuku_outdated">Too old (version 13 or later needed), update Shizuku</string>
+    <string name="shell_shizuku_not_granted">Access not granted. If no prompt appears, allow this app in the Shizuku app.</string>
+    <string name="shell_shizuku_ready">Ready, commands run as uid %1$d</string>
+    <string name="shell_shizuku_grant">Grant access</string>
+    <string name="shell_su_label">su</string>
+    <string name="shell_su_not_found">Not found</string>
+    <string name="shell_su_found">Found at %1$s</string>
+    <string name="shell_su_testing">Testing %1$s…</string>
+    <string name="shell_su_works">%1$s works (root)</string>
+    <string name="shell_su_fails">%1$s failed: %2$s</string>
+    <string name="shell_su_test">Test</string>
+    <string name="shell_auto_allow_switch">Auto-allow elevation requests</string>
+    <string name="shell_auto_allow_description">Runs every elevated command without asking. Commands on the blocklist are still refused.</string>
+    <string name="shell_blocklist_title">Blocklist</string>
+    <string name="shell_blocklist_description">Commands matching a pattern are always refused, elevated or not. A pattern must match the whole command and * matches anything, for example *reboot*. Only the text is compared: the same action written another way is not refused.</string>
+    <string name="shell_allowlist_title">Allowlist</string>
+    <string name="shell_allowlist_description">Elevated commands matching a pattern run without asking; any other elevated command asks you on this phone. * matches anything except ; &amp; | ` $ ( ) &lt; &gt; and line breaks, and a pattern must match the whole command, for example ls -* /data. Environment variables sent with the command are not checked.</string>
+    <string name="shell_pattern_input_label">Pattern</string>
+    <string name="shell_pattern_add">Add</string>
+    <string name="shell_pattern_remove">Remove %1$s</string>
+    <string name="shell_patterns_empty">No patterns</string>
 </resources>
