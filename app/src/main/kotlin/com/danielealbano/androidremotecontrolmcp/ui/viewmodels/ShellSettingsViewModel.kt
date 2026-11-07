@@ -159,7 +159,6 @@ class ShellSettingsViewModel
         override fun onCleared() {
             shizukuApi.removePermissionResultListener(permissionListener)
             limitSaves.close()
-            super.onCleared()
         }
 
         private fun refreshStatus() {
