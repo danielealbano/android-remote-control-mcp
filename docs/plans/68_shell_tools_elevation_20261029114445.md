@@ -7220,3 +7220,26 @@ fix only the affected command is run again.
 - The Mermaid gate of Task 11.1 had not been run for the changed `docs/ARCHITECTURE.md` and `CONTRIBUTING.md`
   blocks: run, every block exits 0.
 - Nit: comments added by the round 1 fixes removed (Conventions: no comments beyond the plan's code).
+
+### Manual QA on the Realme T70 (2026-11-07, HEAD e5ad39b) and the owner's follow-up
+
+- Every Task 11.2 step passed on the T70 except where noted here. The lock-screen checks of step 5 (command hidden
+  with "hide sensitive content", shown with "show all", Approve asking for the PIN, the request going through after
+  the unlock) were done on redroid with a test PIN: the T70 has a PIN the session does not know.
+- No heads-up banner appeared on the T70 for the approval notification (channel High, "Pop on screen" on); the
+  notification went to the shade only. Redroid shows the heads-up. Reported to the owner; cause not established.
+- The limit fields save every valid value while typing (typing `65` saved `6` on the way), as the plan's editor does.
+- Finding: the remedy "force-stop and reopen the app" makes Android remove the app's accessibility service from the
+  enabled list (checked on the T70). Owner decision: a **Restart app** button instead, shown only when needed, using
+  ProcessPhoenix 3.0.0 (Apache-2.0), reopening on the home screen.
+  - `ShizukuProviderSwitch.enabledAtProcessStart()`: `McpApplication.attachBaseContext` records whether the provider
+    was enabled when the process started (`ShizukuProviderSwitchImpl.recordProcessStart`).
+  - `ShizukuState.NeedsRestart`: Shizuku installed, no binder, provider not enabled at process start. The Shizuku row
+    shows `shell_shizuku_needs_restart` and a **Restart app** button; the tool error reason says to tap Restart app;
+    `NotRunning` no longer gives restart advice.
+  - `AppRestarter` (`ProcessPhoenix.triggerRebirth`), bound in `ServiceModule` (`ShellModule` would exceed detekt's
+    function limit); `McpApplication.onCreate` returns early in the `:phoenix` process.
+  - `E2EShellShizukuTest` order 6 is now `elevation turned on after the app started connects Shizuku after Restart
+    app`: it taps the button through the UI, waits for a new app pid and the server, then for Shizuku.
+  - Checked on the T70: after Restart app the accessibility service stays enabled and bound, the server comes back by
+    itself, the app reopens on the home screen, and Shizuku is Ready (elevated `id -u` returns 2000).
