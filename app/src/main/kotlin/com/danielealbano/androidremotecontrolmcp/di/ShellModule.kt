@@ -4,6 +4,8 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ShellSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellCommandAuthorizer
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellCommandAuthorizerImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellLifecycle
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellLifecycleImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManager
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManagerImpl
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory
@@ -65,4 +67,7 @@ abstract class ShellModule {
 
     @Binds
     abstract fun bindShellCommandAuthorizer(impl: ShellCommandAuthorizerImpl): ShellCommandAuthorizer
+
+    @Binds
+    abstract fun bindShellLifecycle(impl: ShellLifecycleImpl): ShellLifecycle
 }

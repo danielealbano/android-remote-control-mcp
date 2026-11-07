@@ -332,6 +332,11 @@ class ToolPermissionsIntegrationTest {
                 "get_location",
                 "get_shared_content",
                 "share_file_via_web",
+                "shell_exec",
+                "shell_start",
+                "shell_output",
+                "shell_kill",
+                "shell_list",
             )
     }
 }

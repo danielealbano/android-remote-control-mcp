@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.mcp
 
+import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
@@ -23,6 +24,9 @@ import com.danielealbano.androidremotecontrolmcp.services.screencapture.Screensh
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotRedactor
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellCommandAuthorizer
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellProcessManager
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import javax.inject.Inject
@@ -80,4 +84,13 @@ class InboxToolDeps
         val notificationProvider: NotificationProvider,
         val sharedContentInbox: SharedContentInbox,
         val ephemeralFileLinkService: EphemeralFileLinkService,
+    )
+
+class ShellToolDeps
+    @Inject
+    constructor(
+        val processManager: ShellProcessManager,
+        val authorizer: ShellCommandAuthorizer,
+        val settingsRepository: SettingsRepository,
+        val scratchDirectory: ShellScratchDirectory,
     )

@@ -27,6 +27,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ShellToolContext
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -37,6 +38,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionToo
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNotificationTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSharingTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerShellTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
@@ -390,6 +392,7 @@ object McpIntegrationTestHelper {
             toolNamePrefix,
             perms,
         )
+        registerShellTools(registrar, deps.shellToolContext, toolNamePrefix, perms)
     }
 
     /**
@@ -666,4 +669,6 @@ data class MockDependencies(
     val serverLog: RecordingServerLogRepository = RecordingServerLogRepository(),
     /** The running tool calls, shared by the tool registration and the transport as in production. */
     val inFlightToolCalls: InFlightToolCalls = InFlightToolCalls(),
+    val shellToolContext: ShellToolContext =
+        ShellToolContext(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), "/scratch"),
 )

@@ -3839,12 +3839,12 @@ default; `RecordingServerLogRepository`.
 (scratch wipe at start, kill everything and cancel pending approvals at stop).
 
 **Acceptance criteria:**
-- [ ] `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` are registered (each disabled by its MCP Tools switch), 65 tools in total.
-- [ ] Every result is JSON prefixed by the untrusted-content warning; refusals and invalid parameters are `isError` results with the reason.
-- [ ] `shell_exec` waits within the foreground budget (approval included), then returns `running` with the `process_id`; a client cancellation before the call returns kills the process.
-- [ ] `command`, `workdir` and `envs` together are at most 100 000 bytes once quoted; `justification` at most 1000 characters.
-- [ ] Tool descriptions state the scratch folder path, `noexec`, `/data/local/tmp`, elevation rules, paging and leftover cleanup.
-- [ ] Server start wipes the scratch folder and opens approvals and the process manager; when the server starts stopping, pending approvals are cancelled, so their calls end at once with the refusal that the server is stopping (the answer reaches the client only if it is written before the server closes its sessions and connections, so it can be lost, like the answer of any call running when the server stops); after Ktor has stopped every process is killed; `ShellLifecycle` is an interface bound in `ShellModule`.
+- [x] `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` are registered (each disabled by its MCP Tools switch), 65 tools in total.
+- [x] Every result is JSON prefixed by the untrusted-content warning; refusals and invalid parameters are `isError` results with the reason.
+- [x] `shell_exec` waits within the foreground budget (approval included), then returns `running` with the `process_id`; a client cancellation before the call returns kills the process.
+- [x] `command`, `workdir` and `envs` together are at most 100 000 bytes once quoted; `justification` at most 1000 characters.
+- [x] Tool descriptions state the scratch folder path, `noexec`, `/data/local/tmp`, elevation rules, paging and leftover cleanup.
+- [x] Server start wipes the scratch folder and opens approvals and the process manager; when the server starts stopping, pending approvals are cancelled, so their calls end at once with the refusal that the server is stopping (the answer reaches the client only if it is written before the server closes its sessions and connections, so it can be lost, like the answer of any call running when the server stops); after Ktor has stopped every process is killed; `ShellLifecycle` is an interface bound in `ShellModule`.
 
 ### Task 6.1 — Parameters, JSON and descriptions
 
@@ -4192,7 +4192,7 @@ internal object ShellToolDescriptions {
 ```
 
 **Definition of Done:**
-- [ ] Files created exactly as above.
+- [x] Files created exactly as above.
 
 ### Task 6.2 — Tool handlers and registration
 
@@ -4346,7 +4346,7 @@ fun registerShellTools(
 ```
 
 **Definition of Done:**
-- [ ] File created exactly as above.
+- [x] File created exactly as above.
 
 ### Task 6.3 — Dependencies, lifecycle and service wiring
 
@@ -4471,7 +4471,7 @@ and right after `serverActive.set(false)` (the Ktor server has stopped, so no ne
 (import `com.danielealbano.androidremotecontrolmcp.services.shell.ShellLifecycle`).
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above; `McpServerService` stays under detekt's 600-line class limit.
+- [x] Files created/modified exactly as above; `McpServerService` stays under detekt's 600-line class limit.
 
 ### Task 6.4 — Tests
 
@@ -4579,7 +4579,7 @@ workdir `@TempDir`.
   `shell_kill`, `shell_list` to `ALL_TOOL_NAMES`.
 
 **Definition of Done:**
-- [ ] Shared test infrastructure changed exactly as above; tests written/updated as listed (not run yet).
+- [x] Shared test infrastructure changed exactly as above; tests written/updated as listed (not run yet).
 
 ---
 
