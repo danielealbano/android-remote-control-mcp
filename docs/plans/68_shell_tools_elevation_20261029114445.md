@@ -713,9 +713,9 @@ instance; `attachBaseContext` is protected, so the test calls it through
 are pure logic, tested on the JVM host with real `/bin/sh`.
 
 **Acceptance criteria:**
-- [ ] Blocklist `*` matches anything (including separators and newlines); allowlist `*` never matches `; & | \` $ ( ) < >`, `\r` or `\n`; whole-command, case-sensitive matching on the trimmed command; blank patterns never match.
-- [ ] The launch script quotes command, workdir and env values safely, prints `<pgid> <uid>` first (calling `id` by absolute path, so `envs` cannot hide it), runs with `umask 0007` in a new session via `setsid -w`, exits 126 when the workdir cannot be entered, and closes the command's stdin.
-- [ ] The output buffer keeps the first half and the last half of its capacity, grows lazily, pages by absolute offset (a page may span the head/tail join when nothing was dropped), reports dropped bytes, never ends a page inside a UTF-8 sequence while more data follows in the same stretch or the process is still running, and, with page sizes of at least 4 bytes (the smallest per-call limit is 4 KiB), never returns an empty page that would stop paging.
+- [x] Blocklist `*` matches anything (including separators and newlines); allowlist `*` never matches `; & | \` $ ( ) < >`, `\r` or `\n`; whole-command, case-sensitive matching on the trimmed command; blank patterns never match.
+- [x] The launch script quotes command, workdir and env values safely, prints `<pgid> <uid>` first (calling `id` by absolute path, so `envs` cannot hide it), runs with `umask 0007` in a new session via `setsid -w`, exits 126 when the workdir cannot be entered, and closes the command's stdin.
+- [x] The output buffer keeps the first half and the last half of its capacity, grows lazily, pages by absolute offset (a page may span the head/tail join when nothing was dropped), reports dropped bytes, never ends a page inside a UTF-8 sequence while more data follows in the same stretch or the process is still running, and, with page sizes of at least 4 bytes (the smallest per-call limit is 4 KiB), never returns an empty page that would stop paging.
 
 ### Task 2.1 — `CommandPatterns`
 
@@ -787,7 +787,7 @@ after the previous one (the earliest one leaves the smallest wildcard stretch, s
 character, every later one does too), and the last part must end the command.
 
 **Definition of Done:**
-- [ ] File created exactly as above.
+- [x] File created exactly as above.
 
 ### Task 2.2 — `ShellScriptBuilder` and the header line
 
@@ -870,7 +870,7 @@ class ShellScriptBuilder(
 ```
 
 **Definition of Done:**
-- [ ] File created exactly as above.
+- [x] File created exactly as above.
 
 ### Task 2.3 — `ShellOutputBuffer`
 
@@ -1024,7 +1024,7 @@ asks again later. At the head end before a gap nothing is trimmed (the next page
 never repeat the same offset forever.
 
 **Definition of Done:**
-- [ ] File created exactly as above.
+- [x] File created exactly as above.
 
 ### Task 2.4 — Tests
 
@@ -1079,7 +1079,7 @@ never repeat the same offset forever.
 | `memory grows lazily` | 1000 buffers of 16 MiB capacity with 10 bytes each are created and read back without `OutOfMemoryError` (eager allocation would need 16 GB) |
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet).
+- [x] Tests written as listed (not run yet).
 
 ---
 
