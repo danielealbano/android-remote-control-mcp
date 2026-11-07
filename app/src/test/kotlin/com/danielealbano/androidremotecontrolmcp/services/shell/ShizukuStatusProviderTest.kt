@@ -15,7 +15,8 @@ class ShizukuStatusProviderTest {
     private val pm = mockk<PackageManager>()
     private val context = mockk<Context> { every { packageManager } returns pm }
     private val api = mockk<ShizukuApi>()
-    private val provider = ShizukuStatusProviderImpl(context, api)
+    private val providerSwitch = mockk<ShizukuProviderSwitch> { every { enabledAtProcessStart() } returns true }
+    private val provider = ShizukuStatusProviderImpl(context, api, providerSwitch)
 
     private fun installed(present: Boolean) {
         if (present) {
@@ -52,6 +53,27 @@ class ShizukuStatusProviderTest {
         installed(true)
 
         assertEquals(ShizukuState.NotRunning, provider.state())
+    }
+
+    @Test
+    fun `needs restart when the provider was off at process start`() {
+        every { api.pingBinder() } returns false
+        every { providerSwitch.enabledAtProcessStart() } returns false
+        installed(true)
+
+        assertEquals(ShizukuState.NeedsRestart, provider.state())
+
+        installed(false)
+
+        assertEquals(ShizukuState.NotInstalled, provider.state())
+    }
+
+    @Test
+    fun `a connected Shizuku is read even when the provider was off at process start`() {
+        every { providerSwitch.enabledAtProcessStart() } returns false
+        running(uid = 2000)
+
+        assertEquals(ShizukuState.Ready(2000), provider.state())
     }
 
     @Test
@@ -104,6 +126,7 @@ class ShizukuStatusProviderTest {
             listOf(
                 ShizukuState.NotInstalled,
                 ShizukuState.NotRunning,
+                ShizukuState.NeedsRestart,
                 ShizukuState.Outdated,
                 ShizukuState.NotGranted,
                 ShizukuState.Ready(2000),
@@ -112,13 +135,18 @@ class ShizukuStatusProviderTest {
         val reasons = states.map { shizukuUnavailableReason(it) }
 
         assertEquals("Shizuku is not installed", reasons[0])
-        assertEquals(true, reasons[1].startsWith("Shizuku is not running"))
-        assertEquals("Shizuku is older than version 13 and must be updated", reasons[2])
+        assertEquals("Shizuku is not running, or has not connected to the app yet", reasons[1])
+        assertEquals(
+            "Shizuku cannot connect until the app restarts, because elevation was turned on after the app started " +
+                "(tap Restart app in the app's Shell settings)",
+            reasons[2],
+        )
+        assertEquals("Shizuku is older than version 13 and must be updated", reasons[3])
         assertEquals(
             "Shizuku has not granted access to the app (grant it in the app's Shell settings)",
-            reasons[3],
+            reasons[4],
         )
-        assertEquals("Shizuku is ready", reasons[4])
+        assertEquals("Shizuku is ready", reasons[5])
         assertEquals(states.size, reasons.distinct().size)
     }
 }

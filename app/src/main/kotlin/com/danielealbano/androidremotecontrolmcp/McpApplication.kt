@@ -8,9 +8,11 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppIconCache
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuProviderSwitchImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlertsImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateCheckScheduler
 import com.danielealbano.androidremotecontrolmcp.startup.runFlavorStartupMigrations
+import com.jakewharton.processphoenix.ProcessPhoenix
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,10 +48,13 @@ class McpApplication :
     override fun attachBaseContext(base: Context) {
         ShizukuProvider.disableAutomaticSuiInitialization()
         super.attachBaseContext(base)
+        ShizukuProviderSwitchImpl.recordProcessStart(base)
     }
 
     override fun onCreate() {
         super.onCreate()
+        // The short-lived process that relaunches the app after "Restart app" needs none of the setup below
+        if (ProcessPhoenix.isPhoenixProcess(this)) return
         // Flavor-specific one-time migrations (gms: geofence config → dedicated key), launched eagerly
         // on a background coroutine (non-blocking — must never stall onCreate). No-op in foss.
         runFlavorStartupMigrations(this)

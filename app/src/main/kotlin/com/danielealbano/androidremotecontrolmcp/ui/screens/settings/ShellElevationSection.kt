@@ -46,6 +46,7 @@ internal fun ShellElevationSection(
     suStatus: SuStatus,
     onSwitch: (ShellSwitch, Boolean) -> Unit,
     onGrantShizuku: () -> Unit,
+    onRestartApp: () -> Unit,
     onTestSu: () -> Unit,
     onAddAllowlistPattern: (String) -> Unit,
     onRemoveAllowlistPattern: (String) -> Unit,
@@ -58,7 +59,7 @@ internal fun ShellElevationSection(
     ) { onSwitch(ShellSwitch.ELEVATION, it) }
     AnimatedVisibility(visible = config.elevationEnabled) {
         Column {
-            ShizukuStatusRow(shizukuState, onGrantShizuku)
+            ShizukuStatusRow(shizukuState, onGrantShizuku, onRestartApp)
             SuStatusRow(suStatus, onTestSu)
             ShellSwitchRow(
                 titleRes = R.string.shell_auto_allow_switch,
@@ -151,6 +152,7 @@ private fun ShellSwitchRow(
 private fun ShizukuStatusRow(
     state: ShizukuState,
     onGrant: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     Spacer(Modifier.height(12.dp))
     Text(stringResource(R.string.shell_shizuku_label), style = MaterialTheme.typography.bodyLarge)
@@ -161,6 +163,9 @@ private fun ShizukuStatusRow(
     )
     if (state == ShizukuState.NotGranted) {
         Button(onClick = onGrant) { Text(stringResource(R.string.shell_shizuku_grant)) }
+    }
+    if (state == ShizukuState.NeedsRestart) {
+        Button(onClick = onRestart) { Text(stringResource(R.string.shell_shizuku_restart)) }
     }
 }
 
@@ -186,6 +191,7 @@ private fun shizukuStatusText(state: ShizukuState): String =
     when (state) {
         ShizukuState.NotInstalled -> stringResource(R.string.shell_shizuku_not_installed)
         ShizukuState.NotRunning -> stringResource(R.string.shell_shizuku_not_running)
+        ShizukuState.NeedsRestart -> stringResource(R.string.shell_shizuku_needs_restart)
         ShizukuState.Outdated -> stringResource(R.string.shell_shizuku_outdated)
         ShizukuState.NotGranted -> stringResource(R.string.shell_shizuku_not_granted)
         is ShizukuState.Ready -> stringResource(R.string.shell_shizuku_ready, state.uid)

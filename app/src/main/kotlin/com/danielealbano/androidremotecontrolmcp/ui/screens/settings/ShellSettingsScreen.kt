@@ -79,6 +79,7 @@ fun ShellSettingsScreen(
                 suStatus = suStatus,
                 onSwitch = viewModel::setSwitch,
                 onGrantShizuku = viewModel::requestShizukuPermission,
+                onRestartApp = viewModel::restartApp,
                 onTestSu = viewModel::testSu,
                 onAddAllowlistPattern = { viewModel.addPattern(ShellPatternKind.ALLOWLIST, it) },
                 onRemoveAllowlistPattern = { viewModel.removePattern(ShellPatternKind.ALLOWLIST, it) },

@@ -9,6 +9,9 @@ import javax.inject.Inject
 
 interface ShizukuProviderSwitch {
     fun setEnabled(enabled: Boolean)
+
+    /** Shizuku reaches the app only through a provider that was enabled when the app process started. */
+    fun enabledAtProcessStart(): Boolean
 }
 
 class ShizukuProviderSwitchImpl internal constructor(
@@ -28,5 +31,20 @@ class ShizukuProviderSwitchImpl internal constructor(
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED
             }
         packageManager.setComponentEnabledSetting(provider, state, PackageManager.DONT_KILL_APP)
+    }
+
+    override fun enabledAtProcessStart(): Boolean = enabledAtStart
+
+    companion object {
+        @Volatile
+        private var enabledAtStart = false
+
+        /** Called from `Application.attachBaseContext`, before the app's providers start. */
+        fun recordProcessStart(context: Context) {
+            val provider = ComponentName(context, ShizukuProvider::class.java)
+            enabledAtStart =
+                context.packageManager.getComponentEnabledSetting(provider) ==
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        }
     }
 }

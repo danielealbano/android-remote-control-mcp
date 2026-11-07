@@ -5,6 +5,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ShellConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellPatternKind
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.shell.AppRestarter
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuApi
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuState
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuStatusProvider
@@ -47,13 +48,14 @@ class ShellSettingsViewModelTest {
     private val shizukuApi =
         mockk<ShizukuApi>(relaxed = true) { every { addPermissionResultListener(capture(listener)) } returns Unit }
     private val su = mockk<SuShell> { every { locate() } returns null }
+    private val appRestarter = mockk<AppRestarter>(relaxed = true)
 
     private lateinit var viewModel: ShellSettingsViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        viewModel = ShellSettingsViewModel(settingsRepository, shizukuStatus, shizukuApi, su, dispatcher)
+        viewModel = ShellSettingsViewModel(settingsRepository, shizukuStatus, shizukuApi, su, appRestarter, dispatcher)
     }
 
     @AfterEach
@@ -172,6 +174,13 @@ class ShellSettingsViewModelTest {
 
         verify(atLeast = 2) { shizukuStatus.state() }
         assertEquals(ShizukuState.Ready(2000), viewModel.shizukuState.value)
+    }
+
+    @Test
+    fun `restart app asks the restarter`() {
+        viewModel.restartApp()
+
+        verify(exactly = 1) { appRestarter.restart() }
     }
 
     @Test

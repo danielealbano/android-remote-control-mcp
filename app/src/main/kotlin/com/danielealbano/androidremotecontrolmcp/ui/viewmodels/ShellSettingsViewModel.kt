@@ -8,6 +8,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellPatternKind
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
+import com.danielealbano.androidremotecontrolmcp.services.shell.AppRestarter
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuApi
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuState
 import com.danielealbano.androidremotecontrolmcp.services.shell.ShizukuStatusProvider
@@ -69,6 +70,7 @@ class ShellSettingsViewModel
         private val shizukuStatus: ShizukuStatusProvider,
         private val shizukuApi: ShizukuApi,
         private val su: SuShell,
+        private val appRestarter: AppRestarter,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         val shellConfig: StateFlow<ShellConfig> =
@@ -139,6 +141,8 @@ class ShellSettingsViewModel
             runCatching { shizukuApi.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE) }
                 .onFailure { Log.w(TAG, "Shizuku permission request failed", it) }
         }
+
+        fun restartApp() = appRestarter.restart()
 
         fun testSu() {
             viewModelScope.launch(ioDispatcher) {
