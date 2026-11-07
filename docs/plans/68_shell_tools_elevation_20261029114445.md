@@ -90,7 +90,7 @@ matches and no action removes code added to main since the plan was written; too
 **Why:** every user story is committed and pushed on its own branch as it is finished (CLAUDE.md).
 
 **Acceptance criteria:**
-- [ ] `feat/shell-tools-elevation` exists from the latest `main`, holds the `docs: add plan 68` commit and is pushed.
+- [x] `feat/shell-tools-elevation` exists from the latest `main`, holds the `docs: add plan 68` commit and is pushed.
 
 ### Task 0.1 — Branch and plan commit
 
@@ -101,7 +101,7 @@ matches and no action removes code added to main since the plan was written; too
   `git push -u origin feat/shell-tools-elevation`.
 
 **Definition of Done:**
-- [ ] Branch created from the latest `main`; the plan commit pushed.
+- [x] Branch created from the latest `main`; the plan commit pushed.
 
 ---
 
