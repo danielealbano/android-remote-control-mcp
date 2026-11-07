@@ -404,6 +404,25 @@ class ShellProcessManagerTest {
         }
 
     @Test
+    fun `normal commands never consult the elevated backend`() =
+        runBlocking {
+            val asked = AtomicInteger()
+            selectElevated = {
+                asked.incrementAndGet()
+                fake
+            }
+
+            val page = start("echo hi")
+
+            assertEquals(ShellProcessState.EXITED, page.snapshot.state)
+            assertEquals(0, page.snapshot.exitCode)
+            assertEquals(ShellBackendKind.APP, page.snapshot.backend)
+            assertEquals(hostOutput("id", "-u").toInt(), page.snapshot.uid)
+            assertEquals(0, asked.get())
+            assertTrue(fake.spawned.isEmpty())
+        }
+
+    @Test
     fun `normal commands are not audited`() =
         runBlocking {
             start("true")

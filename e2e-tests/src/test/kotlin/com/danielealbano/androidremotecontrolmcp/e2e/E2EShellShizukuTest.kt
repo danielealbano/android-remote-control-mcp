@@ -159,6 +159,17 @@ class E2EShellShizukuTest {
 
     @Test
     @Order(6)
+    fun `normal commands run as the app user while Shizuku is ready`() =
+        runBlocking {
+            val result = ShellE2E.call("shell_exec", ShellE2E.run("id -u"))
+
+            assertEquals("app", result.text("backend"))
+            assertEquals(ShellE2E.appUid(), result.number("uid"))
+            assertEquals(ShellE2E.appUid().toString(), result.text("output").trim())
+        }
+
+    @Test
+    @Order(7)
     fun `elevation turned on after the app started connects Shizuku after Restart app`() =
         runBlocking {
             ShellE2E.configure(*ShellE2E.switches(elevation = false, autoAllow = true))
@@ -176,7 +187,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(7)
+    @Order(8)
     fun `back-to-back elevated commands rebind the helper`() =
         runBlocking {
             repeat(BACK_TO_BACK) { round ->
@@ -188,7 +199,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(8)
+    @Order(9)
     fun `scratch folder is shared both ways`() =
         runBlocking {
             ShellE2E.call("shell_exec", ShellE2E.run("mkdir -p d1 && echo app > d1/a.txt"))
@@ -202,7 +213,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(9)
+    @Order(10)
     fun `binaries run from data local tmp through elevation`() =
         runBlocking {
             val command =
@@ -215,7 +226,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(10)
+    @Order(11)
     fun `the helper stops after the job`() =
         runBlocking {
             ShellE2E.call("shell_exec", ShellE2E.run("true", elevated = true))
@@ -224,7 +235,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(11)
+    @Order(12)
     fun `a background elevated process keeps the helper until killed`() =
         runBlocking {
             val id = ShellE2E.call("shell_start", ShellE2E.run("sleep 600", elevated = true)).number("process_id")
@@ -238,7 +249,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(12)
+    @Order(13)
     fun `the app dying stops its elevated processes`() =
         runBlocking {
             ShellE2E.call("shell_start", ShellE2E.run("sleep 600", elevated = true))
@@ -254,7 +265,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(13)
+    @Order(14)
     fun `Shizuku stopping ends running elevated processes`() =
         runBlocking {
             val id = ShellE2E.call("shell_start", ShellE2E.run("sleep 600", elevated = true)).number("process_id")
@@ -272,7 +283,7 @@ class E2EShellShizukuTest {
         }
 
     @Test
-    @Order(14)
+    @Order(15)
     fun `root mode reports uid 0`() =
         runBlocking {
             ShizukuE2E.startAsRoot()

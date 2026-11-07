@@ -7256,3 +7256,11 @@ fix only the affected command is run again.
 ### Restart app change, review rounds 2 and 3
 
 - Opus round 2: zero findings. Fable round 1: zero findings. The review loop ended at b90fe84.
+
+### Owner request after the PR was opened (2026-11-07): normal commands without Shizuku
+
+- Shizuku is optional: even when it is installed, running and allowed, a normal command must not depend on it. The
+  code already picks the backend only from `elevated`; two tests now pin it: `ShellProcessManagerTest` "normal
+  commands never consult the elevated backend" (a ready elevated backend is never asked for nor spawned, the command
+  runs on the app backend as the app uid) and `E2EShellShizukuTest` order 6 "normal commands run as the app user
+  while Shizuku is ready" (backend `app`, the app uid); the later orders moved up by one.
