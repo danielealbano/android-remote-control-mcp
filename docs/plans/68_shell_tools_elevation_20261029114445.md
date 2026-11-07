@@ -1089,12 +1089,12 @@ never repeat the same offset forever.
 `su`; the Shizuku helper is bound only while elevated Shizuku processes exist ("downgrade" after the job).
 
 **Acceptance criteria:**
-- [ ] `AppShellBackend` runs `/system/bin/sh -c <script>` as the app; kill sends SIGKILL to the process group.
-- [ ] `SuShellBackend` (behind the `SuShell` interface) finds `su` in `PATH` plus fallback directories, runs `su -c <script>`, kills via `su -c 'kill -9 -<pgid>'` (a form every `sh` accepts, `dash` included), and can probe `su -c 'id -u'` (15 s timeout).
-- [ ] `ShizukuStatusProvider` (interface, `ShizukuStatusProviderImpl`) distinguishes not installed / not running / outdated (< 13: older servers cannot construct a UserService with a `Context`) / not granted / ready(uid), checking the binder first.
-- [ ] `ShellUserService` runs in a helper process (`<application id>:shell`) that Shizuku starts as its own user, accepts `start`/`kill` only from the app's uid (`destroy` is Shizuku's own teardown call), streams combined output through a pipe, reports exits through a one-way callback, kills the process group at exit and kills everything on `destroy()` (which Shizuku sends when the app's connection dies, the service being non-daemon), when an exit cannot be delivered to the app and on JVM shutdown; a kill requested before the header waits for it, so the whole group is killed.
-- [ ] `ShizukuShellBackend` binds the non-daemon UserService on demand with a fresh tag per binding (10 s timeout), unbinds it (remove = true) once the manager has released every Shizuku process (an exit callback alone never releases it, so output still draining is not cut off), ignores callbacks from bindings it already dropped, fails pending processes with "Shizuku stopped" when its current binding is lost (disconnect, or a dead binder found before the disconnect arrives), and never lets a Shizuku API exception escape.
-- [ ] `ElevatedShellSelector` picks Shizuku when ready, else `su` when found, else fails with the reason.
+- [x] `AppShellBackend` runs `/system/bin/sh -c <script>` as the app; kill sends SIGKILL to the process group.
+- [x] `SuShellBackend` (behind the `SuShell` interface) finds `su` in `PATH` plus fallback directories, runs `su -c <script>`, kills via `su -c 'kill -9 -<pgid>'` (a form every `sh` accepts, `dash` included), and can probe `su -c 'id -u'` (15 s timeout).
+- [x] `ShizukuStatusProvider` (interface, `ShizukuStatusProviderImpl`) distinguishes not installed / not running / outdated (< 13: older servers cannot construct a UserService with a `Context`) / not granted / ready(uid), checking the binder first.
+- [x] `ShellUserService` runs in a helper process (`<application id>:shell`) that Shizuku starts as its own user, accepts `start`/`kill` only from the app's uid (`destroy` is Shizuku's own teardown call), streams combined output through a pipe, reports exits through a one-way callback, kills the process group at exit and kills everything on `destroy()` (which Shizuku sends when the app's connection dies, the service being non-daemon), when an exit cannot be delivered to the app and on JVM shutdown; a kill requested before the header waits for it, so the whole group is killed.
+- [x] `ShizukuShellBackend` binds the non-daemon UserService on demand with a fresh tag per binding (10 s timeout), unbinds it (remove = true) once the manager has released every Shizuku process (an exit callback alone never releases it, so output still draining is not cut off), ignores callbacks from bindings it already dropped, fails pending processes with "Shizuku stopped" when its current binding is lost (disconnect, or a dead binder found before the disconnect arrives), and never lets a Shizuku API exception escape.
+- [x] `ElevatedShellSelector` picks Shizuku when ready, else `su` when found, else fails with the reason.
 
 ### Task 3.1 — Backend contract and the app backend
 
@@ -1198,7 +1198,7 @@ class AppShellBackend internal constructor(
 ```
 
 **Definition of Done:**
-- [ ] Files created exactly as above.
+- [x] Files created exactly as above.
 
 ### Task 3.2 — `SuShellBackend`
 
@@ -1335,7 +1335,7 @@ private fun killAsRoot(
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 3.3 — Shizuku API wrapper and status
 
@@ -1503,7 +1503,7 @@ internal fun shizukuUnavailableReason(state: ShizukuState): String =
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 3.4 — UserService (runs in the helper process Shizuku starts)
 
@@ -1720,7 +1720,7 @@ class ShellUserService(
 ```
 
 **Definition of Done:**
-- [ ] AIDL files and both classes created exactly as above.
+- [x] AIDL files and both classes created exactly as above.
 
 ### Task 3.5 — `ShizukuShellBackend` and `ElevatedShellSelector`
 
@@ -1962,7 +1962,7 @@ private fun noBackendMessage(state: ShizukuState): String =
 ```
 
 **Definition of Done:**
-- [ ] Files created/modified exactly as above.
+- [x] Files created/modified exactly as above.
 
 ### Task 3.6 — Tests
 
@@ -2068,7 +2068,7 @@ with `locate()` stubbed.
 | `backends lists Shizuku and su` | `selector.backends == listOf(shizuku, su)` (the manager releases these at server stop) |
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet).
+- [x] Tests written as listed (not run yet).
 
 ---
 
