@@ -12,6 +12,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfi
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellAdbConfigApplier
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
@@ -35,6 +36,8 @@ class AdbConfigHandler(
     private val arcTunnelEnrollment: ArcTunnelEnrollment,
     private val isIpLiteral: (String) -> Boolean = InetAddresses::isNumericAddress,
 ) {
+    private val shellAdbConfigApplier = ShellAdbConfigApplier(settingsRepository)
+
     /**
      * Dispatches the intent to the appropriate handler based on its action.
      */
@@ -90,6 +93,7 @@ class AdbConfigHandler(
         applyDownloadTimeout(intent)
         applyDeviceSlug(intent)
         applyToolPermissions(intent)
+        shellAdbConfigApplier.apply(intent)
         applyStorageLocationPermissions(intent)
         applyArcTunnelEnroll(intent)
 

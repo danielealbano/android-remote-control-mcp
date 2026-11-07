@@ -4589,8 +4589,8 @@ workdir `@TempDir`.
 applier serves both receivers.
 
 **Acceptance criteria:**
-- [ ] `shell_elevation_enabled` and `shell_auto_allow_elevation` (`--ez`), `shell_blocklist` and `shell_allowlist` (`--es`, JSON array of strings; invalid JSON ignored with a warning, never clears the list), and each `ShellLimit.key` (`--ei`, validated; invalid ignored with a warning) are applied by both `AdbConfigHandler` and `E2EConfigReceiver`.
-- [ ] Limits sent in one broadcast apply in any order: a limit refused only because of another limit in the same broadcast (background default vs max, or the output memory cap) is retried once after the others.
+- [x] `shell_elevation_enabled` and `shell_auto_allow_elevation` (`--ez`), `shell_blocklist` and `shell_allowlist` (`--es`, JSON array of strings; invalid JSON ignored with a warning, never clears the list), and each `ShellLimit.key` (`--ei`, validated; invalid ignored with a warning) are applied by both `AdbConfigHandler` and `E2EConfigReceiver`.
+- [x] Limits sent in one broadcast apply in any order: a limit refused only because of another limit in the same broadcast (background default vs max, or the output memory cap) is retried once after the others.
 
 ### Task 7.1 — `ShellAdbConfigApplier` and the two call sites
 
@@ -4691,7 +4691,7 @@ inside `scope.launch`, add after `applyTunnelSettings(intent)`:
 ```
 
 **Definition of Done:**
-- [ ] File created and both call sites added exactly as above.
+- [x] File created and both call sites added exactly as above.
 
 ### Task 7.2 — Tests
 
@@ -4711,7 +4711,7 @@ inside `scope.launch`, add after `applyTunnelSettings(intent)`:
 **Files (modify):** `test/.../services/mcp/AdbConfigHandlerTest.kt` — one test `shell extras are applied` (a `shell_auto_allow_elevation` + `shell_max_running_processes` broadcast reaches `settingsRepository`; the test stubs `coEvery { settingsRepository.updateShellLimit(any(), any()) } returns Result.success(1)`, since the existing mock only relaxes Unit functions); `app/src/testDebug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EConfigReceiverTest.kt` — one test that the receiver applies `shell_elevation_enabled`.
 
 **Definition of Done:**
-- [ ] Tests written as listed (not run yet).
+- [x] Tests written as listed (not run yet).
 
 ---
 
