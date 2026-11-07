@@ -17,6 +17,10 @@ by that compare URL. No fork code is ported.
 
 **Plan document handling:** commit this file as a standalone `docs: add plan 68` commit on the feature branch (User Story 0).
 
+**Refresh (owner, 2026-11-07):** checked against main `f43efc4` (v1.13.0 plus plans 69 and 70): every anchor below still
+matches and no action removes code added to main since the plan was written; tool counts moved from 58 → 63 to
+60 → 65; the output memory cap (64 MiB in all) was added as an owner decision.
+
 ## Agreed decisions (owner, 2026-10-28/29) — NOT derivable from code
 
 | Topic | Decision |
@@ -26,7 +30,7 @@ by that compare URL. No fork code is ported.
 | Shell model | No persistent shell, no PTY, stdin closed. `workdir` REQUIRED on every call (never remembered). `envs` JSON object of environment variables, never filtered. |
 | Foreground cap | `shell_exec` waits at most the foreground cap (default 90 s, range 10-90 s); the approval wait counts toward it; a command still running at the cap keeps running in the background and the call returns its `process_id`. |
 | Output | stdout+stderr combined; per process a buffer keeping the start and the end (default 1 MiB); each call returns at most the per-call cap (default 64 KiB) with `next_offset` paging. |
-| Limits | All configurable (UI, ADB, debug e2e receiver): running 16 (1-64), finished kept 32 (0-256), background timeout default 30 min (1 min up to the max), background timeout max 120 min (1-1440 min), approval 60 s (10-85 s), foreground 90 s (10-90 s), output per call 64 KiB (4-256 KiB), buffer 1024 KiB (64-16384 KiB). |
+| Limits | All configurable (UI, ADB, debug e2e receiver): running 16 (1-64), finished kept 32 (0-256), background timeout default 30 min (1 min up to the max), background timeout max 120 min (1-1440 min), approval 60 s (10-85 s), foreground 90 s (10-90 s), output per call 64 KiB (4-256 KiB), buffer 1024 KiB (64-16384 KiB). Output memory is capped in total (owner, 2026-11-07): (running + finished kept) × output kept per process at most 64 MiB; a limit change that would go over it is refused like an out-of-range value (UI, ADB and debug e2e receiver alike). |
 | Settings apply | Shell settings are tool SETTINGS: read on every call (live), like the storage settings. The five tool on/off switches keep the existing restart rule. |
 | Elevation | Off by default. Per single command (`elevated: true` + required `justification`). Backend priority: Shizuku when usable, else `su` when found, else the call fails telling the agent why. Elevation is dropped after the command: the Shizuku helper process is stopped when no elevated Shizuku process remains. |
 | Permission model | Blocklist (always wins, applies to ALL commands, `*` matches anything). If auto-allow is off: allowlist (`*` never crosses `; & | \` $ ( ) < >` or a newline), otherwise an approval notification (Approve/Deny actions requiring the phone unlocked) or a modal opened by tapping it, showing the justification and the command (truncated at 500 chars). Approval timeout default 60 s. Notifications unavailable → fail at once. No "add to allowlist" button. `envs` are NOT considered by the allowlist. |
@@ -108,7 +112,7 @@ before anything can switch it.
 
 **Acceptance criteria:**
 - [ ] `ServerConfig.shellConfig` exposes elevation, auto-allow, both pattern lists and the eight limits with the agreed defaults and ranges.
-- [ ] `SettingsRepository` extends `ShellSettings`; out-of-range limits, a background default above the max and a max below the default are refused.
+- [ ] `SettingsRepository` extends `ShellSettings`; out-of-range limits, a background default above the max, a max below the default and a running, kept or output-per-process change that puts (running + finished kept) × output kept per process over 64 MiB are refused.
 - [ ] Turning elevation on/off enables/disables `rikka.shizuku.ShizukuProvider`; the app re-applies the state at startup.
 - [ ] Shizuku 13.1.5 libraries are dependencies of both flavors; the provider is declared disabled; Sui auto-initialization is disabled before providers start.
 
@@ -198,6 +202,11 @@ private const val UPPER_OUTPUT_PER_CALL_KIB = 256
 private const val DEFAULT_OUTPUT_BUFFER_KIB = 1024
 private const val LOWER_OUTPUT_BUFFER_KIB = 64
 private const val UPPER_OUTPUT_BUFFER_KIB = 16384
+private const val KIB_PER_MIB = 1024
+
+/** Output kept in memory, in all: (running + finished kept) × output kept per process. */
+const val SHELL_OUTPUT_MEMORY_CAP_MIB = 64
+const val SHELL_OUTPUT_MEMORY_CAP_KIB = SHELL_OUTPUT_MEMORY_CAP_MIB * KIB_PER_MIB
 
 enum class ShellLimit(
     val key: String,
@@ -248,6 +257,10 @@ enum class ShellLimit(
     fun isValid(value: Int): Boolean = value in min..max
 }
 
+/** The limits whose combination [SHELL_OUTPUT_MEMORY_CAP_KIB] caps. */
+val SHELL_OUTPUT_MEMORY_LIMITS: Set<ShellLimit> =
+    setOf(ShellLimit.MAX_RUNNING_PROCESSES, ShellLimit.MAX_FINISHED_PROCESSES, ShellLimit.OUTPUT_BUFFER_KIB)
+
 enum class ShellPatternKind {
     BLOCKLIST,
     ALLOWLIST,
@@ -268,6 +281,17 @@ data class ShellConfig(
                 limit(ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES),
                 limit(ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES),
             )
+
+    /** The output memory, in KiB, the limits allow with [limit] set to [value]. */
+    fun outputMemoryKib(
+        limit: ShellLimit,
+        value: Int,
+    ): Long {
+        val next = copy(limits = limits + (limit to value))
+        val running = next.limit(ShellLimit.MAX_RUNNING_PROCESSES).toLong()
+        val finished = next.limit(ShellLimit.MAX_FINISHED_PROCESSES)
+        return (running + finished) * next.limit(ShellLimit.OUTPUT_BUFFER_KIB)
+    }
 }
 ```
 
@@ -280,7 +304,7 @@ data class ShellConfig(
 ```
 
 **Definition of Done:**
-- [ ] Enum keys, defaults and ranges exactly as above; `ServerConfig.shellConfig` added.
+- [ ] Enum keys, defaults, ranges and the output memory cap exactly as above; `ServerConfig.shellConfig` added.
 
 ### Task 1.3 — `ShizukuProviderSwitch`
 
@@ -369,6 +393,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.danielealbano.androidremotecontrolmcp.data.model.SHELL_OUTPUT_MEMORY_CAP_KIB
+import com.danielealbano.androidremotecontrolmcp.data.model.SHELL_OUTPUT_MEMORY_CAP_MIB
+import com.danielealbano.androidremotecontrolmcp.data.model.SHELL_OUTPUT_MEMORY_LIMITS
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellPatternKind
@@ -417,9 +444,14 @@ internal fun crossLimitError(
     val maxMinutes = current.limit(ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES)
     val exceedsMax = limit == ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES && value > maxMinutes
     val belowDefault = limit == ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES && value < defaultMinutes
+    val overMemory =
+        limit in SHELL_OUTPUT_MEMORY_LIMITS && current.outputMemoryKib(limit, value) > SHELL_OUTPUT_MEMORY_CAP_KIB
     return when {
         exceedsMax -> "Must not exceed the maximum background timeout ($maxMinutes)"
         belowDefault -> "Must not be below the default background timeout ($defaultMinutes)"
+        overMemory ->
+            "Running plus kept processes times the output kept per process must not exceed " +
+                "$SHELL_OUTPUT_MEMORY_CAP_MIB MiB"
         else -> null
     }
 }
@@ -628,7 +660,9 @@ cannot interleave with a toggle). Replace the line
 | `patterns are trimmed, blanks dropped, duplicates removed` | input `[" ls -* ", "", "ls -*", "*reboot*"]` → `["ls -*", "*reboot*"]` for both lists |
 | `editShellPatterns changes the stored list in one edit` | stored `["a"]`, `editShellPatterns(BLOCKLIST) { it + "b" }` → `["a", "b"]`; two concurrent edits adding `c` and `d` (launched together) → both present |
 | `invalid stored pattern JSON reads as empty` | write `"not json"` under the key directly → empty list |
-| `every limit accepts min and max and refuses outside` | parameterized over `ShellLimit.entries`; for BACKGROUND_TIMEOUT_DEFAULT_MINUTES set the max to 1440 first, for BACKGROUND_TIMEOUT_MAX_MINUTES set the default to 1 first |
+| `every limit accepts min and max and refuses outside` | parameterized over `ShellLimit.entries`; for BACKGROUND_TIMEOUT_DEFAULT_MINUTES set the max to 1440 first, for BACKGROUND_TIMEOUT_MAX_MINUTES set the default to 1 first; for MAX_RUNNING_PROCESSES, MAX_FINISHED_PROCESSES and OUTPUT_BUFFER_KIB set the other two to their minimums first (1 running, 0 kept, 64 KiB) |
+| `output memory over 64 MiB is refused` | defaults (16 running, 32 kept): buffer 1365 accepted (48 × 1365 = 65520 KiB), 1366 refused (65568) with "Running plus kept processes times the output kept per process must not exceed 64 MiB" and the stored buffer unchanged; buffer back to 1024: running 32 accepted (64 × 1024 = 65536, the cap itself), 33 refused; kept 33 refused likewise |
+| `outputMemoryKib uses the new value` | `ShellConfig().outputMemoryKib(OUTPUT_BUFFER_KIB, 2048)` == 98304; `ShellConfig().outputMemoryKib(MAX_FINISHED_PROCESSES, 0)` == 16384 |
 | `background default above the max is refused` | max 60, default 61 → failure "Must not exceed the maximum background timeout (60)", stored default unchanged |
 | `max below the default is refused` | default 30, max 20 → failure "Must not be below the default background timeout (30)", stored max unchanged |
 | `out-of-range stored limit falls back to the default` | write 0 for `shell_max_running_processes` directly → `limit(..)` == 16 |
@@ -3805,7 +3839,7 @@ default; `RecordingServerLogRepository`.
 (scratch wipe at start, kill everything and cancel pending approvals at stop).
 
 **Acceptance criteria:**
-- [ ] `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` are registered (each disabled by its MCP Tools switch), 63 tools in total.
+- [ ] `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` are registered (each disabled by its MCP Tools switch), 65 tools in total.
 - [ ] Every result is JSON prefixed by the untrusted-content warning; refusals and invalid parameters are `isError` results with the reason.
 - [ ] `shell_exec` waits within the foreground budget (approval included), then returns `running` with the `process_id`; a client cancellation before the call returns kills the process.
 - [ ] `command`, `workdir` and `envs` together are at most 100 000 bytes once quoted; `justification` at most 1000 characters.
@@ -4536,11 +4570,11 @@ workdir `@TempDir`.
   (imports
   `com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory`,
   `io.mockk.every`, `io.mockk.mockk`, `java.io.File`).
-- `test/.../integration/McpProtocolIntegrationTest.kt`: `EXPECTED_TOOL_COUNT = 63`; rename the test
-  `listTools returns all 58 registered tools` to `listTools returns all 63 registered tools`; add
+- `test/.../integration/McpProtocolIntegrationTest.kt`: `EXPECTED_TOOL_COUNT = 65`; rename the test
+  `listTools returns all 60 registered tools` to `listTools returns all 65 registered tools`; add
   `android_shell_exec`, `android_shell_start`, `android_shell_output`, `android_shell_kill`, `android_shell_list` to
   `EXPECTED_TOOL_NAMES`.
-- `test/.../integration/AuthIntegrationTest.kt`: `EXPECTED_TOOL_COUNT = 63`.
+- `test/.../integration/AuthIntegrationTest.kt`: `EXPECTED_TOOL_COUNT = 65`.
 - `test/.../integration/ToolPermissionsIntegrationTest.kt`: add `shell_exec`, `shell_start`, `shell_output`,
   `shell_kill`, `shell_list` to `ALL_TOOL_NAMES`.
 
@@ -4556,7 +4590,7 @@ applier serves both receivers.
 
 **Acceptance criteria:**
 - [ ] `shell_elevation_enabled` and `shell_auto_allow_elevation` (`--ez`), `shell_blocklist` and `shell_allowlist` (`--es`, JSON array of strings; invalid JSON ignored with a warning, never clears the list), and each `ShellLimit.key` (`--ei`, validated; invalid ignored with a warning) are applied by both `AdbConfigHandler` and `E2EConfigReceiver`.
-- [ ] Limits sent in one broadcast apply in any order: a limit refused only because of another limit in the same broadcast (background default vs max) is retried once after the others.
+- [ ] Limits sent in one broadcast apply in any order: a limit refused only because of another limit in the same broadcast (background default vs max, or the output memory cap) is retried once after the others.
 
 ### Task 7.1 — `ShellAdbConfigApplier` and the two call sites
 
@@ -4687,8 +4721,8 @@ inside `scope.launch`, add after `applyTunnelSettings(intent)`:
 usable, grants Shizuku access and tests `su` from the app.
 
 **Acceptance criteria:**
-- [ ] Settings → Shell: elevation switch; when on, Shizuku status (+ Grant access when not granted), `su` status (+ Test), auto-allow switch, and the allowlist editor only while auto-allow is off; the blocklist editor always; the eight limits with validation (required, number, range, background default ≤ max, max ≥ default) under a note that kept output lives in the app's memory.
-- [ ] Changes apply live (no restart, editable while the server runs); limit edits are saved in the order typed; a timeout field refused because of the other one is saved again once the other one allows it; the limit fields reload from the stored settings on resume; Shizuku/`su` status refreshes on resume and after a Shizuku permission result.
+- [ ] Settings → Shell: elevation switch; when on, Shizuku status (+ Grant access when not granted), `su` status (+ Test), auto-allow switch, and the allowlist editor only while auto-allow is off; the blocklist editor always; the eight limits with validation (required, number, range, background default ≤ max, max ≥ default, (running + finished kept) × output kept per process at most 64 MiB) under a note that kept output lives in the app's memory.
+- [ ] Changes apply live (no restart, editable while the server runs); limit edits are saved in the order typed; a timeout field refused because of the other one is saved again once the other one allows it, and a running, kept or output-per-process field refused for the memory cap once one of the other two allows it; the limit fields reload from the stored settings on resume; Shizuku/`su` status refreshes on resume and after a Shizuku permission result.
 - [ ] MCP Tools screen lists the five shell tools under "Shell"; Privacy screen says shell tools are not covered.
 
 ### Task 8.1 — Strings, `ShellLimitEditor` and `ShellSettingsViewModel`
@@ -4726,7 +4760,7 @@ and before `</resources>`:
 
 ```xml
     <string name="shell_limits_title">Limits</string>
-    <string name="shell_limits_memory_note">Output is kept in the app\'s memory: up to the output kept per process for every running and every kept finished process. Large values with many processes can make Android stop the app.</string>
+    <string name="shell_limits_memory_note">Output is kept in the app\'s memory: up to the output kept per process for every running and every kept finished process, at most 64 MiB in all.</string>
     <string name="shell_limit_max_running_processes">Maximum running processes</string>
     <string name="shell_limit_max_finished_processes">Finished processes kept</string>
     <string name="shell_limit_background_timeout_default_minutes">Background timeout, default (minutes)</string>
@@ -4740,6 +4774,7 @@ and before `</resources>`:
     <string name="shell_limit_error_out_of_range">Must be between %1$d and %2$d</string>
     <string name="shell_limit_error_above_max">Must not exceed the maximum background timeout</string>
     <string name="shell_limit_error_below_default">Must not be below the default background timeout</string>
+    <string name="shell_limit_error_over_memory_cap">Running plus kept processes times the output kept per process must not exceed %1$d MiB</string>
     <string name="shell_elevation_title">Elevated commands</string>
     <string name="shell_elevation_switch">Allow elevated commands</string>
     <string name="shell_elevation_switch_description">Lets an MCP client ask to run a single command as the adb shell user through Shizuku (as root when Shizuku runs as root) or, when Shizuku is not usable, as root through su. Off by default.</string>
@@ -4774,6 +4809,7 @@ and before `</resources>`:
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
 
+import com.danielealbano.androidremotecontrolmcp.data.model.SHELL_OUTPUT_MEMORY_LIMITS
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -4787,6 +4823,7 @@ enum class ShellLimitInputError {
     OUT_OF_RANGE,
     ABOVE_MAX,
     BELOW_DEFAULT,
+    OVER_MEMORY_CAP,
 }
 
 data class ShellLimitField(
@@ -4825,7 +4862,7 @@ class ShellLimitEditor(
         value: Int,
     ) {
         if (store(limit, value)) {
-            sibling(limit)?.let { retry(it) }
+            siblings(limit).forEach { retry(it) }
         } else {
             markIfUnchanged(limit, value, refusedError(limit))
         }
@@ -4861,17 +4898,19 @@ class ShellLimitEditor(
         mutableFields.update { it + (limit to field) }
     }
 
-    private fun sibling(limit: ShellLimit): ShellLimit? =
+    private fun siblings(limit: ShellLimit): List<ShellLimit> =
         when (limit) {
-            ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES
-            ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES
-            else -> null
+            ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> listOf(ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES)
+            ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> listOf(ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES)
+            in SHELL_OUTPUT_MEMORY_LIMITS -> (SHELL_OUTPUT_MEMORY_LIMITS - limit).toList()
+            else -> emptyList()
         }
 
     private fun refusedError(limit: ShellLimit): ShellLimitInputError =
         when (limit) {
             ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> ShellLimitInputError.ABOVE_MAX
             ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> ShellLimitInputError.BELOW_DEFAULT
+            in SHELL_OUTPUT_MEMORY_LIMITS -> ShellLimitInputError.OVER_MEMORY_CAP
             else -> ShellLimitInputError.OUT_OF_RANGE
         }
 }
@@ -5315,6 +5354,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.SHELL_OUTPUT_MEMORY_CAP_MIB
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ShellPatternKind
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
@@ -5426,12 +5466,14 @@ private fun limitErrorText(
     error: ShellLimitInputError,
 ): String {
     val outOfRange = R.string.shell_limit_error_out_of_range
+    val overMemory = R.string.shell_limit_error_over_memory_cap
     return when (error) {
         ShellLimitInputError.REQUIRED -> stringResource(R.string.shell_limit_error_required)
         ShellLimitInputError.NOT_A_NUMBER -> stringResource(R.string.shell_limit_error_not_a_number)
         ShellLimitInputError.OUT_OF_RANGE -> stringResource(outOfRange, limit.min, limit.max)
         ShellLimitInputError.ABOVE_MAX -> stringResource(R.string.shell_limit_error_above_max)
         ShellLimitInputError.BELOW_DEFAULT -> stringResource(R.string.shell_limit_error_below_default)
+        ShellLimitInputError.OVER_MEMORY_CAP -> stringResource(overMemory, SHELL_OUTPUT_MEMORY_CAP_MIB)
     }
 }
 ```
@@ -5594,6 +5636,8 @@ Sharing category:
 | `a sibling retry does not overwrite newer text` | default 200 refused; while the retry's `store` suspends the user edits the default to `150` → after the retry succeeds the field shows `150` with no change made by the retry |
 | `the refused sibling is saved once the other one allows it` | default 200 refused (ABOVE_MAX), then max 300 saved → store called again with default 200, the default field error cleared |
 | `a sibling without a refusal error is not saved again` | max saved while the default field has no error → no extra store call |
+| `refused memory limit shows over memory cap` | store refuses OUTPUT_BUFFER_KIB → OVER_MEMORY_CAP on its field; MAX_RUNNING_PROCESSES and MAX_FINISHED_PROCESSES likewise |
+| `a memory limit refused is saved once another memory limit allows it` | buffer 4096 refused (OVER_MEMORY_CAP), then running 4 saved → store called again with buffer 4096, its error cleared; the kept field (no error) is not saved again |
 
 **File:** `test/.../ui/viewmodels/ShellSettingsViewModelTest.kt`
 
@@ -6256,7 +6300,7 @@ no capabilities and cannot enter the app's scratch folder)
 including the two documented behaviours (normal-command identity, self-approval).
 
 **Acceptance criteria:**
-- [ ] Every count says 63 tools / 15 categories; every new setting, ADB extra, permission, component, lifecycle step and the elevated flow is documented with the texts below; Mermaid diagrams validated with `mmdc`.
+- [ ] Every count says 65 tools / 15 categories; every new setting, ADB extra, permission, component, lifecycle step and the elevated flow is documented with the texts below; Mermaid diagrams validated with `mmdc`.
 - [ ] README "No Root Required" wording is unchanged (owner decision); elevation is described in a new subsection.
 - [ ] Normal-command identity and self-approval are documented in MCP_TOOLS, README and PROJECT.
 
@@ -6269,8 +6313,8 @@ including the two documented behaviours (normal-command identity, self-approval)
 19. [Shell Tools](#15-shell-tools)
 ```
 
-- Overview: `The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:` →
-  `The MCP server exposes 63 tools via the JSON-RPC 2.0 protocol, organized into 15 categories:`; add after the
+- Overview: `The MCP server exposes 60 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:` →
+  `The MCP server exposes 65 tools via the JSON-RPC 2.0 protocol, organized into 15 categories:`; add after the
   `| Sharing | … | 48 |` row:
 
 ```markdown
@@ -6289,7 +6333,7 @@ Shell tools run shell commands on the device, like the shell tools of coding-age
 **Services**: `ShellProcessManager`, `ShellCommandAuthorizer`, `AppShellBackend`, `ShizukuShellBackend`, `SuShellBackend`
 **Permission**: None for normal commands. Elevated commands need Shizuku (`moe.shizuku.manager.permission.API_V23`, granted in the Shizuku app) or a `su` grant from the root manager.
 
-**Processes**: `android_shell_exec` waits for the command at most the foreground limit (Settings → Shell, default 90 seconds, range 10 to 90; waiting for an approval counts toward it). A command still running at the limit keeps running in the background and the call returns its `process_id`; if the client cancels the call or closes its request before it returns, the command is killed, so keep the foreground limit below the client's request timeout. `android_shell_start` returns without waiting for the command to end; an elevated command that needs approval first waits for the user's answer, at most the foreground limit. A background command is stopped after its timeout (default 30 minutes, at most the maximum setting, default 120 minutes; a command `android_shell_exec` moved to the background gets the default, counted from its start) or when the server stops. At most 16 processes run at the same time and the 32 most recently finished processes are kept (both configurable). Android can stop child processes of apps when more than 32 run on the device; a normal command stopped this way ends with exit code 137 and no other notice. Each process keeps the start and the end of its output when the output exceeds the buffer (default 1024 KiB), in the app's memory, for every running and every kept finished process, so large buffers with many processes can make Android stop the app; each call returns at most the per-call limit (default 64 KiB), and the next page starts at `next_offset`. `command`, `workdir` and `envs` together may take at most 100000 bytes once quoted for the shell, and `justification` at most 1000 characters.
+**Processes**: `android_shell_exec` waits for the command at most the foreground limit (Settings → Shell, default 90 seconds, range 10 to 90; waiting for an approval counts toward it). A command still running at the limit keeps running in the background and the call returns its `process_id`; if the client cancels the call or closes its request before it returns, the command is killed, so keep the foreground limit below the client's request timeout. `android_shell_start` returns without waiting for the command to end; an elevated command that needs approval first waits for the user's answer, at most the foreground limit. A background command is stopped after its timeout (default 30 minutes, at most the maximum setting, default 120 minutes; a command `android_shell_exec` moved to the background gets the default, counted from its start) or when the server stops. At most 16 processes run at the same time and the 32 most recently finished processes are kept (both configurable). Android can stop child processes of apps when more than 32 run on the device; a normal command stopped this way ends with exit code 137 and no other notice. Each process keeps the start and the end of its output when the output exceeds the buffer (default 1024 KiB), in the app's memory, for every running and every kept finished process; the settings keep (running + kept finished processes) × buffer at most 64 MiB; each call returns at most the per-call limit (default 64 KiB), and the next page starts at `next_offset`. `command`, `workdir` and `envs` together may take at most 100000 bytes once quoted for the shell, and `justification` at most 1000 characters.
 
 **Scratch folder**: `/storage/emulated/0/Android/data/<application id>/cache/shell`, emptied every time the server starts (entries the app cannot delete, for example ones an elevated command made unreadable to it, stay). Normal and elevated commands can both read and write it (normal commands run with `umask 0007`). It is mounted `noexec`: run scripts with `sh script.sh`; to run a binary, copy it to `/data/local/tmp` with an elevated command and run it from there. The file tools do not expose it.
 
@@ -6599,9 +6643,9 @@ Lists the running and the kept finished processes, oldest first.
 ### Task 10.2 — `README.md`, `CONTRIBUTING.md`, `THIRD_PARTY_LICENSES.md`, `docs/PERMISSIONS.md`
 
 **Action 1 — modify** `README.md`:
-- `### 58 MCP Tools across 14 Categories` → `### 63 MCP Tools across 15 Categories`; in the sentence below it
+- `### 60 MCP Tools across 14 Categories` → `### 65 MCP Tools across 15 Categories`; in the sentence below it
   `notifications, location, and sharing.` → `notifications, location, sharing, and shell.`
-- Comparison table: `| MCP tools | 58 | 21 | 11 | 5 | 10 | 11 |` → `| MCP tools | 63 | 21 | 11 | 5 | 10 | 11 |`.
+- Comparison table: `| MCP tools | 60 | 21 | 11 | 5 | 10 | 11 |` → `| MCP tools | 65 | 21 | 11 | 5 | 10 | 11 |`.
 - Privacy Mode: add after the paragraph ending `is best-effort mitigation, not a guarantee.`, separated by blank lines:
 
 ```markdown
@@ -6622,7 +6666,7 @@ Shell tools are not covered: commands and their output pass through unchanged.
 | Shell: Approval Timeout | 60 seconds | Range 10-85 seconds |
 | Shell: Foreground Wait Limit | 90 seconds | Range 10-90 seconds; `android_shell_exec` waits at most this long, then the command continues in the background |
 | Shell: Output per Call | 64 KiB | Range 4-256 KiB |
-| Shell: Output Kept per Process | 1024 KiB | Range 64-16384 KiB; beyond it only the start and the end of the output are kept. It is held in the app's memory for every running and every kept finished process, so large values with many processes can make Android stop the app |
+| Shell: Output Kept per Process | 1024 KiB | Range 64-16384 KiB; beyond it only the start and the end of the output are kept. It is held in the app's memory for every running and every kept finished process: (running + kept) × output kept per process must not exceed 64 MiB, and a change that would go over it is refused |
 ```
 
 - Headless Setup via ADB extras table: add after the row of the `storage_allow_delete` extra:
@@ -6632,14 +6676,14 @@ Shell tools are not covered: commands and their output pass through unchanged.
 | `shell_auto_allow_elevation` | boolean | Run every elevated shell command without asking |
 | `shell_blocklist` | string (JSON) | Shell blocklist as a JSON array of patterns, e.g. `["*reboot*"]` (`[]` empties it; invalid JSON is ignored) |
 | `shell_allowlist` | string (JSON) | Shell allowlist as a JSON array of patterns (`[]` empties it; invalid JSON is ignored) |
-| `shell_max_running_processes` | int | Maximum running shell processes (1-64) |
-| `shell_max_finished_processes` | int | Finished shell processes kept (0-256) |
+| `shell_max_running_processes` | int | Maximum running shell processes (1-64; (running + kept) × output kept per process at most 64 MiB) |
+| `shell_max_finished_processes` | int | Finished shell processes kept (0-256; (running + kept) × output kept per process at most 64 MiB) |
 | `shell_background_timeout_default_minutes` | int | Default background timeout in minutes (1 up to the maximum) |
 | `shell_background_timeout_max_minutes` | int | Maximum background timeout in minutes (1-1440, not below the default; both can be sent in one broadcast) |
 | `shell_approval_timeout_seconds` | int | Approval timeout in seconds (10-85) |
 | `shell_foreground_wait_seconds` | int | Foreground wait limit in seconds (10-90) |
 | `shell_output_per_call_kib` | int | Output returned per call in KiB (4-256) |
-| `shell_output_buffer_kib` | int | Output kept per process in KiB (64-16384) |
+| `shell_output_buffer_kib` | int | Output kept per process in KiB (64-16384; (running + kept) × output kept per process at most 64 MiB; limits sent in one broadcast can be in any order) |
 ```
 
 - Permissions Reference table: add after the row of `READ_MEDIA_AUDIO`:
@@ -6672,9 +6716,9 @@ The shell tools can run single commands with more power than the app has, only a
 Normal (not elevated) shell commands run as the app itself: they can read and change the app's own files, including its settings, and they can use any `su` grant or Shizuku access you gave the app. An MCP client that can use the notification, accessibility or intent tools can approve its own elevation request, so the approval is a check for you, not a boundary against such a client. If the app process dies while elevated commands run through `su`, some root managers (for example Magisk) keep those commands running until they end on their own. The shell tools are on by default: turn them off in Settings → MCP Tools unless you trust your MCP clients, turn on elevation only for clients you trust, and keep authentication on.
 ```
 
-**Action 2 — modify** `CONTRIBUTING.md`: `and all 58 MCP tool handlers.` → `and all 63 MCP tool handlers.`;
+**Action 2 — modify** `CONTRIBUTING.md`: `and all 60 MCP tool handlers.` → `and all 65 MCP tool handlers.`;
 `tool dispatch for all 12 tool categories,` → `tool dispatch for all 15 tool categories,`; in the Mermaid diagram
-`SDK -->|"58 MCP Tools"| Tools["Tool Handlers"]` → `SDK -->|"63 MCP Tools"| Tools["Tool Handlers"]`.
+`SDK -->|"60 MCP Tools"| Tools["Tool Handlers"]` → `SDK -->|"65 MCP Tools"| Tools["Tool Handlers"]`.
 
 **Action 3 — modify** `THIRD_PARTY_LICENSES.md`: add after the `| MCP Kotlin SDK | MIT | … |` row:
 
@@ -6730,7 +6774,7 @@ Elevated commands through `su` are granted by your root manager when the app fir
 - `app/src/main/aidl/com/danielealbano/androidremotecontrolmcp/services/shell/` — `IShellService.aidl`, `IShellProcessCallback.aidl` (Shizuku UserService interface)
 ```
 
-- MCP Tools Specification: `The MCP server exposes 58 tools across 14 categories.` → `The MCP server exposes 63 tools
+- MCP Tools Specification: `The MCP server exposes 60 tools across 14 categories.` → `The MCP server exposes 65 tools
   across 15 categories.`; add after the Sharing Tools section (before the `---` that ends the chapter):
 
 ```markdown
@@ -6804,11 +6848,11 @@ SAF tree URI permissions (user-granted per storage location via system file pick
 - **Approval Timeout**: 60 seconds (range 10-85)
 - **Foreground Wait Limit**: 90 seconds (range 10-90)
 - **Output per Call**: 64 KiB (range 4-256)
-- **Output Kept per Process**: 1024 KiB (range 64-16384); held in the app's memory for every running and every kept finished process, so large values with many processes can make Android stop the app
+- **Output Kept per Process**: 1024 KiB (range 64-16384); held in the app's memory for every running and every kept finished process; (running + kept) × output kept per process must not exceed 64 MiB (the defaults use 48 MiB)
 - All shell settings are read on every tool call (they apply at once, also while the server runs) and can be set from the UI, from ADB (`AdbConfigReceiver`) and from the debug e2e receiver
 ```
 
-- Related Documentation: `for all 58 tools` → `for all 63 tools`.
+- Related Documentation: `for all 60 tools` → `for all 65 tools`.
 
 **Action 2 — modify** `docs/ARCHITECTURE.md`:
 - Component Diagram: replace the whole Mermaid block with:
