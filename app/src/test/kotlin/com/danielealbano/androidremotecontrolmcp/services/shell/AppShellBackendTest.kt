@@ -86,7 +86,7 @@ class AppShellBackendTest {
             try {
                 shell.kill(null)
 
-                withTimeout(WAIT_MS) { shell.exit.await() }
+                assertTrue(withTimeout(WAIT_MS) { shell.exit.await() }.code != null)
             } finally {
                 ProcessBuilder("kill", "-9", "--", "-${header!!.pgid}").start().waitFor()
             }
