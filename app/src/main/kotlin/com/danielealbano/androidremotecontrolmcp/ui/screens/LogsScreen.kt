@@ -61,6 +61,7 @@ private val CHIP_DISPLAY_ORDER =
         ServerLogEntry.Type.AUTH,
         ServerLogEntry.Type.CHANNEL,
         ServerLogEntry.Type.SETTINGS,
+        ServerLogEntry.Type.SHELL,
     )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -223,5 +224,6 @@ private fun typeLabel(type: ServerLogEntry.Type): String =
             ServerLogEntry.Type.CHANNEL -> R.string.server_logs_type_channel
             ServerLogEntry.Type.SETTINGS -> R.string.server_logs_type_settings
             ServerLogEntry.Type.PRIVACY -> R.string.server_logs_type_privacy
+            ServerLogEntry.Type.SHELL -> R.string.server_logs_type_shell
         },
     )

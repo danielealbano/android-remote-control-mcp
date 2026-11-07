@@ -210,6 +210,16 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
                 ToolEntry("share_file_via_web", R.string.mcp_tool_share_file_via_web),
             ),
         ),
+        ToolCategory(
+            R.string.mcp_tools_category_shell,
+            listOf(
+                ToolEntry("shell_exec", R.string.mcp_tool_shell_exec),
+                ToolEntry("shell_start", R.string.mcp_tool_shell_start),
+                ToolEntry("shell_output", R.string.mcp_tool_shell_output),
+                ToolEntry("shell_kill", R.string.mcp_tool_shell_kill),
+                ToolEntry("shell_list", R.string.mcp_tool_shell_list),
+            ),
+        ),
     )
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.every
+import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,6 +59,7 @@ class SettingsRepositoryServerRunningTest {
                 EventChannelSettingsImpl(dataStore, changeLogger),
                 ArcTunnelSettingsImpl(dataStore, changeLogger),
                 DownloadSettingsImpl(dataStore, changeLogger),
+                ShellSettingsImpl(dataStore, changeLogger, mockk(relaxed = true)),
             )
     }
 

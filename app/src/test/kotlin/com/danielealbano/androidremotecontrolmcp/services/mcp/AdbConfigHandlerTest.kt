@@ -10,9 +10,11 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellAdbConfigApplier
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
@@ -179,6 +181,21 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify { settingsRepository.updateBearerToken("my-test-token") }
+            }
+
+        @Test
+        @DisplayName("shell extras are applied")
+        fun shellExtrasApplied() =
+            runTest {
+                coEvery { settingsRepository.updateShellLimit(any(), any()) } returns Result.success(1)
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(ShellAdbConfigApplier.EXTRA_AUTO_ALLOW_ELEVATION, true)
+                        int(ShellLimit.MAX_RUNNING_PROCESSES.key, 4)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateShellAutoAllowElevation(true) }
+                coVerify { settingsRepository.updateShellLimit(ShellLimit.MAX_RUNNING_PROCESSES, 4) }
             }
 
         @Test

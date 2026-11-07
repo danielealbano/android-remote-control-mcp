@@ -17,11 +17,13 @@ import com.danielealbano.androidremotecontrolmcp.data.model.PlaceholderFormat
 import com.danielealbano.androidremotecontrolmcp.data.model.PrivacyModeConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.RedactionMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ShellLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.privacy.PiiCategory
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.every
+import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -84,6 +86,7 @@ class SettingsRepositoryImplTest {
                 EventChannelSettingsImpl(dataStore, changeLogger),
                 ArcTunnelSettingsImpl(dataStore, changeLogger),
                 DownloadSettingsImpl(dataStore, changeLogger),
+                ShellSettingsImpl(dataStore, changeLogger, mockk(relaxed = true)),
             )
     }
 
@@ -180,6 +183,18 @@ class SettingsRepositoryImplTest {
                 val secondRead = repository.getServerConfig()
 
                 assertEquals(firstRead.bearerToken, secondRead.bearerToken)
+            }
+
+        @Test
+        fun `serverConfig exposes the shell config`() =
+            testScope.runTest {
+                repository.updateShellAutoAllowElevation(true)
+                repository.updateShellLimit(ShellLimit.OUTPUT_PER_CALL_KIB, 8).getOrThrow()
+
+                val shellConfig = repository.getServerConfig().shellConfig
+
+                assertTrue(shellConfig.autoAllowElevation)
+                assertEquals(8, shellConfig.limit(ShellLimit.OUTPUT_PER_CALL_KIB))
             }
     }
 

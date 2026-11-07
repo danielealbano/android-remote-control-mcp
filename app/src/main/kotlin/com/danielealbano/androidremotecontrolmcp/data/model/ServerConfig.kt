@@ -84,6 +84,7 @@ data class ServerConfig(
     val toolPermissionsConfig: ToolPermissionsConfig = ToolPermissionsConfig(),
     val privacyModeConfig: PrivacyModeConfig = PrivacyModeConfig(),
     val hideFromRecents: Boolean = false,
+    val shellConfig: ShellConfig = ShellConfig(),
 ) {
     /** The address the main listener binds to. */
     val bindHost: String

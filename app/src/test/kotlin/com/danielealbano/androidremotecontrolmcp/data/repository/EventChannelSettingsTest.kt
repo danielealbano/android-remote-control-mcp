@@ -109,6 +109,7 @@ class EventChannelSettingsTest {
                 ),
                 io.mockk.mockk<ArcTunnelSettings>(relaxed = true),
                 io.mockk.mockk<DownloadSettings>(relaxed = true),
+                io.mockk.mockk<ShellSettings>(relaxed = true),
             )
 
         @Test

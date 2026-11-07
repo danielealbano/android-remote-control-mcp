@@ -165,7 +165,7 @@ jobs:
     # linux-modules-extra-$(uname -r) or, on the 7.0 azure kernel (no modules-extra package), in the base
     # linux-modules package; ubuntu-latest had moved to a kernel without linux-modules-extra when this was pinned.
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7

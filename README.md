@@ -68,9 +68,9 @@ To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel giv
 - Auto-start on boot
 - Remote access tunnels via the free end-to-end encrypted tunnel (no account), Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
-### 60 MCP Tools across 14 Categories
+### 65 MCP Tools across 15 Categories
 
-Screen introspection, system actions, touch actions, gestures, node actions, text input, utilities, file operations, app management, camera, intents, notifications, location, and sharing.
+Screen introspection, system actions, touch actions, gestures, node actions, text input, utilities, file operations, app management, camera, intents, notifications, location, sharing, and shell.
 
 All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`).
 
@@ -91,7 +91,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full tool reference with inpu
 
 | Feature | This project | [mobile-mcp] | [Android-MCP] | [android-mcp-server] | [adb-mcp] | [droidrun-mcp] |
 |---------|:-:|:-:|:-:|:-:|:-:|:-:|
-| MCP tools | 60 | 21 | 11 | 5 | 10 | 11 |
+| MCP tools | 65 | 21 | 11 | 5 | 10 | 11 |
 | Runs on the phone (no ADB) | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
 | Action latency | 10-100 ms | 1-4 s | 1-4 s | 1-4 s | 1-4 s | 1-4 s |
 | Works over the internet | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
@@ -183,6 +183,8 @@ runs fully on-device: fast rule-based checks (checksums, formats, field context)
 local NER model — no cloud calls. Detected values are either pseudonymized with consistent
 placeholders (`EMAIL#a1b2c`, so AI tools keep working across screens) or fully redacted. Detection
 is best-effort mitigation, not a guarantee.
+
+Shell tools are not covered: commands and their output pass through unchanged.
 
 The model is the [Ai4Privacy multilingual anonymiser](https://huggingface.co/ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii)
 (MIT license, Built with Llama), downloaded once on first enable (~150 MB) directly from the pinned
@@ -338,6 +340,18 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Allow Unverified HTTPS | Disabled | Accept unverified (self-signed or invalid) HTTPS certificates for `android_download_from_url` (less secure) |
 | Block Local Network Downloads | Disabled | `android_download_from_url` refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms) |
 | Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
+| Shell: Allow Elevated Commands | Disabled | Lets MCP clients ask to run single shell commands through Shizuku (as the adb shell user, or as root when Shizuku runs as root) or `su` (as root). Every shell setting is in Settings → Shell and applies at once, also while the server runs |
+| Shell: Auto-allow Elevation | Disabled | Run every elevated command without asking (the blocklist still applies) |
+| Shell: Blocklist | Empty | Commands matching a pattern are always refused, elevated or not (a pattern matches the whole command, `*` matches anything: `*reboot*`). It compares text only, so the same action written another way is not refused |
+| Shell: Allowlist | Empty | Elevated commands matching a pattern run without asking while auto-allow is off (a pattern matches the whole command; `*` never matches `;`, `&`, `\|`, `` ` ``, `$`, `(`, `)`, `<`, `>` or a line break); any other elevated command asks for approval on the phone. Environment variables sent with the command (`envs`) are not checked |
+| Shell: Maximum Running Processes | 16 | Range 1-64. Android can stop child processes of apps when more than 32 run on the device; a normal command stopped this way ends with exit code 137 and no other notice. |
+| Shell: Finished Processes Kept | 32 | Range 0-256 |
+| Shell: Background Timeout, Default | 30 minutes | From 1 minute up to the maximum |
+| Shell: Background Timeout, Maximum | 120 minutes | Range 1-1440 minutes, not below the default |
+| Shell: Approval Timeout | 60 seconds | Range 10-85 seconds |
+| Shell: Foreground Wait Limit | 90 seconds | Range 10-90 seconds; `android_shell_exec` waits at most this long, then the command continues in the background |
+| Shell: Output per Call | 64 KiB | Range 4-256 KiB |
+| Shell: Output Kept per Process | 1024 KiB | Range 64-16384 KiB; beyond it only the start and the end of the output are kept. It is held in the app's memory for every running and every kept finished process: (running + kept) × output kept per process must not exceed 64 MiB, and a change that would go over it is refused |
 
 ### Using with adb Port Forwarding
 
@@ -510,6 +524,18 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `storage_location_id` | string | ID of an existing storage location (from `android_list_storage_locations` or Settings > Storage); required by the two extras below, unknown IDs are ignored |
 | `storage_allow_write` | boolean | Allow write operations on the location identified by `storage_location_id` |
 | `storage_allow_delete` | boolean | Allow delete operations on the location identified by `storage_location_id` |
+| `shell_elevation_enabled` | boolean | Allow elevated shell commands |
+| `shell_auto_allow_elevation` | boolean | Run every elevated shell command without asking |
+| `shell_blocklist` | string (JSON) | Shell blocklist as a JSON array of patterns, e.g. `["*reboot*"]` (`[]` empties it; invalid JSON is ignored) |
+| `shell_allowlist` | string (JSON) | Shell allowlist as a JSON array of patterns (`[]` empties it; invalid JSON is ignored) |
+| `shell_max_running_processes` | int | Maximum running shell processes (1-64; (running + kept) × output kept per process at most 64 MiB) |
+| `shell_max_finished_processes` | int | Finished shell processes kept (0-256; (running + kept) × output kept per process at most 64 MiB) |
+| `shell_background_timeout_default_minutes` | int | Default background timeout in minutes (1 up to the maximum) |
+| `shell_background_timeout_max_minutes` | int | Maximum background timeout in minutes (1-1440, not below the default; both can be sent in one broadcast) |
+| `shell_approval_timeout_seconds` | int | Approval timeout in seconds (10-85) |
+| `shell_foreground_wait_seconds` | int | Foreground wait limit in seconds (10-90) |
+| `shell_output_per_call_kib` | int | Output returned per call in KiB (4-256) |
+| `shell_output_buffer_kib` | int | Output kept per process in KiB (64-16384; (running + kept) × output kept per process at most 64 MiB; limits sent in one broadcast can be in any order) |
 
 #### Start the MCP Server
 
@@ -545,7 +571,7 @@ adb shell am start \
 
 ## Permissions Reference
 
-The app declares the permissions below. **Normal** permissions are granted automatically at install. **Runtime** permissions and **Special access** require explicit user action (via the app's Settings > Permissions tab, or programmatically — see [Granting Permissions Programmatically](docs/PERMISSIONS.md)). All runtime permissions are optional: the app works without them, but the features that depend on them are disabled until granted.
+The app declares the permissions below. **Normal** permissions are granted automatically at install. **Runtime** permissions and **Special access** require explicit user action (via the app's Settings > Permissions tab, or programmatically — see [Granting Permissions Programmatically](docs/PERMISSIONS.md)). All runtime permissions are optional: the app works without them, but the features that depend on them are disabled until granted. The optional Shizuku permission for elevated shell commands is granted in Settings → Shell (Grant access) or in the Shizuku app.
 
 | Permission | Type | Used for |
 |------------|------|----------|
@@ -570,6 +596,7 @@ The app declares the permissions below. **Normal** permissions are granted autom
 | `READ_MEDIA_IMAGES` | Runtime | "All files" mode for built-in image storage locations (Android 13+) |
 | `READ_MEDIA_VIDEO` | Runtime | "All files" mode for built-in video storage locations (Android 13+) |
 | `READ_MEDIA_AUDIO` | Runtime | "All files" mode for built-in audio storage locations (Android 13+) |
+| `moe.shizuku.manager.permission.API_V23` | Runtime (Shizuku) | Optional elevated shell commands through Shizuku; granted in the Shizuku app or with Settings → Shell → Grant access (declared by the Shizuku client library) |
 | Accessibility Service | Special access | UI introspection, action execution, and screenshots — **required** for core functionality |
 | Notification Listener | Special access | Reading and managing notifications via notification tools |
 
@@ -580,6 +607,12 @@ The app declares the permissions below. **Normal** permissions are granted autom
 ### No Root Required
 
 The application runs entirely within Android's standard permission model. No root access, no unlocked bootloader, no custom ROM required.
+
+### Optional Elevated Shell Commands
+
+The shell tools can run single commands with more power than the app has, only after you turn on **Settings → Shell → Allow elevated commands** (off by default). An elevated command runs through [Shizuku](https://shizuku.rikka.app/) as the adb shell user (or as root when Shizuku runs as root) or, when Shizuku is not usable, through `su` as root. Each elevated command carries a justification from the client and passes your rules: the blocklist always refuses, auto-allow or the allowlist let it run, and otherwise the phone asks you to approve it (Approve and Deny need the phone unlocked). Every elevated command is written to the server log (an entry keeps at most its first 500 bytes, so the end of a very long command can be missing). If you turn this on while the app is running, tap **Restart app** in the Shizuku row so Shizuku can connect (the app closes and opens again by itself; a running server starts again). The app itself never needs root; Shizuku or root are used only for these commands.
+
+Normal (not elevated) shell commands run as the app itself: they can read and change the app's own files, including its settings, and they can use any `su` grant or Shizuku access you gave the app. An MCP client that can use the notification, accessibility or intent tools can approve its own elevation request, so the approval is a check for you, not a boundary against such a client. If the app process dies while elevated commands run through `su`, some root managers (for example Magisk) keep those commands running until they end on their own. The shell tools are on by default: turn them off in Settings → MCP Tools unless you trust your MCP clients, turn on elevation only for clients you trust, and keep authentication on.
 
 ### Trust Model
 
@@ -598,7 +631,7 @@ Authentication is combined (dual-accept): a `/mcp` request is authorized by a va
 
 ### Permissions
 
-All permissions are managed from the app's Settings > Permissions tab. Every sensitive permission requires explicit user action — nothing is granted silently.
+All permissions are managed from the app's Settings > Permissions tab. Every sensitive permission requires explicit user action — nothing is granted silently. The optional Shizuku access for elevated shell commands is granted in Settings → Shell or in the Shizuku app, and `su` grants come from your root manager.
 
 Storage locations are configured in Settings > Storage, which includes automatic locations (e.g., Downloads) and custom locations authorized via the system file picker.
 

@@ -59,6 +59,8 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileL
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkServiceImpl
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInboxImpl
+import com.danielealbano.androidremotecontrolmcp.services.shell.AppRestarter
+import com.danielealbano.androidremotecontrolmcp.services.shell.AppRestarterImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClient
 import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClientImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
@@ -208,6 +210,9 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAccessibilityNodeCache(impl: AccessibilityNodeCacheImpl): AccessibilityNodeCache
+
+    @Binds
+    abstract fun bindAppRestarter(impl: AppRestarterImpl): AppRestarter
 
     @Binds
     @Singleton

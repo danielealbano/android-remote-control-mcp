@@ -7,6 +7,9 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotRedactor
+import com.danielealbano.androidremotecontrolmcp.services.shell.ShellScratchDirectory
+import io.mockk.every
+import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.io.File
 
 @DisplayName("McpToolRegistration")
 class McpToolRegistrationTest {
@@ -51,6 +55,12 @@ class McpToolRegistrationTest {
                 deps.locationProvider,
             ),
             InboxToolDeps(deps.notificationProvider, deps.sharedContentInbox, deps.ephemeralFileLinkService),
+            ShellToolDeps(
+                deps.shellToolContext.processManager,
+                deps.shellToolContext.authorizer,
+                deps.shellToolContext.settingsRepository,
+                mockk<ShellScratchDirectory> { every { path() } returns File("/scratch") },
+            ),
         )
 
     /** The tool names [McpToolRegistration.registerAll] puts on a fresh SDK server. */

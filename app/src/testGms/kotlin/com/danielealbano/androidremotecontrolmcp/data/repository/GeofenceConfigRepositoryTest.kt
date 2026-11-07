@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.GeofenceZone
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.every
+import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +177,7 @@ class GeofenceConfigRepositoryTest {
                     EventChannelSettingsImpl(dataStore, changeLogger),
                     ArcTunnelSettingsImpl(dataStore, changeLogger),
                     DownloadSettingsImpl(dataStore, changeLogger),
+                    ShellSettingsImpl(dataStore, changeLogger, mockk(relaxed = true)),
                 )
             settingsRepository.updateNotificationChannelEnabled(true)
 

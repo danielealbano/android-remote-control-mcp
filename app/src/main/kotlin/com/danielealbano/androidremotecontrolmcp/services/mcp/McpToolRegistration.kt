@@ -5,6 +5,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogReposi
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ShellToolContext
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -15,6 +16,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionToo
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNotificationTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSharingTools
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerShellTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
@@ -37,6 +39,7 @@ class McpToolRegistration
         private val privacy: PrivacyToolDeps,
         private val device: DeviceToolDeps,
         private val inbox: InboxToolDeps,
+        private val shell: ShellToolDeps,
     ) {
         /** Registers every MCP tool on [server]; [currentBaseUrl] is the URL the sharing tools hand out. */
         fun registerAll(
@@ -72,6 +75,17 @@ class McpToolRegistration
             )
             registerLocationTools(registrar, d.locationProvider, privacy.privacyToolGate, toolNamePrefix, perms)
             registerSharingBundle(registrar, toolNamePrefix, perms, fileSizeLimitMb, currentBaseUrl)
+            registerShellTools(
+                registrar,
+                ShellToolContext(
+                    shell.processManager,
+                    shell.authorizer,
+                    shell.settingsRepository,
+                    shell.scratchDirectory.path()?.absolutePath,
+                ),
+                toolNamePrefix,
+                perms,
+            )
         }
 
         private fun registerAccessibilityToolBundle(
