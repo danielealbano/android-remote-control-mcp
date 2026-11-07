@@ -69,7 +69,13 @@ class E2EShellPermissionTest {
             try {
                 val result = ShellE2E.call("shell_exec", elevatedId())
 
-                assertEquals("2000", result.getValue("output").jsonPrimitive.content.trim())
+                assertEquals(
+                    "2000",
+                    result
+                        .getValue("output")
+                        .jsonPrimitive.content
+                        .trim(),
+                )
             } finally {
                 ShellE2E.configure(*ShellE2E.switches(elevation = true, autoAllow = false))
             }
@@ -106,7 +112,13 @@ class E2EShellPermissionTest {
                 val result = ShellE2E.call("shell_exec", elevatedId())
                 val elapsedMs = System.currentTimeMillis() - started
 
-                assertEquals("2000", result.getValue("output").jsonPrimitive.content.trim())
+                assertEquals(
+                    "2000",
+                    result
+                        .getValue("output")
+                        .jsonPrimitive.content
+                        .trim(),
+                )
                 assertTrue(elapsedMs < QUICK_MS, "took $elapsedMs ms")
             } finally {
                 ShellE2E.configure(*ShellE2E.patterns("shell_allowlist", emptyList()))

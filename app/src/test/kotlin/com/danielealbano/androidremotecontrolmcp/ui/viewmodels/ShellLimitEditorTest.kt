@@ -153,7 +153,11 @@ class ShellLimitEditorTest {
         runTest {
             answer = { _, _, _ -> false }
             val memoryLimits =
-                listOf(ShellLimit.OUTPUT_BUFFER_KIB, ShellLimit.MAX_RUNNING_PROCESSES, ShellLimit.MAX_FINISHED_PROCESSES)
+                listOf(
+                    ShellLimit.OUTPUT_BUFFER_KIB,
+                    ShellLimit.MAX_RUNNING_PROCESSES,
+                    ShellLimit.MAX_FINISHED_PROCESSES,
+                )
 
             memoryLimits.forEach { limit ->
                 editor.edit(limit, limit.max.toString())

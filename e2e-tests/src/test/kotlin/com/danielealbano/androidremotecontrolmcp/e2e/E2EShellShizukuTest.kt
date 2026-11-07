@@ -55,8 +55,7 @@ class E2EShellShizukuTest {
         assertEquals(expected, ShizukuE2E.providerState())
     }
 
-    private fun running(args: String): Boolean =
-        StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
+    private fun running(args: String): Boolean = StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
 
     private fun noProcessWithin(
         args: String,

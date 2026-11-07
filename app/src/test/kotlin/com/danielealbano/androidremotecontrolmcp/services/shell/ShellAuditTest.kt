@@ -18,10 +18,15 @@ class ShellAuditTest {
     private fun launch(grant: ElevationGrant? = ElevationGrant.ALLOWLISTED): ShellLaunch =
         ShellLaunch("cmd", "/", emptyMap(), 30, grant?.let { ShellElevation("j", it) })
 
-    private fun process(launch: ShellLaunch = launch()): ShellProcess =
-        ShellProcess(7, launch, backend, ShellOutputBuffer(1024), 0)
+    private fun process(launch: ShellLaunch = launch()): ShellProcess {
+        val buffer = ShellOutputBuffer(1024)
+        return ShellProcess(7, launch, backend, buffer, 0)
+    }
 
-    private fun messages(): List<String> = log.entries.filter { it.type == ServerLogEntry.Type.SHELL }.map { it.message }
+    private fun messages(): List<String> {
+        val entries = log.entries.filter { it.type == ServerLogEntry.Type.SHELL }
+        return entries.map { it.message }
+    }
 
     @Test
     fun `normal commands are never logged`() {

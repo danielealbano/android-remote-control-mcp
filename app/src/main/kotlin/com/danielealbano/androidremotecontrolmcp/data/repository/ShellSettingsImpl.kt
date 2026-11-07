@@ -26,6 +26,9 @@ internal val SHELL_ALLOWLIST_KEY = stringPreferencesKey("shell_allowlist")
 
 private val SHELL_PATTERNS_SERIALIZER = ListSerializer(String.serializer())
 
+private const val OVER_MEMORY_CAP_MESSAGE =
+    "Running plus kept processes times the output kept per process must not exceed $SHELL_OUTPUT_MEMORY_CAP_MIB MiB"
+
 internal fun shellLimitKey(limit: ShellLimit): Preferences.Key<Int> = intPreferencesKey(limit.key)
 
 internal fun parseShellPatternsOrNull(json: String): List<String>? =
@@ -63,9 +66,7 @@ internal fun crossLimitError(
     return when {
         exceedsMax -> "Must not exceed the maximum background timeout ($maxMinutes)"
         belowDefault -> "Must not be below the default background timeout ($defaultMinutes)"
-        overMemory ->
-            "Running plus kept processes times the output kept per process must not exceed " +
-                "$SHELL_OUTPUT_MEMORY_CAP_MIB MiB"
+        overMemory -> OVER_MEMORY_CAP_MESSAGE
         else -> null
     }
 }

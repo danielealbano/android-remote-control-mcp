@@ -41,8 +41,10 @@ class ShellCommandAuthorizerTest {
         return error?.message.orEmpty()
     }
 
-    private fun shellMessages(): List<String> =
-        log.entries.filter { it.type == ServerLogEntry.Type.SHELL }.map { it.message }
+    private fun shellMessages(): List<String> {
+        val entries = log.entries.filter { it.type == ServerLogEntry.Type.SHELL }
+        return entries.map { it.message }
+    }
 
     @Test
     fun `normal command allowed without elevation`() =

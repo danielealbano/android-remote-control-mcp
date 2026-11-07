@@ -87,8 +87,9 @@ class CommandPatternsTest {
 
     @Test
     fun `large commands match in linear time`() {
-        val matching = "a".repeat(20_000) + "b".repeat(20_000) + "c".repeat(20_000) + "d".repeat(20_000) +
-            "e".repeat(20_000)
+        val matching =
+            "a".repeat(20_000) + "b".repeat(20_000) + "c".repeat(20_000) + "d".repeat(20_000) +
+                "e".repeat(20_000)
         val notMatching = "x".repeat(100_000)
 
         assertTimeoutPreemptively(Duration.ofSeconds(1)) {

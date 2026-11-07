@@ -53,8 +53,7 @@ class E2EShellTest {
         return !running(args)
     }
 
-    private fun running(args: String): Boolean =
-        StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
+    private fun running(args: String): Boolean = StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
 
     @Test
     @Order(1)
@@ -129,7 +128,11 @@ class E2EShellTest {
                     .call("shell_list")
                     .getValue("processes")
                     .jsonArray
-                    .map { it.jsonObject.getValue("process_id").jsonPrimitive.int }
+                    .map {
+                        it.jsonObject
+                            .getValue("process_id")
+                            .jsonPrimitive.int
+                    }
             assertTrue(listed.contains(id), listed.toString())
             assertEquals("killed", ShellE2E.call("shell_kill", mapOf("process_id" to id)).text("state"))
         }

@@ -37,7 +37,8 @@ class ShellProcessManagerTest {
 
     private val log = RecordingServerLogRepository()
     private val fake = FakeShellBackend()
-    private val app = AppShellBackend("/bin/sh") { pgid -> ProcessBuilder("kill", "-9", "--", "-$pgid").start().waitFor() }
+    private val app =
+        AppShellBackend("/bin/sh") { pgid -> ProcessBuilder("kill", "-9", "--", "-$pgid").start().waitFor() }
 
     @Volatile
     private var config = ShellConfig()
@@ -104,8 +105,10 @@ class ShellProcessManagerTest {
 
     private fun state(id: Int): ShellProcessState? = manager.list().firstOrNull { it.id == id }?.state
 
-    private fun shellMessages(): List<String> =
-        log.entries.filter { it.type == ServerLogEntry.Type.SHELL }.map { it.message }
+    private fun shellMessages(): List<String> {
+        val entries = log.entries.filter { it.type == ServerLogEntry.Type.SHELL }
+        return entries.map { it.message }
+    }
 
     private fun hostOutput(vararg command: String): String =
         ProcessBuilder(*command)
@@ -249,7 +252,11 @@ class ShellProcessManagerTest {
     fun `killAndAwait stops the process and its group`() =
         runBlocking {
             val id = start("sleep 300 & echo \$!; wait", waitMs = 0).snapshot.id
-            val child = manager.page(id, 0, WAIT_MS, MAX_BYTES).chunk.text.trim()
+            val child =
+                manager
+                    .page(id, 0, WAIT_MS, MAX_BYTES)
+                    .chunk.text
+                    .trim()
 
             val snapshot = manager.killAndAwait(id, WAIT_MS)
 
@@ -420,7 +427,8 @@ class ShellProcessManagerTest {
         runBlocking {
             val other = newManager()
             try {
-                val beforeOpen = assertThrows<McpToolException.ActionFailed> { runBlocking { start("true", target = other) } }
+                val beforeOpen =
+                    assertThrows<McpToolException.ActionFailed> { runBlocking { start("true", target = other) } }
                 assertTrue(beforeOpen.message.orEmpty().contains("not running"), beforeOpen.message)
 
                 other.open()
@@ -498,7 +506,9 @@ class ShellProcessManagerTest {
 
                 start("true")
                 eventually("the watcher failure is logged") { calls.get() >= 1 }
-                verify(timeout = WAIT_MS) { Log.e("MCP:ShellProcessManager", "A shell process watcher failed", failure) }
+                verify(timeout = WAIT_MS) {
+                    Log.e("MCP:ShellProcessManager", "A shell process watcher failed", failure)
+                }
 
                 val page = start("echo ok")
 

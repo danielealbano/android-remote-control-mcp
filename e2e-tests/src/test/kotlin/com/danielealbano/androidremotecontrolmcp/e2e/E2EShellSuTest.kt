@@ -45,8 +45,7 @@ class E2EShellSuTest {
 
     private fun elevated(command: String): Map<String, Any?> = ShellE2E.run(command, elevated = true, workdir = ROOT)
 
-    private fun running(args: String): Boolean =
-        StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
+    private fun running(args: String): Boolean = StorageE2E.shell("ps -A -o ARGS").lines().any { it.trim() == args }
 
     @Test
     @Order(1)

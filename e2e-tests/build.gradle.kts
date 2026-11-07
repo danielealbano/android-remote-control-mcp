@@ -112,16 +112,17 @@ fun ndkClang(): File {
 
 val testSuBinary = layout.buildDirectory.file("testsu/x86_64/su")
 
-val compileTestSu = tasks.register<Exec>("compileTestSu") {
-    val source = file("src/test/native/testsu.c")
-    inputs.file(source)
-    outputs.file(testSuBinary)
-    doFirst {
-        val output = testSuBinary.get().asFile
-        output.parentFile.mkdirs()
-        commandLine(ndkClang().absolutePath, "-O2", "-o", output.absolutePath, source.absolutePath)
+val compileTestSu =
+    tasks.register<Exec>("compileTestSu") {
+        val source = file("src/test/native/testsu.c")
+        inputs.file(source)
+        outputs.file(testSuBinary)
+        doFirst {
+            val output = testSuBinary.get().asFile
+            output.parentFile.mkdirs()
+            commandLine(ndkClang().absolutePath, "-O2", "-o", output.absolutePath, source.absolutePath)
+        }
     }
-}
 
 tasks.withType<Test> {
     // Ensure both the main app and compose test app APKs are built before E2E tests run.

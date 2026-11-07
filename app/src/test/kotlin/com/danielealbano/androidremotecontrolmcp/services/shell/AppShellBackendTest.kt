@@ -68,7 +68,11 @@ class AppShellBackendTest {
             val shell = backend.spawn(1, script("sleep 300 & echo \$!; sleep 300"))
             val header = ShellScriptBuilder.readHeader(shell.output).header
             assertNotNull(header)
-            val child = shell.output.bufferedReader().readLine().trim()
+            val child =
+                shell.output
+                    .bufferedReader()
+                    .readLine()
+                    .trim()
 
             shell.kill(header!!.pgid)
             withTimeout(WAIT_MS) { shell.exit.await() }

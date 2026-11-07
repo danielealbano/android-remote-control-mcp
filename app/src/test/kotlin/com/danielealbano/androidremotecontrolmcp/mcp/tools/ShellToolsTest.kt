@@ -268,7 +268,14 @@ class ShellToolsTest {
         assertEquals(setOf("command", "workdir", "envs", "elevated", "justification"), exec.properties!!.keys)
         val envs = exec.properties!!["envs"]!!.jsonObject
         assertEquals("object", envs["type"]?.jsonPrimitive?.content)
-        assertEquals("string", envs["additionalProperties"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+        assertEquals(
+            "string",
+            envs["additionalProperties"]
+                ?.jsonObject
+                ?.get("type")
+                ?.jsonPrimitive
+                ?.content,
+        )
         assertEquals(exec.properties!!.keys + "timeout_minutes", start.properties!!.keys)
         assertEquals(listOf("command", "workdir"), exec.required)
         assertEquals(listOf("command", "workdir"), start.required)

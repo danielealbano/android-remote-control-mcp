@@ -173,15 +173,23 @@ class ShellSettingsImplTest {
     fun `every limit accepts min and max and refuses outside`(limit: ShellLimit) =
         testScope.runTest {
             when (limit) {
-                ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES ->
+                ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES -> {
                     settings.updateShellLimit(ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES, 1440).getOrThrow()
-                ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES ->
+                }
+
+                ShellLimit.BACKGROUND_TIMEOUT_MAX_MINUTES -> {
                     settings.updateShellLimit(ShellLimit.BACKGROUND_TIMEOUT_DEFAULT_MINUTES, 1).getOrThrow()
-                ShellLimit.MAX_RUNNING_PROCESSES, ShellLimit.MAX_FINISHED_PROCESSES, ShellLimit.OUTPUT_BUFFER_KIB ->
+                }
+
+                ShellLimit.MAX_RUNNING_PROCESSES, ShellLimit.MAX_FINISHED_PROCESSES, ShellLimit.OUTPUT_BUFFER_KIB -> {
                     MINIMUMS.filterKeys { it != limit }.forEach { (other, value) ->
                         settings.updateShellLimit(other, value).getOrThrow()
                     }
-                else -> Unit
+                }
+
+                else -> {
+                    Unit
+                }
             }
 
             assertTrue(settings.updateShellLimit(limit, limit.min).isSuccess)
