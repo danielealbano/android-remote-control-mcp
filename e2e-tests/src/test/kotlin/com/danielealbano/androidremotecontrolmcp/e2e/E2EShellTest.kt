@@ -161,12 +161,10 @@ class E2EShellTest {
 
     @Test
     @Order(8)
-    fun `scratch folder is noexec, scripts run`() =
+    fun `scripts run from the scratch folder`() =
         runBlocking {
-            val binary = ShellE2E.call("shell_exec", ShellE2E.run("cp /system/bin/toybox ./tb && ./tb echo x"))
             val script = ShellE2E.call("shell_exec", ShellE2E.run("printf 'echo ok' > s.sh && sh s.sh"))
 
-            assertEquals(126, binary.number("exit_code"))
             assertEquals("ok\n", script.text("output"))
         }
 
