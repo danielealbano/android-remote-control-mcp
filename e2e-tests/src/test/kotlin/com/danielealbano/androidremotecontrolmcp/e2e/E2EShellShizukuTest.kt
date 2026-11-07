@@ -107,6 +107,9 @@ class E2EShellShizukuTest {
         ShellE2E.configure(*ShellE2E.switches(elevation = true, autoAllow = true))
 
         assertEquals("enabled", ShizukuE2E.providerState())
+
+        forceStopApp()
+        ShellE2E.restartServer()
     }
 
     @Test

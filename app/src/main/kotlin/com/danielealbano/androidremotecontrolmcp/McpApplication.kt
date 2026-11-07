@@ -53,7 +53,6 @@ class McpApplication :
 
     override fun onCreate() {
         super.onCreate()
-        // The short-lived process that relaunches the app after "Restart app" needs none of the setup below
         if (ProcessPhoenix.isPhoenixProcess(this)) return
         // Flavor-specific one-time migrations (gms: geofence config → dedicated key), launched eagerly
         // on a background coroutine (non-blocking — must never stall onCreate). No-op in foss.
