@@ -163,6 +163,8 @@ class E2EShellPermissionTest {
             val started = System.currentTimeMillis()
             val call = async(Dispatchers.IO) { ShellE2E.callError("shell_exec", elevatedId()) }
 
+            // On redroid a row that arrives while the shade is open ignores swipes, so open it once the row is posted.
+            DeviceUiE2E.awaitNotificationPosted(APPROVAL_TAG)
             DeviceUiE2E.expandNotifications()
             DeviceUiE2E.swipeAwayWhenVisible("Approve an elevated command?")
             val error = call.await()
@@ -234,5 +236,6 @@ class E2EShellPermissionTest {
         const val QUICK_MS = 10_000L
         const val AT_ONCE_MS = 5_000L
         const val MILLIS_PER_SECOND = 1_000L
+        const val APPROVAL_TAG = "shell_elevation"
     }
 }

@@ -6,6 +6,7 @@ object DeviceUiE2E {
     private const val POLL_MS = 500L
     private const val SWIPE_MS = "300"
     private val BOUNDS = Regex("bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"")
+    private val SIZE = Regex("(\\d+)x(\\d+)")
 
     fun expandNotifications() {
         AndroidContainerSetup.execAdb("shell", "cmd", "statusbar", "expand-notifications")
@@ -22,10 +23,27 @@ object DeviceUiE2E {
         AndroidContainerSetup.execAdb("shell", "input", "tap", x, y)
     }
 
+    /** Swipes from the text to the right screen edge: a swipe across the text alone is too short to dismiss its row. */
     fun swipeAwayWhenVisible(text: String) {
         val bounds = awaitVisible(text)
         val y = "${(bounds[1] + bounds[3]) / 2}"
-        AndroidContainerSetup.execAdb("shell", "input", "swipe", "${bounds[0] + 1}", y, "${bounds[2] - 1}", y, SWIPE_MS)
+        val end = "${screenWidth() - 1}"
+        AndroidContainerSetup.execAdb("shell", "input", "swipe", "${bounds[0] + 1}", y, end, y, SWIPE_MS)
+    }
+
+    fun awaitNotificationPosted(tag: String) {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (!isNotificationPosted(tag) && System.currentTimeMillis() < deadline) Thread.sleep(POLL_MS)
+        check(isNotificationPosted(tag)) { "No notification tagged '$tag' within ${WAIT_MS}ms" }
+    }
+
+    private fun isNotificationPosted(tag: String): Boolean =
+        AndroidContainerSetup.execAdb("shell", "dumpsys", "notification").contains("tag=$tag ")
+
+    private fun screenWidth(): Int {
+        val size = AndroidContainerSetup.execAdb("shell", "wm", "size")
+        val match = checkNotNull(SIZE.findAll(size).lastOrNull()) { "Unexpected 'wm size' output: $size" }
+        return match.groupValues[1].toInt()
     }
 
     fun awaitVisible(text: String): List<Int> {
