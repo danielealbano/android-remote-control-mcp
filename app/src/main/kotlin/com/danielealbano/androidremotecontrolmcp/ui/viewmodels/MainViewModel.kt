@@ -143,6 +143,12 @@ class MainViewModel
         private val _downloadTimeoutError = MutableStateFlow<String?>(null)
         val downloadTimeoutError: StateFlow<String?> = _downloadTimeoutError.asStateFlow()
 
+        private val _screenAwakeTimeoutInput = MutableStateFlow("")
+        val screenAwakeTimeoutInput: StateFlow<String> = _screenAwakeTimeoutInput.asStateFlow()
+
+        private val _screenAwakeTimeoutError = MutableStateFlow<String?>(null)
+        val screenAwakeTimeoutError: StateFlow<String?> = _screenAwakeTimeoutError.asStateFlow()
+
         private val _deviceSlugInput = MutableStateFlow("")
         val deviceSlugInput: StateFlow<String> = _deviceSlugInput.asStateFlow()
 
@@ -179,6 +185,8 @@ class MainViewModel
                     _fileSizeLimitError.value = null
                     _downloadTimeoutInput.value = config.downloadTimeoutSeconds.toString()
                     _downloadTimeoutError.value = null
+                    _screenAwakeTimeoutInput.value = config.screenAwakeTimeoutSeconds.toString()
+                    _screenAwakeTimeoutError.value = null
                     _deviceSlugInput.value = config.deviceSlug
                     _deviceSlugError.value = null
                 }
@@ -202,6 +210,19 @@ class MainViewModel
             viewModelScope.launch {
                 tunnelManager.tunnelStatus.collect { status ->
                     _tunnelStatus.value = status
+                }
+            }
+        }
+
+        fun updateScreenAwakeTimeout(input: String) {
+            _screenAwakeTimeoutInput.value = input
+            val seconds = input.toIntOrNull()
+            val result = seconds?.let(settingsRepository::validateScreenAwakeTimeout)
+            _screenAwakeTimeoutError.value =
+                if (result == null) "Enter a whole number of seconds" else result.exceptionOrNull()?.message
+            if (seconds != null && result?.isSuccess == true) {
+                viewModelScope.launch(ioDispatcher) {
+                    settingsRepository.updateScreenAwakeTimeout(seconds)
                 }
             }
         }

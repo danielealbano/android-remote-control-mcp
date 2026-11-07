@@ -5,6 +5,7 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogReposi
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -19,7 +20,6 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityToolCallIndicator
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import javax.inject.Inject
 
@@ -45,9 +45,10 @@ class McpToolRegistration
             perms: ToolPermissionsConfig,
             fileSizeLimitMb: Int,
             toolCallIndicatorEnabled: Boolean,
+            indicators: ToolCallIndicator,
             currentBaseUrl: () -> String,
         ) {
-            val toolCallIndicator = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator())
+            val toolCallIndicator = ReferenceCountedToolCallIndicator(indicators)
             toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
             val registrar =
                 LoggedToolRegistrar(

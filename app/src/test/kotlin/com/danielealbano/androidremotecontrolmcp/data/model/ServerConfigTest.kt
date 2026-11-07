@@ -10,6 +10,11 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ServerConfig")
 class ServerConfigTest {
+    @Test
+    fun `screen awake is disabled by default`() {
+        assertEquals(0, ServerConfig().screenAwakeTimeoutSeconds)
+    }
+
     @Nested
     @DisplayName("default values")
     inner class DefaultValues {

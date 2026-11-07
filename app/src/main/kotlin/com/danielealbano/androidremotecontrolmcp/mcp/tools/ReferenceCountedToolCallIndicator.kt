@@ -35,7 +35,7 @@ class ReferenceCountedToolCallIndicator(
                         if (nextTool == null) {
                             delegate.onToolCallFinished(toolName)
                         } else {
-                            delegate.onToolCallStarted(nextTool)
+                            delegate.onActiveToolChanged(nextTool)
                         }
                     }
                 }

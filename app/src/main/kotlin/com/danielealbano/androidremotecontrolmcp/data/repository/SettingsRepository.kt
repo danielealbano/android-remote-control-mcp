@@ -131,6 +131,9 @@ interface SettingsRepository :
     /** Enables or disables the on-device MCP tool-call activity indicator. */
     suspend fun updateToolCallIndicatorEnabled(enabled: Boolean)
 
+    /** Persists a validated screen-awake idle grace; zero disables it. */
+    suspend fun updateScreenAwakeTimeout(seconds: Int)
+
     /**
      * Observes the persisted server-running intent flag (`true` after ACTION_START, `false` after
      * ACTION_STOP). Used by restart triggers to decide whether to bring the MCP server back up.
@@ -226,6 +229,9 @@ interface SettingsRepository :
      * @return [Result.success] with the validated timeout, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateDownloadTimeout(seconds: Int): Result<Int>
+
+    /** Validates zero (disabled) or the configured nonzero screen-awake timeout range. */
+    fun validateScreenAwakeTimeout(seconds: Int): Result<Int>
 
     /**
      * Validates a device slug string.
