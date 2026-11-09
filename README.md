@@ -18,6 +18,8 @@ To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel giv
 
 > **Warning:** This software is provided "as-is" without warranty of any kind, for **research and educational purposes only**. The authors do not condone the use of this tool for any illegal, unauthorized, or unethical activities. Users are solely responsible for ensuring their use complies with all applicable laws and regulations. By using this software, you agree to use it responsibly and at your own risk.
 
+> **Warning:** The free end-to-end encrypted HTTPS tunnel only works with the signed builds downloaded from this repository's [Releases](https://github.com/danielealbano/android-remote-control-mcp/releases) page. The tunnel service checks the app's signing key when a phone enrolls, so it refuses builds you compile yourself or get from anywhere else.
+
 ---
 
 ## Contents
