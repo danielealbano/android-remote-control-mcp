@@ -17,12 +17,15 @@ object OAuthPolicy {
      */
     const val CHATGPT_REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect"
 
+    /** The fixed Kimi (kimi.com) connector callback, used by Kimi custom plugins (hosted remote MCP). */
+    const val KIMI_REDIRECT_URI = "https://www.kimi.com/mcp-oauth-callback"
+
     /** ChatGPT also uses per-connector OAuth callback URLs under this exact host/path prefix. */
     private const val CHATGPT_REDIRECT_HOST = "chatgpt.com"
     private const val CHATGPT_REDIRECT_PATH_PREFIX = "/connector/oauth/"
 
     /** Exact non-loopback redirect URIs accepted by the allowlist (add other hosted connectors here). */
-    val ALLOWED_REDIRECT_URIS = setOf(CLAUDE_REDIRECT_URI, CHATGPT_REDIRECT_URI)
+    val ALLOWED_REDIRECT_URIS = setOf(CLAUDE_REDIRECT_URI, CHATGPT_REDIRECT_URI, KIMI_REDIRECT_URI)
 
     /** Maximum persisted OAuth clients before eviction. */
     const val MAX_OAUTH_CLIENTS = 20
