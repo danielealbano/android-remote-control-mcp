@@ -1,5 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.AuthorizeOptions
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.CANONICAL
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.OVERRIDE
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.REDIRECT
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.VERIFIER
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.authorize
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.connectMcp
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.registerResponse
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.tokenRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
@@ -17,9 +26,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.modelcontextprotocol.kotlin.sdk.client.Client
-import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
-import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -161,7 +167,7 @@ class OAuthFlowIntegrationTest {
                 val tokens = danceToTokens(ctx, clientId, includeResource = true)
                 val access = tokens.access
 
-                val mcpClient = connectMcp(access)
+                val mcpClient = connectMcp(this, access)
                 try {
                     val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
                     assertNotEquals(true, result.isError)
@@ -384,7 +390,7 @@ class OAuthFlowIntegrationTest {
             McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
                 val clientId = register(client)
                 val tokens = danceToTokens(ctx, clientId, includeResource = false)
-                val mcpClient = connectMcp(tokens.access)
+                val mcpClient = connectMcp(this, tokens.access)
                 try {
                     val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
                     assertNotEquals(true, result.isError)
@@ -488,51 +494,11 @@ class OAuthFlowIntegrationTest {
     private suspend fun register(
         client: HttpClient,
         redirectUri: String = REDIRECT,
-    ): String {
-        val resp =
-            client.post("/register") {
-                contentType(ContentType.Application.Json)
-                setBody(
-                    """{"redirect_uris":["$redirectUri"],"token_endpoint_auth_method":"none",""" +
-                        """"grant_types":["authorization_code","refresh_token"],"response_types":["code"],""" +
-                        """"scope":"mcp","client_name":"Claude","application_type":"web"}""",
-                )
-            }
-        return Json
-            .parseToJsonElement(resp.bodyAsText())
+    ): String =
+        Json
+            .parseToJsonElement(registerResponse(client, listOf(redirectUri), clientName = "Claude").bodyAsText())
             .jsonObject["client_id"]!!
             .jsonPrimitive.content
-    }
-
-    private data class AuthorizeOptions(
-        val redirectUri: String = REDIRECT,
-        val challengeMethod: String = "S256",
-        val resourceOverride: String? = null,
-        val includeResource: Boolean = true,
-        val state: String = "xyz",
-    )
-
-    private suspend fun authorize(
-        client: HttpClient,
-        clientId: String,
-        options: AuthorizeOptions = AuthorizeOptions(),
-    ): HttpResponse =
-        client.get("/authorize") {
-            url {
-                parameters.append("response_type", "code")
-                parameters.append("client_id", clientId)
-                parameters.append("redirect_uri", options.redirectUri)
-                parameters.append("code_challenge", CHALLENGE)
-                parameters.append("code_challenge_method", options.challengeMethod)
-                parameters.append("state", options.state)
-                parameters.append("scope", "mcp")
-                if (options.resourceOverride != null) {
-                    parameters.append("resource", options.resourceOverride)
-                } else if (options.includeResource) {
-                    parameters.append("resource", CANONICAL)
-                }
-            }
-        }
 
     private suspend fun danceToCode(
         ctx: McpIntegrationTestHelper.OAuthTestContext,
@@ -567,28 +533,6 @@ class OAuthFlowIntegrationTest {
         return Tokens(obj["access_token"]!!.jsonPrimitive.content, obj["refresh_token"]!!.jsonPrimitive.content)
     }
 
-    private suspend fun tokenRequest(
-        client: HttpClient,
-        clientId: String,
-        code: String,
-        verifier: String,
-        includeResource: Boolean,
-    ): HttpResponse =
-        client.post("/token") {
-            setBody(
-                FormDataContent(
-                    Parameters.build {
-                        append("grant_type", "authorization_code")
-                        append("code", code)
-                        append("redirect_uri", REDIRECT)
-                        append("client_id", clientId)
-                        append("code_verifier", verifier)
-                        if (includeResource) append("resource", CANONICAL)
-                    },
-                ),
-            )
-        }
-
     private suspend fun refreshRequest(
         client: HttpClient,
         clientId: String,
@@ -605,25 +549,6 @@ class OAuthFlowIntegrationTest {
                 ),
             )
         }
-
-    private suspend fun ApplicationTestBuilder.connectMcp(accessToken: String): Client {
-        val httpClient =
-            createClient {
-                install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                    json(io.modelcontextprotocol.kotlin.sdk.types.McpJson)
-                }
-                install(io.ktor.client.plugins.sse.SSE)
-            }
-        val transport =
-            StreamableHttpClientTransport(
-                client = httpClient,
-                url = "/mcp",
-                requestBuilder = { header("Authorization", "Bearer $accessToken") },
-            )
-        val mcpClient = Client(clientInfo = Implementation(name = "oauth-test-client", version = "1.0.0"))
-        mcpClient.connect(transport)
-        return mcpClient
-    }
 
     private fun ApplicationTestBuilder.createNoRedirectClient(): HttpClient =
         createClient {
@@ -644,14 +569,4 @@ class OAuthFlowIntegrationTest {
 
     private fun kotlinx.serialization.json.JsonElement.jsonObjectArray(): List<String> =
         (this as kotlinx.serialization.json.JsonArray).map { it.jsonPrimitive.content }
-
-    private companion object {
-        const val REDIRECT = "https://claude.ai/api/mcp/auth_callback"
-        const val OVERRIDE = "https://test.host"
-        const val CANONICAL = "https://test.host/mcp"
-
-        // RFC 7636 Appendix B PKCE test vector.
-        const val VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-        const val CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-    }
 }

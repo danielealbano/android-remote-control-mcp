@@ -24,6 +24,24 @@ object OAuthPolicy {
     private const val CHATGPT_REDIRECT_HOST = "chatgpt.com"
     private const val CHATGPT_REDIRECT_PATH_PREFIX = "/connector/oauth/"
 
+    /**
+     * Gemini custom-connector callbacks go through Google's OAuth redirect relay. Gemini registers six redirect URIs
+     * in one DCR request (these three hosts x the `/r/` and `/a/` paths), all ending in the same per-connector id.
+     */
+    private val GEMINI_REDIRECT_HOSTS =
+        setOf(
+            "oauth-redirect.googleusercontent.com",
+            "oauth-redirect-sandbox.googleusercontent.com",
+            "oauth-redirect-test.googleusercontent.com",
+        )
+
+    /**
+     * Only the custom-connector id (`user_bound_custom-mcp-` + 24 lowercase hex digits). The same relay delivers
+     * account-linking codes to any Google developer project under `/r/<project-id>`, so a wider pattern would let any
+     * project receive this server's authorization codes.
+     */
+    private val GEMINI_REDIRECT_PATH = Regex("^/[ra]/user_bound_custom-mcp-[0-9a-f]{24}$")
+
     /** Exact non-loopback redirect URIs accepted by the allowlist (add other hosted connectors here). */
     val ALLOWED_REDIRECT_URIS = setOf(CLAUDE_REDIRECT_URI, CHATGPT_REDIRECT_URI, KIMI_REDIRECT_URI)
 
@@ -56,11 +74,13 @@ object OAuthPolicy {
 
     /**
      * CLOSED redirect policy (the security boundary). Returns true ONLY for a URI in [ALLOWED_REDIRECT_URIS],
-     * ChatGPT's HTTPS callback namespace on the EXACT `chatgpt.com` host (path under `/connector/oauth/`), or
-     * `http://` loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local test clients
-     * (MCP Inspector / mcp-remote / Claude Code). The host is compared via [URI.host] for EXACT equality —
-     * deceptive hosts (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`), other loopback
-     * IPs, `0.0.0.0`, non-`https` ChatGPT callbacks, and any other https host are rejected.
+     * ChatGPT's HTTPS callback namespace on the EXACT `chatgpt.com` host (path under `/connector/oauth/`),
+     * Gemini's HTTPS custom-connector callbacks on the three EXACT Google relay hosts (see [GEMINI_REDIRECT_PATH]),
+     * or `http://` loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local test clients
+     * (MCP Inspector / mcp-remote / Claude Code). ChatGPT and loopback hosts are compared via [URI.host] for EXACT
+     * equality; Gemini compares [URI.getRawAuthority] with the three hosts, so it also refuses userinfo and any port,
+     * even an empty one. Deceptive hosts (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`),
+     * other loopback IPs, `0.0.0.0`, non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
      */
     fun isAllowedRedirectUri(uri: String): Boolean {
         if (uri in ALLOWED_REDIRECT_URIS) return true
@@ -74,8 +94,21 @@ object OAuthPolicy {
                 parsed.path?.startsWith(CHATGPT_REDIRECT_PATH_PREFIX) == true
         val isLoopback = parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
 
-        return isChatGptConnectorCallback || isLoopback
+        return isChatGptConnectorCallback || isGeminiConnectorCallback(parsed) || isLoopback
     }
+
+    /**
+     * Gemini relay callback: `https` only, the raw authority must be exactly one of the hosts (so no userinfo and no
+     * port, not even an empty one; a URI without an authority is refused too), no query or fragment, and the raw path
+     * must be the exact id shape.
+     */
+    private fun isGeminiConnectorCallback(parsed: URI?): Boolean =
+        parsed != null &&
+            parsed.scheme == "https" &&
+            parsed.rawAuthority in GEMINI_REDIRECT_HOSTS &&
+            parsed.rawQuery == null &&
+            parsed.rawFragment == null &&
+            parsed.rawPath?.let { GEMINI_REDIRECT_PATH.matches(it) } == true
 
     /**
      * RFC 8707 resource matching: case-insensitive on scheme+host, trailing-slash-insensitive, exact

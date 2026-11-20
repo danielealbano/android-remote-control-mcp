@@ -64,7 +64,7 @@ To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel giv
 ### MCP Server
 - HTTP server running directly on Android (Ktor + Netty), with optional HTTPS
 - Streamable HTTP transport at `/mcp` (MCP specification compliant, JSON-only, no SSE)
-- Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop custom connectors, with on-device approval)
+- Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT and Gemini custom connectors, with on-device approval)
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1), network (0.0.0.0) or a specific IP address of the device
 - Auto-start on boot
@@ -164,7 +164,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full build requirements and instructi
 
    - **Accessibility Service** — **required.** Powers UI introspection, action execution, and screenshots; nothing works without it.
      - **If the toggle is greyed out** (Android 13+, common on Samsung/One UI for apps installed from an APK): this is Android's "Restricted settings" protection. A dialog reads *"Restricted setting — For your security, this setting is currently unavailable."* To unblock it, go to **Settings → Apps → Android Remote Control MCP → App info**, tap the **⋮ menu** (top-right), choose **Allow restricted settings**, confirm with your PIN/pattern/biometric, then enable the Accessibility Service. (Play Store / F-Droid installs are not affected.)
-   - **Notifications** — **optional** (recommended for OAuth). OAuth sign-in approvals (Claude.ai / Claude Desktop, ChatGPT, or any third-party OAuth client) arrive as heads-up notifications you tap to confirm the 2-digit code and approve. It is **no longer required** for OAuth login, though: if you don't grant this permission, pending requests still appear as a **card on the app's Server screen** that you tap to review and approve/deny. The **Event Channel** push feature — e.g. pushing device events to Claude Code — runs as a foreground service that posts its status notification through this permission on Android 13+.
+   - **Notifications** — **optional** (recommended for OAuth). OAuth sign-in approvals (Claude.ai / Claude Desktop, ChatGPT, Gemini, or any third-party OAuth client) arrive as heads-up notifications you tap to confirm the 2-digit code and approve. It is **no longer required** for OAuth login, though: if you don't grant this permission, pending requests still appear as a **card on the app's Server screen** that you tap to review and approve/deny. The **Event Channel** push feature — e.g. pushing device events to Claude Code — runs as a foreground service that posts its status notification through this permission on Android 13+.
    - **Other permissions** (optional) — Camera, Microphone, and Location enable their corresponding MCP tools. The app works without them; only the dependent features are disabled until granted. See the [Permissions Reference](#permissions-reference) below for the complete list.
    - **Storage locations** — configure in Settings > Storage if you plan to use the file tools (automatic locations like Downloads, plus custom locations via SAF).
 
@@ -252,7 +252,7 @@ Replace `DEVICE_IP`, `PORT`, and `YOUR_TOKEN` with the values shown in the app's
 Claude.ai (web) and Claude Desktop connect as a **custom connector** (remote MCP) using OAuth 2.1 — the app is its own OAuth Authorization Server, so no external account or pre-registration is needed. This requires the server to be reachable over a **public HTTPS URL**, so you must first enable a [remote access tunnel](#using-remote-access-tunnels) — a `localhost`/LAN address or `adb` port-forward will **not** work.
 
 1. **OAuth is enabled by default** — no action needed (if you previously disabled it, re-enable it under **Settings → Access**). The bearer token stays enabled too; both are accepted.
-2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…` URL from the Server tab and append `/mcp` (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
+2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…/mcp` URL from the Server tab (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
 3. In Claude, open **[Customize → Connectors → Add custom connector](https://claude.ai/customize/connectors?modal=add-custom-connector)**, paste the `https://…/mcp` URL, and **leave the OAuth Client ID and Client Secret blank** (the app uses Dynamic Client Registration). Click **Add**.
 4. Claude opens a browser approval page showing a **2-digit code**. On the device, tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — to open the approval screen, confirm the code matches, and **Approve**.
 5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens.
@@ -269,11 +269,27 @@ ChatGPT connects to the server as a **custom MCP connector** using the same self
 
 1. **Enable Developer mode** — in ChatGPT on the web, open **Settings → Connectors → Advanced settings** (labelled **Apps & Connectors** on some builds) and turn on **Developer mode**.
 2. **Start the tunnel** — same as the Claude flow above: OAuth stays enabled by default, turn on **Remote Access** under Settings → Tunnel, start the server, and copy the public `https://…/mcp` URL from the Server tab.
-3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (the app self-registers clients via Dynamic Client Registration).
+3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (ChatGPT registers itself with the app through Dynamic Client Registration).
 4. **Approve on the device** — ChatGPT starts the OAuth flow. Tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — confirm the 2-digit code matches, and **Approve** (identical to the Claude approval step).
 5. Manage or revoke the connected client any time under **Settings → Access → Connected clients** in the app.
 
 > ⚠️ **Security:** the same cautions apply — treat the tunnel URL as sensitive, approve only connections you initiated (verify the code), revoke unused clients, and stop the tunnel and server when you are done.
+
+### Connect from Gemini (Custom Connector, OAuth)
+
+Gemini connects as a **custom app** over OAuth 2.1. It needs a public HTTPS URL, so enable a [remote access tunnel](#using-remote-access-tunnels) first.
+
+Google requires a personal Google Account, age 18 or over, Gemini in English, and Gemini [History](https://myactivity.google.com/product/gemini) turned on. It is not available in every country. The free plan works.
+
+1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
+2. On [gemini.google.com](https://gemini.google.com), on a computer or in a phone's browser, open the menu, then **Customize** → **Connectors** → **+**. The Gemini mobile app cannot add one.
+3. Paste the URL as the **MCP Server URL** and leave **Client ID** and **Client secret** empty. Choose **Next**, accept the risks, choose **Connect**, and continue through Google's account link dialog.
+4. On the phone, check the 2-digit code and approve the request from **Google** (notification, or the card on the Server screen).
+5. In a chat, type `@` and pick the app. It also works in the Gemini mobile app.
+
+To remove it, open **Customize** → **Connectors** → **Custom apps** → **…** → **Delete**, then revoke the client under **Settings → Access → Connected clients**.
+
+> ⚠️ **Security:** the same cautions as for Claude apply.
 
 ### Other MCP Clients
 
@@ -329,7 +345,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Port | `8080` | HTTP/HTTPS server port |
 | Binding Address | `127.0.0.1` | `127.0.0.1` (localhost, use with adb port forwarding), `0.0.0.0` (network, all interfaces) or a specific IP address of the device (IPv4 or IPv6, not IPv6 link-local, without a zone index such as `%3`; the server does not start while the device does not have it) |
 | Bearer Token | Enabled, auto-generated UUID | Static token for MCP requests (Settings → Access). Enforcement is set by the Bearer toggle, not by clearing the value. |
-| OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop custom connectors (Settings → Access). |
+| OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop, ChatGPT and Gemini custom connectors (Settings → Access). |
 | Public URL override | Empty (auto-detect) | Pin the public host used for OAuth metadata and share links. |
 | HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
@@ -495,7 +511,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 |-------|------|-------------|
 | `bearer_token` | string | Static bearer-token value (clearing it while `bearer_token_enabled=true` fails closed, it does NOT disable auth) |
 | `bearer_token_enabled` | boolean | Enable/disable bearer-token authentication (controls enforcement, independent of the value) |
-| `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop connectors) |
+| `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT and Gemini connectors) |
 | `public_url_override` | string | Pin the public host used for OAuth metadata and share links (empty = auto-detect from the request) |
 | `binding_address` | string | `127.0.0.1` (localhost), `0.0.0.0` (network) or another IP address literal of the device (specific IP) |
 | `port` | int | HTTP/HTTPS server port (1-65535) |
