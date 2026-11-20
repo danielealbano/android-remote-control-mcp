@@ -96,13 +96,14 @@ object OAuthPolicy {
         return isChatGptConnectorCallback || isGeminiConnectorCallback(parsed) || isLoopback
     }
 
-    /** Gemini relay callback: no userinfo, port, query or fragment, and the raw path must be the exact id shape. */
+    /**
+     * Gemini relay callback: the raw authority must be exactly one of the hosts (so no userinfo and no port, not even
+     * an empty one), no query or fragment, and the raw path must be the exact id shape.
+     */
     private fun isGeminiConnectorCallback(parsed: URI?): Boolean =
         parsed != null &&
             parsed.scheme == "https" &&
-            parsed.host in GEMINI_REDIRECT_HOSTS &&
-            parsed.userInfo == null &&
-            parsed.port == -1 &&
+            parsed.rawAuthority in GEMINI_REDIRECT_HOSTS &&
             parsed.rawQuery == null &&
             parsed.rawFragment == null &&
             parsed.rawPath?.let { GEMINI_REDIRECT_PATH.matches(it) } == true
