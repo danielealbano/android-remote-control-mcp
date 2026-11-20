@@ -1,5 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.AuthorizeOptions
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.CANONICAL
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.OVERRIDE
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.REDIRECT
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.VERIFIER
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.authorize
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.connectMcp
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.registerResponse
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.tokenRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
@@ -17,9 +26,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.modelcontextprotocol.kotlin.sdk.client.Client
-import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
-import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -161,7 +167,7 @@ class OAuthFlowIntegrationTest {
                 val tokens = danceToTokens(ctx, clientId, includeResource = true)
                 val access = tokens.access
 
-                val mcpClient = connectMcp(access)
+                val mcpClient = connectMcp(this, access)
                 try {
                     val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
                     assertNotEquals(true, result.isError)
@@ -201,74 +207,6 @@ class OAuthFlowIntegrationTest {
                     }
                 assertEquals(HttpStatusCode.Created, resp.status)
                 assertTrue(resp.bodyAsText().contains("https://chatgpt.com/connector/oauth/abc123"))
-            }
-        }
-
-    @Test
-    @DisplayName("Gemini connector: six callbacks registered, approval on the production /r/ callback, tool call")
-    fun geminiConnectorFlowSucceeds() =
-        runTest {
-            val deps = McpIntegrationTestHelper.createMockDependencies()
-            coEvery { deps.actionExecutor.tap(any(), any()) } returns Result.success(Unit)
-            McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
-                val registerResp = registerResponse(client, GEMINI_CALLBACKS, clientName = "Google")
-                assertEquals(HttpStatusCode.Created, registerResp.status)
-                val registered = Json.parseToJsonElement(registerResp.bodyAsText()).jsonObject
-                assertEquals(GEMINI_CALLBACKS, registered["redirect_uris"]!!.jsonObjectArray())
-                val clientId = registered["client_id"]!!.jsonPrimitive.content
-
-                authorize(client, clientId, AuthorizeOptions(redirectUri = GEMINI_REDIRECT))
-                val approval =
-                    ctx.approvalCoordinator
-                        .observePending()
-                        .value
-                        .single()
-                assertEquals("Google", approval.clientName)
-                assertEquals("oauth-redirect.googleusercontent.com", approval.redirectHost)
-                ctx.approvalCoordinator.approve(approval.id, System.currentTimeMillis())
-                val redirect =
-                    Json
-                        .parseToJsonElement(client.get("/authorize/status?id=${approval.id}").bodyAsText())
-                        .jsonObject["redirect"]!!
-                        .jsonPrimitive.content
-                assertTrue(redirect.startsWith("$GEMINI_REDIRECT?"), redirect)
-                assertEquals("xyz", Url(redirect).parameters["state"])
-
-                val tokenResp =
-                    tokenRequest(
-                        client,
-                        clientId,
-                        Url(redirect).parameters["code"]!!,
-                        verifier = VERIFIER,
-                        includeResource = true,
-                        redirectUri = GEMINI_REDIRECT,
-                    )
-                assertEquals(HttpStatusCode.OK, tokenResp.status)
-                val access =
-                    Json
-                        .parseToJsonElement(tokenResp.bodyAsText())
-                        .jsonObject["access_token"]!!
-                        .jsonPrimitive.content
-                val mcpClient = connectMcp(access)
-                try {
-                    val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
-                    assertNotEquals(true, result.isError)
-                } finally {
-                    mcpClient.close()
-                }
-            }
-        }
-
-    @Test
-    @DisplayName("register rejects a Gemini batch that also carries a Google project relay callback")
-    fun registerRejectsGeminiBatchWithProjectRelay() =
-        runTest {
-            McpIntegrationTestHelper.withOAuthTestApplication { ctx ->
-                val projectRelay = "https://oauth-redirect.googleusercontent.com/r/my-gcp-project"
-                val resp = registerResponse(client, GEMINI_CALLBACKS + projectRelay, clientName = "Google")
-                assertEquals(HttpStatusCode.BadRequest, resp.status)
-                assertTrue(resp.bodyAsText().contains("invalid_redirect_uri"))
-                assertTrue(ctx.clientRepository.getClients().isEmpty())
             }
         }
 
@@ -452,7 +390,7 @@ class OAuthFlowIntegrationTest {
             McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
                 val clientId = register(client)
                 val tokens = danceToTokens(ctx, clientId, includeResource = false)
-                val mcpClient = connectMcp(tokens.access)
+                val mcpClient = connectMcp(this, tokens.access)
                 try {
                     val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
                     assertNotEquals(true, result.isError)
@@ -562,51 +500,6 @@ class OAuthFlowIntegrationTest {
             .jsonObject["client_id"]!!
             .jsonPrimitive.content
 
-    private suspend fun registerResponse(
-        client: HttpClient,
-        redirectUris: List<String>,
-        clientName: String,
-    ): HttpResponse =
-        client.post("/register") {
-            contentType(ContentType.Application.Json)
-            setBody(
-                """{"redirect_uris":[${redirectUris.joinToString(",") { "\"$it\"" }}],""" +
-                    """"token_endpoint_auth_method":"none",""" +
-                    """"grant_types":["authorization_code","refresh_token"],"response_types":["code"],""" +
-                    """"scope":"mcp","client_name":"$clientName","application_type":"web"}""",
-            )
-        }
-
-    private data class AuthorizeOptions(
-        val redirectUri: String = REDIRECT,
-        val challengeMethod: String = "S256",
-        val resourceOverride: String? = null,
-        val includeResource: Boolean = true,
-        val state: String = "xyz",
-    )
-
-    private suspend fun authorize(
-        client: HttpClient,
-        clientId: String,
-        options: AuthorizeOptions = AuthorizeOptions(),
-    ): HttpResponse =
-        client.get("/authorize") {
-            url {
-                parameters.append("response_type", "code")
-                parameters.append("client_id", clientId)
-                parameters.append("redirect_uri", options.redirectUri)
-                parameters.append("code_challenge", CHALLENGE)
-                parameters.append("code_challenge_method", options.challengeMethod)
-                parameters.append("state", options.state)
-                parameters.append("scope", "mcp")
-                if (options.resourceOverride != null) {
-                    parameters.append("resource", options.resourceOverride)
-                } else if (options.includeResource) {
-                    parameters.append("resource", CANONICAL)
-                }
-            }
-        }
-
     private suspend fun danceToCode(
         ctx: McpIntegrationTestHelper.OAuthTestContext,
         clientId: String,
@@ -640,29 +533,6 @@ class OAuthFlowIntegrationTest {
         return Tokens(obj["access_token"]!!.jsonPrimitive.content, obj["refresh_token"]!!.jsonPrimitive.content)
     }
 
-    private suspend fun tokenRequest(
-        client: HttpClient,
-        clientId: String,
-        code: String,
-        verifier: String,
-        includeResource: Boolean,
-        redirectUri: String = REDIRECT,
-    ): HttpResponse =
-        client.post("/token") {
-            setBody(
-                FormDataContent(
-                    Parameters.build {
-                        append("grant_type", "authorization_code")
-                        append("code", code)
-                        append("redirect_uri", redirectUri)
-                        append("client_id", clientId)
-                        append("code_verifier", verifier)
-                        if (includeResource) append("resource", CANONICAL)
-                    },
-                ),
-            )
-        }
-
     private suspend fun refreshRequest(
         client: HttpClient,
         clientId: String,
@@ -679,25 +549,6 @@ class OAuthFlowIntegrationTest {
                 ),
             )
         }
-
-    private suspend fun ApplicationTestBuilder.connectMcp(accessToken: String): Client {
-        val httpClient =
-            createClient {
-                install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                    json(io.modelcontextprotocol.kotlin.sdk.types.McpJson)
-                }
-                install(io.ktor.client.plugins.sse.SSE)
-            }
-        val transport =
-            StreamableHttpClientTransport(
-                client = httpClient,
-                url = "/mcp",
-                requestBuilder = { header("Authorization", "Bearer $accessToken") },
-            )
-        val mcpClient = Client(clientInfo = Implementation(name = "oauth-test-client", version = "1.0.0"))
-        mcpClient.connect(transport)
-        return mcpClient
-    }
 
     private fun ApplicationTestBuilder.createNoRedirectClient(): HttpClient =
         createClient {
@@ -718,28 +569,4 @@ class OAuthFlowIntegrationTest {
 
     private fun kotlinx.serialization.json.JsonElement.jsonObjectArray(): List<String> =
         (this as kotlinx.serialization.json.JsonArray).map { it.jsonPrimitive.content }
-
-    private companion object {
-        const val REDIRECT = "https://claude.ai/api/mcp/auth_callback"
-        const val OVERRIDE = "https://test.host"
-        const val CANONICAL = "https://test.host/mcp"
-
-        // The six redirect URIs Gemini registered on a real device, in the order it sent them; it authorizes on
-        // the production /r/ one.
-        const val GEMINI_ID = "user_bound_custom-mcp-8569b7990f18a8201022f919"
-        const val GEMINI_REDIRECT = "https://oauth-redirect.googleusercontent.com/r/$GEMINI_ID"
-        val GEMINI_CALLBACKS =
-            listOf(
-                "https://oauth-redirect-sandbox.googleusercontent.com/r/$GEMINI_ID",
-                "https://oauth-redirect-test.googleusercontent.com/r/$GEMINI_ID",
-                GEMINI_REDIRECT,
-                "https://oauth-redirect-sandbox.googleusercontent.com/a/$GEMINI_ID",
-                "https://oauth-redirect-test.googleusercontent.com/a/$GEMINI_ID",
-                "https://oauth-redirect.googleusercontent.com/a/$GEMINI_ID",
-            )
-
-        // RFC 7636 Appendix B PKCE test vector.
-        const val VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-        const val CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-    }
 }
