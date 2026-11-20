@@ -77,9 +77,10 @@ object OAuthPolicy {
      * ChatGPT's HTTPS callback namespace on the EXACT `chatgpt.com` host (path under `/connector/oauth/`),
      * Gemini's HTTPS custom-connector callbacks on the three EXACT Google relay hosts (see [GEMINI_REDIRECT_PATH]),
      * or `http://` loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local test clients
-     * (MCP Inspector / mcp-remote / Claude Code). The host is compared via [URI.host] for EXACT equality —
-     * deceptive hosts (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`), other loopback
-     * IPs, `0.0.0.0`, non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
+     * (MCP Inspector / mcp-remote / Claude Code). ChatGPT and loopback hosts are compared via [URI.host] for EXACT
+     * equality; Gemini compares [URI.getRawAuthority] with the three hosts, so it also refuses userinfo and any port,
+     * even an empty one. Deceptive hosts (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`),
+     * other loopback IPs, `0.0.0.0`, non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
      */
     fun isAllowedRedirectUri(uri: String): Boolean {
         if (uri in ALLOWED_REDIRECT_URIS) return true
@@ -97,8 +98,9 @@ object OAuthPolicy {
     }
 
     /**
-     * Gemini relay callback: the raw authority must be exactly one of the hosts (so no userinfo and no port, not even
-     * an empty one), no query or fragment, and the raw path must be the exact id shape.
+     * Gemini relay callback: `https` only, the raw authority must be exactly one of the hosts (so no userinfo and no
+     * port, not even an empty one; a URI without an authority is refused too), no query or fragment, and the raw path
+     * must be the exact id shape.
      */
     private fun isGeminiConnectorCallback(parsed: URI?): Boolean =
         parsed != null &&

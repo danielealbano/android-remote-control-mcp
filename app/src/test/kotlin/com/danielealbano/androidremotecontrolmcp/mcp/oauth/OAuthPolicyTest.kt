@@ -41,10 +41,11 @@ class OAuthPolicyTest {
     @DisplayName("allows the six Gemini connector callbacks")
     fun allowsGeminiConnectorCallbacks() {
         GEMINI_CALLBACKS.forEach { assertTrue(OAuthPolicy.isAllowedRedirectUri(it), it) }
-        // An id seen from another server URL; together with GEMINI_ID it covers every hex digit.
-        assertTrue(
-            OAuthPolicy.isAllowedRedirectUri("https://$GEMINI_HOST/r/user_bound_custom-mcp-52daa21ec0e98956d5f21956"),
-        )
+        // An id seen from another server URL, and a made-up one that holds all 16 hex digits.
+        listOf("52daa21ec0e98956d5f21956", "0123456789abcdef01234567").forEach {
+            val uri = "https://$GEMINI_HOST/r/user_bound_custom-mcp-$it"
+            assertTrue(OAuthPolicy.isAllowedRedirectUri(uri), uri)
+        }
     }
 
     @Test
@@ -79,6 +80,8 @@ class OAuthPolicyTest {
     fun rejectsDeceptiveGeminiCallbacks() {
         listOf(
             "http://$GEMINI_HOST/r/$GEMINI_ID",
+            "https:///r/$GEMINI_ID",
+            "https:$GEMINI_HOST/r/$GEMINI_ID",
             "https://$GEMINI_HOST.evil.example/r/$GEMINI_ID",
             "https://$GEMINI_HOST@evil.example/r/$GEMINI_ID",
             "https://evil@$GEMINI_HOST/r/$GEMINI_ID",

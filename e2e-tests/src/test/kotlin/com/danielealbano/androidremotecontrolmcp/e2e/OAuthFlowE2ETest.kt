@@ -28,8 +28,8 @@ import java.net.URLEncoder
  * Acts as the OAuth client over the container's forwarded HTTP port: DCR → authorize → (debug) approve
  * → token → connect the MCP SDK client with the issued access token → call a basic tool. Because the
  * test is its own client over plain HTTP and never follows the final redirect, an `http://localhost/callback`
- * redirect from the allowlist is fine (no tunnel needed), and so are Gemini's six relay callbacks, which check the
- * allowlist with the device's own `java.net.URI`.
+ * redirect from the allowlist is fine (no tunnel needed), and so are Gemini's six relay callbacks; the device checks
+ * them against the allowlist with its own `java.net.URI`.
  *
  * Container assumptions: the shared container must have OAuth enabled and the server (re)started so the
  * new auth model is live — driven via [AndroidContainerSetup.configureOAuthEnabled] + a server restart.
