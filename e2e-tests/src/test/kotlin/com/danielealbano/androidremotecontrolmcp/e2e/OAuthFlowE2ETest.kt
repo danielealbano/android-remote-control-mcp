@@ -8,6 +8,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -26,8 +27,9 @@ import java.net.URLEncoder
  *
  * Acts as the OAuth client over the container's forwarded HTTP port: DCR → authorize → (debug) approve
  * → token → connect the MCP SDK client with the issued access token → call a basic tool. Because the
- * test is its own client over plain HTTP, an `http://localhost/callback` redirect from the allowlist is
- * fine (no tunnel needed).
+ * test is its own client over plain HTTP and never follows the final redirect, an `http://localhost/callback`
+ * redirect from the allowlist is fine (no tunnel needed), and so are Gemini's six relay callbacks, which check the
+ * allowlist with the device's own `java.net.URI`.
  *
  * Container assumptions: the shared container must have OAuth enabled and the server (re)started so the
  * new auth model is live — driven via [AndroidContainerSetup.configureOAuthEnabled] + a server restart.
@@ -42,6 +44,19 @@ class OAuthFlowE2ETest {
 
     @Test
     fun `full OAuth flow issues a token that authorizes a tool call`() {
+        runFlow(redirectUris = listOf(REDIRECT), redirectUri = REDIRECT, clientName = "E2E")
+    }
+
+    @Test
+    fun `Gemini connector registration and callback complete the OAuth flow`() {
+        runFlow(redirectUris = GEMINI_CALLBACKS, redirectUri = GEMINI_REDIRECT, clientName = "Google")
+    }
+
+    private fun runFlow(
+        redirectUris: List<String>,
+        redirectUri: String,
+        clientName: String,
+    ) {
         // OAuth is enabled by default, so the container's server already mounts the OAuth endpoints.
         waitForHealth()
 
@@ -49,24 +64,23 @@ class OAuthFlowE2ETest {
         val (regStatus, regBody) =
             httpPost(
                 "$base/register",
-                """{"redirect_uris":["$REDIRECT"],"token_endpoint_auth_method":"none",""" +
+                """{"redirect_uris":[${redirectUris.joinToString(",") { "\"$it\"" }}],""" +
+                    """"token_endpoint_auth_method":"none",""" +
                     """"grant_types":["authorization_code","refresh_token"],"response_types":["code"],""" +
-                    """"scope":"mcp","client_name":"E2E","application_type":"web"}""",
+                    """"scope":"mcp","client_name":"$clientName","application_type":"web"}""",
                 "application/json",
             )
         assertEquals(HttpURLConnection.HTTP_CREATED, regStatus, "register failed: $regBody")
-        val clientId =
-            Json
-                .parseToJsonElement(regBody)
-                .jsonObject["client_id"]!!
-                .jsonPrimitive.content
+        val registered = Json.parseToJsonElement(regBody).jsonObject
+        assertEquals(redirectUris, registered["redirect_uris"]!!.jsonArray.map { it.jsonPrimitive.content })
+        val clientId = registered["client_id"]!!.jsonPrimitive.content
 
         // 2. Authorize (creates a pending approval). Parse the approval id from the consent page JS.
         // The optional `resource` param is omitted so the server defaults it to its own request-derived
         // canonical resource (avoids host/port ambiguity through the container port-forward); the token
         // aud and the /mcp check then use the SAME server-side derivation.
         val authorizeUrl =
-            "$base/authorize?response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(REDIRECT)}" +
+            "$base/authorize?response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(redirectUri)}" +
                 "&code_challenge=${enc(CHALLENGE)}&code_challenge_method=S256&state=xyz&scope=mcp"
         val (authStatus, authBody) = httpGet(authorizeUrl)
         assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed: $authBody")
@@ -87,7 +101,7 @@ class OAuthFlowE2ETest {
                 mapOf(
                     "grant_type" to "authorization_code",
                     "code" to code!!,
-                    "redirect_uri" to REDIRECT,
+                    "redirect_uri" to redirectUri,
                     "client_id" to clientId,
                     "code_verifier" to VERIFIER,
                 ),
@@ -198,6 +212,19 @@ class OAuthFlowE2ETest {
 
     private companion object {
         const val REDIRECT = "http://localhost/callback"
+
+        // The six redirect URIs Gemini registered on a real device; it authorizes on the production /r/ one.
+        const val GEMINI_ID = "user_bound_custom-mcp-8569b7990f18a8201022f919"
+        const val GEMINI_REDIRECT = "https://oauth-redirect.googleusercontent.com/r/$GEMINI_ID"
+        val GEMINI_CALLBACKS =
+            listOf(
+                "https://oauth-redirect-sandbox.googleusercontent.com/r/$GEMINI_ID",
+                "https://oauth-redirect-test.googleusercontent.com/r/$GEMINI_ID",
+                GEMINI_REDIRECT,
+                "https://oauth-redirect-sandbox.googleusercontent.com/a/$GEMINI_ID",
+                "https://oauth-redirect-test.googleusercontent.com/a/$GEMINI_ID",
+                "https://oauth-redirect.googleusercontent.com/a/$GEMINI_ID",
+            )
         const val HTTP_TIMEOUT_MS = 15_000
         const val STATUS_TIMEOUT_MS = 30_000L
         val SETTLED_STATES = setOf("approved", "denied", "expired")
