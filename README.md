@@ -277,18 +277,19 @@ ChatGPT connects to the server as a **custom MCP connector** using the same self
 
 ### Connect from Gemini (Custom Connector, OAuth)
 
-Gemini connects to the server as a **custom app** (remote MCP) using the same self-contained OAuth 2.1 flow. The server must be reachable over a **public HTTPS URL**, so enable a [remote access tunnel](#using-remote-access-tunnels) first. A `localhost`/LAN address or an `adb` port-forward will **not** work.
+Gemini connects as a **custom app** over OAuth 2.1. It needs a public HTTPS URL, so enable a [remote access tunnel](#using-remote-access-tunnels) first.
 
-Google's requirements: a personal Google Account (not a work or school account), age 18 or over, Gemini in English, and Gemini **History** turned on. Custom apps are unavailable while History is off. They are not offered in every country. The free plan works.
+Google requires a personal Google Account, age 18 or over, Gemini in English, and Gemini [History](https://myactivity.google.com/product/gemini) turned on. It is not available in every country. The free plan works.
 
-1. **Turn on History** at [myactivity.google.com/product/gemini](https://myactivity.google.com/product/gemini).
-2. **Start the tunnel**: same as the Claude flow above. OAuth stays enabled by default. Turn on **Remote Access** under Settings → Tunnel, start the server, and copy the public `https://…/mcp` URL from the Server tab.
-3. **Add the custom app**: this works only on the Gemini website, [gemini.google.com](https://gemini.google.com), on a computer or in a phone's browser. The Gemini mobile app cannot add one. Open the menu. On a phone, it is ☰ at the top left. Choose **Customize**, then the **Connectors** tab. Choose **+**. On a computer, the button reads **+ Custom**. Paste the `https://…/mcp` URL as the **MCP Server URL**. Leave **Client ID** and **Client secret** under **Show more** empty, because Gemini registers itself with the app (Dynamic Client Registration). Choose **Next**, tick the box that accepts the risks, and choose **Connect**. Google then asks to link your Google Account with the custom app. Continue to the end of that dialog to open the approval page.
-4. **Approve on the device**: the approval page shows a **2-digit code**. The phone shows the request as coming from **Google**, with the host `oauth-redirect.googleusercontent.com`. Tap the heads-up notification (or, if the Notifications permission is off, the **pending approvals** card on the app's **Server** screen), confirm the code matches, and **Approve**.
-5. **Use it**: the custom app works on the Gemini website and in the Gemini mobile app. In a chat, type `@` and pick it to make Gemini use it. Gemini asks before it runs a tool: choose **Allow once** or **Always allow**.
-6. **Remove it**: on the Gemini website, open **Customize → Connectors**. Under **Custom apps** at the bottom, open the **…** menu next to the app and choose **Delete**. Revoke the client in the app under **Settings → Access → Connected clients**.
+1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
+2. On [gemini.google.com](https://gemini.google.com), on a computer or in a phone's browser, open the menu, then **Customize** → **Connectors** → **+**. The Gemini mobile app cannot add one.
+3. Paste the URL as the **MCP Server URL** and leave **Client ID** and **Client secret** empty. Choose **Next**, accept the risks, choose **Connect**, and continue through Google's account link dialog.
+4. On the phone, check the 2-digit code and approve the request from **Google** (notification, or the card on the Server screen).
+5. In a chat, type `@` and pick the app. It also works in the Gemini mobile app.
 
-> ⚠️ **Security:** the same cautions apply. Treat the tunnel URL as sensitive, approve only connections you started (check the code), revoke unused clients, and stop the tunnel and server when you are done.
+To remove it, open **Customize** → **Connectors** → **Custom apps** → **…** → **Delete**, then revoke the client under **Settings → Access → Connected clients**.
+
+> ⚠️ **Security:** the same cautions as for Claude apply.
 
 ### Other MCP Clients
 
