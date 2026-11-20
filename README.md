@@ -252,7 +252,7 @@ Replace `DEVICE_IP`, `PORT`, and `YOUR_TOKEN` with the values shown in the app's
 Claude.ai (web) and Claude Desktop connect as a **custom connector** (remote MCP) using OAuth 2.1 — the app is its own OAuth Authorization Server, so no external account or pre-registration is needed. This requires the server to be reachable over a **public HTTPS URL**, so you must first enable a [remote access tunnel](#using-remote-access-tunnels) — a `localhost`/LAN address or `adb` port-forward will **not** work.
 
 1. **OAuth is enabled by default** — no action needed (if you previously disabled it, re-enable it under **Settings → Access**). The bearer token stays enabled too; both are accepted.
-2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…` URL from the Server tab and append `/mcp` (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
+2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…/mcp` URL from the Server tab (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
 3. In Claude, open **[Customize → Connectors → Add custom connector](https://claude.ai/customize/connectors?modal=add-custom-connector)**, paste the `https://…/mcp` URL, and **leave the OAuth Client ID and Client Secret blank** (the app uses Dynamic Client Registration). Click **Add**.
 4. Claude opens a browser approval page showing a **2-digit code**. On the device, tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — to open the approval screen, confirm the code matches, and **Approve**.
 5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens.
@@ -269,7 +269,7 @@ ChatGPT connects to the server as a **custom MCP connector** using the same self
 
 1. **Enable Developer mode** — in ChatGPT on the web, open **Settings → Connectors → Advanced settings** (labelled **Apps & Connectors** on some builds) and turn on **Developer mode**.
 2. **Start the tunnel** — same as the Claude flow above: OAuth stays enabled by default, turn on **Remote Access** under Settings → Tunnel, start the server, and copy the public `https://…/mcp` URL from the Server tab.
-3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (the app self-registers clients via Dynamic Client Registration).
+3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (ChatGPT registers itself with the app through Dynamic Client Registration).
 4. **Approve on the device** — ChatGPT starts the OAuth flow. Tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — confirm the 2-digit code matches, and **Approve** (identical to the Claude approval step).
 5. Manage or revoke the connected client any time under **Settings → Access → Connected clients** in the app.
 
