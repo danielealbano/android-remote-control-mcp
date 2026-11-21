@@ -93,7 +93,7 @@ class OAuthClientRepositoryImpl
                         lastUsedAtMs = nowMs,
                         currentRefreshJti = null,
                     )
-                persist(snapshot.value.withinCap(newClient))
+                persist(snapshot.value.withinCap(newClient, serverLog::logEvicted))
                 newClient
             }
 
@@ -138,7 +138,8 @@ class OAuthClientRepositoryImpl
                         connections = listOf(connection),
                         iconUrl = iconUrl,
                     )
-                persist(snapshot.value.replacing(clientId) { client } ?: snapshot.value.withinCap(client))
+                val updated = snapshot.value.replacing(clientId) { client }
+                persist(updated ?: snapshot.value.withinCap(client, serverLog::logEvicted))
                 client
             }
 

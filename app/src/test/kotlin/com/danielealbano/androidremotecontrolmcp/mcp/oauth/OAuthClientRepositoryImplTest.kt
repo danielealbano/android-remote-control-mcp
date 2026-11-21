@@ -250,6 +250,29 @@ class OAuthClientRepositoryImplTest {
         }
 
     @Test
+    @DisplayName("evicting an approved client is logged with its name; evicting an unapproved one is not")
+    fun approvedEvictionLogged() =
+        testScope.runTest {
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 0L)
+            val ids = (1L until OAuthPolicy.MAX_OAUTH_CLIENTS.toLong()).map { register(it).clientId }
+            register(100L)
+            val evictedLog = "OAuth client removed (more than ${OAuthPolicy.MAX_OAUTH_CLIENTS} clients): "
+            assertTrue(serverLog.ofType(ServerLogEntry.Type.OAUTH).none { it.message.startsWith(evictedLog) })
+            assertNull(repository.getClient(ids[0]), "the oldest unapproved must be evicted")
+
+            repository
+                .getClients()
+                .filterNot { it.isApproved }
+                .forEach { repository.recordGrant(it.clientId, "j", null, 200L) }
+            register(300L)
+            assertNull(repository.getClient(DOC), "the least recently used approved client must be evicted")
+            assertEquals(
+                listOf("${evictedLog}Claude Code"),
+                serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }.filter { it.startsWith(evictedLog) },
+            )
+        }
+
+    @Test
     @DisplayName("connections persist across a new instance")
     fun connectionsPersist() =
         testScope.runTest {

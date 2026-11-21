@@ -1,8 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.data.repository
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.loggable
 import kotlinx.serialization.json.Json
 
 /** The persisted client list, or none when [stored] is absent or unreadable. */
@@ -19,16 +21,38 @@ internal fun decodeClients(
  * This list plus [newcomer] within [OAuthPolicy.MAX_OAUTH_CLIENTS]. The victim is chosen among the EXISTING clients
  * only (the newcomer is always kept): the oldest unapproved one (never completed a token grant), or the overall oldest
  * only when every existing client is approved — so registration spam (which adds unapproved entries) can never evict
- * an approved client.
+ * an approved client. The evicted client, if any, is handed to [onEvicted].
  */
-internal fun List<OAuthClient>.withinCap(newcomer: OAuthClient): List<OAuthClient> {
+internal fun List<OAuthClient>.withinCap(
+    newcomer: OAuthClient,
+    onEvicted: (OAuthClient) -> Unit,
+): List<OAuthClient> {
     val combined = this + newcomer
     val victim =
         filterNot { it.isApproved }
             .ifEmpty { this }
             .minByOrNull { it.lastUsedAtMs }
             .takeIf { combined.size > OAuthPolicy.MAX_OAUTH_CLIENTS }
-    return if (victim != null) combined - victim else combined
+    return if (victim != null) {
+        onEvicted(victim)
+        combined - victim
+    } else {
+        combined
+    }
+}
+
+/**
+ * Logs that [victim] was evicted to make room, when it was approved: its tokens (for CIMD, every connection's) stop
+ * working. An unapproved victim is not logged, so registration spam does not fill the log too.
+ */
+internal fun ServerLogRepository.logEvicted(victim: OAuthClient) {
+    if (victim.isApproved) {
+        log(
+            ServerLogEntry.Type.OAUTH,
+            "OAuth client removed (more than ${OAuthPolicy.MAX_OAUTH_CLIENTS} clients): " +
+                loggable(victim.clientName ?: victim.clientId),
+        )
+    }
 }
 
 /** This list with the client [clientId] replaced by [change] of it, or null when it is not in the list. */
