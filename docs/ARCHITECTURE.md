@@ -301,7 +301,7 @@ sequenceDiagram
 
 ### OAuth 2.1 Authorization Server (self-contained)
 
-- New components live under `mcp/oauth/`: `OAuthPolicy` (redirect allowlist, resource matching, TTL/cap constants), `Pkce` (S256), `JwtTokenService(Impl)` (HS256 issue/verify, memoized algorithm), `OAuthClientRepository(Impl)` (persisted registry in a dedicated `oauth_clients` DataStore with an in-memory snapshot), `AuthorizationCodeStore(Impl)` (single-use 60s codes), `OAuthApprovalCoordinator(Impl)` (number-match pending approvals), `OAuthMetadata` (RFC 9728/8414 docs), `OAuthRoutes` (the HTTP endpoints), `OAuthAccessValidator` (the `/mcp` token check, shared by server and tests), `LogoUrlPolicy` (SSRF guard for client-logo rendering), `OAuthConnectors` (the app table behind both the redirect allowlist and the CIMD document domains), `ClientMetadataDocuments` (CIMD download and checks), `OAuthHttpFetcher` / `OkHttpOAuthHttpFetcher` (guarded downloads of CIMD documents and logos) with `PublicAddresses` (RFC 6890 special-use address filter), `ConsentLogo` (the logo embedded in the consent page). `RequestBaseUrl` derives the per-request public base URL (used by OAuth metadata/`aud` and the share-content links).
+- New components live under `mcp/oauth/`: `OAuthPolicy` (redirect allowlist, CIMD document and redirect rules, loopback detection, client display name and logo policy, resource matching, TTL/cap/download constants), `Pkce` (S256), `JwtTokenService(Impl)` (HS256 issue/verify, memoized algorithm), `OAuthClientRepository(Impl)` (persisted registry in a dedicated `oauth_clients` DataStore with an in-memory snapshot), `AuthorizationCodeStore(Impl)` (single-use 60s codes), `OAuthApprovalCoordinator(Impl)` (number-match pending approvals), `OAuthMetadata` (RFC 9728/8414 docs), `OAuthRoutes` (the HTTP endpoints), `OAuthAccessValidator` (the `/mcp` token check, shared by server and tests), `LogoUrlPolicy` (SSRF guard for client-logo rendering), `OAuthConnectors` (the app table behind both the redirect allowlist and the CIMD document domains), `ClientMetadataDocuments` (CIMD download and checks), `OAuthHttpFetcher` / `OkHttpOAuthHttpFetcher` (guarded downloads of CIMD documents and logos) with `PublicAddresses` (RFC 6890 special-use address filter), `ConsentLogo` (the logo embedded in the consent page). `RequestBaseUrl` derives the per-request public base URL (used by OAuth metadata/`aud` and the share-content links).
 - The app is both Authorization Server and Resource Server, so tokens are HS256-signed with a device-held secret (no JWKS). Access TTL 24h, refresh TTL 90d, code TTL 60s; both tokens carry `aud` = `<base>/mcp` and `client_id`, and for a CIMD client the `connection_id` of its login.
 
 ```mermaid
@@ -318,7 +318,7 @@ sequenceDiagram
         C->>S: GET /authorize (client_id = document URL, PKCE S256, resource)
         S->>D: GET document (guarded download)
         D-->>S: client metadata (client_id, client_name, redirect_uris)
-    else DCR (Gemini, Kimi, older connections)
+    else DCR (Gemini, older connections)
         C->>S: POST /register (DCR)
         S-->>C: 201 client_id
         C->>S: GET /authorize (client_id, PKCE S256, resource)
