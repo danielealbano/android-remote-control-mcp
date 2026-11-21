@@ -299,15 +299,15 @@ To remove it, open **Customize** → **Connectors** → **Custom apps** → **�
 
 Kimi connects through a **personal plugin** that wraps this MCP server, over OAuth 2.1. It needs a public HTTPS URL, so enable a [remote access tunnel](#using-remote-access-tunnels) first.
 
-These steps follow [Kimi's help](https://www.kimi.com/en/help/plugins-and-skills/create). They have not been checked on a real Kimi account.
+These steps follow Kimi's help on [creating](https://www.kimi.com/en/help/plugins-and-skills/create) and [using](https://www.kimi.com/en/help/plugins-and-skills/overview) plugins. They have not been checked on a real Kimi account.
 
 1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
 2. In the Kimi Work desktop app, start **Plugin Builder**: type `/` in a conversation, or choose **Custom plugin** in the plugin marketplace. Ask for a plugin for this MCP server and give it the URL.
 3. Open **Plugins** → **Personal** and choose **+** to install the plugin. Kimi then opens this server's approval page.
 4. On the phone, check the 2-digit code and approve the request (notification, or the card on the Server screen).
-5. In a chat, type `/` or choose **+** → **Plugins** and pick the plugin. Plugins work with K3 or K3 Swarm and in Deep Research, Build and PPT, but not in Kimi Claw or Kimi Plus.
+5. In a chat, type `/` or choose **+** → **Plugins** and pick the plugin. Plugins work in the Kimi Work desktop app, with K3 or K3 Swarm, and in Deep Research, Build and PPT. They do not work yet in Kimi Claw or Kimi Plus.
 
-To remove it, uninstall the plugin in Kimi, then revoke the client in this app under **Settings → Access → Connected clients**.
+To remove it, open **Plugins** → **Personal** in Kimi, uninstall the plugin and delete its entry, then revoke the client in this app under **Settings → Access → Connected clients**.
 
 > ⚠️ **Security:** the same cautions as for Claude apply.
 
