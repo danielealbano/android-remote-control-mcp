@@ -104,6 +104,15 @@ internal object OAuthTestClient {
             )
         }
 
+    /** A client that does not follow redirects, to read an authorization redirect's `Location`. */
+    fun ApplicationTestBuilder.createNoRedirectClient(): HttpClient =
+        createClient {
+            followRedirects = false
+            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                json(io.modelcontextprotocol.kotlin.sdk.types.McpJson)
+            }
+        }
+
     suspend fun connectMcp(
         app: ApplicationTestBuilder,
         accessToken: String,
@@ -128,8 +137,9 @@ internal object OAuthTestClient {
 
     /**
      * A hosted connector's whole flow: DCR with [redirectUris] as [clientName], authorization on [redirectUri], the
-     * on-device approval showing [clientName] and [redirectHost], the code on [redirectUri], the token, and an
-     * `android_tap` call with the access token (the caller stubs the tap and sets the public URL to [OVERRIDE]).
+     * on-device approval showing [clientName] and [redirectHost], the code and the RFC 9207 `iss` on [redirectUri],
+     * the token, and an `android_tap` call with the access token (the caller stubs the tap and sets the public URL
+     * to [OVERRIDE]).
      */
     suspend fun ApplicationTestBuilder.assertConnectorFlow(
         ctx: McpIntegrationTestHelper.OAuthTestContext,
@@ -160,6 +170,7 @@ internal object OAuthTestClient {
                 .jsonPrimitive.content
         assertTrue(redirect.startsWith("$redirectUri?"), redirect)
         assertEquals("xyz", Url(redirect).parameters["state"])
+        assertEquals(OVERRIDE, Url(redirect).parameters["iss"])
 
         val tokenResp =
             tokenRequest(

@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -27,6 +28,7 @@ class OAuthMetadataTest {
     fun asFields() {
         val obj = Json.parseToJsonElement(OAuthMetadata.authorizationServerMetadata(base)).jsonObject
         assertEquals(base, obj["issuer"]?.jsonPrimitive?.content)
+        assertEquals(true, obj["authorization_response_iss_parameter_supported"]?.jsonPrimitive?.boolean)
         assertEquals("$base/authorize", obj["authorization_endpoint"]?.jsonPrimitive?.content)
         assertEquals("$base/token", obj["token_endpoint"]?.jsonPrimitive?.content)
         assertEquals("$base/register", obj["registration_endpoint"]?.jsonPrimitive?.content)

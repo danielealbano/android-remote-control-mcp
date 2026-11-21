@@ -156,16 +156,19 @@ internal suspend fun ApplicationCall.respondAuthorizeError(message: String) {
     )
 }
 
+/** Redirects an authorization error to the client, with the RFC 9207 `iss` = [issuer]. */
 internal suspend fun ApplicationCall.redirectWithError(
     redirectUri: String,
     error: String,
     state: String,
+    issuer: String,
 ) {
     val url =
         URLBuilder(redirectUri)
             .apply {
                 parameters.append("error", error)
                 if (state.isNotEmpty()) parameters.append("state", state)
+                parameters.append("iss", issuer)
             }.buildString()
     respondRedirect(url)
 }

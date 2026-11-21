@@ -34,6 +34,8 @@ internal data class PendingAuthorizeRequest(
     val resource: String,
     val scope: String,
     val state: String,
+    /** The issuer at `/authorize`, returned as the RFC 9207 `iss` with the code. */
+    val issuer: String,
     val expiresAtMs: Long,
 )
 

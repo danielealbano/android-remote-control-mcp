@@ -23,11 +23,15 @@ object OAuthMetadata {
             },
         )
 
-    /** RFC 8414 Authorization Server Metadata for issuer `<baseUrl>`. */
+    /**
+     * RFC 8414 Authorization Server Metadata for issuer `<baseUrl>`. It advertises RFC 9207 issuer identification:
+     * every authorization response carries `iss` = this exact issuer.
+     */
     fun authorizationServerMetadata(baseUrl: String): String =
         Json.encodeToString(
             buildJsonObject {
                 put("issuer", baseUrl)
+                put("authorization_response_iss_parameter_supported", true)
                 put("authorization_endpoint", "$baseUrl/authorize")
                 put("token_endpoint", "$baseUrl/token")
                 put("registration_endpoint", "$baseUrl/register")
