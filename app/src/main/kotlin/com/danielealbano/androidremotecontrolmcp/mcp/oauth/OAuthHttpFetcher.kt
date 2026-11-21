@@ -12,6 +12,7 @@ import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.Proxy
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
@@ -96,11 +97,15 @@ class OkHttpOAuthHttpFetcher internal constructor(
                 .url(httpUrl)
                 .header("Accept", accept)
                 .build()
+        val startedNs = System.nanoTime()
         return try {
             ArcTunnelHttp.await(client.newCall(request)) { readCapped(it, maxBytes) }
         } catch (e: IOException) {
             Log.d(TAG, "Download from ${httpUrl.host} failed: ${e.javaClass.simpleName}")
-            FetchResult.Failed(failureReason(e))
+            // Whatever failed once the call timeout had run out, the download timed out.
+            val limitNs = TimeUnit.MILLISECONDS.toNanos(client.callTimeoutMillis.toLong())
+            val timedOut = limitNs > 0 && System.nanoTime() - startedNs >= limitNs
+            FetchResult.Failed(failureReason(e, timedOut))
         }
     }
 
@@ -122,11 +127,15 @@ class OkHttpOAuthHttpFetcher internal constructor(
         }
     }
 
-    private fun failureReason(failure: IOException): String =
-        when (failure) {
-            is InterruptedIOException -> "timed out"
-            is UnknownHostException -> failure.message ?: "unknown host"
-            is SSLException -> "TLS failed"
+    private fun failureReason(
+        failure: IOException,
+        timedOut: Boolean,
+    ): String =
+        when {
+            timedOut || failure is SocketTimeoutException -> "timed out"
+            failure is UnknownHostException -> failure.message ?: "unknown host"
+            failure is SSLException -> "TLS failed"
+            failure is InterruptedIOException -> "interrupted"
             else -> failure.javaClass.simpleName
         }
 

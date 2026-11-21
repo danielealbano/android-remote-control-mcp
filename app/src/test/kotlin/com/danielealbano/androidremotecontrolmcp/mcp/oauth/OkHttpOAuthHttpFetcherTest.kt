@@ -16,15 +16,20 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.Proxy
 import java.net.ServerSocket
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 @DisplayName("OkHttpOAuthHttpFetcher")
 class OkHttpOAuthHttpFetcherTest {
@@ -282,6 +287,95 @@ class OkHttpOAuthHttpFetcherTest {
     }
 
     @Test
+    @DisplayName("reports a socket timeout as timed out and any other interrupted I/O as interrupted")
+    fun reportsInterruptedApartFromTimeouts() =
+        runTest {
+            fun failingWith(thrown: IOException) =
+                OkHttpOAuthHttpFetcher {
+                    OkHttpOAuthHttpFetcher.clientBuilder().addInterceptor { throw thrown }.build()
+                }
+            val timedOut = failingWith(SocketTimeoutException("connect timed out"))
+            assertEquals("timed out", failure(timedOut.get(url("/doc"), "application/json", MAX)))
+            val interrupted = failingWith(InterruptedIOException("interrupted"))
+            assertEquals("interrupted", failure(interrupted.get(url("/doc"), "application/json", MAX)))
+        }
+
+    @Test
+    @DisplayName("PublicDns gives up a lookup queued behind stalled ones at its own limit")
+    fun publicDnsQueuedLookupTimesOut() {
+        val release = CountDownLatch(1)
+        val busy = CountDownLatch(LOOKUP_THREADS)
+        val stalled =
+            PublicDns({
+                busy.countDown()
+                release.await()
+                emptyList<InetAddress>()
+            }, MAX_LOOKUP_MS)
+        val holders = List(LOOKUP_THREADS) { thread { runCatching { stalled.lookup(HOST) } } }
+        try {
+            assertTrue(busy.await(MAX_LOOKUP_MS, TimeUnit.MILLISECONDS))
+            val queued = PublicDns({ listOf(InetAddress.getByName("1.1.1.1")) }, SHORT_TIMEOUT_MS)
+            val thrown = assertThrows(UnknownHostException::class.java) { queued.lookup(HOST) }
+            assertEquals("$HOST did not resolve in $SHORT_TIMEOUT_MS ms", thrown.message)
+        } finally {
+            release.countDown()
+            holders.forEach { it.join() }
+        }
+    }
+
+    @Test
+    @DisplayName("PublicDns stops a lookup it gave up, so its thread is free again")
+    fun publicDnsStopsGivenUpLookup() {
+        val release = CountDownLatch(1)
+        val stopped = CountDownLatch(1)
+        val dns =
+            PublicDns({
+                try {
+                    release.await()
+                } catch (e: InterruptedException) {
+                    stopped.countDown()
+                    throw e
+                }
+                emptyList<InetAddress>()
+            }, SHORT_TIMEOUT_MS)
+        try {
+            assertThrows(UnknownHostException::class.java) { dns.lookup(HOST) }
+            assertTrue(stopped.await(MAX_LOOKUP_MS, TimeUnit.MILLISECONDS))
+        } finally {
+            release.countDown()
+        }
+    }
+
+    @Test
+    @DisplayName("PublicDns answers an interrupted caller with an InterruptedIOException and keeps its interrupt")
+    fun publicDnsInterruptedCaller() {
+        val release = CountDownLatch(1)
+        val started = CountDownLatch(1)
+        val dns =
+            PublicDns({
+                started.countDown()
+                release.await()
+                emptyList<InetAddress>()
+            }, MAX_LOOKUP_MS)
+        var thrown: Throwable? = null
+        var keptInterrupt = false
+        val caller =
+            thread {
+                thrown = runCatching { dns.lookup(HOST) }.exceptionOrNull()
+                keptInterrupt = Thread.currentThread().isInterrupted
+            }
+        try {
+            assertTrue(started.await(MAX_LOOKUP_MS, TimeUnit.MILLISECONDS))
+            caller.interrupt()
+            caller.join(MAX_LOOKUP_MS)
+        } finally {
+            release.countDown()
+        }
+        assertInstanceOf(InterruptedIOException::class.java, thrown)
+        assertTrue(keptInterrupt)
+    }
+
+    @Test
     @DisplayName("PublicOnlyDns gives no address for a host with only special-use ones")
     fun publicOnlyDnsRefusesLoopback() {
         assertThrows(UnknownHostException::class.java) { PublicOnlyDns.lookup("localhost") }
@@ -292,6 +386,9 @@ class OkHttpOAuthHttpFetcherTest {
         const val MAX = 64
         const val SHORT_TIMEOUT_MS = 200L
         const val MAX_LOOKUP_MS = 5_000L
+
+        // The size of PublicDns's lookup pool.
+        const val LOOKUP_THREADS = 4
         val held: HeldCertificate =
             HeldCertificate
                 .Builder()

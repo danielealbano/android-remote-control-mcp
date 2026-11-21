@@ -194,8 +194,6 @@ class OAuthLoggingIntegrationTest {
             }
         }
 
-    // ── helpers (mirror OAuthFlowIntegrationTest) ────────────────────────────
-
     @Test
     @DisplayName("what anyone can send without a login or an approval cannot fake or reorder a log line")
     fun unauthenticatedInputKeptOutOfLogLines() =
@@ -237,6 +235,8 @@ class OAuthLoggingIntegrationTest {
                 assertTrue(messages.none { it.codePoints().anyMatch(::isHidden) }, messages.toString())
             }
         }
+
+    // ── helpers (mirror OAuthFlowIntegrationTest) ────────────────────────────
 
     /** A character that could break or reorder a log line: a control, a line or paragraph separator, a format one. */
     private fun isHidden(codePoint: Int): Boolean =

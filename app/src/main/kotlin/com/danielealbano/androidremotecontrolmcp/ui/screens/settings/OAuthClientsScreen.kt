@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -166,6 +167,7 @@ private fun clientLabel(client: OAuthClient): String =
         ?: stringResource(R.string.oauth_clients_unknown_client)
 
 /** The revoke dialog text: revoking a CIMD row ends every connection of its app. */
+@StringRes
 internal fun revokeDialogBodyRes(clientId: String): Int =
     if (OAuthPolicy.isMetadataDocumentClientId(clientId)) {
         R.string.oauth_clients_revoke_dialog_body_app
