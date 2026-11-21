@@ -38,6 +38,72 @@ class OAuthPolicyTest {
     }
 
     @Test
+    @DisplayName("allows ChatGPT callback-id callbacks")
+    fun allowsChatGptConnectorCallbacks() {
+        // The id ChatGPT registered on a real device, a one-character id, and one that holds the whole alphabet.
+        listOf(CHATGPT_ID, "a", "ABCXYZabcxyz0189_-").forEach {
+            val uri = "https://$CHATGPT_HOST/connector/oauth/$it"
+            assertTrue(OAuthPolicy.isAllowedRedirectUri(uri), uri)
+        }
+    }
+
+    @Test
+    @DisplayName("rejects ChatGPT callback paths that are not one callback id")
+    fun rejectsChatGptCallbackOtherPaths() {
+        listOf(
+            "/connector/oauth/",
+            "/connector/oauth",
+            "/connector/oauth/$CHATGPT_ID/",
+            "/connector/oauth/$CHATGPT_ID/extra",
+            "/connector/oauth//$CHATGPT_ID",
+            "/connector/oauth/../../evil",
+            "/connector/oauth/../oauth/$CHATGPT_ID",
+            "/connector/oauth/./$CHATGPT_ID",
+            "/connector/oauth/..",
+            "/connector/oauth/%2e%2e",
+            "/connector/oauth/%2F$CHATGPT_ID",
+            "/connector/oauth/%2DBSmWqXatII2",
+            "/connector/oauth/a.b",
+            "/connector/oauth/a~b",
+            "/connector/oauth/a+b",
+            "/connector/oauth/a=",
+            "/connector/oauth/a:b",
+            "/connector/oauth/a;b",
+            "/connector/OAuth/$CHATGPT_ID",
+            "/connector/oauthx/$CHATGPT_ID",
+            "/x/connector/oauth/$CHATGPT_ID",
+            "/",
+            "",
+        ).forEach {
+            val uri = "https://$CHATGPT_HOST$it"
+            assertFalse(OAuthPolicy.isAllowedRedirectUri(uri), uri)
+        }
+    }
+
+    @Test
+    @DisplayName("rejects deceptive ChatGPT callback hosts, schemes and suffixes")
+    fun rejectsDeceptiveChatGptCallbacks() {
+        val path = "/connector/oauth/$CHATGPT_ID"
+        listOf(
+            "https:///connector/oauth/$CHATGPT_ID",
+            "https:$CHATGPT_HOST$path",
+            "https://evil@$CHATGPT_HOST$path",
+            "https://@$CHATGPT_HOST$path",
+            "https://www.$CHATGPT_HOST$path",
+            "https://chat.openai.com$path",
+            "https://CHATGPT.COM$path",
+            "https://$CHATGPT_HOST.$path",
+            "https://$CHATGPT_HOST:$path",
+            "https://$CHATGPT_HOST:443$path",
+            "https://$CHATGPT_HOST:8443$path",
+            "https://$CHATGPT_HOST$path?x=1",
+            "https://$CHATGPT_HOST$path?",
+            "https://$CHATGPT_HOST$path#frag",
+            "https://$CHATGPT_HOST$path#",
+        ).forEach { assertFalse(OAuthPolicy.isAllowedRedirectUri(it), it) }
+    }
+
+    @Test
     @DisplayName("allows the six Gemini connector callbacks")
     fun allowsGeminiConnectorCallbacks() {
         GEMINI_CALLBACKS.forEach { assertTrue(OAuthPolicy.isAllowedRedirectUri(it), it) }
@@ -129,6 +195,11 @@ class OAuthPolicyTest {
     }
 
     private companion object {
+        const val CHATGPT_HOST = "chatgpt.com"
+
+        // The callback id ChatGPT registered on a real device (the same for two connectors of one account).
+        const val CHATGPT_ID = "-BSmWqXatII2"
+
         const val GEMINI_HOST = "oauth-redirect.googleusercontent.com"
         const val GEMINI_ID = "user_bound_custom-mcp-8569b7990f18a8201022f919"
 
