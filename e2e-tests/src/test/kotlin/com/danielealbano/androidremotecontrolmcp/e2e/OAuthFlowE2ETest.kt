@@ -4,10 +4,12 @@ import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.APPROVAL_ID
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CHALLENGE
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CODE_REGEX
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.VERIFIER
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.issOf
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -83,6 +85,8 @@ class OAuthFlowE2ETest {
         // OAuth is enabled by default, so the container's server already mounts the OAuth endpoints.
         waitForHealth()
 
+        val issuer = metadataIssuer()
+
         // 1. Dynamic Client Registration
         val (regStatus, regBody) =
             httpPost(
@@ -114,7 +118,7 @@ class OAuthFlowE2ETest {
         AndroidContainerSetup.approvePendingOAuth()
 
         // 4. Poll /authorize/status until approved, extract the code.
-        val code = pollForCode(approvalId!!)
+        val code = pollForCode(approvalId!!, issuer)
         assertNotNull(code, "did not receive an authorization code after approval")
 
         // 5. Exchange the code for tokens.
@@ -163,7 +167,20 @@ class OAuthFlowE2ETest {
         }
     }
 
-    private fun pollForCode(approvalId: String): String? {
+    /** The metadata `issuer`, after checking the metadata advertises RFC 9207 issuer identification. */
+    private fun metadataIssuer(): String {
+        val (status, body) = httpGet("$base/.well-known/oauth-authorization-server")
+        assertEquals(HttpURLConnection.HTTP_OK, status, body)
+        val metadata = Json.parseToJsonElement(body).jsonObject
+        assertEquals(JsonPrimitive(true), metadata["authorization_response_iss_parameter_supported"])
+        return metadata["issuer"]!!.jsonPrimitive.content
+    }
+
+    /** The code of the approved redirect, after checking the redirect carries `iss` = [issuer] (RFC 9207). */
+    private fun pollForCode(
+        approvalId: String,
+        issuer: String,
+    ): String? {
         val deadline = System.currentTimeMillis() + STATUS_TIMEOUT_MS
         var settled: JsonObject? = null
         while (settled == null && System.currentTimeMillis() < deadline) {
@@ -171,7 +188,9 @@ class OAuthFlowE2ETest {
             if (settled == null) Thread.sleep(1_000)
         }
         val approved = settled?.takeIf { it["state"]?.jsonPrimitive?.content == "approved" } ?: return null
-        return CODE_REGEX.find(approved["redirect"]!!.jsonPrimitive.content)?.groupValues?.get(1)
+        val redirect = approved["redirect"]!!.jsonPrimitive.content
+        assertEquals(issuer, issOf(redirect), redirect)
+        return CODE_REGEX.find(redirect)?.groupValues?.get(1)
     }
 
     /**

@@ -9,7 +9,8 @@ import kotlinx.serialization.json.putJsonArray
 /**
  * OAuth discovery documents. PRM is RFC 9728; AS metadata is RFC 8414. The field sets are exactly those
  * the spike confirmed Claude.ai completes discovery + authorization against, plus the `offline_access`
- * scope ChatGPT relies on to obtain and maintain refresh-token connectivity.
+ * scope ChatGPT relies on to obtain and maintain refresh-token connectivity, and the RFC 9207
+ * `authorization_response_iss_parameter_supported` flag.
  */
 object OAuthMetadata {
     /** RFC 9728 Protected Resource Metadata for `<baseUrl>/mcp`. */
@@ -23,11 +24,15 @@ object OAuthMetadata {
             },
         )
 
-    /** RFC 8414 Authorization Server Metadata for issuer `<baseUrl>`. */
+    /**
+     * RFC 8414 Authorization Server Metadata for issuer `<baseUrl>`. It advertises RFC 9207 issuer identification:
+     * every authorization response carries `iss` = this exact issuer.
+     */
     fun authorizationServerMetadata(baseUrl: String): String =
         Json.encodeToString(
             buildJsonObject {
                 put("issuer", baseUrl)
+                put("authorization_response_iss_parameter_supported", true)
                 put("authorization_endpoint", "$baseUrl/authorize")
                 put("token_endpoint", "$baseUrl/token")
                 put("registration_endpoint", "$baseUrl/register")

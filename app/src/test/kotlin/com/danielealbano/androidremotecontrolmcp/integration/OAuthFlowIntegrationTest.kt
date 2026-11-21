@@ -7,6 +7,7 @@ import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.RED
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.VERIFIER
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.authorize
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.connectMcp
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.createNoRedirectClient
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.registerResponse
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.tokenRequest
 import io.ktor.client.HttpClient
@@ -22,8 +23,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.testing.ApplicationTestBuilder
 import io.mockk.coEvery
 import io.mockk.coVerify
 import kotlinx.coroutines.test.runTest
@@ -548,14 +547,6 @@ class OAuthFlowIntegrationTest {
                     },
                 ),
             )
-        }
-
-    private fun ApplicationTestBuilder.createNoRedirectClient(): HttpClient =
-        createClient {
-            followRedirects = false
-            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                json(io.modelcontextprotocol.kotlin.sdk.types.McpJson)
-            }
         }
 
     private fun io.ktor.client.request.HttpRequestBuilder.mcpInitializeBody() {

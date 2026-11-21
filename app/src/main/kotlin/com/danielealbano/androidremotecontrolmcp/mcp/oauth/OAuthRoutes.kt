@@ -130,11 +130,13 @@ private suspend fun ApplicationCall.handleAuthorize(
         respondAuthorizeError("Invalid client_id or redirect_uri.")
         return
     }
-    val canonical = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
+    // The same base URL the metadata names as `issuer`, so the RFC 9207 `iss` matches it exactly.
+    val issuer = effectiveBaseUrl(this, deps.publicUrlOverride)
+    val canonical = canonicalResource(issuer)
     val state = params["state"].orEmpty()
     val paramError = authorizeParamError(params, canonical)
     if (paramError != null) {
-        redirectWithError(redirectUri, paramError, state)
+        redirectWithError(redirectUri, paramError, state, issuer)
         return
     }
     val redirectHost = host(redirectUri) ?: "Unknown"
@@ -163,6 +165,7 @@ private suspend fun ApplicationCall.handleAuthorize(
             resource = canonical,
             scope = params["scope"].orEmpty().ifEmpty { "mcp" },
             state = state,
+            issuer = issuer,
             expiresAtMs = approval.expiresAtMs,
         ),
         deps.nowMs(),
@@ -233,6 +236,7 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
                         .apply {
                             parameters.append("code", code)
                             parameters.append("state", pending.state)
+                            parameters.append("iss", pending.issuer)
                         }.buildString()
                 respondText(
                     Json.encodeToString(

@@ -23,11 +23,27 @@ object DeviceUiE2E {
         AndroidContainerSetup.execAdb("shell", "input", "tap", x, y)
     }
 
-    fun swipeAwayWhenVisible(text: String) {
-        val bounds = awaitVisible(text)
-        val y = "${(bounds[1] + bounds[3]) / 2}"
-        val end = "${screenWidth() - 1}"
-        AndroidContainerSetup.execAdb("shell", "input", "swipe", "${bounds[0] + 1}", y, end, y, SWIPE_MS)
+    /**
+     * Swipes the notification showing [text] away until the notification tagged [tag] is no longer posted. One swipe
+     * can miss while the shade is still settling, so it is repeated until the dismissal lands or [WAIT_MS] runs out.
+     */
+    fun swipeAwayNotification(
+        text: String,
+        tag: String,
+    ) {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (isNotificationPosted(tag) && System.currentTimeMillis() < deadline) {
+            val bounds = findBounds(text)
+            if (bounds == null) {
+                expandNotifications()
+            } else {
+                val y = "${(bounds[1] + bounds[3]) / 2}"
+                val end = "${screenWidth() - 1}"
+                AndroidContainerSetup.execAdb("shell", "input", "swipe", "${bounds[0] + 1}", y, end, y, SWIPE_MS)
+            }
+            Thread.sleep(POLL_MS)
+        }
+        check(!isNotificationPosted(tag)) { "The notification tagged '$tag' was still posted after ${WAIT_MS}ms" }
     }
 
     fun awaitNotificationPosted(tag: String) {
