@@ -467,6 +467,10 @@
     <string name="oauth_clients_last_used">Last used %1$s</string>
     <string name="oauth_clients_revoke_named">Revoke %1$s</string>
     <string name="oauth_clients_unknown_client">Unknown</string>
+    <plurals name="oauth_clients_connections">
+        <item quantity="one">%1$d connection</item>
+        <item quantity="other">%1$d connections</item>
+    </plurals>
     <string name="oauth_clients_revoke_dialog_title">Revoke client?</string>
     <string name="oauth_clients_revoke_dialog_body">Revoking immediately invalidates this client\'s tokens. It must re-authorize to reconnect.</string>
     <string name="oauth_clients_revoke_confirm">Revoke</string>

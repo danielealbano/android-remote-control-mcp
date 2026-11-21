@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
@@ -48,8 +49,8 @@ import coil3.compose.AsyncImage
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.LogoUrlPolicy
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.OAuthClientsViewModel
@@ -122,10 +123,7 @@ private fun ClientRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val clientLabel =
-            client.clientName
-                ?: hostOf(client.redirectUris.firstOrNull())
-                ?: stringResource(R.string.oauth_clients_unknown_client)
+        val clientLabel = clientLabel(client)
         ClientAvatar(client)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -134,7 +132,7 @@ private fun ClientRow(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                text = client.applicationType ?: "—",
+                text = clientDetail(client),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -157,6 +155,22 @@ private fun ClientRow(
         }
     }
 }
+
+/** The client's name, with its document host for a CIMD client. */
+@Composable
+private fun clientLabel(client: OAuthClient): String =
+    OAuthPolicy.clientDisplayName(client.clientId, client.clientName)
+        ?: hostOf(client.redirectUris.firstOrNull())
+        ?: stringResource(R.string.oauth_clients_unknown_client)
+
+/** A CIMD client is one row for every login of its app: how many connections it holds; else the DCR type. */
+@Composable
+private fun clientDetail(client: OAuthClient): String =
+    if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
+        pluralStringResource(R.plurals.oauth_clients_connections, client.connections.size, client.connections.size)
+    } else {
+        client.applicationType ?: "—"
+    }
 
 @Composable
 private fun ClientAvatar(client: OAuthClient) {
@@ -198,11 +212,12 @@ private fun ClientAvatar(client: OAuthClient) {
                 .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        // Initials sit behind; a successfully-loaded safe logo covers them.
+        // Initials sit behind; a successfully-loaded allowed logo covers them.
         Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
-        if (LogoUrlPolicy.isSafeLogoUrl(client.logoUri)) {
+        val logoUri = OAuthPolicy.displayLogoUri(client.clientId, client.logoUri)
+        if (logoUri != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(client.logoUri).build(),
+                model = ImageRequest.Builder(context).data(logoUri).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
                 modifier = Modifier.matchParentSize(),
