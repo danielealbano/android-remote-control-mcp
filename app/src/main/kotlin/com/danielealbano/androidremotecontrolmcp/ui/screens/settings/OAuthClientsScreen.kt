@@ -49,6 +49,7 @@ import coil3.compose.AsyncImage
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
@@ -215,9 +216,16 @@ private fun ClientAvatar(client: OAuthClient) {
         // Initials sit behind; a successfully-loaded allowed logo covers them.
         Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
         val logoUri = OAuthPolicy.displayLogoUri(client.clientId, client.logoUri)
-        if (logoUri != null) {
+        // A CIMD client without a logo shows the favicon of its document host, as on the approval screen.
+        val iconUrl =
+            if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
+                ClientIconUrl.resolve(logoUri, hostOf(client.clientId))
+            } else {
+                logoUri
+            }
+        if (iconUrl != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(logoUri).build(),
+                model = ImageRequest.Builder(context).data(iconUrl).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
                 modifier = Modifier.matchParentSize(),

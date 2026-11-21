@@ -230,6 +230,9 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertTrue(warned.loopbackRedirect)
                 assertEquals("Claude Code (claude.ai)", warned.clientName)
                 assertEquals("localhost", warned.redirectHost)
+                // No logo in Claude Code's document: the favicon comes from its document host, not from localhost.
+                assertEquals("claude.ai", warned.iconHost)
+                assertTrue(page.contains("https://icons.duckduckgo.com/ip3/claude.ai.ico"), page)
                 ctx.approvalCoordinator.deny(warned.id)
                 val tokens = login(ctx, CLAUDE_CODE_URL, redirect)
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, tokens.access))
@@ -323,13 +326,14 @@ class OAuthMetadataDocumentIntegrationTest {
             val fetcher = FakeOAuthHttpFetcher(mapOf(claudeLogo to png(), evilLogo to png()))
             withServer(fetcher) { ctx ->
                 val evilPage = authorize(client, registerWithLogo(client, evilLogo)).bodyAsText()
-                assertNull(
+                val evilApproval =
                     ctx.approvalCoordinator
                         .observePending()
                         .value
                         .single()
-                        .logoUri,
-                )
+                assertNull(evilApproval.logoUri)
+                // A DCR client's favicon still comes from its redirect host.
+                assertEquals("claude.ai", evilApproval.iconHost)
                 assertFalse(evilPage.contains("data:image/png"), evilPage)
                 assertTrue(evilPage.contains("https://icons.duckduckgo.com/ip3/claude.ai.ico"), evilPage)
                 assertFalse(fetcher.requested.contains(evilLogo))

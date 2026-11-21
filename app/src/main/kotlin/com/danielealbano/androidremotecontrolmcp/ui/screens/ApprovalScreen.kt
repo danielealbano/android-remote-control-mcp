@@ -244,7 +244,7 @@ private fun ClientIcon(
             .take(2)
             .uppercase()
             .ifEmpty { "?" }
-    val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.redirectHost)
+    val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.iconHost)
 
     // Decorative: the client's name is read next to it
     Box(

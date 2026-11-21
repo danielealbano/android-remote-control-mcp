@@ -3,11 +3,16 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import java.net.URI
 
-/** Who is asking at `/authorize`: the name and logo to show, and the CIMD document (null for a DCR client). */
+/**
+ * Who is asking at `/authorize`: the name and logo to show, the host whose favicon stands in for a missing logo (the
+ * document host for a CIMD client, whose redirect may be loopback; null for DCR, which uses its redirect host), and
+ * the CIMD document (null for a DCR client).
+ */
 internal class AuthorizeRequester(
     val displayName: String,
     val logoUri: String?,
     val metadataDocument: ClientMetadataDocument?,
+    val iconHost: String? = null,
 )
 
 /** A DCR client: registered, with [redirectUri] among its registered URIs and still inside the allowlist. */
@@ -52,6 +57,7 @@ internal suspend fun metadataDocumentRequester(
                 displayName = OAuthPolicy.clientDisplayName(clientId, document.clientName) ?: document.clientName,
                 logoUri = OAuthPolicy.displayLogoUri(clientId, document.logoUri),
                 metadataDocument = document,
+                iconHost = host(clientId),
             )
         }
     }

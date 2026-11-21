@@ -152,6 +152,7 @@ private suspend fun ApplicationCall.handleAuthorize(
                 clientIp = clientIp,
                 clientGeo = clientGeo,
                 loopbackRedirect = OAuthPolicy.isLoopbackRedirectUri(redirectUri),
+                iconHost = requester.iconHost ?: redirectHost,
             ),
             deps.nowMs(),
         )

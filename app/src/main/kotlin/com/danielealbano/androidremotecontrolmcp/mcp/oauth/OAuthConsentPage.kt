@@ -13,7 +13,8 @@ private const val LOOPBACK_WARNING =
 
 /**
  * Renders and responds with the [consentPageHtml] for [approval]: the client's logo when the phone could embed one
- * ([embeddedLogo], from [ConsentLogo]), else the redirect host's favicon ([ClientIconUrl]), and the countdown seeded
+ * ([embeddedLogo], from [ConsentLogo]), else the favicon of [PendingApproval.iconHost] ([ClientIconUrl]), and the
+ * countdown seeded
  * from the window remaining at [nowMs].
  */
 suspend fun ApplicationCall.respondConsentPage(
@@ -29,7 +30,7 @@ suspend fun ApplicationCall.respondConsentPage(
             clientName = displayName,
             host = approval.redirectHost,
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
-            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, approval.redirectHost),
+            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, approval.iconHost),
             loopbackWarning = approval.loopbackRedirect,
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)
