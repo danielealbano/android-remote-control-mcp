@@ -48,6 +48,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -56,6 +57,7 @@ import org.junit.jupiter.api.Test
 @Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
+    private val registerCardDismissedFlow = MutableStateFlow(false)
     private val testDispatcher: TestDispatcher = StandardTestDispatcher()
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var tunnelManager: TunnelManager
@@ -108,6 +110,7 @@ class MainViewModelTest {
         pendingApprovalsFlow = MutableStateFlow(emptyList())
         approvalCoordinator = mockk(relaxed = true)
         every { approvalCoordinator.observePending() } returns pendingApprovalsFlow
+        every { settingsRepository.registerCardDismissed } returns registerCardDismissedFlow
 
         listenerRules = mockk()
         every { listenerRules.check(any()) } returns ListenerSettingsCheck()
@@ -138,6 +141,27 @@ class MainViewModelTest {
             matchCode = "42",
             expiresAtMs = 0L,
         )
+
+    @Test
+    fun `registerCardDismissed starts hidden, then follows the saved value`() =
+        runTest {
+            viewModel.registerCardDismissed.test {
+                assertTrue(awaitItem())
+                assertFalse(awaitItem())
+                registerCardDismissedFlow.value = true
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `dismissRegisterCard saves the dismissal`() =
+        runTest {
+            viewModel.dismissRegisterCard()
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.updateRegisterCardDismissed(true) }
+        }
 
     @Test
     fun `pendingApprovalCount is zero when no pending approvals`() =

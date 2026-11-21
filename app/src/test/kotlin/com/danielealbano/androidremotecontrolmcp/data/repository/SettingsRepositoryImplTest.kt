@@ -758,6 +758,28 @@ class SettingsRepositoryImplTest {
 
                 assertFalse(config.tunnelEnabled)
             }
+
+        @Test
+        fun `turning a tunnel on brings back a dismissed Register with card`() =
+            testScope.runTest {
+                repository.updateRegisterCardDismissed(true)
+
+                repository.updateTunnelEnabled(true)
+
+                assertFalse(repository.registerCardDismissed.first())
+            }
+
+        @Test
+        fun `a tunnel already on, or turned off, leaves the Register with card dismissed`() =
+            testScope.runTest {
+                repository.updateTunnelEnabled(true)
+                repository.updateRegisterCardDismissed(true)
+
+                repository.updateTunnelEnabled(true)
+                assertTrue(repository.registerCardDismissed.first())
+                repository.updateTunnelEnabled(false)
+                assertTrue(repository.registerCardDismissed.first())
+            }
     }
 
     @Nested
@@ -1987,6 +2009,14 @@ class SettingsRepositoryImplTest {
                 assertFalse(repository.privacyModeCardDismissed.first())
                 repository.updatePrivacyModeCardDismissed(true)
                 assertTrue(repository.privacyModeCardDismissed.first())
+            }
+
+        @Test
+        fun `Register with card dismissal persists and defaults to false`() =
+            testScope.runTest {
+                assertFalse(repository.registerCardDismissed.first())
+                repository.updateRegisterCardDismissed(true)
+                assertTrue(repository.registerCardDismissed.first())
             }
     }
 }

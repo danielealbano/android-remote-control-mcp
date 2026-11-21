@@ -621,6 +621,18 @@ class MainViewModel
                 .map { it.hideFromRecents }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_TIMEOUT_MS), false)
 
+        /**
+         * True once the user dismissed the home-screen "Register with" card (persisted; enabling a tunnel clears it).
+         * Starts true, so the card does not flash up before the saved value is read.
+         */
+        val registerCardDismissed: StateFlow<Boolean> =
+            settingsRepository.registerCardDismissed
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_TIMEOUT_MS), true)
+
+        fun dismissRegisterCard() {
+            viewModelScope.launch(ioDispatcher) { settingsRepository.updateRegisterCardDismissed(true) }
+        }
+
         val pendingApprovalCount: StateFlow<Int> =
             approvalCoordinator
                 .observePending()
