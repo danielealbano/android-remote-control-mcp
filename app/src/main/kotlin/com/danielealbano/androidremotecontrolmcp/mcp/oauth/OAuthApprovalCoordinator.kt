@@ -14,9 +14,12 @@ enum class ApprovalState { PENDING, APPROVED, DENIED, EXPIRED }
  * @property redirectHost Host of the client's redirect URI (display).
  * @property matchCode 2-digit confirmation code shown in the browser and the app (unique among pending).
  * @property expiresAtMs Approval window deadline.
- * @property logoUri DCR `logo_uri` of the requesting client (SSRF-guarded at render), else null.
+ * @property logoUri The requesting client's logo as [OAuthPolicy.displayLogoUri] allows it (DCR or CIMD), else null.
  * @property clientIp Source IP of the request, from what its listener trusts (`ClientIpSource`), else null.
  * @property clientGeo Offline geolocation of [clientIp] (country/city), else null.
+ * @property loopbackRedirect The code goes to a loopback redirect: an app on the computer where the login page is
+ *   open, which any program there could claim, so the approval warns (MCP authorization spec, localhost redirect
+ *   risks).
  */
 data class PendingApproval(
     val id: String,
@@ -27,6 +30,7 @@ data class PendingApproval(
     val logoUri: String? = null,
     val clientIp: String? = null,
     val clientGeo: GeoLocation? = null,
+    val loopbackRedirect: Boolean = false,
 )
 
 /** The requesting-client identity captured at `/authorize` and surfaced on the approval. */
@@ -36,6 +40,7 @@ data class ApprovalRequest(
     val logoUri: String?,
     val clientIp: String?,
     val clientGeo: GeoLocation?,
+    val loopbackRedirect: Boolean = false,
 )
 
 /**

@@ -52,6 +52,7 @@ class OAuthApprovalCoordinatorImpl
                         logoUri = request.logoUri,
                         clientIp = request.clientIp,
                         clientGeo = request.clientGeo,
+                        loopbackRedirect = request.loopbackRedirect,
                     )
                 entries[approval.id] = Entry(approval, ApprovalState.PENDING)
                 refreshPendingLocked()

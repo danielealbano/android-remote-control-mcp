@@ -70,6 +70,8 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals("Claude (claude.ai)", approval.clientName)
                 assertEquals("claude.ai", approval.redirectHost)
                 assertEquals(LOGO, approval.logoUri)
+                assertFalse(approval.loopbackRedirect)
+                assertFalse(html.contains(LOOPBACK_WARNING_START), html)
                 ctx.approvalCoordinator.approve(approval.id, System.currentTimeMillis())
                 val redirect = statusRedirect(client, approval.id)
                 assertTrue(redirect.startsWith("${OAuthPolicy.CLAUDE_REDIRECT_URI}?"), redirect)
@@ -112,8 +114,6 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals(HttpStatusCode.OK, refreshRequest(client, CLAUDE_DOC_URL, second.refresh).status)
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, first.access))
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, second.access))
-            }
-        }
                 // No cache: every login reads the document again.
                 assertEquals(2, fetcher.requested.count { it == CLAUDE_DOC_URL })
             }
@@ -171,6 +171,8 @@ class OAuthMetadataDocumentIntegrationTest {
                         .value
                         .isEmpty(),
                 )
+            }
+        }
 
     @Test
     @DisplayName("revoking the app ends every connection at once")
@@ -212,12 +214,24 @@ class OAuthMetadataDocumentIntegrationTest {
         }
 
     @Test
-    @DisplayName("Claude Code's real document: a loopback redirect on any port")
+    @DisplayName("Claude Code's real document: a loopback redirect on any port, with the loopback warning")
     fun claudeCodeLoopback() =
         runTest {
             val fetcher = FakeOAuthHttpFetcher(mapOf(CLAUDE_CODE_URL to FakeOAuthHttpFetcher.json(CLAUDE_CODE_DOC)))
             withServer(fetcher) { ctx ->
-                val tokens = login(ctx, CLAUDE_CODE_URL, "http://localhost:53682/callback")
+                val redirect = "http://localhost:53682/callback"
+                val page = authorize(client, CLAUDE_CODE_URL, AuthorizeOptions(redirectUri = redirect)).bodyAsText()
+                assertTrue(page.contains(LOOPBACK_WARNING_START), page)
+                val warned =
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                assertTrue(warned.loopbackRedirect)
+                assertEquals("Claude Code (claude.ai)", warned.clientName)
+                assertEquals("localhost", warned.redirectHost)
+                ctx.approvalCoordinator.deny(warned.id)
+                val tokens = login(ctx, CLAUDE_CODE_URL, redirect)
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, tokens.access))
                 assertEquals("Claude Code", ctx.clientRepository.getClient(CLAUDE_CODE_URL)?.clientName)
             }
@@ -445,6 +459,7 @@ class OAuthMetadataDocumentIntegrationTest {
     private companion object {
         const val CLAUDE_DOC_URL = "https://claude.ai/oauth/test-client-metadata"
         const val MISMATCH_URL = "https://claude.ai/oauth/mismatch"
+        const val LOOPBACK_WARNING_START = "The access goes to an app on the computer where this page is open."
         const val LOGO = "https://claude.ai/images/claude-logo.png"
         val PNG = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13)
 

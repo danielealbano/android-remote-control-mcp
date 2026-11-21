@@ -6,6 +6,11 @@ import io.ktor.server.response.respondText
 
 private const val MILLIS_PER_SECOND = 1000L
 
+/** The in-app approval's words: the code goes to an app on this computer, which any program here could claim. */
+private const val LOOPBACK_WARNING =
+    "The access goes to an app on the computer where this page is open. " +
+        "Approve only if you started this login here yourself."
+
 /**
  * Renders and responds with the [consentPageHtml] for [approval]: the client's logo when the phone could embed one
  * ([embeddedLogo], from [ConsentLogo]), else the redirect host's favicon ([ClientIconUrl]), and the countdown seeded
@@ -15,7 +20,6 @@ suspend fun ApplicationCall.respondConsentPage(
     approval: PendingApproval,
     displayName: String,
     embeddedLogo: String?,
-    redirectHost: String,
     nowMs: Long,
 ) {
     val data =
@@ -23,9 +27,10 @@ suspend fun ApplicationCall.respondConsentPage(
             approvalId = approval.id,
             matchCode = approval.matchCode,
             clientName = displayName,
-            host = redirectHost,
+            host = approval.redirectHost,
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
-            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, redirectHost),
+            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, approval.redirectHost),
+            loopbackWarning = approval.loopbackRedirect,
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)
 }
@@ -51,6 +56,7 @@ fun consentPageHtml(data: ConsentPageData): String {
         )
     val iconTag =
         data.iconUrl?.let { """<img class="icon" src="${escapeHtml(it)}" alt="" onerror="this.remove()">""" } ?: ""
+    val warningTag = if (data.loopbackWarning) "<div class=\"warning\">$LOOPBACK_WARNING</div>" else ""
     val seconds = data.expiresInSeconds.coerceAtLeast(0)
     return """
         <!DOCTYPE html>
@@ -66,6 +72,7 @@ fun consentPageHtml(data: ConsentPageData): String {
           <div class="avatar">$initials$iconTag</div>
           <h1>Approve <strong>$safeName</strong></h1>
           <div class="host">&#127760; $safeHost</div>
+          $warningTag
           <div class="prompt">Open Android Remote Control and approve the request showing this code:</div>
           <div class="code">$safeCode</div>
           <div class="timer" id="timer"></div>
@@ -126,6 +133,7 @@ private val CONSENT_PAGE_STYLES =
     .timer { margin-top: 1.25rem; font-size: 0.9rem; color: var(--muted); }
     .status { margin-top: 0.5rem; font-size: 0.9rem; color: var(--muted); }
     .error { color: var(--error); }
+    .warning { margin-top: 1rem; font-size: 0.9rem; color: var(--error); }
     """.trimIndent()
 
 private fun consentPageScript(

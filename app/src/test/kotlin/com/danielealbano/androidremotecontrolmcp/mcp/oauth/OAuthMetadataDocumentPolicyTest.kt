@@ -126,6 +126,19 @@ class OAuthMetadataDocumentPolicyTest {
     }
 
     @Test
+    @DisplayName("isLoopbackRedirectUri is true only for http loopback redirects")
+    fun loopbackRedirects() {
+        listOf("http://localhost:1/cb", "http://127.0.0.1/cb", "http://[::1]:5/cb").forEach {
+            assertTrue(OAuthPolicy.isLoopbackRedirectUri(it), it)
+        }
+        val notLoopback =
+            listOf(OAuthPolicy.CLAUDE_REDIRECT_URI, "https://localhost/cb", "http://localhost.evil.example/cb")
+        (notLoopback + "nope").forEach {
+            assertFalse(OAuthPolicy.isLoopbackRedirectUri(it), it)
+        }
+    }
+
+    @Test
     @DisplayName("displayLogoUri keeps a CIMD logo, and a DCR logo only on an app domain")
     fun displayLogoUri() {
         val cdnLogo = "https://persistent.oaistatic.com/sonic/misc/openai-logo.png"

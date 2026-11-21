@@ -141,6 +141,8 @@ private suspend fun ApplicationCall.handleAuthorize(
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
+    // Before the approval exists, so the phone never asks while the browser still waits for its page.
+    val embeddedLogo = ConsentLogo.embed(deps.httpFetcher, requester.logoUri)
     val approval =
         deps.approvalCoordinator.createPending(
             ApprovalRequest(
@@ -149,6 +151,7 @@ private suspend fun ApplicationCall.handleAuthorize(
                 logoUri = requester.logoUri,
                 clientIp = clientIp,
                 clientGeo = clientGeo,
+                loopbackRedirect = OAuthPolicy.isLoopbackRedirectUri(redirectUri),
             ),
             deps.nowMs(),
         )
@@ -168,8 +171,7 @@ private suspend fun ApplicationCall.handleAuthorize(
         ),
         deps.nowMs(),
     )
-    val embeddedLogo = ConsentLogo.embed(deps.httpFetcher, requester.logoUri)
-    respondConsentPage(approval, requester.displayName, embeddedLogo, redirectHost, deps.nowMs())
+    respondConsentPage(approval, requester.displayName, embeddedLogo, deps.nowMs())
 }
 
 /** Logs an OAUTH authorization-request entry annotated with the client's IP and geolocation (never tokens). */

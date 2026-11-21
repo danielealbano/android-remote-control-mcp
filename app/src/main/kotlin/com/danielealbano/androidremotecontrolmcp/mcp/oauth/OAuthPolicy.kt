@@ -60,7 +60,6 @@ object OAuthPolicy {
     const val IDLE_SESSION_LOG_THRESHOLD_MS = 1_800_000L
 
     private const val SCHEME_SEPARATOR = "://"
-    private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
 
     /** A lowercase DNS host name with at least two labels. */
     private val HOST_NAME = Regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
@@ -77,7 +76,7 @@ object OAuthPolicy {
      */
     fun isAllowedRedirectUri(uri: String): Boolean {
         val parsed = runCatching { URI(uri) }.getOrNull()
-        return isLoopbackRedirect(parsed) || OAuthConnectors.ALL.any { it.ownsHostedCallback(uri, parsed) }
+        return parsed.isLoopbackRedirect() || OAuthConnectors.ALL.any { it.ownsHostedCallback(uri, parsed) }
     }
 
     /** True when [clientId] is a Client ID Metadata Document URL (DCR client ids are `arc-<uuid>`). */
@@ -118,7 +117,7 @@ object OAuthPolicy {
         redirectUri: String,
     ): Boolean {
         val parsed = runCatching { URI(redirectUri) }.getOrNull()
-        val loopback = isLoopbackRedirect(parsed)
+        val loopback = parsed.isLoopbackRedirect()
         return OAuthConnectors.ALL.any {
             it.ownsDocumentHost(documentHost) &&
                 (it.ownsHostedCallback(redirectUri, parsed) || (loopback && it.loopbackRedirects))
@@ -171,16 +170,14 @@ object OAuthPolicy {
         return if (clientName != null && host != null) "$clientName ($host)" else clientName ?: host
     }
 
-    private fun isLoopbackRedirect(parsed: URI?): Boolean {
-        val host = parsed?.host?.removePrefix("[")?.removeSuffix("]")
-        return parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
-    }
+    /** True when [uri] is an `http` loopback redirect (`localhost`, `127.0.0.1`, `[::1]`): an app on the computer. */
+    fun isLoopbackRedirectUri(uri: String): Boolean = runCatching { URI(uri) }.getOrNull().isLoopbackRedirect()
 
     /** A loopback redirect without its port, for [isListedRedirectUri]; null for anything else. */
     private fun loopbackKey(uri: String): List<String?>? =
         runCatching { URI(uri) }
             .getOrNull()
-            ?.takeIf { isLoopbackRedirect(it) && it.rawUserInfo == null && it.rawFragment == null }
+            ?.takeIf { it.isLoopbackRedirect() && it.rawUserInfo == null && it.rawFragment == null }
             ?.let { listOf(it.host, it.rawPath, it.rawQuery) }
 
     /**
@@ -208,4 +205,12 @@ object OAuthPolicy {
             "$scheme://${rest.substring(0, slash).lowercase()}${rest.substring(slash)}"
         }
     }
+}
+
+private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
+
+/** An `http` redirect to `localhost`, `127.0.0.1` or `[::1]` (any or no port), compared via [URI.host] exactly. */
+private fun URI?.isLoopbackRedirect(): Boolean {
+    val host = this?.host?.removePrefix("[")?.removeSuffix("]")
+    return this != null && scheme == "http" && host in LOOPBACK_HOSTS
 }

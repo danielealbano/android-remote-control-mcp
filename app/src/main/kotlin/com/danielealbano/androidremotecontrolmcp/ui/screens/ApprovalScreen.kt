@@ -170,6 +170,16 @@ private fun ApprovalCard(
                 Spacer(Modifier.height(8.dp))
                 ClientOriginRow(ip = approval.clientIp, geo = approval.clientGeo)
             }
+            if (approval.loopbackRedirect) {
+                // The code goes to an app on the computer of the login page, which any program there could claim.
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.approval_loopback_warning),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(24.dp))
             Text(
                 text = stringResource(R.string.approval_match_code_label),
