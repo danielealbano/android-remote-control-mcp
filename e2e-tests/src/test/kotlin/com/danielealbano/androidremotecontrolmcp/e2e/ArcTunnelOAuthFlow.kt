@@ -4,6 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.APPROVAL_ID
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CHALLENGE
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.CODE_REGEX
 import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.VERIFIER
+import com.danielealbano.androidremotecontrolmcp.e2e.OAuthE2EVectors.issOf
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -86,6 +87,7 @@ class ArcTunnelOAuthFlow(
             assertTrue(metadata.body.contains("\"authorization_servers\":[\"$base\"]"), metadata.body)
             val server = send(http, "/.well-known/oauth-authorization-server")
             assertTrue(server.body.contains("\"issuer\":\"$base\""), server.body)
+            assertTrue(server.body.contains("\"authorization_response_iss_parameter_supported\":true"), server.body)
             val unauthorized = send(http, "/mcp", json("{}"))
             assertEquals(UNAUTHORIZED, unauthorized.code)
             assertEquals(
@@ -165,6 +167,8 @@ class ArcTunnelOAuthFlow(
             state = if (status.code == OK) field(status.body, "state") else "HTTP ${status.code}"
             if (state == "approved") {
                 val redirect = field(status.body, "redirect")
+                // RFC 9207: through the real tunnel the iss is exactly the issuer the metadata names.
+                assertEquals(base, issOf(redirect), redirect)
                 return requireNotNull(CODE_REGEX.find(redirect)?.groupValues?.get(1)) { "no code in $redirect" }
             }
             check(state != "denied" && state != "expired") { "the authorization ended as $state" }
