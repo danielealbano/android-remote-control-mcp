@@ -272,7 +272,7 @@ If **Add custom MCP server** is missing in step 2, your plan or workspace does n
 1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
 2. On [chatgpt.com/plugins](https://chatgpt.com/plugins), on a computer or in a phone's browser, choose **+** → **Add custom MCP server**. The ChatGPT Android app cannot add one.
 3. Enter a name, paste the URL under **Server URL**, and keep **OAuth** with the default advanced settings (ChatGPT then identifies itself with its client metadata document). Tick **I understand and want to continue**, choose **Create as a plugin**, then **Connect** followed by the plugin name.
-4. On the phone, check the 2-digit code and approve the request from **ChatGPT (chatgpt.com)** (notification, or the card on the Server screen).
+4. On the phone, check the 2-digit code and approve the request from **ChatGPT** (notification, or the card on the Server screen).
 5. In a chat, type `@` and pick the plugin. It also works in the ChatGPT Android app.
 
 To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**. ChatGPT is one row there for all its plugins and accounts connected to this phone, so revoking it ends every ChatGPT connection.
