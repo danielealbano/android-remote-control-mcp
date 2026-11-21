@@ -200,7 +200,7 @@ class OAuthPolicyTest {
     private companion object {
         const val CHATGPT_HOST = "chatgpt.com"
 
-        // The callback id ChatGPT registered on a real device (the same for two connectors of one account).
+        // The callback id ChatGPT registered on a real device (the same for three connectors of one account).
         const val CHATGPT_ID = "-BSmWqXatII2"
 
         const val GEMINI_HOST = "oauth-redirect.googleusercontent.com"
