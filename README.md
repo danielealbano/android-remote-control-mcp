@@ -64,7 +64,7 @@ To reach the phone from anywhere, the free end-to-end encrypted HTTPS tunnel giv
 ### MCP Server
 - HTTP server running directly on Android (Ktor + Netty), with optional HTTPS
 - Streamable HTTP transport at `/mcp` (MCP specification compliant, JSON-only, no SSE)
-- Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT and Gemini custom connectors, with on-device approval)
+- Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT, Gemini and Kimi custom connectors, with on-device approval)
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1), network (0.0.0.0) or a specific IP address of the device
 - Auto-start on boot
@@ -164,7 +164,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full build requirements and instructi
 
    - **Accessibility Service** — **required.** Powers UI introspection, action execution, and screenshots; nothing works without it.
      - **If the toggle is greyed out** (Android 13+, common on Samsung/One UI for apps installed from an APK): this is Android's "Restricted settings" protection. A dialog reads *"Restricted setting — For your security, this setting is currently unavailable."* To unblock it, go to **Settings → Apps → Android Remote Control MCP → App info**, tap the **⋮ menu** (top-right), choose **Allow restricted settings**, confirm with your PIN/pattern/biometric, then enable the Accessibility Service. (Play Store / F-Droid installs are not affected.)
-   - **Notifications** — **optional** (recommended for OAuth). OAuth sign-in approvals (Claude.ai / Claude Desktop, ChatGPT, Gemini, or any third-party OAuth client) arrive as heads-up notifications you tap to confirm the 2-digit code and approve. It is **no longer required** for OAuth login, though: if you don't grant this permission, pending requests still appear as a **card on the app's Server screen** that you tap to review and approve/deny. The **Event Channel** push feature — e.g. pushing device events to Claude Code — runs as a foreground service that posts its status notification through this permission on Android 13+.
+   - **Notifications** — **optional** (recommended for OAuth). OAuth sign-in approvals (Claude.ai / Claude Desktop, ChatGPT, Gemini, Kimi, or any third-party OAuth client) arrive as heads-up notifications you tap to confirm the 2-digit code and approve. It is **no longer required** for OAuth login, though: if you don't grant this permission, pending requests still appear as a **card on the app's Server screen** that you tap to review and approve/deny. The **Event Channel** push feature — e.g. pushing device events to Claude Code — runs as a foreground service that posts its status notification through this permission on Android 13+.
    - **Other permissions** (optional) — Camera, Microphone, and Location enable their corresponding MCP tools. The app works without them; only the dependent features are disabled until granted. See the [Permissions Reference](#permissions-reference) below for the complete list.
    - **Storage locations** — configure in Settings > Storage if you plan to use the file tools (automatic locations like Downloads, plus custom locations via SAF).
 
@@ -295,6 +295,22 @@ To remove it, open **Customize** → **Connectors** → **Custom apps** → **�
 
 > ⚠️ **Security:** the same cautions as for Claude apply.
 
+### Connect from Kimi (Personal Plugin, OAuth)
+
+Kimi connects through a **personal plugin** that wraps this MCP server, over OAuth 2.1. It needs a public HTTPS URL, so enable a [remote access tunnel](#using-remote-access-tunnels) first.
+
+These steps follow [Kimi's help](https://www.kimi.com/en/help/plugins-and-skills/create). They have not been checked on a real Kimi account.
+
+1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
+2. In the Kimi Work desktop app, start **Plugin Builder**: type `/` in a conversation, or choose **Custom plugin** in the plugin marketplace. Ask for a plugin for this MCP server and give it the URL.
+3. Open **Plugins** → **Personal** and choose **+** to install the plugin. Kimi then opens this server's approval page.
+4. On the phone, check the 2-digit code and approve the request (notification, or the card on the Server screen).
+5. In a chat, type `/` or choose **+** → **Plugins** and pick the plugin. Plugins work with K3 or K3 Swarm and in Deep Research, Build and PPT, but not in Kimi Claw or Kimi Plus.
+
+To remove it, uninstall the plugin in Kimi, then revoke the client in this app under **Settings → Access → Connected clients**.
+
+> ⚠️ **Security:** the same cautions as for Claude apply.
+
 ### Other MCP Clients
 
 The MCP server exposes a standard Streamable HTTP endpoint at `/mcp` with combined authentication (static bearer token and/or OAuth 2.1). Any MCP-compatible client can connect to it — refer to your client's documentation for the specific configuration format.
@@ -349,7 +365,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Port | `8080` | HTTP/HTTPS server port |
 | Binding Address | `127.0.0.1` | `127.0.0.1` (localhost, use with adb port forwarding), `0.0.0.0` (network, all interfaces) or a specific IP address of the device (IPv4 or IPv6, not IPv6 link-local, without a zone index such as `%3`; the server does not start while the device does not have it) |
 | Bearer Token | Enabled, auto-generated UUID | Static token for MCP requests (Settings → Access). Enforcement is set by the Bearer toggle, not by clearing the value. |
-| OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop, ChatGPT and Gemini custom connectors (Settings → Access). |
+| OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop, ChatGPT, Gemini and Kimi custom connectors (Settings → Access). |
 | Public URL override | Empty (auto-detect) | Pin the public host used for OAuth metadata and share links. |
 | HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
@@ -515,7 +531,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 |-------|------|-------------|
 | `bearer_token` | string | Static bearer-token value (clearing it while `bearer_token_enabled=true` fails closed, it does NOT disable auth) |
 | `bearer_token_enabled` | boolean | Enable/disable bearer-token authentication (controls enforcement, independent of the value) |
-| `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT and Gemini connectors) |
+| `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop, ChatGPT, Gemini and Kimi connectors) |
 | `public_url_override` | string | Pin the public host used for OAuth metadata and share links (empty = auto-detect from the request) |
 | `binding_address` | string | `127.0.0.1` (localhost), `0.0.0.0` (network) or another IP address literal of the device (specific IP) |
 | `port` | int | HTTP/HTTPS server port (1-65535) |
