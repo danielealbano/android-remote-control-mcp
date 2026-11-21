@@ -34,39 +34,13 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
 ) {
     val code = form["code"]?.let { deps.authorizationCodeStore.consume(it, deps.nowMs()) }
     val clientId = form["client_id"]
-    val resourceForm = form["resource"]
-    val errorCode: String? =
-        when {
-            code == null -> {
-                "invalid_grant"
-            }
-
-            form["redirect_uri"] != code.redirectUri -> {
-                "invalid_grant"
-            }
-
-            clientId.isNullOrEmpty() -> {
-                "invalid_request"
-            }
-
-            clientId != code.clientId -> {
-                "invalid_grant"
-            }
-
-            !resourceForm.isNullOrEmpty() && !OAuthPolicy.resourceMatches(resourceForm, code.resource) -> {
-                "invalid_grant"
-            }
-
-            !Pkce.verifyS256(form["code_verifier"].orEmpty(), code.codeChallenge) -> {
-                "invalid_grant"
-            }
-
-            else -> {
-                null
-            }
-        }
-    if (errorCode != null || code == null) {
-        respondOAuthError(HttpStatusCode.BadRequest, errorCode ?: "invalid_grant")
+    val refusal = codeGrantRefusal(form, code, request.headers[HttpHeaders.Authorization] != null)
+    if (refusal != null || code == null) {
+        deps.serverLog.log(
+            ServerLogEntry.Type.OAUTH,
+            "OAuth code refused (${loggable(clientId ?: "no client_id")}): ${refusal?.reason ?: UNKNOWN_CODE}",
+        )
+        respondOAuthError(HttpStatusCode.BadRequest, refusal?.error ?: "invalid_grant")
         return
     }
     val jti = UUID.randomUUID().toString()
@@ -78,6 +52,54 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
         refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource, grant.connectionId),
     )
 }
+
+/** Why `/token` refuses a code: the OAuth [error], and the logged [reason], so a failed login can be diagnosed. */
+private class CodeRefusal(
+    val error: String,
+    val reason: String,
+)
+
+/** The refusal of the code grant [form] for [code] (null when unknown, used or expired), or null when it is valid. */
+private fun codeGrantRefusal(
+    form: Parameters,
+    code: AuthorizationCode?,
+    authorizationHeaderSent: Boolean,
+): CodeRefusal? {
+    val clientId = form["client_id"]
+    val resourceForm = form["resource"]
+    return when {
+        code == null -> {
+            CodeRefusal("invalid_grant", UNKNOWN_CODE)
+        }
+
+        form["redirect_uri"] != code.redirectUri -> {
+            CodeRefusal("invalid_grant", "redirect_uri differs")
+        }
+
+        clientId.isNullOrEmpty() -> {
+            val header = if (authorizationHeaderSent) "sent" else "absent"
+            CodeRefusal("invalid_request", "no client_id (Authorization header $header)")
+        }
+
+        clientId != code.clientId -> {
+            CodeRefusal("invalid_grant", "client_id differs")
+        }
+
+        !resourceForm.isNullOrEmpty() && !OAuthPolicy.resourceMatches(resourceForm, code.resource) -> {
+            CodeRefusal("invalid_grant", "resource ${loggable(resourceForm)} differs")
+        }
+
+        !Pkce.verifyS256(form["code_verifier"].orEmpty(), code.codeChallenge) -> {
+            CodeRefusal("invalid_grant", "PKCE verifier does not match")
+        }
+
+        else -> {
+            null
+        }
+    }
+}
+
+private const val UNKNOWN_CODE = "unknown, used or expired code"
 
 /** A recorded code grant: the CIMD connection its tokens carry (null for DCR), and the client's name. */
 private class RecordedGrant(

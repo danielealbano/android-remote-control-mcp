@@ -232,8 +232,8 @@ private fun ApprovalActions(
 }
 
 /**
- * Circular client icon on a clean light disc (favicons are designed for light backgrounds). The SSRF-safe
- * logo / favicon is inset over muted initials, so a transparent or failed-to-load icon still reads.
+ * Circular client icon on a clean light disc (favicons are designed for light backgrounds): the approval's icon URL,
+ * with muted initials only until it has loaded, so a missing or failed icon still reads.
  */
 @Composable
 private fun ClientIcon(

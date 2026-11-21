@@ -74,7 +74,7 @@ class OkHttpOAuthHttpFetcher internal constructor(
         return when {
             httpUrl == null -> FetchResult.Failed("not a URL")
             !httpUrl.isHttps -> FetchResult.Failed("not https")
-            isIpLiteral(httpUrl.host) -> FetchResult.Failed("an IP-literal host")
+            LogoUrlPolicy.isIpLiteral(httpUrl.host) -> FetchResult.Failed("an IP-literal host")
             else -> download(httpUrl, accept, maxBytes)
         }
     }
@@ -124,8 +124,6 @@ class OkHttpOAuthHttpFetcher internal constructor(
             else -> failure.javaClass.simpleName
         }
 
-    private fun isIpLiteral(host: String): Boolean = ':' in host || IPV4_LITERAL.matches(host)
-
     internal companion object {
         /** The production client settings; tests change the DNS, the TLS trust and, in one test, the call timeout. */
         fun clientBuilder(): OkHttpClient.Builder =
@@ -139,7 +137,6 @@ class OkHttpOAuthHttpFetcher internal constructor(
 
         private const val TAG = "MCP:OAuthFetch"
         private const val HTTP_OK = 200
-        private val IPV4_LITERAL = Regex("^[0-9.]+$")
     }
 }
 

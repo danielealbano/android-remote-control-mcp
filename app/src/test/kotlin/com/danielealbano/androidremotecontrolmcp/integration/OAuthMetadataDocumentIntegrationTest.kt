@@ -62,6 +62,8 @@ class OAuthMetadataDocumentIntegrationTest {
                 val html = page.bodyAsText()
                 assertTrue(html.contains("Claude (claude.ai)"), html)
                 assertTrue(html.contains("data:image/png;base64,"), html)
+                // The browser never gets the logo's own URL: only the copy the phone downloaded.
+                assertFalse(html.contains(LOGO), html)
                 val approval =
                     ctx.approvalCoordinator
                         .observePending()
@@ -94,6 +96,24 @@ class OAuthMetadataDocumentIntegrationTest {
                 val messages = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
                 assertTrue(messages.contains("OAuth tokens issued to Claude (claude.ai)"), messages.toString())
                 assertTrue(messages.contains("OAuth token refreshed for Claude (claude.ai)"), messages.toString())
+            }
+        }
+
+    @Test
+    @DisplayName("a logo the phone cannot download is shown on the phone, while the consent page links the favicon")
+    fun undownloadableLogo() =
+        runTest {
+            // The document names a logo the fake fetcher does not serve.
+            withServer(FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to claudeDoc()))) { ctx ->
+                val html = authorize(client, CLAUDE_DOC_URL).bodyAsText()
+                val approval =
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                assertEquals(LOGO, approval.iconUrl)
+                assertTrue(html.contains(CLAUDE_FAVICON), html)
+                assertFalse(html.contains(LOGO), html)
             }
         }
 
@@ -345,8 +365,9 @@ class OAuthMetadataDocumentIntegrationTest {
     @DisplayName("the code is only redeemed with the document URL it was issued to")
     fun tokenNeedsTheDocumentUrl() =
         runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
             val fetcher = FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to claudeDoc()))
-            withServer(fetcher) { ctx ->
+            withServer(fetcher, deps) { ctx ->
                 val code = loginCode(ctx, CLAUDE_DOC_URL, OAuthPolicy.CLAUDE_REDIRECT_URI)
                 val resp =
                     tokenRequest(
@@ -359,6 +380,27 @@ class OAuthMetadataDocumentIntegrationTest {
                     )
                 assertEquals(HttpStatusCode.BadRequest, resp.status)
                 assertTrue(ctx.clientRepository.getClients().isEmpty())
+                val refused = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
+                val expected = "OAuth code refused (https://claude.ai/oauth/other): client_id differs"
+                assertTrue(refused.contains(expected), "$refused")
+                // The code is single use: the right client cannot redeem it after a refused try.
+                val again =
+                    tokenRequest(
+                        client,
+                        CLAUDE_DOC_URL,
+                        code,
+                        verifier = VERIFIER,
+                        includeResource = true,
+                        redirectUri = OAuthPolicy.CLAUDE_REDIRECT_URI,
+                    )
+                assertEquals(HttpStatusCode.BadRequest, again.status)
+                assertEquals(
+                    "OAuth code refused ($CLAUDE_DOC_URL): unknown, used or expired code",
+                    deps.serverLog
+                        .ofType(ServerLogEntry.Type.OAUTH)
+                        .last()
+                        .message,
+                )
             }
         }
 
@@ -502,7 +544,7 @@ class OAuthMetadataDocumentIntegrationTest {
             .jsonPrimitive.content
     }
 
-    /** A hosted-Claude shaped document at [CLAUDE_DOC_URL] (its real URL is not documented). */
+    /** Hosted Claude's real document (read on 2026-11-21), with a logo added for the logo checks. */
     private fun claudeDoc(redirects: String = """["${OAuthPolicy.CLAUDE_REDIRECT_URI}"]"""): FetchedBody =
         FakeOAuthHttpFetcher.json(
             """{"client_id":"$CLAUDE_DOC_URL","client_name":"Claude","redirect_uris":$redirects,""" +
@@ -510,7 +552,8 @@ class OAuthMetadataDocumentIntegrationTest {
         )
 
     private companion object {
-        const val CLAUDE_DOC_URL = "https://claude.ai/oauth/test-client-metadata"
+        // Hosted Claude's real document URL, seen on its first CIMD login on 2026-11-21.
+        const val CLAUDE_DOC_URL = "https://claude.ai/oauth/mcp-oauth-client-metadata"
         const val MISMATCH_URL = "https://claude.ai/oauth/mismatch"
         const val LOOPBACK_WARNING_START = "The access goes to an app on the computer where this page is open."
         const val CLAUDE_FAVICON = "https://icons.duckduckgo.com/ip3/claude.ai.ico"

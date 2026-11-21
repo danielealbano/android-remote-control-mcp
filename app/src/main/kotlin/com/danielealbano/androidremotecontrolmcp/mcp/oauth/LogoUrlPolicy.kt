@@ -3,11 +3,14 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 import java.net.URI
 
 /**
- * SSRF guard for rendering a client `logo_uri` (DCR or CIMD). Returns true only for an `https` URL whose host is not a
- * literal private / loopback / link-local IP and not `localhost`. The loader MUST additionally not
- * follow redirects and MUST cap size/timeout; this predicate is the host-allowlist part.
+ * SSRF guard for rendering a client `logo_uri` (DCR or CIMD). Returns true only for an `https` URL whose host is a
+ * name, never an IP literal (OkHttp connects to an IP literal without asking its DNS, so `PublicOnlyDns` could not
+ * filter it), and not `localhost`; names are further checked by that DNS when the logo is downloaded. The loader
+ * MUST additionally not follow redirects and MUST cap size/timeout; this predicate is the host-allowlist part.
  */
 object LogoUrlPolicy {
+    private val IPV4_LITERAL = Regex("^[0-9.]+$")
+
     private const val IPV4_OCTETS = 4
     private const val MAX_OCTET = 255
     private const val NET_10 = 10
@@ -22,8 +25,11 @@ object LogoUrlPolicy {
 
     fun isSafeLogoUrl(url: String?): Boolean {
         val uri = url?.takeIf { it.isNotBlank() }?.let { runCatching { URI(it) }.getOrNull() } ?: return false
-        return uri.scheme?.lowercase() == "https" && isPublicHost(uri.host)
+        return uri.scheme?.lowercase() == "https" && isPublicHost(uri.host) && !isIpLiteral(uri.host)
     }
+
+    /** True when [host] is an IP literal (IPv6 with or without brackets, or dotted IPv4), not a name. */
+    fun isIpLiteral(host: String?): Boolean = host != null && (':' in host || IPV4_LITERAL.matches(host))
 
     /**
      * True when [host] is a routable public host (not `localhost`, not a private/loopback/link-local IP).

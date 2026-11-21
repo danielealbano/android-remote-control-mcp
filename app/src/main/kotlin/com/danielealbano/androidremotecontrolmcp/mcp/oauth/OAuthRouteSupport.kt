@@ -40,7 +40,7 @@ internal data class PendingAuthorizeRequest(
     val expiresAtMs: Long,
     /** The CIMD client's document read at `/authorize`; null for a DCR client. */
     val metadataDocument: ClientMetadataDocument? = null,
-    /** The icon the approval showed, kept with the client once approved. */
+    /** The icon the approval showed, kept with the client when the code is redeemed. */
     val iconUrl: String? = null,
 )
 

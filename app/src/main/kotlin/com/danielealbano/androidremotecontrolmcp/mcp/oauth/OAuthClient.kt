@@ -19,7 +19,8 @@ import kotlinx.serialization.Serializable
  * @property currentRefreshJti DCR only: the single valid refresh-token jti; null until the first token grant.
  *   Used both for refresh rotation and to protect already-approved clients from registration-spam eviction.
  * @property connections CIMD only: one entry per login, at most [OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT].
- * @property iconUrl The icon the approval screen showed at the latest approval (logo or favicon); null shows initials.
+ * @property iconUrl The icon the approval screen showed for the latest redeemed code (logo or favicon); null shows
+ *   initials.
  */
 @Serializable
 data class OAuthClient(

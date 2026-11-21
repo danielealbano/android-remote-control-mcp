@@ -12,6 +12,7 @@ class OAuthMetadataDocumentPolicyTest {
     @Test
     @DisplayName("metadataDocumentHost accepts the real document URLs of the supported apps")
     fun acceptsRealDocumentUrls() {
+        assertEquals("claude.ai", OAuthPolicy.metadataDocumentHost(CLAUDE_DOC))
         assertEquals("claude.ai", OAuthPolicy.metadataDocumentHost(CLAUDE_CODE_DOC))
         assertEquals("chatgpt.com", OAuthPolicy.metadataDocumentHost(CHATGPT_DOC))
         assertEquals("chatgpt.com", OAuthPolicy.metadataDocumentHost(CODEX_DOC))
@@ -150,6 +151,8 @@ class OAuthMetadataDocumentPolicyTest {
         assertNull(OAuthPolicy.displayLogoUri("arc-1", "https://claude.ai.evil.example/l.png"))
         assertNull(OAuthPolicy.displayLogoUri(CHATGPT_DOC, "http://persistent.oaistatic.com/l.png"))
         assertNull(OAuthPolicy.displayLogoUri(CHATGPT_DOC, "https://192.168.1.1/l.png"))
+        assertNull(OAuthPolicy.displayLogoUri(CHATGPT_DOC, "https://[::ffff:192.168.1.1]:8443/x.png"))
+        assertNull(OAuthPolicy.displayLogoUri(CHATGPT_DOC, "https://100.64.0.1/x.png"))
         assertNull(OAuthPolicy.displayLogoUri(CHATGPT_DOC, null))
     }
 
@@ -194,6 +197,7 @@ class OAuthMetadataDocumentPolicyTest {
 
     private companion object {
         // The real document URLs, read from each app on 2026-11-21.
+        const val CLAUDE_DOC = "https://claude.ai/oauth/mcp-oauth-client-metadata"
         const val CLAUDE_CODE_DOC = "https://claude.ai/oauth/claude-code-client-metadata"
         const val CHATGPT_DOC = "https://chatgpt.com/oauth/client.json"
         const val CODEX_DOC = "https://chatgpt.com/oauth/codex/client.json"

@@ -237,7 +237,7 @@ class OAuthClientRepositoryImplTest {
         }
 
     @Test
-    @DisplayName("connections persist across a new instance, and a stored list without them still loads")
+    @DisplayName("connections persist across a new instance")
     fun connectionsPersist() =
         testScope.runTest {
             connect("Claude Code", REDIRECTS, null, "c1", "j1", 1L)

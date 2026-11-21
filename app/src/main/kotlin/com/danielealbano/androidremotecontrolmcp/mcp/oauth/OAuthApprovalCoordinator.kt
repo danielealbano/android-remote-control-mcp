@@ -15,7 +15,8 @@ enum class ApprovalState { PENDING, APPROVED, DENIED, EXPIRED }
  * @property matchCode 2-digit confirmation code shown in the browser and the app (unique among pending).
  * @property expiresAtMs Approval window deadline.
  * @property iconUrl The icon the approval shows: the client's allowed logo ([OAuthPolicy.displayLogoUri]), else a
- *   favicon ([ClientIconUrl]); null shows initials. Kept with the client when approved, so the clients list shows it.
+ *   favicon ([ClientIconUrl]); null shows initials. Kept with the client when its code is redeemed, so the clients list
+ *   shows it.
  * @property clientIp Source IP of the request, from what its listener trusts (`ClientIpSource`), else null.
  * @property clientGeo Offline geolocation of [clientIp] (country/city), else null.
  * @property loopbackRedirect The code goes to a loopback redirect: an app on the computer where the login page is

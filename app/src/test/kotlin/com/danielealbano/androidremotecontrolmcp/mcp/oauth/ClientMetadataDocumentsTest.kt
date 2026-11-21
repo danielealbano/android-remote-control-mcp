@@ -16,8 +16,11 @@ class ClientMetadataDocumentsTest {
         assertInstanceOf(ClientMetadataResult.Invalid::class.java, result).reason
 
     @Test
-    @DisplayName("parses the real Claude Code, ChatGPT, Codex and VS Code documents")
+    @DisplayName("parses the real Claude, Claude Code, ChatGPT, Codex and VS Code documents")
     fun parsesRealDocuments() {
+        val claude = valid(ClientMetadataDocuments.parse(CLAUDE_URL, CLAUDE_DOC))
+        assertEquals("Claude", claude.clientName)
+        assertEquals(listOf("https://claude.ai/api/mcp/auth_callback"), claude.redirectUris)
         val claudeCode = valid(ClientMetadataDocuments.parse(CLAUDE_CODE_URL, CLAUDE_CODE_DOC))
         assertEquals("Claude Code", claudeCode.clientName)
         assertEquals(listOf("http://localhost/callback", "http://127.0.0.1/callback"), claudeCode.redirectUris)
@@ -104,6 +107,10 @@ class ClientMetadataDocumentsTest {
                 )
             valid(ClientMetadataDocuments.load(fetcher("application/json; charset=utf-8"), CLAUDE_CODE_URL))
             valid(ClientMetadataDocuments.load(fetcher("application/client-metadata+json"), CLAUDE_CODE_URL))
+            // A server-sent content type is filtered before it is logged.
+            val sneakyType = "text/html\u2028OAuth client revoked: x\u202E"
+            val sneaky = ClientMetadataDocuments.load(fetcher(sneakyType), CLAUDE_CODE_URL)
+            assertEquals("not served as JSON: text/htmlOAuth client revoked: x", invalidReason(sneaky))
             listOf("text/html", null).forEach { type ->
                 val result = ClientMetadataDocuments.load(fetcher(type), CLAUDE_CODE_URL)
                 assertEquals("not served as JSON: ${type ?: "none"}", invalidReason(result), type)
@@ -146,6 +153,13 @@ class ClientMetadataDocumentsTest {
 
     private companion object {
         // The real documents, read from each URL on 2026-11-21.
+        const val CLAUDE_URL = "https://claude.ai/oauth/mcp-oauth-client-metadata"
+        const val CLAUDE_DOC =
+            """{"client_id":"https://claude.ai/oauth/mcp-oauth-client-metadata","client_name":"Claude",""" +
+                """"client_uri":"https://claude.ai","redirect_uris":["https://claude.ai/api/mcp/auth_callback"],""" +
+                """"grant_types":["authorization_code","refresh_token",""" +
+                """"urn:ietf:params:oauth:grant-type:jwt-bearer"],""" +
+                """"response_types":["code"],"token_endpoint_auth_method":"none"}"""
         const val CLAUDE_CODE_URL = "https://claude.ai/oauth/claude-code-client-metadata"
         const val CLAUDE_CODE_DOC =
             """{"client_id":"https://claude.ai/oauth/claude-code-client-metadata","client_name":"Claude Code",""" +
