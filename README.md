@@ -255,7 +255,7 @@ Claude.ai (web) and Claude Desktop connect as a **custom connector** (remote MCP
 2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…/mcp` URL from the Server tab (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
 3. In Claude, open **[Customize → Connectors → Add custom connector](https://claude.ai/customize/connectors?modal=add-custom-connector)**, paste the `https://…/mcp` URL, and **leave the OAuth Client ID and Client Secret blank** (Claude identifies itself to the app, no registration needed). Click **Add**.
 4. Claude opens a browser approval page showing a **2-digit code**. On the device, tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — to open the approval screen, confirm the code matches, and **Approve**.
-5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens. An app that identifies itself with a client metadata document, such as Claude, ChatGPT or Claude Code, is one row with all its connections, and revoking it ends them all.
+5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens. An app that identifies itself with a client metadata document, such as Claude, ChatGPT or Claude Code, is one row with all its connections, and revoking it ends them all. A connection made before the app supported client metadata documents keeps a row of its own.
 
 > **Public URL override (optional):** if your tunnel/host topology needs a fixed public host (or you bind to `0.0.0.0` without a trusted proxy), set a **Public URL override** in Settings → Access so OAuth metadata and links use a stable host.
 
@@ -275,7 +275,7 @@ If **Add custom MCP server** is missing in step 2, your plan or workspace does n
 4. On the phone, check the 2-digit code and approve the request from **ChatGPT** (notification, or the card on the Server screen).
 5. In a chat, type `@` and pick the plugin. It also works in the ChatGPT Android app.
 
-To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**. ChatGPT is one row there for all its plugins and accounts connected to this phone, so revoking it ends every ChatGPT connection.
+To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**. ChatGPT is one row there for all its plugins and accounts connected to this phone, so revoking it ends every ChatGPT connection. A plugin connected before the app supported client metadata documents keeps a row of its own.
 
 > ⚠️ **Security:** the same cautions as for Claude apply.
 

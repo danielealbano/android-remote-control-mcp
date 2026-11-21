@@ -17,8 +17,12 @@ import io.ktor.http.Url
 import io.ktor.http.contentType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.putJsonArray
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -192,19 +196,68 @@ class OAuthLoggingIntegrationTest {
 
     // ── helpers (mirror OAuthFlowIntegrationTest) ────────────────────────────
 
+    @Test
+    @DisplayName("what anyone can send without a login or an approval cannot fake or reorder a log line")
+    fun unauthenticatedInputKeptOutOfLogLines() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
+                client.post("/register") {
+                    contentType(ContentType.Application.Json)
+                    setBody(buildJsonObject { putJsonArray("redirect_uris") { add(SNEAKY_URI) } }.toString())
+                }
+                val clientId = register(client, SNEAKY_NAME)
+                authorize(client, clientId)
+                authorize(client, clientId)
+                val (denied, expired) = ctx.approvalCoordinator.observePending().value
+                ctx.approvalCoordinator.deny(denied.id)
+                ctx.approvalCoordinator.stateOf(expired.id, expired.expiresAtMs)
+                authorize(client, SNEAKY_DOCUMENT)
+                client.post("/token") {
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("grant_type", "authorization_code")
+                                append("code", "bogus")
+                                append("client_id", "x\ny\u202e")
+                            },
+                        ),
+                    )
+                }
+                val messages = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
+                listOf(
+                    "OAuth client registration rejected redirect URI(s): https://evil.example/cb",
+                    "OAuth client registered: $LOGGED_NAME",
+                    "OAuth authorization requested by $LOGGED_NAME",
+                    "OAuth authorization denied for $LOGGED_NAME",
+                    "OAuth authorization for $LOGGED_NAME expired",
+                    "OAuth client metadata document refused (https://evil.example/x): not on a supported app domain",
+                    "OAuth code refused (xy): unknown, used or expired code",
+                ).forEach { expected -> assertTrue(messages.any { it.startsWith(expected) }, "$expected in $messages") }
+                assertTrue(messages.none { it.codePoints().anyMatch(::isHidden) }, messages.toString())
+            }
+        }
+
+    /** A character that could break or reorder a log line: a control, a line or paragraph separator, a format one. */
+    private fun isHidden(codePoint: Int): Boolean =
+        Character.isISOControl(codePoint) || Character.getType(codePoint).toByte() in HIDDEN_TYPES
+
     private data class Tokens(
         val access: String,
         val refresh: String,
     )
 
-    private suspend fun register(client: HttpClient): String {
+    private suspend fun register(
+        client: HttpClient,
+        clientName: String = "Claude",
+    ): String {
         val resp =
             client.post("/register") {
                 contentType(ContentType.Application.Json)
                 setBody(
                     """{"redirect_uris":["$REDIRECT"],"token_endpoint_auth_method":"none",""" +
                         """"grant_types":["authorization_code","refresh_token"],"response_types":["code"],""" +
-                        """"scope":"mcp","client_name":"Claude","application_type":"web"}""",
+                        """"scope":"mcp","client_name":${JsonPrimitive(clientName)},"application_type":"web"}""",
                 )
             }
         return Json
@@ -301,6 +354,11 @@ class OAuthLoggingIntegrationTest {
         const val REDIRECT = "https://claude.ai/api/mcp/auth_callback"
         const val OVERRIDE = "https://test.host"
         const val SPOOFED_ADDRESS = "198.51.100.6"
+        const val SNEAKY_NAME = "Evil\nOAuth client revoked: Claude\u2028\u202e"
+        const val LOGGED_NAME = "EvilOAuth client revoked: Claude"
+        const val SNEAKY_URI = "https://evil.example/\u2028cb\n"
+        const val SNEAKY_DOCUMENT = "https://evil.example/\u2028x\u202e"
+        val HIDDEN_TYPES = setOf(Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR, Character.FORMAT)
         const val CANONICAL = "https://test.host/mcp"
 
         // RFC 7636 Appendix B PKCE test vector.

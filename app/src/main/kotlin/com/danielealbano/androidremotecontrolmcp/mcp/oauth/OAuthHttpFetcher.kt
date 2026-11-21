@@ -125,7 +125,7 @@ class OkHttpOAuthHttpFetcher internal constructor(
         }
 
     internal companion object {
-        /** The production client settings; tests change the DNS, the TLS trust and, in one test, the call timeout. */
+        /** The production client settings, which the tests build on. */
         fun clientBuilder(): OkHttpClient.Builder =
             OkHttpClient
                 .Builder()
