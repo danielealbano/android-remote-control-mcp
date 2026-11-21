@@ -237,6 +237,19 @@ class OAuthClientRepositoryImplTest {
         }
 
     @Test
+    @DisplayName("the first CIMD login into a full registry evicts the least recently used unapproved DCR client")
+    fun cimdLoginIntoFullRegistry() =
+        testScope.runTest {
+            val ids = (1L..OAuthPolicy.MAX_OAUTH_CLIENTS.toLong()).map { register(it).clientId }
+            repository.recordGrant(ids[0], "jti", null, 1L)
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 100L)
+            assertEquals(OAuthPolicy.MAX_OAUTH_CLIENTS, repository.getClients().size)
+            assertNotNull(repository.getClient(DOC))
+            assertNotNull(repository.getClient(ids[0]), "the approved oldest must survive")
+            assertNull(repository.getClient(ids[1]), "the oldest unapproved must be evicted")
+        }
+
+    @Test
     @DisplayName("connections persist across a new instance")
     fun connectionsPersist() =
         testScope.runTest {

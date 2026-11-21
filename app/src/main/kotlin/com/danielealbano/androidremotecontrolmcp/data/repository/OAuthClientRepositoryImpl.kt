@@ -10,6 +10,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientMetadataDocumen
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.loggable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -115,7 +116,7 @@ class OAuthClientRepositoryImpl
                         if (kept.size < it.connections.size) {
                             serverLog.log(
                                 ServerLogEntry.Type.OAUTH,
-                                "OAuth connection ended for $clientName: " +
+                                "OAuth connection ended for ${loggable(clientName)}: " +
                                     "more than ${OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT} connections",
                             )
                         }
@@ -148,7 +149,7 @@ class OAuthClientRepositoryImpl
                 val updated = snapshot.value.filterNot { it.clientId == clientId }
                 if (updated.size != snapshot.value.size) {
                     persist(updated)
-                    val name = removed?.clientName ?: clientId
+                    val name = loggable(removed?.clientName ?: clientId)
                     serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth client revoked: $name")
                 }
             }

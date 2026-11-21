@@ -47,7 +47,7 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
     val jti = UUID.randomUUID().toString()
     val grant = recordGrant(deps, code, jti)
     val displayName = grant.clientName ?: code.clientId
-    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to $displayName")
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to ${loggable(displayName)}")
     respondTokens(
         access = deps.tokenService.issueAccessToken(code.clientId, code.resource, grant.connectionId),
         refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource, grant.connectionId),
@@ -161,7 +161,7 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
     val resource = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
     val clientName = deps.clientRepository.getClient(claims.clientId)?.clientName
     val name = clientName ?: claims.clientId
-    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for $name")
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for ${loggable(name)}")
     respondTokens(
         access = deps.tokenService.issueAccessToken(claims.clientId, resource, claims.connectionId),
         refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource, claims.connectionId),

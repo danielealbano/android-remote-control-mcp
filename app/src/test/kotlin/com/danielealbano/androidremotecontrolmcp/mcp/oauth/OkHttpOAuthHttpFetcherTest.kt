@@ -221,6 +221,19 @@ class OkHttpOAuthHttpFetcherTest {
         }
 
     @Test
+    @DisplayName("lets an error that is not an I/O failure through instead of reporting a failed download")
+    fun propagatesNonIoErrors() =
+        runTest {
+            val broken =
+                OkHttpOAuthHttpFetcher {
+                    OkHttpOAuthHttpFetcher.clientBuilder().addInterceptor { error("bug") }.build()
+                }
+            val thrown = runCatching { broken.get(url("/doc"), "application/json", MAX) }.exceptionOrNull()
+            assertInstanceOf(IllegalStateException::class.java, thrown)
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
     @DisplayName("the production fetcher never connects to a host with only special-use addresses")
     fun productionRefusesLoopbackHost() =
         runTest {

@@ -178,7 +178,7 @@ class OAuthMetadataDocumentPolicyTest {
     @DisplayName("the app table keeps the redirect allowlist and the document domains together")
     fun appTableInSync() {
         assertEquals(
-            OAuthConnectors.ALL.flatMap { it.exactRedirectUris }.toSet(),
+            setOf(OAuthPolicy.CLAUDE_REDIRECT_URI, OAuthPolicy.CHATGPT_REDIRECT_URI, OAuthPolicy.KIMI_REDIRECT_URI),
             OAuthPolicy.ALLOWED_REDIRECT_URIS,
         )
         // Every app with a document domain can receive codes somewhere, and every hosted callback is reachable

@@ -2,13 +2,13 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHttp
-import kotlinx.coroutines.CancellationException
 import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.Proxy
@@ -90,12 +90,12 @@ class OkHttpOAuthHttpFetcher internal constructor(
                 .url(httpUrl)
                 .header("Accept", accept)
                 .build()
-        return runCatching { ArcTunnelHttp.await(client.newCall(request)) { readCapped(it, maxBytes) } }
-            .getOrElse {
-                if (it is CancellationException) throw it
-                Log.d(TAG, "Download from ${httpUrl.host} failed: ${it.javaClass.simpleName}")
-                FetchResult.Failed(failureReason(it))
-            }
+        return try {
+            ArcTunnelHttp.await(client.newCall(request)) { readCapped(it, maxBytes) }
+        } catch (e: IOException) {
+            Log.d(TAG, "Download from ${httpUrl.host} failed: ${e.javaClass.simpleName}")
+            FetchResult.Failed(failureReason(e))
+        }
     }
 
     /** The body when the status is 200 and it has 1 to [maxBytes] bytes, else why not. */
@@ -116,7 +116,7 @@ class OkHttpOAuthHttpFetcher internal constructor(
         }
     }
 
-    private fun failureReason(failure: Throwable): String =
+    private fun failureReason(failure: IOException): String =
         when (failure) {
             is InterruptedIOException -> "timed out"
             is UnknownHostException -> failure.message ?: "unknown host"

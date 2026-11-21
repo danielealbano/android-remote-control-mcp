@@ -72,12 +72,12 @@ class OAuthApprovalCoordinatorImpl
                     if (entry.state == ApprovalState.APPROVED) {
                         serverLog.log(
                             ServerLogEntry.Type.OAUTH,
-                            "OAuth authorization approved for ${entry.approval.clientName}",
+                            "OAuth authorization approved for ${loggable(entry.approval.clientName)}",
                         )
                     } else {
                         serverLog.log(
                             ServerLogEntry.Type.OAUTH,
-                            "OAuth authorization for ${entry.approval.clientName} expired",
+                            "OAuth authorization for ${loggable(entry.approval.clientName)} expired",
                         )
                     }
                 }
@@ -91,7 +91,7 @@ class OAuthApprovalCoordinatorImpl
                     it.state = ApprovalState.DENIED
                     serverLog.log(
                         ServerLogEntry.Type.OAUTH,
-                        "OAuth authorization denied for ${it.approval.clientName}",
+                        "OAuth authorization denied for ${loggable(it.approval.clientName)}",
                     )
                 }
                 refreshPendingLocked()
@@ -108,7 +108,7 @@ class OAuthApprovalCoordinatorImpl
                     entry.state = ApprovalState.EXPIRED
                     serverLog.log(
                         ServerLogEntry.Type.OAUTH,
-                        "OAuth authorization for ${entry.approval.clientName} expired",
+                        "OAuth authorization for ${loggable(entry.approval.clientName)} expired",
                     )
                     refreshPendingLocked()
                 }
@@ -123,7 +123,7 @@ class OAuthApprovalCoordinatorImpl
                     if (entry.state == ApprovalState.PENDING) {
                         serverLog.log(
                             ServerLogEntry.Type.OAUTH,
-                            "OAuth authorization for ${entry.approval.clientName} expired",
+                            "OAuth authorization for ${loggable(entry.approval.clientName)} expired",
                         )
                     }
                     iterator.remove()

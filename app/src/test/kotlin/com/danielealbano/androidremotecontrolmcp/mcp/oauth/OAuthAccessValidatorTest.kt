@@ -213,6 +213,28 @@ class OAuthAccessValidatorTest {
             coVerify(exactly = 1) { clientRepository.touchLastUsed(DOC, 5L, "conn-2") }
         }
 
+    @Test
+    @DisplayName("pruning the debounce keys keeps the live CIMD connections and drops the clients that are gone")
+    fun pruneKeepsLiveConnections() =
+        runTest {
+            coEvery { clientRepository.getClient(any()) } answers { client(firstArg()) }
+            coEvery { clientRepository.getClient(DOC) } returns cimdClient("conn-1")
+            coEvery { clientRepository.getClients() } returns listOf(cimdClient("conn-1"))
+            coEvery { tokenService.verifyAccessToken(any()) } answers { AccessTokenClaims(firstArg(), resource) }
+            coEvery { tokenService.verifyAccessToken("cimd") } returns AccessTokenClaims(DOC, resource, "conn-1")
+            val validator =
+                OAuthAccessValidator(tokenService, clientRepository, serverLog, debounceMs = 1000L, nowMs = { 5L })
+            validator.validate("cimd", resource)
+            // One key per DCR client no longer in the registry, until the map passes its bound and is pruned.
+            repeat(OAuthPolicy.MAX_OAUTH_CLIENTS * OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT) {
+                validator.validate("dcr-$it", resource)
+            }
+            validator.validate("cimd", resource)
+            validator.validate("dcr-0", resource)
+            coVerify(exactly = 1) { clientRepository.touchLastUsed(DOC, 5L, "conn-1") }
+            coVerify(exactly = 2) { clientRepository.touchLastUsed("dcr-0", 5L, null) }
+        }
+
     private fun cimdClient(vararg connectionIds: String) =
         OAuthClient(
             clientId = DOC,

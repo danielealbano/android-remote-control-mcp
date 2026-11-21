@@ -5,8 +5,8 @@ import java.net.URI
 /**
  * Security policy constants and predicates for the self-contained OAuth authorization server: the redirect-URI
  * allowlist (a CLOSED set, from [OAuthConnectors.ALL]), the Client ID Metadata Document rules (document URL, redirect
- * binding, listed-redirect matching), loopback detection, the client display name and logo policy, resource matching
- * (RFC 8707), and the locked TTL/cap values agreed for tokens, codes, approvals, the client registry and downloads.
+ * binding, listed-redirect matching), loopback detection, the client logo policy, resource matching (RFC 8707), and
+ * the locked TTL/cap values agreed for tokens, codes, approvals, the client registry and downloads.
  */
 object OAuthPolicy {
     /** The fixed Claude.ai connector callback. */

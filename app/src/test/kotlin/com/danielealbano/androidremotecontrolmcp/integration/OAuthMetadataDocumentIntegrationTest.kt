@@ -199,6 +199,34 @@ class OAuthMetadataDocumentIntegrationTest {
         }
 
     @Test
+    @DisplayName("a client_name with a line break or a bidi control cannot fake or reorder a log line")
+    fun clientNameKeptOutOfLogLines() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            val sneaky =
+                FakeOAuthHttpFetcher.json(
+                    """{"client_id":"$CLAUDE_DOC_URL","client_name":"Evil\nOAuth client revoked: Claude\u202e",""" +
+                        """"redirect_uris":["${OAuthPolicy.CLAUDE_REDIRECT_URI}"],""" +
+                        """"token_endpoint_auth_method":"none"}""",
+                )
+            withServer(FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to sneaky)), deps) { ctx ->
+                val tokens = login(ctx, CLAUDE_DOC_URL, OAuthPolicy.CLAUDE_REDIRECT_URI)
+                assertEquals(HttpStatusCode.OK, refreshRequest(client, CLAUDE_DOC_URL, tokens.refresh).status)
+                ctx.clientRepository.revoke(CLAUDE_DOC_URL)
+                val messages = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
+                val name = "EvilOAuth client revoked: Claude"
+                listOf(
+                    "OAuth authorization requested by $name",
+                    "OAuth authorization approved for $name",
+                    "OAuth tokens issued to $name",
+                    "OAuth token refreshed for $name",
+                    "OAuth client revoked: $name",
+                ).forEach { assertTrue(messages.any { message -> message.startsWith(it) }, "$it in $messages") }
+                assertTrue(messages.none { it.contains('\n') || it.contains('\u202e') }, messages.toString())
+            }
+        }
+
+    @Test
     @DisplayName("revoking the app ends every connection at once")
     fun revokeEndsAllConnections() =
         runTest {

@@ -72,9 +72,10 @@ private suspend fun ApplicationCall.handleRegister(deps: OAuthRouteDeps) {
     val rejectedRedirectUris = redirectUris.filterNot(OAuthPolicy::isAllowedRedirectUri)
     if (redirectUris.isEmpty() || rejectedRedirectUris.isNotEmpty()) {
         if (rejectedRedirectUris.isNotEmpty()) {
+            val rejected = rejectedRedirectUris.joinToString { loggable(it) }
             deps.serverLog.log(
                 ServerLogEntry.Type.OAUTH,
-                "OAuth client registration rejected redirect URI(s): ${rejectedRedirectUris.joinToString()}",
+                "OAuth client registration rejected redirect URI(s): $rejected",
             )
         }
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_redirect_uri")
@@ -106,7 +107,7 @@ private suspend fun ApplicationCall.handleRegister(deps: OAuthRouteDeps) {
     respondText(Json.encodeToString(json), ContentType.Application.Json, HttpStatusCode.Created)
     deps.serverLog.log(
         ServerLogEntry.Type.OAUTH,
-        "OAuth client registered: ${client.clientName ?: client.clientId}",
+        "OAuth client registered: ${loggable(client.clientName ?: client.clientId)}",
     )
 }
 
@@ -192,7 +193,7 @@ private fun OAuthRouteDeps.logAuthorizationRequested(
     val originText = listOfNotNull(clientIp, geoText).joinToString(" — ").takeIf { it.isNotEmpty() }
     serverLog.log(
         ServerLogEntry.Type.OAUTH,
-        "OAuth authorization requested by $displayName" + (originText?.let { " from $it" } ?: ""),
+        "OAuth authorization requested by ${loggable(displayName)}" + (originText?.let { " from $it" } ?: ""),
     )
 }
 
