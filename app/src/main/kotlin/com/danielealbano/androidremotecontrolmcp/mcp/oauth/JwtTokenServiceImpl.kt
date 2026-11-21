@@ -36,9 +36,10 @@ class JwtTokenServiceImpl
         override suspend fun issueAccessToken(
             clientId: String,
             resource: String,
+            connectionId: String?,
         ): String =
             sign(
-                clientId = clientId,
+                TokenSubject(clientId, connectionId),
                 resource = resource,
                 type = TYPE_ACCESS,
                 jti = UUID.randomUUID().toString(),
@@ -49,10 +50,24 @@ class JwtTokenServiceImpl
             clientId: String,
             jti: String,
             resource: String,
-        ): String = sign(clientId, resource, TYPE_REFRESH, jti, OAuthPolicy.REFRESH_TOKEN_TTL_SECONDS)
+            connectionId: String?,
+        ): String =
+            sign(
+                TokenSubject(clientId, connectionId),
+                resource = resource,
+                type = TYPE_REFRESH,
+                jti = jti,
+                ttlSeconds = OAuthPolicy.REFRESH_TOKEN_TTL_SECONDS,
+            )
+
+        /** Who a token is for: the client, and the connection for a CIMD client. */
+        private class TokenSubject(
+            val clientId: String,
+            val connectionId: String?,
+        )
 
         private suspend fun sign(
-            clientId: String,
+            subject: TokenSubject,
             resource: String,
             type: String,
             jti: String,
@@ -62,8 +77,9 @@ class JwtTokenServiceImpl
             return JWT
                 .create()
                 .withIssuer(ISS)
-                .withSubject(clientId)
-                .withClaim(CLAIM_CLIENT_ID, clientId)
+                .withSubject(subject.clientId)
+                .withClaim(CLAIM_CLIENT_ID, subject.clientId)
+                .apply { subject.connectionId?.let { withClaim(CLAIM_CONNECTION_ID, it) } }
                 .withClaim(CLAIM_TYPE, type)
                 .withAudience(resource)
                 .withJWTId(jti)
@@ -77,7 +93,7 @@ class JwtTokenServiceImpl
             val clientId = decoded.getClaim(CLAIM_CLIENT_ID).asString()
             val audience = decoded.audience?.firstOrNull()
             return if (clientId != null && audience != null) {
-                AccessTokenClaims(clientId = clientId, audience = audience)
+                AccessTokenClaims(clientId, audience, decoded.getClaim(CLAIM_CONNECTION_ID).asString())
             } else {
                 null
             }
@@ -88,7 +104,7 @@ class JwtTokenServiceImpl
             val clientId = decoded.getClaim(CLAIM_CLIENT_ID).asString()
             val jti = decoded.id
             return if (clientId != null && jti != null) {
-                RefreshTokenClaims(clientId = clientId, jti = jti)
+                RefreshTokenClaims(clientId, jti, decoded.getClaim(CLAIM_CONNECTION_ID).asString())
             } else {
                 null
             }
@@ -110,6 +126,7 @@ class JwtTokenServiceImpl
         private companion object {
             const val ISS = "android-remote-control-mcp"
             const val CLAIM_CLIENT_ID = "client_id"
+            const val CLAIM_CONNECTION_ID = "connection_id"
             const val CLAIM_TYPE = "typ"
             const val TYPE_ACCESS = "access"
             const val TYPE_REFRESH = "refresh"

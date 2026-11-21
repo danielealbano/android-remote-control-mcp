@@ -1,5 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -13,6 +18,38 @@ class ConsentPageTest {
         expiresInSeconds: Long = 300L,
         iconUrl: String? = null,
     ) = ConsentPageData("approval-id", "42", clientName, host, expiresInSeconds, iconUrl)
+
+    @Test
+    @DisplayName("warns about another domain, escaped, and shows only the loopback warning for a loopback redirect")
+    fun otherDomainWarning() {
+        val base = ConsentPageData("approval-id", "42", "App", "app.example", 300L, null)
+        val other = consentPageHtml(base.copy(otherDomainHost = "<b>docs.example</b>"))
+        val escaped = "This app identifies itself from &lt;b&gt;docs.example&lt;/b&gt;, a different domain."
+        assertTrue(other.contains(escaped), other)
+        assertFalse(other.contains("<b>docs.example</b>"), other)
+        val loopback = consentPageHtml(base.copy(loopbackWarning = true, otherDomainHost = "docs.example"))
+        assertTrue(loopback.contains("The access goes to an app on the computer where this page is open."), loopback)
+        assertFalse(loopback.contains("a different domain"), loopback)
+        assertFalse(consentPageHtml(base).contains("class=\"warning\""))
+    }
+
+    @Test
+    @DisplayName("respondConsentPage passes the approval's other-domain host to the page")
+    fun respondConsentPagePassesOtherDomain() =
+        testApplication {
+            val approval =
+                PendingApproval(
+                    id = "id",
+                    clientName = "App",
+                    redirectHost = "claude.ai",
+                    matchCode = "42",
+                    expiresAtMs = Long.MAX_VALUE,
+                    otherDomainHost = "chatgpt.com",
+                )
+            routing { get("/") { call.respondConsentPage(approval, "App", null, 0L) } }
+            val html = client.get("/").bodyAsText()
+            assertTrue(html.contains("This app identifies itself from chatgpt.com, a different domain."), html)
+        }
 
     @Test
     @DisplayName("escapes a malicious client name")

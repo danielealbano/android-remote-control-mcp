@@ -58,12 +58,13 @@ import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.geo.CountryDisplay
 import com.danielealbano.androidremotecontrolmcp.geo.GeoLocation
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PendingApproval
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PublicOnlyDns
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ApprovalViewModel
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +114,7 @@ fun ApprovalScreen(
     }
 }
 
-/** Coil loader with redirects disabled and a short timeout (SSRF hardening for the remote icon fetch). */
+/** Coil loader with the downloads' guard: public addresses only, no proxy, no redirects, a short timeout. */
 @Composable
 private fun rememberLogoImageLoader(): ImageLoader {
     val context = LocalContext.current
@@ -126,6 +127,8 @@ private fun rememberLogoImageLoader(): ImageLoader {
                         callFactory = {
                             OkHttpClient
                                 .Builder()
+                                .dns(PublicOnlyDns)
+                                .proxy(Proxy.NO_PROXY)
                                 .followRedirects(false)
                                 .followSslRedirects(false)
                                 .callTimeout(LOGO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -169,6 +172,24 @@ private fun ApprovalCard(
             if (approval.clientIp != null) {
                 Spacer(Modifier.height(8.dp))
                 ClientOriginRow(ip = approval.clientIp, geo = approval.clientGeo)
+            }
+            // Loopback: the code goes to an app on the computer of the login page, which any program there could claim.
+            // Otherwise a CIMD client whose document is on another domain than its redirect.
+            val otherDomain = approval.otherDomainHost
+            val warning =
+                when {
+                    approval.loopbackRedirect -> stringResource(R.string.approval_loopback_warning)
+                    otherDomain != null -> stringResource(R.string.approval_other_domain_warning, otherDomain)
+                    else -> null
+                }
+            if (warning != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = warning,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
             }
             Spacer(Modifier.height(24.dp))
             Text(
@@ -219,8 +240,8 @@ private fun ApprovalActions(
 }
 
 /**
- * Circular client icon on a clean light disc (favicons are designed for light backgrounds). The SSRF-safe
- * logo / favicon is inset over muted initials, so a transparent or failed-to-load icon still reads.
+ * Circular client icon on a clean light disc (favicons are designed for light backgrounds): the approval's icon URL,
+ * with muted initials only until it has loaded, so a missing or failed icon still reads.
  */
 @Composable
 private fun ClientIcon(
@@ -234,7 +255,8 @@ private fun ClientIcon(
             .take(2)
             .uppercase()
             .ifEmpty { "?" }
-    val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.redirectHost)
+    val iconUrl = approval.iconUrl
+    var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
 
     // Decorative: the client's name is read next to it
     Box(
@@ -246,19 +268,22 @@ private fun ClientIcon(
                 .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        // Initials sit behind; a successfully-loaded icon covers them.
-        Text(
-            text = initials,
-            color = ICON_INITIALS_COLOR,
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
+        // Initials only while there is no icon: a transparent icon must not show them through.
+        if (!iconLoaded) {
+            Text(
+                text = initials,
+                color = ICON_INITIALS_COLOR,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (iconUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(iconUrl).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
                 modifier = Modifier.matchParentSize().padding(ICON_INSET_DP.dp),
+                onSuccess = { iconLoaded = true },
             )
         }
     }

@@ -6,15 +6,23 @@ import io.ktor.server.response.respondText
 
 private const val MILLIS_PER_SECOND = 1000L
 
+/** The consent page's wording of the in-app loopback warning, from the browser's point of view. */
+private const val LOOPBACK_WARNING =
+    "The access goes to an app on the computer where this page is open. " +
+        "Approve only if you started this login here yourself."
+
+/** The consent page's wording of the in-app other-domain warning; [safeHost] is already HTML-escaped. */
+private fun otherDomainWarning(safeHost: String) =
+    "This app identifies itself from $safeHost, a different domain. Approve only if you expected this."
+
 /**
- * Renders and responds with the [consentPageHtml] for [approval], resolving the requesting client's icon
- * via [ClientIconUrl] and seeding the countdown from the window remaining at [nowMs].
+ * Renders and responds with the [consentPageHtml] for [approval], with [iconUrl] (the logo the phone embedded with
+ * [ConsentLogo], else the favicon link) and the countdown seeded from the window remaining at [nowMs].
  */
 suspend fun ApplicationCall.respondConsentPage(
     approval: PendingApproval,
     displayName: String,
-    logoUri: String?,
-    redirectHost: String,
+    iconUrl: String?,
     nowMs: Long,
 ) {
     val data =
@@ -22,9 +30,11 @@ suspend fun ApplicationCall.respondConsentPage(
             approvalId = approval.id,
             matchCode = approval.matchCode,
             clientName = displayName,
-            host = redirectHost,
+            host = approval.redirectHost,
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
-            iconUrl = ClientIconUrl.resolve(logoUri, redirectHost),
+            iconUrl = iconUrl,
+            loopbackWarning = approval.loopbackRedirect,
+            otherDomainHost = approval.otherDomainHost,
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)
 }
@@ -50,6 +60,13 @@ fun consentPageHtml(data: ConsentPageData): String {
         )
     val iconTag =
         data.iconUrl?.let { """<img class="icon" src="${escapeHtml(it)}" alt="" onerror="this.remove()">""" } ?: ""
+    val warningText =
+        when {
+            data.loopbackWarning -> LOOPBACK_WARNING
+            data.otherDomainHost != null -> otherDomainWarning(escapeHtml(data.otherDomainHost))
+            else -> null
+        }
+    val warningTag = warningText?.let { "<div class=\"warning\">$it</div>" }.orEmpty()
     val seconds = data.expiresInSeconds.coerceAtLeast(0)
     return """
         <!DOCTYPE html>
@@ -65,6 +82,7 @@ fun consentPageHtml(data: ConsentPageData): String {
           <div class="avatar">$initials$iconTag</div>
           <h1>Approve <strong>$safeName</strong></h1>
           <div class="host">&#127760; $safeHost</div>
+          $warningTag
           <div class="prompt">Open Android Remote Control and approve the request showing this code:</div>
           <div class="code">$safeCode</div>
           <div class="timer" id="timer"></div>
@@ -125,6 +143,7 @@ private val CONSENT_PAGE_STYLES =
     .timer { margin-top: 1.25rem; font-size: 0.9rem; color: var(--muted); }
     .status { margin-top: 0.5rem; font-size: 0.9rem; color: var(--muted); }
     .error { color: var(--error); }
+    .warning { margin-top: 1rem; font-size: 0.9rem; color: var(--error); }
     """.trimIndent()
 
 private fun consentPageScript(

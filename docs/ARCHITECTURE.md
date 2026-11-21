@@ -301,21 +301,28 @@ sequenceDiagram
 
 ### OAuth 2.1 Authorization Server (self-contained)
 
-- New components live under `mcp/oauth/`: `OAuthPolicy` (redirect allowlist, resource matching, TTL/cap constants), `Pkce` (S256), `JwtTokenService(Impl)` (HS256 issue/verify, memoized algorithm), `OAuthClientRepository(Impl)` (persisted registry in a dedicated `oauth_clients` DataStore with an in-memory snapshot), `AuthorizationCodeStore(Impl)` (single-use 60s codes), `OAuthApprovalCoordinator(Impl)` (number-match pending approvals), `OAuthMetadata` (RFC 9728/8414 docs), `OAuthRoutes` (the HTTP endpoints), `OAuthAccessValidator` (the `/mcp` token check, shared by server and tests), `LogoUrlPolicy` (SSRF guard for client-logo rendering). `RequestBaseUrl` derives the per-request public base URL (used by OAuth metadata/`aud` and the share-content links).
-- The app is both Authorization Server and Resource Server, so tokens are HS256-signed with a device-held secret (no JWKS). Access TTL 24h, refresh TTL 90d, code TTL 60s; both tokens carry `aud` = `<base>/mcp` and `client_id`.
+- New components live under `mcp/oauth/`: `OAuthPolicy` (redirect allowlist, CIMD document and redirect rules, loopback detection, client logo policy, resource matching, TTL/cap/download constants), `Pkce` (S256), `JwtTokenService(Impl)` (HS256 issue/verify, memoized algorithm), `OAuthClientRepository(Impl)` (persisted registry in a dedicated `oauth_clients` DataStore with an in-memory snapshot), `AuthorizationCodeStore(Impl)` (single-use 60s codes), `OAuthApprovalCoordinator(Impl)` (number-match pending approvals), `OAuthMetadata` (RFC 9728/8414 docs), `OAuthRoutes` (the HTTP endpoints), `OAuthAccessValidator` (the `/mcp` token check, shared by server and tests), `LogoUrlPolicy` (SSRF guard for client-logo rendering), `OAuthConnectors` (the app table behind both the redirect allowlist and the CIMD document domains), `ClientMetadataDocuments` (CIMD download and checks), `OAuthHttpFetcher` / `OkHttpOAuthHttpFetcher` (guarded downloads of CIMD documents and logos) with `PublicAddresses` (RFC 6890 special-use address filter), `ConsentLogo` (the logo embedded in the consent page). `RequestBaseUrl` derives the per-request public base URL (used by OAuth metadata/`aud` and the share-content links).
+- The app is both Authorization Server and Resource Server, so tokens are HS256-signed with a device-held secret (no JWKS). Access TTL 24h, refresh TTL 90d, code TTL 60s; both tokens carry `aud` = `<base>/mcp` and `client_id`, and for a CIMD client the `connection_id` of its login.
 
 ```mermaid
 sequenceDiagram
     participant C as Claude.ai
     participant S as MCP Server
+    participant D as App domain (claude.ai)
     participant U as User (device)
     C->>S: POST /mcp (no token)
     S-->>C: 401 + WWW-Authenticate (resource_metadata)
     C->>S: GET /.well-known/oauth-protected-resource/mcp
     C->>S: GET /.well-known/oauth-authorization-server
-    C->>S: POST /register (DCR)
-    S-->>C: 201 client_id
-    C->>S: GET /authorize (PKCE S256, resource)
+    alt CIMD (client_id_metadata_document_supported)
+        C->>S: GET /authorize (client_id = document URL, PKCE S256, resource)
+        S->>D: GET document (guarded download)
+        D-->>S: client metadata (client_id, client_name, redirect_uris)
+    else DCR (Gemini, older connections)
+        C->>S: POST /register (DCR)
+        S-->>C: 201 client_id
+        C->>S: GET /authorize (client_id, PKCE S256, resource)
+    end
     S->>S: createPending (2-digit code)
     S-->>C: consent page (polls /authorize/status)
     U->>S: approve in-app (match code)
@@ -324,7 +331,7 @@ sequenceDiagram
     C->>S: POST /token (code_verifier, resource)
     S-->>C: access + refresh JWT
     C->>S: POST /mcp (Bearer access)
-    S->>S: verify sig + aud + client in registry
+    S->>S: verify sig + aud + client (and CIMD connection) in registry
     S-->>C: 200 (tools)
 ```
 

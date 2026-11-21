@@ -32,4 +32,21 @@ class LogoUrlPolicyTest {
         assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://169.254.1.1/x.png"))
         assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::1]/x.png"))
     }
+
+    @Test
+    @DisplayName("rejects every IP-literal host, public ones too: the loaders' DNS filter never sees them")
+    fun rejectsIpLiterals() {
+        listOf(
+            "https://8.8.8.8/x.png",
+            "https://[::ffff:192.168.1.1]:8443/x.png",
+            "https://0.0.0.0:8080/x.png",
+            "https://100.64.0.1/x.png",
+            "https://192.0.0.8/x.png",
+            "https://[2606:4700::1]/x.png",
+        ).forEach { assertFalse(LogoUrlPolicy.isSafeLogoUrl(it), it) }
+        assertTrue(LogoUrlPolicy.isIpLiteral("10.0.0.1"))
+        assertTrue(LogoUrlPolicy.isIpLiteral("::1"))
+        assertFalse(LogoUrlPolicy.isIpLiteral("cdn.example.com"))
+        assertFalse(LogoUrlPolicy.isIpLiteral(null))
+    }
 }

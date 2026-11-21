@@ -26,6 +26,8 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenServiceImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinatorImpl
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthHttpFetcher
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OkHttpOAuthHttpFetcher
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyPipeline
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyPipelineImpl
 import com.danielealbano.androidremotecontrolmcp.privacy.model.PrivacyModelStore
@@ -306,6 +308,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAuthorizationCodeStore(impl: AuthorizationCodeStoreImpl): AuthorizationCodeStore
+
+    @Binds
+    @Singleton
+    abstract fun bindOAuthHttpFetcher(impl: OkHttpOAuthHttpFetcher): OAuthHttpFetcher
 
     @Binds
     @Singleton

@@ -28,7 +28,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import java.net.URI
 
 /**
  * Registers the OAuth endpoints (all UNAUTHENTICATED — the combined-auth plugin excludes them). Mount
@@ -73,9 +72,10 @@ private suspend fun ApplicationCall.handleRegister(deps: OAuthRouteDeps) {
     val rejectedRedirectUris = redirectUris.filterNot(OAuthPolicy::isAllowedRedirectUri)
     if (redirectUris.isEmpty() || rejectedRedirectUris.isNotEmpty()) {
         if (rejectedRedirectUris.isNotEmpty()) {
+            val rejected = rejectedRedirectUris.joinToString { loggable(it) }
             deps.serverLog.log(
                 ServerLogEntry.Type.OAUTH,
-                "OAuth client registration rejected redirect URI(s): ${rejectedRedirectUris.joinToString()}",
+                "OAuth client registration rejected redirect URI(s): $rejected",
             )
         }
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_redirect_uri")
@@ -107,7 +107,7 @@ private suspend fun ApplicationCall.handleRegister(deps: OAuthRouteDeps) {
     respondText(Json.encodeToString(json), ContentType.Application.Json, HttpStatusCode.Created)
     deps.serverLog.log(
         ServerLogEntry.Type.OAUTH,
-        "OAuth client registered: ${client.clientName ?: client.clientId}",
+        "OAuth client registered: ${loggable(client.clientName ?: client.clientId)}",
     )
 }
 
@@ -117,16 +117,15 @@ private suspend fun ApplicationCall.handleAuthorize(
 ) {
     val params = request.queryParameters
     val clientId = params["client_id"]
-    val client = if (clientId.isNullOrEmpty()) null else deps.clientRepository.getClient(clientId)
     val redirectUri = params["redirect_uri"]
-    val redirectValid =
-        client != null &&
-            clientId != null &&
-            !redirectUri.isNullOrEmpty() &&
-            redirectUri in client.redirectUris &&
-            OAuthPolicy.isAllowedRedirectUri(redirectUri)
-    if (!redirectValid) {
-        // Open-redirect guard: never redirect to an unvalidated URI.
+    val requester =
+        when {
+            clientId.isNullOrEmpty() || redirectUri.isNullOrEmpty() -> null
+            OAuthPolicy.isMetadataDocumentClientId(clientId) -> metadataDocumentRequester(deps, clientId, redirectUri)
+            else -> registeredRequester(deps, clientId, redirectUri)
+        }
+    if (requester == null || clientId == null || redirectUri == null) {
+        // Open-redirect guard: never redirect to an unvalidated URI (nor when a CIMD document cannot be used).
         respondAuthorizeError("Invalid client_id or redirect_uri.")
         return
     }
@@ -140,22 +139,28 @@ private suspend fun ApplicationCall.handleAuthorize(
         return
     }
     val redirectHost = host(redirectUri) ?: "Unknown"
-    val displayName = client.clientName ?: redirectHost
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
+    // The one icon the approval shows and the client keeps when the code is redeemed: the allowed logo, else favicon.
+    val favicon = ClientIconUrl.favicon(requester.iconHost ?: redirectHost)
+    val iconUrl = requester.logoUri ?: favicon
+    // Before the approval exists, so the phone never asks while the browser still waits for its page.
+    val embeddedLogo = ConsentLogo.embed(deps.httpFetcher, requester.logoUri)
     val approval =
         deps.approvalCoordinator.createPending(
             ApprovalRequest(
-                clientName = displayName,
+                clientName = requester.displayName,
                 redirectHost = redirectHost,
-                logoUri = client.logoUri,
+                iconUrl = iconUrl,
                 clientIp = clientIp,
                 clientGeo = clientGeo,
+                loopbackRedirect = OAuthPolicy.isLoopbackRedirectUri(redirectUri),
+                otherDomainHost = requester.otherDomainHost(redirectUri),
             ),
             deps.nowMs(),
         )
-    deps.logAuthorizationRequested(displayName, clientIp, clientGeo)
+    deps.logAuthorizationRequested(requester.displayName, clientIp, clientGeo)
     pendingAuthorize.put(
         approval.id,
         PendingAuthorizeRequest(
@@ -167,10 +172,12 @@ private suspend fun ApplicationCall.handleAuthorize(
             state = state,
             issuer = issuer,
             expiresAtMs = approval.expiresAtMs,
+            metadataDocument = requester.metadataDocument,
+            iconUrl = iconUrl,
         ),
         deps.nowMs(),
     )
-    respondConsentPage(approval, displayName, client.logoUri, redirectHost, deps.nowMs())
+    respondConsentPage(approval, requester.displayName, embeddedLogo ?: favicon, deps.nowMs())
 }
 
 /** Logs an OAUTH authorization-request entry annotated with the client's IP and geolocation (never tokens). */
@@ -186,7 +193,7 @@ private fun OAuthRouteDeps.logAuthorizationRequested(
     val originText = listOfNotNull(clientIp, geoText).joinToString(" — ").takeIf { it.isNotEmpty() }
     serverLog.log(
         ServerLogEntry.Type.OAUTH,
-        "OAuth authorization requested by $displayName" + (originText?.let { " from $it" } ?: ""),
+        "OAuth authorization requested by ${loggable(displayName)}" + (originText?.let { " from $it" } ?: ""),
     )
 }
 
@@ -228,6 +235,8 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
                             codeChallenge = pending.codeChallenge,
                             resource = pending.resource,
                             scope = pending.scope,
+                            metadataDocument = pending.metadataDocument,
+                            iconUrl = pending.iconUrl,
                         ),
                         deps.nowMs(),
                     )
@@ -263,8 +272,6 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
         }
     }
 }
-
-private fun host(uri: String): String? = runCatching { URI(uri).host }.getOrNull()
 
 private fun JsonObject.stringField(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 

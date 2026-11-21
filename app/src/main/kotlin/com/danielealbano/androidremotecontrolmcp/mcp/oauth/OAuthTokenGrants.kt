@@ -34,50 +34,109 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
 ) {
     val code = form["code"]?.let { deps.authorizationCodeStore.consume(it, deps.nowMs()) }
     val clientId = form["client_id"]
-    val resourceForm = form["resource"]
-    val errorCode: String? =
-        when {
-            code == null -> {
-                "invalid_grant"
-            }
-
-            form["redirect_uri"] != code.redirectUri -> {
-                "invalid_grant"
-            }
-
-            clientId.isNullOrEmpty() -> {
-                "invalid_request"
-            }
-
-            clientId != code.clientId -> {
-                "invalid_grant"
-            }
-
-            !resourceForm.isNullOrEmpty() && !OAuthPolicy.resourceMatches(resourceForm, code.resource) -> {
-                "invalid_grant"
-            }
-
-            !Pkce.verifyS256(form["code_verifier"].orEmpty(), code.codeChallenge) -> {
-                "invalid_grant"
-            }
-
-            else -> {
-                null
-            }
-        }
-    if (errorCode != null || code == null) {
-        respondOAuthError(HttpStatusCode.BadRequest, errorCode ?: "invalid_grant")
+    val refusal = codeGrantRefusal(form, code, request.headers[HttpHeaders.Authorization] != null)
+    if (refusal != null || code == null) {
+        deps.serverLog.log(
+            ServerLogEntry.Type.OAUTH,
+            "OAuth code refused (${loggable(clientId?.takeIf { it.isNotEmpty() } ?: "no client_id")}): " +
+                (refusal?.reason ?: UNKNOWN_CODE),
+        )
+        respondOAuthError(HttpStatusCode.BadRequest, refusal?.error ?: "invalid_grant")
         return
     }
     val jti = UUID.randomUUID().toString()
-    deps.clientRepository.setRefreshJti(code.clientId, jti)
-    deps.clientRepository.touchLastUsed(code.clientId, deps.nowMs())
-    val clientName = deps.clientRepository.getClient(code.clientId)?.clientName ?: code.clientId
-    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to $clientName")
+    val grant = recordGrant(deps, code, jti)
+    val displayName = grant.clientName ?: code.clientId
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to ${loggable(displayName)}")
     respondTokens(
-        access = deps.tokenService.issueAccessToken(code.clientId, code.resource),
-        refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource),
+        access = deps.tokenService.issueAccessToken(code.clientId, code.resource, grant.connectionId),
+        refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource, grant.connectionId),
     )
+}
+
+/** Why `/token` refuses a code: the OAuth [error], and the logged [reason], so a failed login can be diagnosed. */
+private class CodeRefusal(
+    val error: String,
+    val reason: String,
+)
+
+/** The refusal of the code grant [form] for [code] (null when unknown, used or expired), or null when it is valid. */
+private fun codeGrantRefusal(
+    form: Parameters,
+    code: AuthorizationCode?,
+    authorizationHeaderSent: Boolean,
+): CodeRefusal? {
+    val clientId = form["client_id"]
+    val resourceForm = form["resource"]
+    return when {
+        form["code"].isNullOrEmpty() -> {
+            CodeRefusal("invalid_request", "no code")
+        }
+
+        code == null -> {
+            CodeRefusal("invalid_grant", UNKNOWN_CODE)
+        }
+
+        form["redirect_uri"] != code.redirectUri -> {
+            CodeRefusal("invalid_grant", "redirect_uri differs")
+        }
+
+        clientId.isNullOrEmpty() -> {
+            val header = if (authorizationHeaderSent) "sent" else "absent"
+            CodeRefusal("invalid_request", "no client_id (Authorization header $header)")
+        }
+
+        clientId != code.clientId -> {
+            CodeRefusal("invalid_grant", "client_id differs")
+        }
+
+        !resourceForm.isNullOrEmpty() && !OAuthPolicy.resourceMatches(resourceForm, code.resource) -> {
+            CodeRefusal("invalid_grant", "resource ${loggable(resourceForm)} differs")
+        }
+
+        !Pkce.verifyS256(form["code_verifier"].orEmpty(), code.codeChallenge) -> {
+            CodeRefusal("invalid_grant", "PKCE verifier does not match")
+        }
+
+        else -> {
+            null
+        }
+    }
+}
+
+private const val UNKNOWN_CODE = "unknown, used or expired code"
+
+/** A recorded code grant: the CIMD connection its tokens carry (null for DCR), and the client's name. */
+private class RecordedGrant(
+    val connectionId: String?,
+    val clientName: String?,
+)
+
+/**
+ * Records the grant of [code] with refresh jti [jti]: a DCR client's own jti, or for a CIMD client a new connection
+ * of its row (created on the first login) with the document read at `/authorize`; either way with the icon the
+ * approval showed.
+ */
+private suspend fun recordGrant(
+    deps: OAuthRouteDeps,
+    code: AuthorizationCode,
+    jti: String,
+): RecordedGrant {
+    val document = code.metadataDocument
+    return if (document == null) {
+        deps.clientRepository.recordGrant(code.clientId, jti, code.iconUrl, deps.nowMs())
+        RecordedGrant(null, deps.clientRepository.getClient(code.clientId)?.clientName)
+    } else {
+        val connectionId = UUID.randomUUID().toString()
+        deps.clientRepository.addConnection(
+            document = document,
+            iconUrl = code.iconUrl,
+            connectionId = connectionId,
+            refreshJti = jti,
+            nowMs = deps.nowMs(),
+        )
+        RecordedGrant(connectionId, document.clientName)
+    }
 }
 
 private suspend fun ApplicationCall.handleRefreshTokenGrant(
@@ -86,28 +145,26 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
 ) {
     val claims = deps.tokenService.verifyRefreshToken(form["refresh_token"].orEmpty())
     val clientIdForm = form["client_id"]
-    val client = claims?.let { deps.clientRepository.getClient(it.clientId) }
-    val rejected =
-        claims == null ||
-            (!clientIdForm.isNullOrEmpty() && clientIdForm != claims.clientId) ||
-            client == null ||
-            // Stale/rotated refresh token — reject only (do NOT revoke the client).
-            claims.jti != client.currentRefreshJti
-    if (rejected) {
+    val newJti = UUID.randomUUID().toString()
+    // The compare and the rotation are one step, so a refresh token works once even when two requests race. A stale
+    // or rotated token, a CIMD connection that ended, or a token of the other client kind is rejected — and only
+    // rejected (do NOT revoke the client).
+    val repository = deps.clientRepository
+    val rotated =
+        claims != null &&
+            (clientIdForm.isNullOrEmpty() || clientIdForm == claims.clientId) &&
+            repository.rotateRefreshJti(claims.clientId, claims.connectionId, claims.jti, newJti, deps.nowMs())
+    if (!rotated) {
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_grant")
         return
     }
     val resource = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
-    val newJti = UUID.randomUUID().toString()
-    deps.clientRepository.setRefreshJti(claims.clientId, newJti)
-    deps.clientRepository.touchLastUsed(claims.clientId, deps.nowMs())
-    deps.serverLog.log(
-        ServerLogEntry.Type.OAUTH,
-        "OAuth token refreshed for ${client.clientName ?: claims.clientId}",
-    )
+    val clientName = deps.clientRepository.getClient(claims.clientId)?.clientName
+    val name = clientName ?: claims.clientId
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for ${loggable(name)}")
     respondTokens(
-        access = deps.tokenService.issueAccessToken(claims.clientId, resource),
-        refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource),
+        access = deps.tokenService.issueAccessToken(claims.clientId, resource, claims.connectionId),
+        refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource, claims.connectionId),
     )
 }
 

@@ -174,8 +174,80 @@ class OAuthAccessValidatorTest {
             assertEquals(1, serverLog.ofType(ServerLogEntry.Type.OAUTH).size)
         }
 
+    @Test
+    @DisplayName("a CIMD token passes only while its connection exists")
+    fun cimdTokenNeedsLiveConnection() =
+        runTest {
+            coEvery { clientRepository.getClient(DOC) } returns cimdClient("conn-1")
+            val validator = OAuthAccessValidator(tokenService, clientRepository, serverLog)
+            coEvery { tokenService.verifyAccessToken("live") } returns AccessTokenClaims(DOC, resource, "conn-1")
+            coEvery { tokenService.verifyAccessToken("ended") } returns AccessTokenClaims(DOC, resource, "conn-2")
+            coEvery { tokenService.verifyAccessToken("none") } returns AccessTokenClaims(DOC, resource)
+            assertTrue(validator.validate("live", resource))
+            assertFalse(validator.validate("ended", resource))
+            assertFalse(validator.validate("none", resource))
+        }
+
+    @Test
+    @DisplayName("a token naming a connection is refused for a DCR client")
+    fun dcrClientRefusesConnectionToken() =
+        runTest {
+            coEvery { tokenService.verifyAccessToken("tok") } returns AccessTokenClaims("c1", resource, "conn-1")
+            coEvery { clientRepository.getClient("c1") } returns client("c1")
+            assertFalse(OAuthAccessValidator(tokenService, clientRepository, serverLog).validate("tok", resource))
+        }
+
+    @Test
+    @DisplayName("last use is debounced per connection and touches that connection")
+    fun touchDebouncedPerConnection() =
+        runTest {
+            coEvery { clientRepository.getClient(DOC) } returns cimdClient("conn-1", "conn-2")
+            coEvery { tokenService.verifyAccessToken("a") } returns AccessTokenClaims(DOC, resource, "conn-1")
+            coEvery { tokenService.verifyAccessToken("b") } returns AccessTokenClaims(DOC, resource, "conn-2")
+            val validator =
+                OAuthAccessValidator(tokenService, clientRepository, serverLog, debounceMs = 1000L, nowMs = { 5L })
+            validator.validate("a", resource)
+            validator.validate("a", resource)
+            validator.validate("b", resource)
+            coVerify(exactly = 1) { clientRepository.touchLastUsed(DOC, 5L, "conn-1") }
+            coVerify(exactly = 1) { clientRepository.touchLastUsed(DOC, 5L, "conn-2") }
+        }
+
+    @Test
+    @DisplayName("pruning the debounce keys keeps the live CIMD connections and drops the clients that are gone")
+    fun pruneKeepsLiveConnections() =
+        runTest {
+            coEvery { clientRepository.getClient(any()) } answers { client(firstArg()) }
+            coEvery { clientRepository.getClient(DOC) } returns cimdClient("conn-1")
+            coEvery { clientRepository.getClients() } returns listOf(cimdClient("conn-1"))
+            coEvery { tokenService.verifyAccessToken(any()) } answers { AccessTokenClaims(firstArg(), resource) }
+            coEvery { tokenService.verifyAccessToken("cimd") } returns AccessTokenClaims(DOC, resource, "conn-1")
+            val validator =
+                OAuthAccessValidator(tokenService, clientRepository, serverLog, debounceMs = 1000L, nowMs = { 5L })
+            validator.validate("cimd", resource)
+            // One key per DCR client no longer in the registry, until the map passes its bound and is pruned.
+            repeat(OAuthPolicy.MAX_OAUTH_CLIENTS * OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT) {
+                validator.validate("dcr-$it", resource)
+            }
+            validator.validate("cimd", resource)
+            validator.validate("dcr-0", resource)
+            coVerify(exactly = 1) { clientRepository.touchLastUsed(DOC, 5L, "conn-1") }
+            coVerify(exactly = 2) { clientRepository.touchLastUsed("dcr-0", 5L, null) }
+        }
+
+    private fun cimdClient(vararg connectionIds: String) =
+        OAuthClient(
+            clientId = DOC,
+            clientName = "Claude Code",
+            redirectUris = listOf("http://localhost/callback"),
+            createdAtMs = 0L,
+            lastUsedAtMs = 0L,
+            connections = connectionIds.map { OAuthConnection(it, "jti-$it", 0L, 0L) },
+        )
+
     private companion object {
         const val THIRTY_MIN_MS = 1_800_000L
         const val ONE_MIN_MS = 60_000L
+        const val DOC = "https://claude.ai/oauth/claude-code-client-metadata"
     }
 }

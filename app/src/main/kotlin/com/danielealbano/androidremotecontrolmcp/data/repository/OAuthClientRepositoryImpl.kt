@@ -6,8 +6,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.di.OAuthClientsDataStore
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientMetadataDocument
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.loggable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -42,13 +45,8 @@ class OAuthClientRepositoryImpl
         private suspend fun seedLocked() {
             if (seeded) return
             val stored = dataStore.data.first()[OAUTH_CLIENTS_KEY]
-            snapshot.value = parse(stored)
+            snapshot.value = decodeClients(json, stored)
             seeded = true
-        }
-
-        private fun parse(stored: String?): List<OAuthClient> {
-            if (stored.isNullOrEmpty()) return emptyList()
-            return runCatching { json.decodeFromString<List<OAuthClient>>(stored) }.getOrDefault(emptyList())
         }
 
         /** Persists [list] to the snapshot and disk. MUST be called with [mutex] held. */
@@ -95,23 +93,54 @@ class OAuthClientRepositoryImpl
                         lastUsedAtMs = nowMs,
                         currentRefreshJti = null,
                     )
-                val existing = snapshot.value
-                val combined = existing + newClient
-                val finalList =
-                    if (combined.size > OAuthPolicy.MAX_OAUTH_CLIENTS) {
-                        // Choose the victim among EXISTING clients only (the newcomer is always kept).
-                        // Prefer the oldest unapproved (never completed a token grant); fall back to the
-                        // overall oldest only when every existing client is approved — so registration
-                        // spam (which adds unapproved entries) can never evict an approved client.
-                        val unapprovedExisting = existing.filter { it.currentRefreshJti == null }
-                        val victim =
-                            (unapprovedExisting.ifEmpty { existing }).minByOrNull { it.lastUsedAtMs }
-                        if (victim != null) combined - victim else combined
-                    } else {
-                        combined
-                    }
-                persist(finalList)
+                persist(snapshot.value.withinCap(newClient, serverLog::logEvicted))
                 newClient
+            }
+
+        override suspend fun addConnection(
+            document: ClientMetadataDocument,
+            iconUrl: String?,
+            connectionId: String,
+            refreshJti: String,
+            nowMs: Long,
+        ): OAuthClient =
+            mutex.withLock {
+                seedLocked()
+                val clientId = document.clientId
+                val clientName = document.clientName
+                val connection = OAuthConnection(connectionId, refreshJti, createdAtMs = nowMs, lastUsedAtMs = nowMs)
+                val existing = snapshot.value.firstOrNull { it.clientId == clientId }
+                val client =
+                    existing?.let {
+                        val kept = it.connections.withinConnectionCap()
+                        if (kept.size < it.connections.size) {
+                            serverLog.log(
+                                ServerLogEntry.Type.OAUTH,
+                                "OAuth connection ended for ${loggable(clientName)}: " +
+                                    "more than ${OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT} connections",
+                            )
+                        }
+                        it.copy(
+                            clientName = clientName,
+                            redirectUris = document.redirectUris,
+                            logoUri = document.logoUri,
+                            lastUsedAtMs = nowMs,
+                            connections = kept + connection,
+                            iconUrl = iconUrl,
+                        )
+                    } ?: OAuthClient(
+                        clientId = clientId,
+                        clientName = clientName,
+                        redirectUris = document.redirectUris,
+                        logoUri = document.logoUri,
+                        createdAtMs = nowMs,
+                        lastUsedAtMs = nowMs,
+                        connections = listOf(connection),
+                        iconUrl = iconUrl,
+                    )
+                val updated = snapshot.value.replacing(clientId) { client }
+                persist(updated ?: snapshot.value.withinCap(client, serverLog::logEvicted))
+                client
             }
 
         override suspend fun revoke(clientId: String) {
@@ -121,10 +150,8 @@ class OAuthClientRepositoryImpl
                 val updated = snapshot.value.filterNot { it.clientId == clientId }
                 if (updated.size != snapshot.value.size) {
                     persist(updated)
-                    serverLog.log(
-                        ServerLogEntry.Type.OAUTH,
-                        "OAuth client revoked: ${removed?.clientName ?: clientId}",
-                    )
+                    val name = loggable(removed?.clientName ?: clientId)
+                    serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth client revoked: $name")
                 }
             }
         }
@@ -132,42 +159,47 @@ class OAuthClientRepositoryImpl
         override suspend fun touchLastUsed(
             clientId: String,
             nowMs: Long,
+            connectionId: String?,
         ) {
             mutex.withLock {
                 seedLocked()
-                var changed = false
-                val updated =
-                    snapshot.value.map {
-                        if (it.clientId == clientId) {
-                            changed = true
-                            it.copy(lastUsedAtMs = nowMs)
-                        } else {
-                            it
-                        }
-                    }
-                if (changed) persist(updated)
+                snapshot.value.replacing(clientId) { it.touched(nowMs, connectionId) }?.let { persist(it) }
             }
         }
 
-        override suspend fun setRefreshJti(
+        override suspend fun recordGrant(
             clientId: String,
-            jti: String,
+            refreshJti: String,
+            iconUrl: String?,
+            nowMs: Long,
         ) {
             mutex.withLock {
                 seedLocked()
-                var changed = false
-                val updated =
-                    snapshot.value.map {
-                        if (it.clientId == clientId) {
-                            changed = true
-                            it.copy(currentRefreshJti = jti)
-                        } else {
-                            it
-                        }
-                    }
-                if (changed) persist(updated)
+                snapshot.value
+                    .replacing(clientId) { client ->
+                        client.withRefreshJti(refreshJti, null).copy(iconUrl = iconUrl, lastUsedAtMs = nowMs)
+                    }?.let { persist(it) }
             }
         }
+
+        override suspend fun rotateRefreshJti(
+            clientId: String,
+            connectionId: String?,
+            expectedJti: String,
+            newJti: String,
+            nowMs: Long,
+        ): Boolean =
+            mutex.withLock {
+                seedLocked()
+                val client = snapshot.value.firstOrNull { it.clientId == clientId }
+                val rotates = client != null && client.refreshJtiOf(connectionId) == expectedJti
+                if (rotates) {
+                    snapshot.value
+                        .replacing(clientId) { it.withRefreshJti(newJti, connectionId).touched(nowMs, connectionId) }
+                        ?.let { persist(it) }
+                }
+                rotates
+            }
 
         private companion object {
             private val OAUTH_CLIENTS_KEY = stringPreferencesKey("oauth_clients")

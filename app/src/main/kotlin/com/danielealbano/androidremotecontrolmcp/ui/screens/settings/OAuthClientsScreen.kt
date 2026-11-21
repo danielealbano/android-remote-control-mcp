@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
@@ -48,12 +50,14 @@ import coil3.compose.AsyncImage
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.LogoUrlPolicy
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PublicOnlyDns
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.OAuthClientsViewModel
 import okhttp3.OkHttpClient
+import java.net.Proxy
 import java.net.URI
 import java.text.DateFormat
 import java.util.Date
@@ -103,7 +107,7 @@ private fun ClientRow(
         AlertDialog(
             onDismissRequest = { showConfirm = false },
             title = { Text(stringResource(R.string.oauth_clients_revoke_dialog_title)) },
-            text = { Text(stringResource(R.string.oauth_clients_revoke_dialog_body)) },
+            text = { Text(stringResource(revokeDialogBodyRes(client.clientId))) },
             confirmButton = {
                 TextButton(onClick = {
                     showConfirm = false
@@ -122,10 +126,7 @@ private fun ClientRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val clientLabel =
-            client.clientName
-                ?: hostOf(client.redirectUris.firstOrNull())
-                ?: stringResource(R.string.oauth_clients_unknown_client)
+        val clientLabel = clientLabel(client)
         ClientAvatar(client)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -134,7 +135,7 @@ private fun ClientRow(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                text = client.applicationType ?: "—",
+                text = clientDetail(client),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -158,10 +159,35 @@ private fun ClientRow(
     }
 }
 
+/** The client's name, else its first redirect host, else Unknown. */
+@Composable
+private fun clientLabel(client: OAuthClient): String =
+    client.clientName
+        ?: hostOf(client.redirectUris.firstOrNull())
+        ?: stringResource(R.string.oauth_clients_unknown_client)
+
+/** The revoke dialog text: revoking a CIMD row ends every connection of its app. */
+@StringRes
+internal fun revokeDialogBodyRes(clientId: String): Int =
+    if (OAuthPolicy.isMetadataDocumentClientId(clientId)) {
+        R.string.oauth_clients_revoke_dialog_body_app
+    } else {
+        R.string.oauth_clients_revoke_dialog_body
+    }
+
+/** A CIMD client is one row for every login of its app: how many connections it holds; else the DCR type. */
+@Composable
+private fun clientDetail(client: OAuthClient): String =
+    if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
+        pluralStringResource(R.plurals.oauth_clients_connections, client.connections.size, client.connections.size)
+    } else {
+        client.applicationType ?: "—"
+    }
+
 @Composable
 private fun ClientAvatar(client: OAuthClient) {
     val context = LocalContext.current
-    // Coil loader with redirects disabled and a short timeout (SSRF hardening for the remote fetch).
+    // Coil loader with the downloads' guard: public addresses only, no proxy, no redirects, a short timeout.
     val imageLoader =
         remember {
             ImageLoader
@@ -172,6 +198,8 @@ private fun ClientAvatar(client: OAuthClient) {
                             callFactory = {
                                 OkHttpClient
                                     .Builder()
+                                    .dns(PublicOnlyDns)
+                                    .proxy(Proxy.NO_PROXY)
                                     .followRedirects(false)
                                     .followSslRedirects(false)
                                     .callTimeout(LOGO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -188,24 +216,30 @@ private fun ClientAvatar(client: OAuthClient) {
             .take(2)
             .uppercase()
 
+    // The icon the approval screen showed when the client was approved; initials when there is none.
+    val iconUrl = client.iconUrl
+    var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
+
     // Decorative: the client's name is read next to it
     Box(
         modifier =
             Modifier
                 .size(AVATAR_SIZE_DP.dp)
                 .clip(CircleShape)
-                .background(badgeColor)
+                // Icons are designed for light backgrounds; the colored badge is only for the initials.
+                .background(if (iconLoaded) ICON_DISC_COLOR else badgeColor)
                 .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        // Initials sit behind; a successfully-loaded safe logo covers them.
-        Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
-        if (LogoUrlPolicy.isSafeLogoUrl(client.logoUri)) {
+        // Initials only while there is no icon: a transparent icon must not show them through.
+        if (!iconLoaded) Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
+        if (iconUrl != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(client.logoUri).build(),
+                model = ImageRequest.Builder(context).data(iconUrl).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
-                modifier = Modifier.matchParentSize(),
+                modifier = Modifier.matchParentSize().padding(ICON_INSET_DP.dp),
+                onSuccess = { iconLoaded = true },
             )
         }
     }
@@ -217,3 +251,5 @@ private const val AVATAR_SIZE_DP = 40
 private const val LOGO_TIMEOUT_SECONDS = 5L
 private const val BADGE_COLOR_MASK = 0xFF404040.toInt()
 private const val BADGE_RGB_MASK = 0x00FFFFFF
+private const val ICON_INSET_DP = 5
+private val ICON_DISC_COLOR = Color.White

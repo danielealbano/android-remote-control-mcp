@@ -77,6 +77,33 @@ class OAuthFlowE2ETest {
         runFlow(redirectUris = GEMINI_CALLBACKS, redirectUri = GEMINI_REDIRECT, clientName = "Google")
     }
 
+    /**
+     * No registration: the device downloads Claude Code's real Client ID Metadata Document from claude.ai (the
+     * container needs internet) and accepts the loopback redirect on a port the document does not list.
+     */
+    @Test
+    fun `Claude Code's real metadata document completes the OAuth flow without registration`() {
+        waitForHealth()
+        authorizeAndCallTool(
+            CLAUDE_CODE_DOCUMENT,
+            CLAUDE_CODE_REDIRECT,
+            authorizeHint = "the device must download $CLAUDE_CODE_DOCUMENT: does the container reach the internet?",
+        )
+    }
+
+    @Test
+    fun `a metadata document URL outside the supported apps is refused without a redirect`() {
+        waitForHealth()
+        val (status, body) =
+            httpGet(
+                "$base/authorize?response_type=code&client_id=${enc("https://evil.example/client.json")}" +
+                    "&redirect_uri=${enc(CLAUDE_CODE_REDIRECT)}&code_challenge=${enc(CHALLENGE)}" +
+                    "&code_challenge_method=S256&state=xyz&scope=mcp",
+            )
+        assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, status, body)
+        assertTrue(body.contains("Invalid client_id or redirect_uri."), body)
+    }
+
     private fun runFlow(
         redirectUris: List<String>,
         redirectUri: String,
@@ -84,10 +111,14 @@ class OAuthFlowE2ETest {
     ) {
         // OAuth is enabled by default, so the container's server already mounts the OAuth endpoints.
         waitForHealth()
+        authorizeAndCallTool(register(redirectUris, clientName), redirectUri)
+    }
 
-        val issuer = metadataIssuer()
-
-        // 1. Dynamic Client Registration
+    /** Dynamic Client Registration of [clientName] with [redirectUris]; returns the client id. */
+    private fun register(
+        redirectUris: List<String>,
+        clientName: String,
+    ): String {
         val (regStatus, regBody) =
             httpPost(
                 "$base/register",
@@ -100,9 +131,21 @@ class OAuthFlowE2ETest {
         assertEquals(HttpURLConnection.HTTP_CREATED, regStatus, "register failed: $regBody")
         val registered = Json.parseToJsonElement(regBody).jsonObject
         assertEquals(redirectUris, registered["redirect_uris"]!!.jsonArray.map { it.jsonPrimitive.content })
-        val clientId = registered["client_id"]!!.jsonPrimitive.content
+        return registered["client_id"]!!.jsonPrimitive.content
+    }
 
-        // 2. Authorize (creates a pending approval). Parse the approval id from the consent page JS.
+    /**
+     * Authorizes [clientId] on [redirectUri], approves on the device, redeems the code and calls a tool. A refused
+     * authorize request fails with [authorizeHint] in its message.
+     */
+    private fun authorizeAndCallTool(
+        clientId: String,
+        redirectUri: String,
+        authorizeHint: String = "",
+    ) {
+        val issuer = metadataIssuer()
+
+        // 1. Authorize (creates a pending approval). Parse the approval id from the consent page JS.
         // The optional `resource` param is omitted so the server defaults it to its own request-derived
         // canonical resource (avoids host/port ambiguity through the container port-forward); the token
         // aud and the /mcp check then use the SAME server-side derivation.
@@ -110,18 +153,19 @@ class OAuthFlowE2ETest {
             "$base/authorize?response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(redirectUri)}" +
                 "&code_challenge=${enc(CHALLENGE)}&code_challenge_method=S256&state=xyz&scope=mcp"
         val (authStatus, authBody) = httpGet(authorizeUrl)
-        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed: $authBody")
+        val hint = authorizeHint.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed$hint: $authBody")
         val approvalId = APPROVAL_ID_REGEX.find(authBody)?.groupValues?.get(1)
         assertNotNull(approvalId, "could not parse approval id from consent page")
 
-        // 3. Approve on-device (debug-only receiver).
+        // 2. Approve on-device (debug-only receiver).
         AndroidContainerSetup.approvePendingOAuth()
 
-        // 4. Poll /authorize/status until approved, extract the code.
+        // 3. Poll /authorize/status until approved, extract the code.
         val code = pollForCode(approvalId!!, issuer)
         assertNotNull(code, "did not receive an authorization code after approval")
 
-        // 5. Exchange the code for tokens.
+        // 4. Exchange the code for tokens.
         val (tokenStatus, tokenBody) =
             httpPostForm(
                 "$base/token",
@@ -140,7 +184,7 @@ class OAuthFlowE2ETest {
                 .jsonObject["access_token"]!!
                 .jsonPrimitive.content
 
-        // 6. Connect the MCP client with the issued access token and call a basic tool.
+        // 5. Connect the MCP client with the issued access token and call a basic tool.
         val client = McpClient(mcpUrl, accessToken)
         runBlocking {
             client.connect()
@@ -167,12 +211,13 @@ class OAuthFlowE2ETest {
         }
     }
 
-    /** The metadata `issuer`, after checking the metadata advertises RFC 9207 issuer identification. */
+    /** The metadata `issuer`, after checking the metadata advertises RFC 9207 issuer identification and CIMD. */
     private fun metadataIssuer(): String {
         val (status, body) = httpGet("$base/.well-known/oauth-authorization-server")
         assertEquals(HttpURLConnection.HTTP_OK, status, body)
         val metadata = Json.parseToJsonElement(body).jsonObject
         assertEquals(JsonPrimitive(true), metadata["authorization_response_iss_parameter_supported"])
+        assertEquals(JsonPrimitive(true), metadata["client_id_metadata_document_supported"])
         return metadata["issuer"]!!.jsonPrimitive.content
     }
 
@@ -254,6 +299,10 @@ class OAuthFlowE2ETest {
 
     private companion object {
         const val REDIRECT = "http://localhost/callback"
+
+        // Claude Code's real document lists `http://localhost/callback` without a port; it listens on another one.
+        const val CLAUDE_CODE_DOCUMENT = "https://claude.ai/oauth/claude-code-client-metadata"
+        const val CLAUDE_CODE_REDIRECT = "http://localhost:53682/callback"
 
         // The redirect URI ChatGPT registered on a real device.
         const val CHATGPT_REDIRECT = "https://chatgpt.com/connector/oauth/-BSmWqXatII2"

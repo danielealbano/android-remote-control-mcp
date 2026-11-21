@@ -467,8 +467,13 @@
     <string name="oauth_clients_last_used">Last used %1$s</string>
     <string name="oauth_clients_revoke_named">Revoke %1$s</string>
     <string name="oauth_clients_unknown_client">Unknown</string>
+    <plurals name="oauth_clients_connections">
+        <item quantity="one">%1$d connection</item>
+        <item quantity="other">%1$d connections</item>
+    </plurals>
     <string name="oauth_clients_revoke_dialog_title">Revoke client?</string>
     <string name="oauth_clients_revoke_dialog_body">Revoking immediately invalidates this client\'s tokens. It must re-authorize to reconnect.</string>
+    <string name="oauth_clients_revoke_dialog_body_app">Revoking immediately ends every connection of this app. Each one must re-authorize to reconnect.</string>
     <string name="oauth_clients_revoke_confirm">Revoke</string>
     <string name="oauth_clients_revoke_cancel">Cancel</string>
 
@@ -482,6 +487,8 @@
     <string name="approval_approve_named">Approve %1$s</string>
     <string name="approval_expires_in">Expires in %1$s</string>
     <string name="approval_expired">Request expired</string>
+    <string name="approval_other_domain_warning">This app identifies itself from %1$s, a different domain. Approve only if you expected this.</string>
+    <string name="approval_loopback_warning">The access goes to an app on the computer where the login page is open. Approve only if you started this login there yourself.</string>
     <string name="notification_channel_oauth_approval_name">Connection approvals</string>
     <string name="notification_oauth_approval_title">Connection request pending</string>
     <string name="notification_oauth_approval_body">%1$d request(s) waiting — tap to review</string>
