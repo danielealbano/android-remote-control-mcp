@@ -20,9 +20,15 @@ object OAuthPolicy {
     /** The fixed Kimi (kimi.com) connector callback, used by Kimi custom plugins (hosted remote MCP). */
     const val KIMI_REDIRECT_URI = "https://www.kimi.com/mcp-oauth-callback"
 
-    /** ChatGPT also uses per-connector OAuth callback URLs under this exact host/path prefix. */
-    private const val CHATGPT_REDIRECT_HOST = "chatgpt.com"
-    private const val CHATGPT_REDIRECT_PATH_PREFIX = "/connector/oauth/"
+    /** ChatGPT also uses callback-id OAuth callback URLs on this exact host (see [CHATGPT_REDIRECT_PATH]). */
+    private val CHATGPT_REDIRECT_HOSTS = setOf("chatgpt.com")
+
+    /**
+     * `/connector/oauth/` + one callback id in the base64url alphabet (12 characters on a real device, e.g.
+     * `-BSmWqXatII2`). OpenAI does not document the id's length, so only its alphabet is checked. The alphabet has no
+     * `.`, `/` or `%`, so dot segments, extra segments and percent-encoding are refused.
+     */
+    private val CHATGPT_REDIRECT_PATH = Regex("^/connector/oauth/[A-Za-z0-9_-]+$")
 
     /**
      * Gemini custom-connector callbacks go through Google's OAuth redirect relay. Gemini registers six redirect URIs
@@ -74,41 +80,42 @@ object OAuthPolicy {
 
     /**
      * CLOSED redirect policy (the security boundary). Returns true ONLY for a URI in [ALLOWED_REDIRECT_URIS],
-     * ChatGPT's HTTPS callback namespace on the EXACT `chatgpt.com` host (path under `/connector/oauth/`),
+     * ChatGPT's HTTPS callback-id callbacks on the EXACT `chatgpt.com` host (see [CHATGPT_REDIRECT_PATH]),
      * Gemini's HTTPS custom-connector callbacks on the three EXACT Google relay hosts (see [GEMINI_REDIRECT_PATH]),
      * or `http://` loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local test clients
-     * (MCP Inspector / mcp-remote / Claude Code). ChatGPT and loopback hosts are compared via [URI.host] for EXACT
-     * equality; Gemini compares [URI.getRawAuthority] with the three hosts, so it also refuses userinfo and any port,
-     * even an empty one. Deceptive hosts (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`),
-     * other loopback IPs, `0.0.0.0`, non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
+     * (MCP Inspector / mcp-remote / Claude Code). Loopback hosts are compared via [URI.host] for EXACT equality;
+     * ChatGPT and Gemini compare [URI.getRawAuthority] with their hosts (see [isHostedCallback]). Deceptive hosts
+     * (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`), other loopback IPs, `0.0.0.0`,
+     * non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
      */
     fun isAllowedRedirectUri(uri: String): Boolean {
         if (uri in ALLOWED_REDIRECT_URIS) return true
 
         val parsed = runCatching { URI(uri) }.getOrNull()
         val host = parsed?.host?.removePrefix("[")?.removeSuffix("]")
-        val isChatGptConnectorCallback =
-            parsed != null &&
-                parsed.scheme == "https" &&
-                host == CHATGPT_REDIRECT_HOST &&
-                parsed.path?.startsWith(CHATGPT_REDIRECT_PATH_PREFIX) == true
         val isLoopback = parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
 
-        return isChatGptConnectorCallback || isGeminiConnectorCallback(parsed) || isLoopback
+        return isHostedCallback(parsed, CHATGPT_REDIRECT_HOSTS, CHATGPT_REDIRECT_PATH) ||
+            isHostedCallback(parsed, GEMINI_REDIRECT_HOSTS, GEMINI_REDIRECT_PATH) ||
+            isLoopback
     }
 
     /**
-     * Gemini relay callback: `https` only, the raw authority must be exactly one of the hosts (so no userinfo and no
+     * Hosted connector callback: `https` only, the raw authority must be exactly one of [hosts] (so no userinfo and no
      * port, not even an empty one; a URI without an authority is refused too), no query or fragment, and the raw path
-     * must be the exact id shape.
+     * must match [path].
      */
-    private fun isGeminiConnectorCallback(parsed: URI?): Boolean =
+    private fun isHostedCallback(
+        parsed: URI?,
+        hosts: Set<String>,
+        path: Regex,
+    ): Boolean =
         parsed != null &&
             parsed.scheme == "https" &&
-            parsed.rawAuthority in GEMINI_REDIRECT_HOSTS &&
+            parsed.rawAuthority in hosts &&
             parsed.rawQuery == null &&
             parsed.rawFragment == null &&
-            parsed.rawPath?.let { GEMINI_REDIRECT_PATH.matches(it) } == true
+            parsed.rawPath?.let { path.matches(it) } == true
 
     /**
      * RFC 8707 resource matching: case-insensitive on scheme+host, trailing-slash-insensitive, exact

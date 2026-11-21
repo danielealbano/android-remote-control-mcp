@@ -7,14 +7,24 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 /** The OAuth client side of the OAuth integration tests: DCR, authorize, token, and an MCP client on the token. */
 internal object OAuthTestClient {
@@ -114,5 +124,64 @@ internal object OAuthTestClient {
         val mcpClient = Client(clientInfo = Implementation(name = "oauth-test-client", version = "1.0.0"))
         mcpClient.connect(transport)
         return mcpClient
+    }
+
+    /**
+     * A hosted connector's whole flow: DCR with [redirectUris] as [clientName], authorization on [redirectUri], the
+     * on-device approval showing [clientName] and [redirectHost], the code on [redirectUri], the token, and an
+     * `android_tap` call with the access token (the caller stubs the tap and sets the public URL to [OVERRIDE]).
+     */
+    suspend fun ApplicationTestBuilder.assertConnectorFlow(
+        ctx: McpIntegrationTestHelper.OAuthTestContext,
+        redirectUris: List<String>,
+        redirectUri: String,
+        clientName: String,
+        redirectHost: String,
+    ) {
+        val registerResp = registerResponse(client, redirectUris, clientName)
+        assertEquals(HttpStatusCode.Created, registerResp.status)
+        val registered = Json.parseToJsonElement(registerResp.bodyAsText()).jsonObject
+        assertEquals(redirectUris, registered["redirect_uris"]!!.jsonArray.map { it.jsonPrimitive.content })
+        val clientId = registered["client_id"]!!.jsonPrimitive.content
+
+        authorize(client, clientId, AuthorizeOptions(redirectUri = redirectUri))
+        val approval =
+            ctx.approvalCoordinator
+                .observePending()
+                .value
+                .single()
+        assertEquals(clientName, approval.clientName)
+        assertEquals(redirectHost, approval.redirectHost)
+        ctx.approvalCoordinator.approve(approval.id, System.currentTimeMillis())
+        val redirect =
+            Json
+                .parseToJsonElement(client.get("/authorize/status?id=${approval.id}").bodyAsText())
+                .jsonObject["redirect"]!!
+                .jsonPrimitive.content
+        assertTrue(redirect.startsWith("$redirectUri?"), redirect)
+        assertEquals("xyz", Url(redirect).parameters["state"])
+
+        val tokenResp =
+            tokenRequest(
+                client,
+                clientId,
+                Url(redirect).parameters["code"]!!,
+                verifier = VERIFIER,
+                includeResource = true,
+                redirectUri = redirectUri,
+            )
+        assertEquals(HttpStatusCode.OK, tokenResp.status)
+        val access =
+            Json
+                .parseToJsonElement(tokenResp.bodyAsText())
+                .jsonObject["access_token"]!!
+                .jsonPrimitive.content
+        val mcpClient = connectMcp(this, access)
+        try {
+            val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
+            assertNotEquals(true, result.isError)
+        } finally {
+            mcpClient.close()
+        }
     }
 }

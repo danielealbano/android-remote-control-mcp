@@ -28,8 +28,8 @@ import java.net.URLEncoder
  * Acts as the OAuth client over the container's forwarded HTTP port: DCR → authorize → (debug) approve
  * → token → connect the MCP SDK client with the issued access token → call a basic tool. Because the
  * test is its own client over plain HTTP and never follows the final redirect, an `http://localhost/callback`
- * redirect from the allowlist is fine (no tunnel needed), and so are Gemini's six relay callbacks; the device checks
- * them against the allowlist with its own `java.net.URI`.
+ * redirect from the allowlist is fine (no tunnel needed), and so are ChatGPT's callback and Gemini's six relay
+ * callbacks; the device checks them against the allowlist with its own `java.net.URI`.
  *
  * Container assumptions: the shared container must have OAuth enabled and the server (re)started so the
  * new auth model is live — driven via [AndroidContainerSetup.configureOAuthEnabled] + a server restart.
@@ -45,6 +45,29 @@ class OAuthFlowE2ETest {
     @Test
     fun `full OAuth flow issues a token that authorizes a tool call`() {
         runFlow(redirectUris = listOf(REDIRECT), redirectUri = REDIRECT, clientName = "E2E")
+    }
+
+    @Test
+    fun `ChatGPT connector registration and callback complete the OAuth flow`() {
+        runFlow(redirectUris = listOf(CHATGPT_REDIRECT), redirectUri = CHATGPT_REDIRECT, clientName = "ChatGPT")
+    }
+
+    @Test
+    fun `ChatGPT callbacks with a port or dot segments are refused at registration`() {
+        waitForHealth()
+        listOf(
+            "https://chatgpt.com:443/connector/oauth/-BSmWqXatII2",
+            "https://chatgpt.com/connector/oauth/../../evil",
+        ).forEach { uri ->
+            val (status, body) =
+                httpPost(
+                    "$base/register",
+                    """{"redirect_uris":["$uri"],"token_endpoint_auth_method":"none"}""",
+                    "application/json",
+                )
+            assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, status, "$uri: $body")
+            assertTrue(body.contains("invalid_redirect_uri"), "$uri: $body")
+        }
     }
 
     @Test
@@ -212,6 +235,9 @@ class OAuthFlowE2ETest {
 
     private companion object {
         const val REDIRECT = "http://localhost/callback"
+
+        // The redirect URI ChatGPT registered on a real device.
+        const val CHATGPT_REDIRECT = "https://chatgpt.com/connector/oauth/-BSmWqXatII2"
 
         // The six redirect URIs Gemini registered on a real device; it authorizes on the production /r/ one.
         const val GEMINI_ID = "user_bound_custom-mcp-8569b7990f18a8201022f919"

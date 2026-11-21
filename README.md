@@ -263,17 +263,21 @@ Custom connectors are available on the Free (1 connector), Pro, Max, Team, and E
 
 > ⚠️ **Security:** treat the public tunnel URL as sensitive, approve only connections you initiated (verify the 2-digit code), revoke clients you no longer use, and stop the tunnel and server when you are done. Never point it at a device holding sensitive data.
 
-### Connect from ChatGPT (Custom Connector, OAuth)
+### Connect from ChatGPT (Custom MCP Server, OAuth)
 
-ChatGPT connects to the server as a **custom MCP connector** using the same self-contained OAuth 2.1 flow. As with Claude, the server must be reachable over a **public HTTPS URL**, so enable a [remote access tunnel](#using-remote-access-tunnels) first — a `localhost`/LAN address or `adb` port-forward will **not** work. Custom connectors require a paid plan (Plus, Pro, Business, Enterprise, or Edu — not Free) and are set up from the **ChatGPT web app**.
+ChatGPT connects as a **custom MCP server** (shown as a plugin) over OAuth 2.1. It needs a public HTTPS URL, so enable a [remote access tunnel](#using-remote-access-tunnels) first.
 
-1. **Enable Developer mode** — in ChatGPT on the web, open **Settings → Connectors → Advanced settings** (labelled **Apps & Connectors** on some builds) and turn on **Developer mode**.
-2. **Start the tunnel** — same as the Claude flow above: OAuth stays enabled by default, turn on **Remote Access** under Settings → Tunnel, start the server, and copy the public `https://…/mcp` URL from the Server tab.
-3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (ChatGPT registers itself with the app through Dynamic Client Registration).
-4. **Approve on the device** — ChatGPT starts the OAuth flow. Tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — confirm the 2-digit code matches, and **Approve** (identical to the Claude approval step).
-5. Manage or revoke the connected client any time under **Settings → Access → Connected clients** in the app.
+If **Add custom MCP server** is missing in step 2, your plan or workspace does not allow it.
 
-> ⚠️ **Security:** the same cautions apply — treat the tunnel URL as sensitive, approve only connections you initiated (verify the code), revoke unused clients, and stop the tunnel and server when you are done.
+1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
+2. On [chatgpt.com/plugins](https://chatgpt.com/plugins), on a computer or in a phone's browser, choose **+** → **Add custom MCP server**. The ChatGPT Android app cannot add one.
+3. Enter a name, paste the URL under **Server URL**, and keep **OAuth** with the default advanced settings (ChatGPT registers itself through Dynamic Client Registration). Tick **I understand and want to continue**, choose **Create as a plugin**, then **Connect** followed by the plugin name.
+4. On the phone, check the 2-digit code and approve the request from **ChatGPT** (notification, or the card on the Server screen).
+5. In a chat, type `@` and pick the plugin. It also works in the ChatGPT Android app.
+
+To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**.
+
+> ⚠️ **Security:** the same cautions as for Claude apply.
 
 ### Connect from Gemini (Custom Connector, OAuth)
 
