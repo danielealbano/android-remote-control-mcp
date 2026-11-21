@@ -5,8 +5,8 @@ import java.net.URI
 
 /**
  * Who is asking at `/authorize`: the name and logo to show, the host whose favicon stands in for a missing logo (the
- * document host for a CIMD client, whose redirect may be loopback; null for DCR, which uses its redirect host), and
- * the CIMD document (null for a DCR client).
+ * document host for a CIMD client, whose redirect may be loopback; for DCR the app table's icon host, or null to use
+ * the redirect host), and the CIMD document (null for a DCR client).
  */
 internal class AuthorizeRequester(
     val displayName: String,
@@ -29,6 +29,7 @@ internal suspend fun registeredRequester(
                 displayName = client.clientName ?: host(redirectUri) ?: "Unknown",
                 logoUri = OAuthPolicy.displayLogoUri(clientId, client.logoUri),
                 metadataDocument = null,
+                iconHost = OAuthConnectors.iconHostFor(redirectUri),
             )
         }
 

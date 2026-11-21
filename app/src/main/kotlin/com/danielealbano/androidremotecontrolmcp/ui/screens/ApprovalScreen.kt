@@ -245,6 +245,7 @@ private fun ClientIcon(
             .uppercase()
             .ifEmpty { "?" }
     val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.iconHost)
+    var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
 
     // Decorative: the client's name is read next to it
     Box(
@@ -256,19 +257,22 @@ private fun ClientIcon(
                 .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        // Initials sit behind; a successfully-loaded icon covers them.
-        Text(
-            text = initials,
-            color = ICON_INITIALS_COLOR,
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
+        // Initials only while there is no icon: a transparent icon must not show them through.
+        if (!iconLoaded) {
+            Text(
+                text = initials,
+                color = ICON_INITIALS_COLOR,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (iconUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(iconUrl).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
                 modifier = Modifier.matchParentSize().padding(ICON_INSET_DP.dp),
+                onSuccess = { iconLoaded = true },
             )
         }
     }

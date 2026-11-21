@@ -51,6 +51,7 @@ import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnectors
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
@@ -203,32 +204,39 @@ private fun ClientAvatar(client: OAuthClient) {
             .take(2)
             .uppercase()
 
+    // As on the approval screen: the allowed logo, else the favicon of the host that identifies the client (the
+    // document host for CIMD, whose redirect may be loopback; for DCR the app table's icon host or the redirect
+    // host), else initials.
+    val redirectUri = client.redirectUris.firstOrNull()
+    val iconHost =
+        if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
+            hostOf(client.clientId)
+        } else {
+            redirectUri?.let { OAuthConnectors.iconHostFor(it) } ?: hostOf(redirectUri)
+        }
+    val iconUrl = ClientIconUrl.resolve(OAuthPolicy.displayLogoUri(client.clientId, client.logoUri), iconHost)
+    var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
+
     // Decorative: the client's name is read next to it
     Box(
         modifier =
             Modifier
                 .size(AVATAR_SIZE_DP.dp)
                 .clip(CircleShape)
-                .background(badgeColor)
+                // Icons are designed for light backgrounds; the colored badge is only for the initials.
+                .background(if (iconLoaded) ICON_DISC_COLOR else badgeColor)
                 .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        // Initials sit behind; a successfully-loaded allowed logo covers them.
-        Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
-        val logoUri = OAuthPolicy.displayLogoUri(client.clientId, client.logoUri)
-        // A CIMD client without a logo shows the favicon of its document host, as on the approval screen.
-        val iconUrl =
-            if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
-                ClientIconUrl.resolve(logoUri, hostOf(client.clientId))
-            } else {
-                logoUri
-            }
+        // Initials only while there is no icon: a transparent icon must not show them through.
+        if (!iconLoaded) Text(text = initials, color = Color.White, textAlign = TextAlign.Center)
         if (iconUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(iconUrl).build(),
                 imageLoader = imageLoader,
                 contentDescription = null,
-                modifier = Modifier.matchParentSize(),
+                modifier = Modifier.matchParentSize().padding(ICON_INSET_DP.dp),
+                onSuccess = { iconLoaded = true },
             )
         }
     }
@@ -240,3 +248,5 @@ private const val AVATAR_SIZE_DP = 40
 private const val LOGO_TIMEOUT_SECONDS = 5L
 private const val BADGE_COLOR_MASK = 0xFF404040.toInt()
 private const val BADGE_RGB_MASK = 0x00FFFFFF
+private const val ICON_INSET_DP = 5
+private val ICON_DISC_COLOR = Color.White
