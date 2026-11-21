@@ -164,7 +164,7 @@ class E2EShellPermissionTest {
 
             DeviceUiE2E.awaitNotificationPosted(APPROVAL_TAG)
             DeviceUiE2E.expandNotifications()
-            DeviceUiE2E.swipeAwayWhenVisible("Approve an elevated command?")
+            DeviceUiE2E.swipeAwayNotification("Approve an elevated command?", APPROVAL_TAG)
             val error = call.await()
             val elapsedMs = System.currentTimeMillis() - started
             DeviceUiE2E.collapseNotifications()
