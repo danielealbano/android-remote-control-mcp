@@ -27,6 +27,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStore
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthHttpFetcher
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeManager
@@ -101,6 +102,8 @@ class McpServerService : Service() {
     @Inject lateinit var approvalCoordinator: OAuthApprovalCoordinator
 
     @Inject lateinit var geoIpResolver: GeoIpResolver
+
+    @Inject lateinit var oauthHttpFetcher: OAuthHttpFetcher
 
     @Inject lateinit var serverLogRepository: ServerLogRepository
 
@@ -263,6 +266,7 @@ class McpServerService : Service() {
                             authorizationCodeStore = authorizationCodeStore,
                             approvalCoordinator = approvalCoordinator,
                             geoIpResolver = geoIpResolver,
+                            httpFetcher = oauthHttpFetcher,
                         ),
                     serverLog = serverLogRepository,
                     inFlightToolCalls = inFlightToolCalls,

@@ -70,14 +70,48 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
         return
     }
     val jti = UUID.randomUUID().toString()
-    deps.clientRepository.setRefreshJti(code.clientId, jti)
-    deps.clientRepository.touchLastUsed(code.clientId, deps.nowMs())
-    val clientName = deps.clientRepository.getClient(code.clientId)?.clientName ?: code.clientId
-    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to $clientName")
+    val grant = recordGrant(deps, code, jti)
+    val displayName = OAuthPolicy.clientDisplayName(code.clientId, grant.clientName) ?: code.clientId
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to $displayName")
     respondTokens(
-        access = deps.tokenService.issueAccessToken(code.clientId, code.resource),
-        refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource),
+        access = deps.tokenService.issueAccessToken(code.clientId, code.resource, grant.connectionId),
+        refresh = deps.tokenService.issueRefreshToken(code.clientId, jti, code.resource, grant.connectionId),
     )
+}
+
+/** A recorded code grant: the CIMD connection its tokens carry (null for DCR), and the client's name. */
+private class RecordedGrant(
+    val connectionId: String?,
+    val clientName: String?,
+)
+
+/**
+ * Records the grant of [code] with refresh jti [jti]: a DCR client's own jti, or for a CIMD client a new connection
+ * of its row (created on the first login) with the document read at `/authorize`.
+ */
+private suspend fun recordGrant(
+    deps: OAuthRouteDeps,
+    code: AuthorizationCode,
+    jti: String,
+): RecordedGrant {
+    val document = code.metadataDocument
+    return if (document == null) {
+        deps.clientRepository.setRefreshJti(code.clientId, jti)
+        deps.clientRepository.touchLastUsed(code.clientId, deps.nowMs())
+        RecordedGrant(null, deps.clientRepository.getClient(code.clientId)?.clientName)
+    } else {
+        val connectionId = UUID.randomUUID().toString()
+        deps.clientRepository.addConnection(
+            clientId = code.clientId,
+            clientName = document.clientName,
+            redirectUris = document.redirectUris,
+            logoUri = document.logoUri,
+            connectionId = connectionId,
+            refreshJti = jti,
+            nowMs = deps.nowMs(),
+        )
+        RecordedGrant(connectionId, document.clientName)
+    }
 }
 
 private suspend fun ApplicationCall.handleRefreshTokenGrant(
@@ -91,25 +125,37 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
         claims == null ||
             (!clientIdForm.isNullOrEmpty() && clientIdForm != claims.clientId) ||
             client == null ||
-            // Stale/rotated refresh token — reject only (do NOT revoke the client).
-            claims.jti != client.currentRefreshJti
+            // Stale/rotated refresh token, or a CIMD connection that ended — reject only (do NOT revoke the client).
+            claims.jti != currentRefreshJti(client, claims.connectionId)
     if (rejected) {
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_grant")
         return
     }
     val resource = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
     val newJti = UUID.randomUUID().toString()
-    deps.clientRepository.setRefreshJti(claims.clientId, newJti)
-    deps.clientRepository.touchLastUsed(claims.clientId, deps.nowMs())
-    deps.serverLog.log(
-        ServerLogEntry.Type.OAUTH,
-        "OAuth token refreshed for ${client.clientName ?: claims.clientId}",
-    )
+    deps.clientRepository.setRefreshJti(claims.clientId, newJti, claims.connectionId)
+    deps.clientRepository.touchLastUsed(claims.clientId, deps.nowMs(), claims.connectionId)
+    val name = OAuthPolicy.clientDisplayName(claims.clientId, client.clientName) ?: claims.clientId
+    deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for $name")
     respondTokens(
-        access = deps.tokenService.issueAccessToken(claims.clientId, resource),
-        refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource),
+        access = deps.tokenService.issueAccessToken(claims.clientId, resource, claims.connectionId),
+        refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource, claims.connectionId),
     )
 }
+
+/**
+ * The refresh jti [client] currently accepts: a DCR client's own, or the jti of its connection [connectionId] for a
+ * CIMD client (null once that connection ended). A token without a connection never refreshes a CIMD client.
+ */
+private fun currentRefreshJti(
+    client: OAuthClient,
+    connectionId: String?,
+): String? =
+    when {
+        connectionId != null -> client.connections.firstOrNull { it.id == connectionId }?.refreshJti
+        OAuthPolicy.isMetadataDocumentClientId(client.clientId) -> null
+        else -> client.currentRefreshJti
+    }
 
 internal suspend fun ApplicationCall.respondTokens(
     access: String,

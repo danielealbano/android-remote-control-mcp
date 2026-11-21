@@ -29,6 +29,7 @@ class OAuthMetadataTest {
         val obj = Json.parseToJsonElement(OAuthMetadata.authorizationServerMetadata(base)).jsonObject
         assertEquals(base, obj["issuer"]?.jsonPrimitive?.content)
         assertEquals(JsonPrimitive(true), obj["authorization_response_iss_parameter_supported"])
+        assertEquals(JsonPrimitive(true), obj["client_id_metadata_document_supported"])
         assertEquals("$base/authorize", obj["authorization_endpoint"]?.jsonPrimitive?.content)
         assertEquals("$base/token", obj["token_endpoint"]?.jsonPrimitive?.content)
         assertEquals("$base/register", obj["registration_endpoint"]?.jsonPrimitive?.content)

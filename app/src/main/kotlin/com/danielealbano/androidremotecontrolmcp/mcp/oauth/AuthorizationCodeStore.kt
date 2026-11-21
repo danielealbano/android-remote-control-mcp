@@ -9,6 +9,8 @@ data class AuthorizationCode(
     val resource: String,
     val scope: String,
     val expiresAtMs: Long,
+    /** The CIMD client's document read at `/authorize`; null for a DCR client. */
+    val metadataDocument: ClientMetadataDocument? = null,
 )
 
 /** The minted-code fields supplied when creating an authorization code. */
@@ -18,6 +20,8 @@ data class AuthorizationCodeRequest(
     val codeChallenge: String,
     val resource: String,
     val scope: String,
+    /** The CIMD client's document read at `/authorize`; null for a DCR client. */
+    val metadataDocument: ClientMetadataDocument? = null,
 )
 
 /**

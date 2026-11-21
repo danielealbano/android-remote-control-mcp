@@ -22,6 +22,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenServiceImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthAccessValidator
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinatorImpl
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthHttpFetcher
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthRouteDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
@@ -559,6 +560,7 @@ object McpIntegrationTestHelper {
         bearerToken: String = "",
         publicUrlOverride: String = "",
         clientIpSource: ClientIpSource? = null,
+        httpFetcher: OAuthHttpFetcher = FakeOAuthHttpFetcher(),
         testBlock: suspend io.ktor.server.testing.ApplicationTestBuilder.(OAuthTestContext) -> Unit,
     ) {
         val sdkServer = createSdkServer(deps)
@@ -604,6 +606,7 @@ object McpIntegrationTestHelper {
                                     authorizationCodeStore = codeStore,
                                     approvalCoordinator = approvalCoordinator,
                                     geoIpResolver = { null },
+                                    httpFetcher = httpFetcher,
                                 ),
                             publicUrlOverride = publicUrlOverride,
                             serverLog = deps.serverLog,

@@ -4,9 +4,9 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Persisted, revocable registry of DCR-registered OAuth clients. Backed by a DEDICATED Preferences
- * DataStore (not the shared settings store). An in-memory snapshot serves `/mcp` hot-path lookups so
- * no per-request JSON decode from disk is needed.
+ * Persisted, revocable registry of OAuth clients: DCR registrations and CIMD clients ([OAuthClient]). Backed by a
+ * DEDICATED Preferences DataStore (not the shared settings store). An in-memory snapshot serves `/mcp` hot-path
+ * lookups so no per-request JSON decode from disk is needed.
  */
 interface OAuthClientRepository {
     /** Observes the current client list (in-memory snapshot, write-through to disk). */
@@ -20,8 +20,8 @@ interface OAuthClientRepository {
 
     /**
      * Registers a new client and returns it. Enforces the cap by evicting the oldest-by-last-used
-     * client WITHOUT a refresh jti (never completed a token grant); only when every client has one
-     * does it evict the overall oldest — so registration spam cannot evict an approved client.
+     * client that never completed a token grant (no refresh jti, no connection); only when every client
+     * completed one does it evict the overall oldest — so registration spam cannot evict an approved client.
      */
     suspend fun register(
         clientName: String?,
@@ -31,18 +31,36 @@ interface OAuthClientRepository {
         nowMs: Long,
     ): OAuthClient
 
-    /** Removes the client (its tokens stop validating immediately). */
+    /**
+     * Adds a login of the CIMD client [clientId] and returns the client. The first login creates its row (under the
+     * same cap as [register]); later ones refresh its name, redirect URIs and logo from the latest document. Beyond
+     * [com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT] connections the
+     * least recently used other one is dropped.
+     */
+    suspend fun addConnection(
+        clientId: String,
+        clientName: String,
+        redirectUris: List<String>,
+        logoUri: String?,
+        connectionId: String,
+        refreshJti: String,
+        nowMs: Long,
+    ): OAuthClient
+
+    /** Removes the client (its tokens stop validating immediately); for CIMD, all its connections. */
     suspend fun revoke(clientId: String)
 
-    /** Updates the client's last-used timestamp. */
+    /** Updates the client's last-used timestamp, and the connection's when [connectionId] is given (CIMD). */
     suspend fun touchLastUsed(
         clientId: String,
         nowMs: Long,
+        connectionId: String? = null,
     )
 
-    /** Sets the client's current refresh-token jti (rotation). */
+    /** Sets the current refresh-token jti (rotation): the client's (DCR), or the [connectionId] connection's (CIMD). */
     suspend fun setRefreshJti(
         clientId: String,
         jti: String,
+        connectionId: String? = null,
     )
 }

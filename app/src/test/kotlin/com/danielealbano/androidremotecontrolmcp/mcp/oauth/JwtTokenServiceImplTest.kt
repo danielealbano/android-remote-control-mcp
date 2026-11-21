@@ -47,6 +47,21 @@ class JwtTokenServiceImplTest {
         }
 
     @Test
+    @DisplayName("a CIMD connection id round-trips in both tokens and is absent otherwise")
+    fun connectionIdRoundTrips() =
+        runTest {
+            val doc = "https://claude.ai/oauth/claude-code-client-metadata"
+            val access = service.verifyAccessToken(service.issueAccessToken(doc, resource, "conn-1"))
+            assertEquals(doc, access?.clientId)
+            assertEquals("conn-1", access?.connectionId)
+            val refresh = service.verifyRefreshToken(service.issueRefreshToken(doc, "jti-1", resource, "conn-1"))
+            assertEquals("conn-1", refresh?.connectionId)
+            assertEquals("jti-1", refresh?.jti)
+            assertNull(service.verifyAccessToken(service.issueAccessToken("client-1", resource))?.connectionId)
+            assertNull(service.verifyRefreshToken(service.issueRefreshToken("client-1", "j", resource))?.connectionId)
+        }
+
+    @Test
     @DisplayName("rejects tampered token")
     fun rejectsTampered() =
         runTest {

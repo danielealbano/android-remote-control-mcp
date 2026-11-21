@@ -29,6 +29,7 @@ class AuthorizationCodeStoreImpl
                         resource = request.resource,
                         scope = request.scope,
                         expiresAtMs = nowMs + OAuthPolicy.AUTH_CODE_TTL_MS,
+                        metadataDocument = request.metadataDocument,
                     )
                 code
             }

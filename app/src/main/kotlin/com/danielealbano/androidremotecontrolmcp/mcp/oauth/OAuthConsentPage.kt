@@ -7,13 +7,14 @@ import io.ktor.server.response.respondText
 private const val MILLIS_PER_SECOND = 1000L
 
 /**
- * Renders and responds with the [consentPageHtml] for [approval], resolving the requesting client's icon
- * via [ClientIconUrl] and seeding the countdown from the window remaining at [nowMs].
+ * Renders and responds with the [consentPageHtml] for [approval]: the client's logo when the phone could embed one
+ * ([embeddedLogo], from [ConsentLogo]), else the redirect host's favicon ([ClientIconUrl]), and the countdown seeded
+ * from the window remaining at [nowMs].
  */
 suspend fun ApplicationCall.respondConsentPage(
     approval: PendingApproval,
     displayName: String,
-    logoUri: String?,
+    embeddedLogo: String?,
     redirectHost: String,
     nowMs: Long,
 ) {
@@ -24,7 +25,7 @@ suspend fun ApplicationCall.respondConsentPage(
             clientName = displayName,
             host = redirectHost,
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
-            iconUrl = ClientIconUrl.resolve(logoUri, redirectHost),
+            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, redirectHost),
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)
 }

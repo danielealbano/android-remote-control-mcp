@@ -20,39 +20,23 @@ object OAuthPolicy {
     /** The fixed Kimi (kimi.com) connector callback, used by Kimi custom plugins (hosted remote MCP). */
     const val KIMI_REDIRECT_URI = "https://www.kimi.com/mcp-oauth-callback"
 
-    /** ChatGPT also uses callback-id OAuth callback URLs on this exact host (see [CHATGPT_REDIRECT_PATH]). */
-    private val CHATGPT_REDIRECT_HOSTS = setOf("chatgpt.com")
-
-    /**
-     * `/connector/oauth/` + one callback id in the base64url alphabet (12 characters on a real device, e.g.
-     * `-BSmWqXatII2`). OpenAI does not document the id's length, so only its alphabet is checked. The alphabet has no
-     * `.`, `/` or `%`, so dot segments, extra segments and percent-encoding are refused.
-     */
-    private val CHATGPT_REDIRECT_PATH = Regex("^/connector/oauth/[A-Za-z0-9_-]+$")
-
-    /**
-     * Gemini custom-connector callbacks go through Google's OAuth redirect relay. Gemini registers six redirect URIs
-     * in one DCR request (these three hosts x the `/r/` and `/a/` paths), all ending in the same per-connector id.
-     */
-    private val GEMINI_REDIRECT_HOSTS =
-        setOf(
-            "oauth-redirect.googleusercontent.com",
-            "oauth-redirect-sandbox.googleusercontent.com",
-            "oauth-redirect-test.googleusercontent.com",
-        )
-
-    /**
-     * Only the custom-connector id (`user_bound_custom-mcp-` + 24 lowercase hex digits). The same relay delivers
-     * account-linking codes to any Google developer project under `/r/<project-id>`, so a wider pattern would let any
-     * project receive this server's authorization codes.
-     */
-    private val GEMINI_REDIRECT_PATH = Regex("^/[ra]/user_bound_custom-mcp-[0-9a-f]{24}$")
-
-    /** Exact non-loopback redirect URIs accepted by the allowlist (add other hosted connectors here). */
-    val ALLOWED_REDIRECT_URIS = setOf(CLAUDE_REDIRECT_URI, CHATGPT_REDIRECT_URI, KIMI_REDIRECT_URI)
+    /** Exact non-loopback redirect URIs accepted by the allowlist (add hosted connectors to [OAuthConnectors.ALL]). */
+    val ALLOWED_REDIRECT_URIS: Set<String> = OAuthConnectors.ALL.flatMapTo(HashSet()) { it.exactRedirectUris }
 
     /** Maximum persisted OAuth clients before eviction. */
     const val MAX_OAUTH_CLIENTS = 20
+
+    /** Maximum connections (logins) one CIMD client keeps; beyond it the least recently used one is dropped. */
+    const val MAX_CONNECTIONS_PER_CLIENT = 10
+
+    /** The most of a CIMD document that is read (draft-ietf-oauth-client-id-metadata-document section 10.11). */
+    const val MAX_METADATA_DOCUMENT_BYTES = 5 * 1024
+
+    /** The most of a client logo that is read to embed it in the consent page. */
+    const val MAX_LOGO_BYTES = 256 * 1024
+
+    /** Whole-call limit for downloading a CIMD document or a client logo. */
+    const val OUTBOUND_FETCH_TIMEOUT_MS = 5_000L
 
     /** Access-token lifetime (24h). */
     const val ACCESS_TOKEN_TTL_SECONDS = 86_400L
@@ -78,44 +62,126 @@ object OAuthPolicy {
     private const val SCHEME_SEPARATOR = "://"
     private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
 
+    /** A lowercase DNS host name with at least two labels. */
+    private val HOST_NAME = Regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+
     /**
-     * CLOSED redirect policy (the security boundary). Returns true ONLY for a URI in [ALLOWED_REDIRECT_URIS],
-     * ChatGPT's HTTPS callback-id callbacks on the EXACT `chatgpt.com` host (see [CHATGPT_REDIRECT_PATH]),
-     * Gemini's HTTPS custom-connector callbacks on the three EXACT Google relay hosts (see [GEMINI_REDIRECT_PATH]),
-     * or `http://` loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local test clients
-     * (MCP Inspector / mcp-remote / Claude Code). Loopback hosts are compared via [URI.host] for EXACT equality;
-     * ChatGPT and Gemini compare [URI.getRawAuthority] with their hosts (see [isHostedCallback]). Deceptive hosts
-     * (`localhost.evil.com`, `chatgpt.com.evil.example`, `localhost@evil.com`), other loopback IPs, `0.0.0.0`,
-     * non-`https` ChatGPT/Gemini callbacks, and any other https host are rejected.
+     * CLOSED redirect policy (the security boundary). Returns true ONLY for a hosted callback of an app in
+     * [OAuthConnectors.ALL] (an exact URI, ChatGPT's callback-id callbacks on the EXACT `chatgpt.com` host, Gemini's
+     * custom-connector callbacks on the three EXACT Google relay hosts; see [HostedCallbackPattern]), or `http://`
+     * loopback (`localhost` / `127.0.0.1` / `[::1]`, any/no port) for local clients (MCP Inspector / mcp-remote /
+     * Claude Code / Codex / VS Code). Loopback hosts are compared via [URI.host] for EXACT equality; hosted patterns
+     * compare [URI.getRawAuthority] with their hosts. Deceptive hosts (`localhost.evil.com`,
+     * `chatgpt.com.evil.example`, `localhost@evil.com`), other loopback IPs, `0.0.0.0`, non-`https` hosted callbacks,
+     * and any other https host are rejected.
      */
     fun isAllowedRedirectUri(uri: String): Boolean {
-        if (uri in ALLOWED_REDIRECT_URIS) return true
-
         val parsed = runCatching { URI(uri) }.getOrNull()
-        val host = parsed?.host?.removePrefix("[")?.removeSuffix("]")
-        val isLoopback = parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
+        return isLoopbackRedirect(parsed) || OAuthConnectors.ALL.any { it.ownsHostedCallback(uri, parsed) }
+    }
 
-        return isHostedCallback(parsed, CHATGPT_REDIRECT_HOSTS, CHATGPT_REDIRECT_PATH) ||
-            isHostedCallback(parsed, GEMINI_REDIRECT_HOSTS, GEMINI_REDIRECT_PATH) ||
-            isLoopback
+    /** True when [clientId] is a Client ID Metadata Document URL (DCR client ids are `arc-<uuid>`). */
+    fun isMetadataDocumentClientId(clientId: String): Boolean = clientId.startsWith("https://")
+
+    /**
+     * The host a CIMD [clientId] is fetched from, or null when it must be refused (draft-ietf-oauth-client-id-metadata-
+     * document section 3, plus the app list): `https`, a raw authority that is a lowercase host name under a document
+     * domain of [OAuthConnectors.ALL] (so no userinfo, no port, no trailing dot), a path other than `/` without dot
+     * segments or percent-encoding, and no query or fragment. The client id is never normalized: the document must
+     * name exactly this string.
+     */
+    fun metadataDocumentHost(clientId: String): String? {
+        val parsed = runCatching { URI(clientId) }.getOrNull()
+        val host = parsed?.rawAuthority
+        val path = parsed?.rawPath.orEmpty()
+        val valid =
+            parsed != null &&
+                host != null &&
+                parsed.scheme == "https" &&
+                HOST_NAME.matches(host) &&
+                parsed.rawQuery == null &&
+                parsed.rawFragment == null &&
+                path.length > 1 &&
+                '%' !in path &&
+                path.split('/').none { it == "." || it == ".." } &&
+                OAuthConnectors.ALL.any { it.ownsDocumentHost(host) }
+        return host.takeIf { valid }
     }
 
     /**
-     * Hosted connector callback: `https` only, the raw authority must be exactly one of [hosts] (so no userinfo and no
-     * port, not even an empty one; a URI without an authority is refused too), no query or fragment, and the raw path
-     * must match [path].
+     * True when a CIMD client whose document came from [documentHost] may use [redirectUri]: a hosted callback of an
+     * app owning that domain, or a loopback redirect when such an app uses loopback. So a document on claude.ai can
+     * only send codes to Claude's callback or to loopback (Claude Code), never to another app's callback.
      */
-    private fun isHostedCallback(
-        parsed: URI?,
-        hosts: Set<String>,
-        path: Regex,
-    ): Boolean =
-        parsed != null &&
-            parsed.scheme == "https" &&
-            parsed.rawAuthority in hosts &&
-            parsed.rawQuery == null &&
-            parsed.rawFragment == null &&
-            parsed.rawPath?.let { path.matches(it) } == true
+    fun isAllowedMetadataDocumentRedirect(
+        documentHost: String,
+        redirectUri: String,
+    ): Boolean {
+        val parsed = runCatching { URI(redirectUri) }.getOrNull()
+        val loopback = isLoopbackRedirect(parsed)
+        return OAuthConnectors.ALL.any {
+            it.ownsDocumentHost(documentHost) &&
+                (it.ownsHostedCallback(redirectUri, parsed) || (loopback && it.loopbackRedirects))
+        }
+    }
+
+    /**
+     * True when [requested] is one of a CIMD document's [listed] redirect URIs: the exact string, or for a loopback
+     * redirect the same URI with the port ignored (RFC 8252 section 7.3). Claude Code and Codex list
+     * `http://localhost/callback` without a port and listen on a different one each time.
+     */
+    fun isListedRedirectUri(
+        requested: String,
+        listed: List<String>,
+    ): Boolean {
+        val key = loopbackKey(requested)
+        return requested in listed || (key != null && listed.any { loopbackKey(it) == key })
+    }
+
+    /**
+     * The logo to show for a client, or null for the favicon or initials. A CIMD logo comes from a document fetched
+     * from the app's own domain, so any SSRF-safe one is used. A DCR client chooses its `logo_uri` freely, and the
+     * phone downloading it would tell that server the phone's real address, so only one under a document domain of
+     * [OAuthConnectors.ALL] is used.
+     */
+    fun displayLogoUri(
+        clientId: String,
+        logoUri: String?,
+    ): String? {
+        val host =
+            logoUri
+                ?.takeIf { LogoUrlPolicy.isSafeLogoUrl(it) }
+                ?.let { runCatching { URI(it).host?.lowercase() }.getOrNull() }
+        val allowed =
+            host != null &&
+                (isMetadataDocumentClientId(clientId) || OAuthConnectors.ALL.any { it.ownsDocumentHost(host) })
+        return logoUri.takeIf { allowed }
+    }
+
+    /**
+     * The name a client is shown with. A CIMD client's own name is self-asserted, so the host its document came from
+     * follows it: `Claude (claude.ai)`. A DCR client shows its `client_name`; null when it sent none.
+     */
+    fun clientDisplayName(
+        clientId: String,
+        clientName: String?,
+    ): String? {
+        if (!isMetadataDocumentClientId(clientId)) return clientName
+        val host = runCatching { URI(clientId).rawAuthority }.getOrNull()
+        return if (clientName != null && host != null) "$clientName ($host)" else clientName ?: host
+    }
+
+    private fun isLoopbackRedirect(parsed: URI?): Boolean {
+        val host = parsed?.host?.removePrefix("[")?.removeSuffix("]")
+        return parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
+    }
+
+    /** A loopback redirect without its port, for [isListedRedirectUri]; null for anything else. */
+    private fun loopbackKey(uri: String): List<String?>? =
+        runCatching { URI(uri) }
+            .getOrNull()
+            ?.takeIf { isLoopbackRedirect(it) && it.rawUserInfo == null && it.rawFragment == null }
+            ?.let { listOf(it.host, it.rawPath, it.rawQuery) }
 
     /**
      * RFC 8707 resource matching: case-insensitive on scheme+host, trailing-slash-insensitive, exact

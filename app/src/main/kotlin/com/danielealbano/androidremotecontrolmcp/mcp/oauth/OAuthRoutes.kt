@@ -28,7 +28,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import java.net.URI
 
 /**
  * Registers the OAuth endpoints (all UNAUTHENTICATED — the combined-auth plugin excludes them). Mount
@@ -117,16 +116,15 @@ private suspend fun ApplicationCall.handleAuthorize(
 ) {
     val params = request.queryParameters
     val clientId = params["client_id"]
-    val client = if (clientId.isNullOrEmpty()) null else deps.clientRepository.getClient(clientId)
     val redirectUri = params["redirect_uri"]
-    val redirectValid =
-        client != null &&
-            clientId != null &&
-            !redirectUri.isNullOrEmpty() &&
-            redirectUri in client.redirectUris &&
-            OAuthPolicy.isAllowedRedirectUri(redirectUri)
-    if (!redirectValid) {
-        // Open-redirect guard: never redirect to an unvalidated URI.
+    val requester =
+        when {
+            clientId.isNullOrEmpty() || redirectUri.isNullOrEmpty() -> null
+            OAuthPolicy.isMetadataDocumentClientId(clientId) -> metadataDocumentRequester(deps, clientId, redirectUri)
+            else -> registeredRequester(deps, clientId, redirectUri)
+        }
+    if (requester == null || clientId == null || redirectUri == null) {
+        // Open-redirect guard: never redirect to an unvalidated URI (nor when a CIMD document cannot be used).
         respondAuthorizeError("Invalid client_id or redirect_uri.")
         return
     }
@@ -140,22 +138,21 @@ private suspend fun ApplicationCall.handleAuthorize(
         return
     }
     val redirectHost = host(redirectUri) ?: "Unknown"
-    val displayName = client.clientName ?: redirectHost
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
     val approval =
         deps.approvalCoordinator.createPending(
             ApprovalRequest(
-                clientName = displayName,
+                clientName = requester.displayName,
                 redirectHost = redirectHost,
-                logoUri = client.logoUri,
+                logoUri = requester.logoUri,
                 clientIp = clientIp,
                 clientGeo = clientGeo,
             ),
             deps.nowMs(),
         )
-    deps.logAuthorizationRequested(displayName, clientIp, clientGeo)
+    deps.logAuthorizationRequested(requester.displayName, clientIp, clientGeo)
     pendingAuthorize.put(
         approval.id,
         PendingAuthorizeRequest(
@@ -167,10 +164,12 @@ private suspend fun ApplicationCall.handleAuthorize(
             state = state,
             issuer = issuer,
             expiresAtMs = approval.expiresAtMs,
+            metadataDocument = requester.metadataDocument,
         ),
         deps.nowMs(),
     )
-    respondConsentPage(approval, displayName, client.logoUri, redirectHost, deps.nowMs())
+    val embeddedLogo = ConsentLogo.embed(deps.httpFetcher, requester.logoUri)
+    respondConsentPage(approval, requester.displayName, embeddedLogo, redirectHost, deps.nowMs())
 }
 
 /** Logs an OAUTH authorization-request entry annotated with the client's IP and geolocation (never tokens). */
@@ -228,6 +227,7 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
                             codeChallenge = pending.codeChallenge,
                             resource = pending.resource,
                             scope = pending.scope,
+                            metadataDocument = pending.metadataDocument,
                         ),
                         deps.nowMs(),
                     )
@@ -263,8 +263,6 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
         }
     }
 }
-
-private fun host(uri: String): String? = runCatching { URI(uri).host }.getOrNull()
 
 private fun JsonObject.stringField(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 

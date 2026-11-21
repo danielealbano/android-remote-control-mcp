@@ -99,6 +99,7 @@ class McpServerListenersTest {
                 mockk(relaxed = true),
                 mockk(relaxed = true),
                 mockk(relaxed = true),
+                mockk(relaxed = true),
             ),
             serverLog,
             InFlightToolCalls(),

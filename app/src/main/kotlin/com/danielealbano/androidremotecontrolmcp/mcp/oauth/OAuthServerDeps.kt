@@ -13,4 +13,5 @@ class OAuthServerDeps(
     val authorizationCodeStore: AuthorizationCodeStore,
     val approvalCoordinator: OAuthApprovalCoordinator,
     val geoIpResolver: GeoIpResolver,
+    val httpFetcher: OAuthHttpFetcher,
 )

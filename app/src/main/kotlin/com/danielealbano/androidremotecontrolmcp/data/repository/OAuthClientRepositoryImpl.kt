@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.di.OAuthClientsDataStore
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,23 +96,51 @@ class OAuthClientRepositoryImpl
                         lastUsedAtMs = nowMs,
                         currentRefreshJti = null,
                     )
-                val existing = snapshot.value
-                val combined = existing + newClient
-                val finalList =
-                    if (combined.size > OAuthPolicy.MAX_OAUTH_CLIENTS) {
-                        // Choose the victim among EXISTING clients only (the newcomer is always kept).
-                        // Prefer the oldest unapproved (never completed a token grant); fall back to the
-                        // overall oldest only when every existing client is approved — so registration
-                        // spam (which adds unapproved entries) can never evict an approved client.
-                        val unapprovedExisting = existing.filter { it.currentRefreshJti == null }
-                        val victim =
-                            (unapprovedExisting.ifEmpty { existing }).minByOrNull { it.lastUsedAtMs }
-                        if (victim != null) combined - victim else combined
-                    } else {
-                        combined
-                    }
-                persist(finalList)
+                persist(snapshot.value.withinCap(newClient))
                 newClient
+            }
+
+        override suspend fun addConnection(
+            clientId: String,
+            clientName: String,
+            redirectUris: List<String>,
+            logoUri: String?,
+            connectionId: String,
+            refreshJti: String,
+            nowMs: Long,
+        ): OAuthClient =
+            mutex.withLock {
+                seedLocked()
+                val connection = OAuthConnection(connectionId, refreshJti, createdAtMs = nowMs, lastUsedAtMs = nowMs)
+                val existing = snapshot.value.firstOrNull { it.clientId == clientId }
+                val client =
+                    existing?.let {
+                        val kept = it.connections.withinConnectionCap()
+                        if (kept.size < it.connections.size) {
+                            serverLog.log(
+                                ServerLogEntry.Type.OAUTH,
+                                "OAuth connection ended for ${OAuthPolicy.clientDisplayName(clientId, clientName)}: " +
+                                    "more than ${OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT} connections",
+                            )
+                        }
+                        it.copy(
+                            clientName = clientName,
+                            redirectUris = redirectUris,
+                            logoUri = logoUri,
+                            lastUsedAtMs = nowMs,
+                            connections = kept + connection,
+                        )
+                    } ?: OAuthClient(
+                        clientId = clientId,
+                        clientName = clientName,
+                        redirectUris = redirectUris,
+                        logoUri = logoUri,
+                        createdAtMs = nowMs,
+                        lastUsedAtMs = nowMs,
+                        connections = listOf(connection),
+                    )
+                persist(snapshot.value.replacing(clientId) { client } ?: snapshot.value.withinCap(client))
+                client
             }
 
         override suspend fun revoke(clientId: String) {
@@ -121,10 +150,8 @@ class OAuthClientRepositoryImpl
                 val updated = snapshot.value.filterNot { it.clientId == clientId }
                 if (updated.size != snapshot.value.size) {
                     persist(updated)
-                    serverLog.log(
-                        ServerLogEntry.Type.OAUTH,
-                        "OAuth client revoked: ${removed?.clientName ?: clientId}",
-                    )
+                    val name = OAuthPolicy.clientDisplayName(clientId, removed?.clientName) ?: clientId
+                    serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth client revoked: $name")
                 }
             }
         }
@@ -132,40 +159,36 @@ class OAuthClientRepositoryImpl
         override suspend fun touchLastUsed(
             clientId: String,
             nowMs: Long,
+            connectionId: String?,
         ) {
             mutex.withLock {
                 seedLocked()
-                var changed = false
-                val updated =
-                    snapshot.value.map {
-                        if (it.clientId == clientId) {
-                            changed = true
-                            it.copy(lastUsedAtMs = nowMs)
-                        } else {
-                            it
-                        }
-                    }
-                if (changed) persist(updated)
+                snapshot.value
+                    .replacing(clientId) { client ->
+                        client.copy(
+                            lastUsedAtMs = nowMs,
+                            connections = client.connections.updating(connectionId) { it.copy(lastUsedAtMs = nowMs) },
+                        )
+                    }?.let { persist(it) }
             }
         }
 
         override suspend fun setRefreshJti(
             clientId: String,
             jti: String,
+            connectionId: String?,
         ) {
             mutex.withLock {
                 seedLocked()
-                var changed = false
-                val updated =
-                    snapshot.value.map {
-                        if (it.clientId == clientId) {
-                            changed = true
-                            it.copy(currentRefreshJti = jti)
+                snapshot.value
+                    .replacing(clientId) { client ->
+                        if (connectionId == null) {
+                            client.copy(currentRefreshJti = jti)
                         } else {
-                            it
+                            val connections = client.connections.updating(connectionId) { it.copy(refreshJti = jti) }
+                            client.copy(connections = connections)
                         }
-                    }
-                if (changed) persist(updated)
+                    }?.let { persist(it) }
             }
         }
 

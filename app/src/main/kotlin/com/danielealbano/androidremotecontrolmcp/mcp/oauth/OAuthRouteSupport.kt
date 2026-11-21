@@ -22,6 +22,7 @@ class OAuthRouteDeps(
     val authorizationCodeStore: AuthorizationCodeStore get() = oauth.authorizationCodeStore
     val approvalCoordinator: OAuthApprovalCoordinator get() = oauth.approvalCoordinator
     val geoIpResolver: GeoIpResolver get() = oauth.geoIpResolver
+    val httpFetcher: OAuthHttpFetcher get() = oauth.httpFetcher
 
     /** Clock seam (defaulted; not a constructor param to keep the list small). */
     val nowMs: () -> Long = { System.currentTimeMillis() }
@@ -37,6 +38,8 @@ internal data class PendingAuthorizeRequest(
     /** The issuer at `/authorize`, returned as the RFC 9207 `iss` with the code. */
     val issuer: String,
     val expiresAtMs: Long,
+    /** The CIMD client's document read at `/authorize`; null for a DCR client. */
+    val metadataDocument: ClientMetadataDocument? = null,
 )
 
 /** Server-lifetime, single-use, expiry-bounded store of approved-but-unredeemed authorize requests. */
