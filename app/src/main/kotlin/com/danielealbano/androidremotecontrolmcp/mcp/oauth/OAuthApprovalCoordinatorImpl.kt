@@ -49,11 +49,10 @@ class OAuthApprovalCoordinatorImpl
                         redirectHost = request.redirectHost,
                         matchCode = matchCode,
                         expiresAtMs = nowMs + OAuthPolicy.APPROVAL_WINDOW_MS,
-                        logoUri = request.logoUri,
+                        iconUrl = request.iconUrl,
                         clientIp = request.clientIp,
                         clientGeo = request.clientGeo,
                         loopbackRedirect = request.loopbackRedirect,
-                        iconHost = request.iconHost,
                     )
                 entries[approval.id] = Entry(approval, ApprovalState.PENDING)
                 refreshPendingLocked()

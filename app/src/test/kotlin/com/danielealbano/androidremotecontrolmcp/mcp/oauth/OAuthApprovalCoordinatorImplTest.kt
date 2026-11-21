@@ -15,10 +15,10 @@ class OAuthApprovalCoordinatorImplTest {
     private fun newCoordinator(serverLog: ServerLogRepository) = OAuthApprovalCoordinatorImpl(serverLog)
 
     private fun req(
-        logoUri: String? = null,
+        iconUrl: String? = null,
         clientIp: String? = null,
         clientGeo: GeoLocation? = null,
-    ) = ApprovalRequest("Claude", "claude.ai", logoUri, clientIp, clientGeo)
+    ) = ApprovalRequest("Claude", "claude.ai", iconUrl, clientIp, clientGeo)
 
     @Test
     @DisplayName("createPending appears in pending flow with 2-digit code")
@@ -31,12 +31,15 @@ class OAuthApprovalCoordinatorImplTest {
         }
 
     @Test
-    @DisplayName("createPending carries logoUri onto the pending approval")
-    fun createPendingCarriesLogoUri() =
+    @DisplayName("createPending carries the icon URL and the loopback flag onto the pending approval")
+    fun createPendingCarriesIconUrl() =
         runTest {
             val coordinator = newCoordinator(RecordingServerLogRepository())
-            val approval = coordinator.createPending(req(logoUri = "https://cdn.example/logo.png"), 0L)
-            assertEquals("https://cdn.example/logo.png", approval.logoUri)
+            val approval = coordinator.createPending(req(iconUrl = "https://cdn.example/logo.png"), 0L)
+            assertEquals("https://cdn.example/logo.png", approval.iconUrl)
+            val request = ApprovalRequest("C", "localhost", null, null, null, loopbackRedirect = true)
+            val loopback = coordinator.createPending(request, 0L)
+            assertEquals(true, loopback.loopbackRedirect)
         }
 
     @Test

@@ -58,12 +58,13 @@ import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.geo.CountryDisplay
 import com.danielealbano.androidremotecontrolmcp.geo.GeoLocation
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PendingApproval
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PublicOnlyDns
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ApprovalViewModel
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +114,7 @@ fun ApprovalScreen(
     }
 }
 
-/** Coil loader with redirects disabled and a short timeout (SSRF hardening for the remote icon fetch). */
+/** Coil loader with the downloads' guard: public addresses only, no proxy, no redirects, a short timeout. */
 @Composable
 private fun rememberLogoImageLoader(): ImageLoader {
     val context = LocalContext.current
@@ -126,6 +127,8 @@ private fun rememberLogoImageLoader(): ImageLoader {
                         callFactory = {
                             OkHttpClient
                                 .Builder()
+                                .dns(PublicOnlyDns)
+                                .proxy(Proxy.NO_PROXY)
                                 .followRedirects(false)
                                 .followSslRedirects(false)
                                 .callTimeout(LOGO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -244,7 +247,7 @@ private fun ClientIcon(
             .take(2)
             .uppercase()
             .ifEmpty { "?" }
-    val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.iconHost)
+    val iconUrl = approval.iconUrl
     var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
 
     // Decorative: the client's name is read next to it

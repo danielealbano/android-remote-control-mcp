@@ -106,7 +106,7 @@ class ClientMetadataDocumentsTest {
             valid(ClientMetadataDocuments.load(fetcher("application/client-metadata+json"), CLAUDE_CODE_URL))
             listOf("text/html", null).forEach { type ->
                 val result = ClientMetadataDocuments.load(fetcher(type), CLAUDE_CODE_URL)
-                assertEquals("not served as JSON: $type", invalidReason(result), type)
+                assertEquals("not served as JSON: ${type ?: "none"}", invalidReason(result), type)
             }
             assertEquals(
                 "could not be downloaded: ${FakeOAuthHttpFetcher.NOT_SERVED}",

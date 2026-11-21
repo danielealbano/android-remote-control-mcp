@@ -87,7 +87,8 @@ private class RecordedGrant(
 
 /**
  * Records the grant of [code] with refresh jti [jti]: a DCR client's own jti, or for a CIMD client a new connection
- * of its row (created on the first login) with the document read at `/authorize`.
+ * of its row (created on the first login) with the document read at `/authorize`; either way with the icon the
+ * approval showed.
  */
 private suspend fun recordGrant(
     deps: OAuthRouteDeps,
@@ -96,16 +97,13 @@ private suspend fun recordGrant(
 ): RecordedGrant {
     val document = code.metadataDocument
     return if (document == null) {
-        deps.clientRepository.setRefreshJti(code.clientId, jti)
-        deps.clientRepository.touchLastUsed(code.clientId, deps.nowMs())
+        deps.clientRepository.recordGrant(code.clientId, jti, code.iconUrl, deps.nowMs())
         RecordedGrant(null, deps.clientRepository.getClient(code.clientId)?.clientName)
     } else {
         val connectionId = UUID.randomUUID().toString()
         deps.clientRepository.addConnection(
-            clientId = code.clientId,
-            clientName = document.clientName,
-            redirectUris = document.redirectUris,
-            logoUri = document.logoUri,
+            document = document,
+            iconUrl = code.iconUrl,
             connectionId = connectionId,
             refreshJti = jti,
             nowMs = deps.nowMs(),

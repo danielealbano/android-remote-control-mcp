@@ -5,8 +5,8 @@ import java.net.URI
 
 /**
  * Who is asking at `/authorize`: the name and logo to show, the host whose favicon stands in for a missing logo (the
- * document host for a CIMD client, whose redirect may be loopback; for DCR the app table's icon host, or null to use
- * the redirect host), and the CIMD document (null for a DCR client).
+ * document host for a CIMD client, whose redirect may be loopback; null for DCR, which uses its redirect host), and
+ * the CIMD document (null for a DCR client).
  */
 internal class AuthorizeRequester(
     val displayName: String,
@@ -29,7 +29,6 @@ internal suspend fun registeredRequester(
                 displayName = client.clientName ?: host(redirectUri) ?: "Unknown",
                 logoUri = OAuthPolicy.displayLogoUri(clientId, client.logoUri),
                 metadataDocument = null,
-                iconHost = OAuthConnectors.iconHostFor(redirectUri),
             )
         }
 
@@ -97,18 +96,24 @@ private suspend fun checkMetadataDocument(
 }
 
 /**
- * Client-sent text for the server log, at most [MAX_LOGGED_CHARS]: without control characters, and without Unicode
- * line and paragraph separators or format characters (bidi controls...), so it cannot fake a log line or reorder one.
+ * Remote-sent text for the server log, at most [MAX_LOGGED_CODE_POINTS] code points (a surrogate pair is never cut):
+ * without control characters, Unicode line and paragraph separators, or format characters of any plane (bidi
+ * controls, tag characters...), so it cannot fake a log line, reorder one or hide text in it.
  */
-internal fun loggable(value: String): String =
-    value
-        .filterNot { it.isISOControl() || it.category in HIDDEN_CATEGORIES }
-        .take(MAX_LOGGED_CHARS)
+internal fun loggable(value: String): String {
+    val kept =
+        value
+            .codePoints()
+            .filter { !Character.isISOControl(it) && Character.getType(it) !in HIDDEN_TYPES }
+            .limit(MAX_LOGGED_CODE_POINTS)
+            .toArray()
+    return String(kept, 0, kept.size)
+}
 
 /** The host of [uri], or null. */
 internal fun host(uri: String): String? = runCatching { URI(uri).host }.getOrNull()
 
-private const val MAX_LOGGED_CHARS = 200
+private const val MAX_LOGGED_CODE_POINTS = 200L
 
-private val HIDDEN_CATEGORIES =
-    setOf(CharCategory.LINE_SEPARATOR, CharCategory.PARAGRAPH_SEPARATOR, CharCategory.FORMAT)
+private val HIDDEN_TYPES =
+    setOf(Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR, Character.FORMAT).map(Byte::toInt).toSet()

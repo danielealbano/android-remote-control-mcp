@@ -69,7 +69,7 @@ class OAuthMetadataDocumentIntegrationTest {
                         .single()
                 assertEquals("Claude (claude.ai)", approval.clientName)
                 assertEquals("claude.ai", approval.redirectHost)
-                assertEquals(LOGO, approval.logoUri)
+                assertEquals(LOGO, approval.iconUrl)
                 assertFalse(approval.loopbackRedirect)
                 assertFalse(html.contains(LOOPBACK_WARNING_START), html)
                 ctx.approvalCoordinator.approve(approval.id, System.currentTimeMillis())
@@ -84,6 +84,8 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals(CLAUDE_DOC_URL, row.clientId)
                 assertEquals("Claude", row.clientName)
                 assertEquals(1, row.connections.size)
+                // The clients list shows what the approval showed.
+                assertEquals(LOGO, row.iconUrl)
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, tokens.access))
 
                 val refreshed = refreshRequest(client, CLAUDE_DOC_URL, tokens.refresh)
@@ -136,7 +138,7 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals(HttpStatusCode.BadRequest, refreshRequest(client, CLAUDE_DOC_URL, noConnection).status)
 
                 val dcr = registerWithLogo(client, "https://claude.ai/logo.png")
-                ctx.clientRepository.setRefreshJti(dcr, "dcr-jti")
+                ctx.clientRepository.recordGrant(dcr, "dcr-jti", null, System.currentTimeMillis())
                 val withConnection = ctx.tokenService.issueRefreshToken(dcr, "dcr-jti", CANONICAL, connection.id)
                 assertEquals(HttpStatusCode.BadRequest, refreshRequest(client, dcr, withConnection).status)
 
@@ -231,12 +233,55 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals("Claude Code (claude.ai)", warned.clientName)
                 assertEquals("localhost", warned.redirectHost)
                 // No logo in Claude Code's document: the favicon comes from its document host, not from localhost.
-                assertEquals("claude.ai", warned.iconHost)
+                assertEquals(CLAUDE_FAVICON, warned.iconUrl)
                 assertTrue(page.contains("https://icons.duckduckgo.com/ip3/claude.ai.ico"), page)
                 ctx.approvalCoordinator.deny(warned.id)
                 val tokens = login(ctx, CLAUDE_CODE_URL, redirect)
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, tokens.access))
                 assertEquals("Claude Code", ctx.clientRepository.getClient(CLAUDE_CODE_URL)?.clientName)
+                assertEquals(CLAUDE_FAVICON, ctx.clientRepository.getClient(CLAUDE_CODE_URL)?.iconUrl)
+            }
+        }
+
+    @Test
+    @DisplayName("a DCR client on a loopback redirect gets the loopback warning, a hosted one does not")
+    fun dcrLoopbackWarning() =
+        runTest {
+            withServer(FakeOAuthHttpFetcher()) { ctx ->
+                val loopback = registerDcr(client, "http://localhost:3000/cb", logoUri = null)
+                val options = AuthorizeOptions(redirectUri = "http://localhost:3000/cb")
+                val page = authorize(client, loopback, options).bodyAsText()
+                assertTrue(page.contains(LOOPBACK_WARNING_START), page)
+                val warned =
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                assertTrue(warned.loopbackRedirect)
+                assertNull(warned.iconUrl)
+                ctx.approvalCoordinator.deny(warned.id)
+
+                val hosted = registerDcr(client, OAuthPolicy.CLAUDE_REDIRECT_URI, logoUri = null)
+                val hostedPage = authorize(client, hosted).bodyAsText()
+                assertFalse(hostedPage.contains(LOOPBACK_WARNING_START), hostedPage)
+                assertFalse(
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .single()
+                        .loopbackRedirect,
+                )
+            }
+        }
+
+    @Test
+    @DisplayName("a DCR login keeps the icon its approval showed on the client row")
+    fun dcrLoginKeepsIcon() =
+        runTest {
+            withServer(FakeOAuthHttpFetcher()) { ctx ->
+                val dcr = registerDcr(client, OAuthPolicy.CLAUDE_REDIRECT_URI, logoUri = null)
+                login(ctx, dcr, OAuthPolicy.CLAUDE_REDIRECT_URI)
+                assertEquals(CLAUDE_FAVICON, ctx.clientRepository.getClient(dcr)?.iconUrl)
             }
         }
 
@@ -331,9 +376,8 @@ class OAuthMetadataDocumentIntegrationTest {
                         .observePending()
                         .value
                         .single()
-                assertNull(evilApproval.logoUri)
-                // A DCR client's favicon still comes from its redirect host.
-                assertEquals("claude.ai", evilApproval.iconHost)
+                // The evil logo is not used: the approval shows the favicon of the redirect host.
+                assertEquals(CLAUDE_FAVICON, evilApproval.iconUrl)
                 assertFalse(evilPage.contains("data:image/png"), evilPage)
                 assertTrue(evilPage.contains("https://icons.duckduckgo.com/ip3/claude.ai.ico"), evilPage)
                 assertFalse(fetcher.requested.contains(evilLogo))
@@ -437,14 +481,19 @@ class OAuthMetadataDocumentIntegrationTest {
     private suspend fun registerWithLogo(
         client: HttpClient,
         logoUri: String,
+    ): String = registerDcr(client, OAuthPolicy.CLAUDE_REDIRECT_URI, logoUri)
+
+    /** Registers a DCR client on [redirectUri], with [logoUri] when given; returns its client id. */
+    private suspend fun registerDcr(
+        client: HttpClient,
+        redirectUri: String,
+        logoUri: String?,
     ): String {
+        val logo = logoUri?.let { ""","logo_uri":"$it"""" }.orEmpty()
         val resp =
             client.post("/register") {
                 contentType(ContentType.Application.Json)
-                setBody(
-                    """{"redirect_uris":["${OAuthPolicy.CLAUDE_REDIRECT_URI}"],""" +
-                        """"client_name":"Logo","logo_uri":"$logoUri"}""",
-                )
+                setBody("""{"redirect_uris":["$redirectUri"],"client_name":"Logo"$logo}""")
             }
         assertEquals(HttpStatusCode.Created, resp.status)
         return Json
@@ -464,6 +513,7 @@ class OAuthMetadataDocumentIntegrationTest {
         const val CLAUDE_DOC_URL = "https://claude.ai/oauth/test-client-metadata"
         const val MISMATCH_URL = "https://claude.ai/oauth/mismatch"
         const val LOOPBACK_WARNING_START = "The access goes to an app on the computer where this page is open."
+        const val CLAUDE_FAVICON = "https://icons.duckduckgo.com/ip3/claude.ai.ico"
         const val LOGO = "https://claude.ai/images/claude-logo.png"
         val PNG = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13)
 

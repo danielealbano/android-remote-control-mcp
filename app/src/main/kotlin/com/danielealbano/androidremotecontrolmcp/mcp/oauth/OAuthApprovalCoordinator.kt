@@ -14,11 +14,10 @@ enum class ApprovalState { PENDING, APPROVED, DENIED, EXPIRED }
  * @property redirectHost Host of the client's redirect URI (display).
  * @property matchCode 2-digit confirmation code shown in the browser and the app (unique among pending).
  * @property expiresAtMs Approval window deadline.
- * @property logoUri The requesting client's logo as [OAuthPolicy.displayLogoUri] allows it (DCR or CIMD), else null.
+ * @property iconUrl The icon the approval shows: the client's allowed logo ([OAuthPolicy.displayLogoUri]), else a
+ *   favicon ([ClientIconUrl]); null shows initials. Kept with the client when approved, so the clients list shows it.
  * @property clientIp Source IP of the request, from what its listener trusts (`ClientIpSource`), else null.
  * @property clientGeo Offline geolocation of [clientIp] (country/city), else null.
- * @property iconHost The host whose favicon stands in for a missing logo: the document host for a CIMD client, else
- *   [redirectHost].
  * @property loopbackRedirect The code goes to a loopback redirect: an app on the computer where the login page is
  *   open, which any program there could claim, so the approval warns (MCP authorization spec, localhost redirect
  *   risks).
@@ -29,22 +28,20 @@ data class PendingApproval(
     val redirectHost: String,
     val matchCode: String,
     val expiresAtMs: Long,
-    val logoUri: String? = null,
+    val iconUrl: String? = null,
     val clientIp: String? = null,
     val clientGeo: GeoLocation? = null,
     val loopbackRedirect: Boolean = false,
-    val iconHost: String = redirectHost,
 )
 
 /** The requesting-client identity captured at `/authorize` and surfaced on the approval. */
 data class ApprovalRequest(
     val clientName: String,
     val redirectHost: String,
-    val logoUri: String?,
+    val iconUrl: String?,
     val clientIp: String?,
     val clientGeo: GeoLocation?,
     val loopbackRedirect: Boolean = false,
-    val iconHost: String = redirectHost,
 )
 
 /**

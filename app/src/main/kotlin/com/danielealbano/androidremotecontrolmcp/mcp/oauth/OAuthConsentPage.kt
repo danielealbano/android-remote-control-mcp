@@ -6,21 +6,19 @@ import io.ktor.server.response.respondText
 
 private const val MILLIS_PER_SECOND = 1000L
 
-/** The in-app approval's words: the code goes to an app on this computer, which any program here could claim. */
+/** The consent page's wording of the in-app loopback warning, from the browser's point of view. */
 private const val LOOPBACK_WARNING =
     "The access goes to an app on the computer where this page is open. " +
         "Approve only if you started this login here yourself."
 
 /**
- * Renders and responds with the [consentPageHtml] for [approval]: the client's logo when the phone could embed one
- * ([embeddedLogo], from [ConsentLogo]), else the favicon of [PendingApproval.iconHost] ([ClientIconUrl]), and the
- * countdown seeded
- * from the window remaining at [nowMs].
+ * Renders and responds with the [consentPageHtml] for [approval], with [iconUrl] (the logo the phone embedded with
+ * [ConsentLogo], else the favicon link) and the countdown seeded from the window remaining at [nowMs].
  */
 suspend fun ApplicationCall.respondConsentPage(
     approval: PendingApproval,
     displayName: String,
-    embeddedLogo: String?,
+    iconUrl: String?,
     nowMs: Long,
 ) {
     val data =
@@ -30,7 +28,7 @@ suspend fun ApplicationCall.respondConsentPage(
             clientName = displayName,
             host = approval.redirectHost,
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
-            iconUrl = embeddedLogo ?: ClientIconUrl.resolve(null, approval.iconHost),
+            iconUrl = iconUrl,
             loopbackWarning = approval.loopbackRedirect,
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)

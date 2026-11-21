@@ -38,16 +38,20 @@ object ClientMetadataDocuments {
     suspend fun load(
         fetcher: OAuthHttpFetcher,
         clientId: String,
-    ): ClientMetadataResult {
-        val result = fetcher.get(clientId, JSON_MEDIA_TYPE, OAuthPolicy.MAX_METADATA_DOCUMENT_BYTES)
-        val body = (result as? FetchResult.Fetched)?.body
-        return when {
-            result is FetchResult.Failed -> ClientMetadataResult.Invalid("could not be downloaded: ${result.reason}")
-            body == null -> ClientMetadataResult.Invalid("could not be downloaded")
-            !isJsonMediaType(body.contentType) -> notJson(body.contentType)
-            else -> parse(clientId, body.bytes.decodeToString())
+    ): ClientMetadataResult =
+        when (val result = fetcher.get(clientId, JSON_MEDIA_TYPE, OAuthPolicy.MAX_METADATA_DOCUMENT_BYTES)) {
+            is FetchResult.Failed -> {
+                ClientMetadataResult.Invalid("could not be downloaded: ${result.reason}")
+            }
+
+            is FetchResult.Fetched -> {
+                if (isJsonMediaType(result.body.contentType)) {
+                    parse(clientId, result.body.bytes.decodeToString())
+                } else {
+                    notJson(result.body.contentType)
+                }
+            }
         }
-    }
 
     /**
      * Checks a document fetched from [clientId]: a JSON object whose `client_id` is exactly [clientId], a non-blank
@@ -59,34 +63,42 @@ object ClientMetadataDocuments {
         clientId: String,
         body: String,
     ): ClientMetadataResult {
-        val json = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
-        val clientName = json?.string("client_name")?.takeIf { it.isNotBlank() }
-        val problem = if (json == null) "not a JSON object" else problemOf(clientId, json, clientName)
-        return if (json != null && clientName != null && problem == null) {
-            ClientMetadataResult.Valid(
-                ClientMetadataDocument(
-                    clientId = clientId,
-                    clientName = clientName,
-                    redirectUris = json.strings("redirect_uris").orEmpty(),
-                    logoUri = json.string("logo_uri"),
-                ),
-            )
-        } else {
-            ClientMetadataResult.Invalid(problem ?: "it has no client_name")
+        val json =
+            runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
+                ?: return ClientMetadataResult.Invalid("not a JSON object")
+        val clientName = json.string("client_name")?.takeIf { it.isNotBlank() }
+        val problem = problemOf(clientId, json)
+        return when {
+            problem != null -> {
+                ClientMetadataResult.Invalid(problem)
+            }
+
+            clientName == null -> {
+                ClientMetadataResult.Invalid("it has no client_name")
+            }
+
+            else -> {
+                ClientMetadataResult.Valid(
+                    ClientMetadataDocument(
+                        clientId = clientId,
+                        clientName = clientName,
+                        redirectUris = json.strings("redirect_uris").orEmpty(),
+                        logoUri = json.string("logo_uri"),
+                    ),
+                )
+            }
         }
     }
 
-    /** Why [json] (fetched from [clientId], named [clientName]) cannot be used, or null. */
+    /** Why [json] (fetched from [clientId]) cannot be used, its `client_name` aside, or null. */
     private fun problemOf(
         clientId: String,
         json: JsonObject,
-        clientName: String?,
     ): String? {
         val malformedList = LIST_FIELDS.firstOrNull { it in json && json.strings(it) == null }
         return when {
             json.string("client_id") != clientId -> "its client_id is not its URL"
             malformedList != null -> "$malformedList is not a list of strings"
-            clientName == null -> "it has no client_name"
             json.strings("redirect_uris").isNullOrEmpty() -> "it has no redirect_uris"
             json.strings("grant_types")?.contains("authorization_code") == false -> "authorization_code not allowed"
             json.strings("response_types")?.contains("code") == false -> "response type code not allowed"
@@ -102,7 +114,11 @@ object ClientMetadataDocuments {
         return if (methods != null) "none" in methods else json.string("token_endpoint_auth_method") == "none"
     }
 
-    private fun notJson(contentType: String?) = ClientMetadataResult.Invalid("not served as JSON: $contentType")
+    /** The server's content type is server-chosen text, so it goes to the log filtered like the client's. */
+    private fun notJson(contentType: String?): ClientMetadataResult {
+        val type = loggable(contentType ?: "none")
+        return ClientMetadataResult.Invalid("not served as JSON: $type")
+    }
 
     private fun isJsonMediaType(contentType: String?): Boolean {
         val type = contentType?.substringBefore(';')?.trim()?.lowercase() ?: return false

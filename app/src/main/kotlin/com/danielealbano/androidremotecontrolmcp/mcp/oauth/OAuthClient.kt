@@ -13,12 +13,13 @@ import kotlinx.serialization.Serializable
  * @property clientName DCR `client_name` (e.g. "Claude"); may be absent. For CIMD the document's `client_name`.
  * @property redirectUris Registered redirect URIs (allowlist-validated at registration); for CIMD the document's.
  * @property applicationType DCR `application_type` (e.g. "web"); shown in the clients row.
- * @property logoUri DCR or document `logo_uri`; shown as [OAuthPolicy.displayLogoUri] allows, else an initials avatar.
+ * @property logoUri DCR or document `logo_uri`, as sent; the approval shows it as [OAuthPolicy.displayLogoUri] allows.
  * @property createdAtMs Registration timestamp; for CIMD the first login.
  * @property lastUsedAtMs Last `/mcp` use (debounced) or token grant.
  * @property currentRefreshJti DCR only: the single valid refresh-token jti; null until the first token grant.
  *   Used both for refresh rotation and to protect already-approved clients from registration-spam eviction.
  * @property connections CIMD only: one entry per login, at most [OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT].
+ * @property iconUrl The icon the approval screen showed at the latest approval (logo or favicon); null shows initials.
  */
 @Serializable
 data class OAuthClient(
@@ -31,6 +32,7 @@ data class OAuthClient(
     val lastUsedAtMs: Long,
     val currentRefreshJti: String? = null,
     val connections: List<OAuthConnection> = emptyList(),
+    val iconUrl: String? = null,
 ) {
     /** True once a token was issued: a DCR refresh jti or, for CIMD, a connection. */
     val isApproved: Boolean get() = currentRefreshJti != null || connections.isNotEmpty()

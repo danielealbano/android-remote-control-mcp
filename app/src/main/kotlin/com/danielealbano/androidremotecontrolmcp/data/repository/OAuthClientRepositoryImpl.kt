@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.di.OAuthClientsDataStore
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientMetadataDocument
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
@@ -96,16 +97,16 @@ class OAuthClientRepositoryImpl
             }
 
         override suspend fun addConnection(
-            clientId: String,
-            clientName: String,
-            redirectUris: List<String>,
-            logoUri: String?,
+            document: ClientMetadataDocument,
+            iconUrl: String?,
             connectionId: String,
             refreshJti: String,
             nowMs: Long,
         ): OAuthClient =
             mutex.withLock {
                 seedLocked()
+                val clientId = document.clientId
+                val clientName = document.clientName
                 val connection = OAuthConnection(connectionId, refreshJti, createdAtMs = nowMs, lastUsedAtMs = nowMs)
                 val existing = snapshot.value.firstOrNull { it.clientId == clientId }
                 val client =
@@ -120,19 +121,21 @@ class OAuthClientRepositoryImpl
                         }
                         it.copy(
                             clientName = clientName,
-                            redirectUris = redirectUris,
-                            logoUri = logoUri,
+                            redirectUris = document.redirectUris,
+                            logoUri = document.logoUri,
                             lastUsedAtMs = nowMs,
                             connections = kept + connection,
+                            iconUrl = iconUrl,
                         )
                     } ?: OAuthClient(
                         clientId = clientId,
                         clientName = clientName,
-                        redirectUris = redirectUris,
-                        logoUri = logoUri,
+                        redirectUris = document.redirectUris,
+                        logoUri = document.logoUri,
                         createdAtMs = nowMs,
                         lastUsedAtMs = nowMs,
                         connections = listOf(connection),
+                        iconUrl = iconUrl,
                     )
                 persist(snapshot.value.replacing(clientId) { client } ?: snapshot.value.withinCap(client))
                 client
@@ -162,14 +165,18 @@ class OAuthClientRepositoryImpl
             }
         }
 
-        override suspend fun setRefreshJti(
+        override suspend fun recordGrant(
             clientId: String,
-            jti: String,
-            connectionId: String?,
+            refreshJti: String,
+            iconUrl: String?,
+            nowMs: Long,
         ) {
             mutex.withLock {
                 seedLocked()
-                snapshot.value.replacing(clientId) { it.withRefreshJti(jti, connectionId) }?.let { persist(it) }
+                snapshot.value
+                    .replacing(clientId) { client ->
+                        client.withRefreshJti(refreshJti, null).copy(iconUrl = iconUrl, lastUsedAtMs = nowMs)
+                    }?.let { persist(it) }
             }
         }
 

@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.data.repository
 
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientMetadataDocument
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import kotlinx.coroutines.flow.Flow
 
@@ -32,16 +33,15 @@ interface OAuthClientRepository {
     ): OAuthClient
 
     /**
-     * Adds a login of the CIMD client [clientId] and returns the client. The first login creates its row (under the
-     * same cap as [register]); later ones refresh its name, redirect URIs and logo from the latest document. Beyond
+     * Adds a login of the CIMD client of [document] and returns the client. The first login creates its row (under the
+     * same cap as [register]); later ones refresh its name, redirect URIs and logo from the latest document, and its
+     * [iconUrl] to the one this approval showed. Beyond
      * [com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT] connections the
      * least recently used other one is dropped.
      */
     suspend fun addConnection(
-        clientId: String,
-        clientName: String,
-        redirectUris: List<String>,
-        logoUri: String?,
+        document: ClientMetadataDocument,
+        iconUrl: String?,
         connectionId: String,
         refreshJti: String,
         nowMs: Long,
@@ -57,11 +57,15 @@ interface OAuthClientRepository {
         connectionId: String? = null,
     )
 
-    /** Sets the current refresh-token jti (rotation): the client's (DCR), or the [connectionId] connection's (CIMD). */
-    suspend fun setRefreshJti(
+    /**
+     * Records a DCR client's code grant: [refreshJti] becomes its single valid refresh jti, [iconUrl] the icon this
+     * approval showed, and [nowMs] its last use.
+     */
+    suspend fun recordGrant(
         clientId: String,
-        jti: String,
-        connectionId: String? = null,
+        refreshJti: String,
+        iconUrl: String?,
+        nowMs: Long,
     )
 
     /**

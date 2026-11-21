@@ -53,9 +53,16 @@ internal fun List<OAuthConnection>.updating(
 internal fun List<OAuthConnection>.withinConnectionCap(): List<OAuthConnection> =
     if (size < OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT) this else this - minBy { it.lastUsedAtMs }
 
-/** The refresh jti this client accepts: its own (DCR, [connectionId] null) or the connection's (CIMD). */
+/**
+ * The refresh jti this client accepts: its own (DCR, [connectionId] null) or the connection's (CIMD). A CIMD client
+ * never accepts a token without a connection, whatever is stored.
+ */
 internal fun OAuthClient.refreshJtiOf(connectionId: String?): String? =
-    if (connectionId == null) currentRefreshJti else connections.firstOrNull { it.id == connectionId }?.refreshJti
+    when {
+        connectionId != null -> connections.firstOrNull { it.id == connectionId }?.refreshJti
+        OAuthPolicy.isMetadataDocumentClientId(clientId) -> null
+        else -> currentRefreshJti
+    }
 
 /** This client with the refresh jti set to [jti]: its own (DCR, [connectionId] null) or the connection's (CIMD). */
 internal fun OAuthClient.withRefreshJti(

@@ -126,16 +126,6 @@ class OAuthMetadataDocumentPolicyTest {
     }
 
     @Test
-    @DisplayName("iconHostFor names Gemini's own host for its relay callbacks and nothing for the others")
-    fun iconHostFor() {
-        val gemini = "https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-8569b7990f18a8201022f919"
-        assertEquals("gemini.google.com", OAuthConnectors.iconHostFor(gemini))
-        assertNull(OAuthConnectors.iconHostFor(OAuthPolicy.CLAUDE_REDIRECT_URI))
-        assertNull(OAuthConnectors.iconHostFor("http://localhost:1/cb"))
-        assertNull(OAuthConnectors.iconHostFor("https://oauth-redirect.googleusercontent.com/r/other-project"))
-    }
-
-    @Test
     @DisplayName("isLoopbackRedirectUri is true only for http loopback redirects")
     fun loopbackRedirects() {
         listOf("http://localhost:1/cb", "http://127.0.0.1/cb", "http://[::1]:5/cb").forEach {

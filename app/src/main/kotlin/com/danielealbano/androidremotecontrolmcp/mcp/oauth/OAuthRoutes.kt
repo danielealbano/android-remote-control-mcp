@@ -141,6 +141,9 @@ private suspend fun ApplicationCall.handleAuthorize(
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
+    // The one icon the approval shows and the client keeps once approved: the allowed logo, else the favicon.
+    val favicon = ClientIconUrl.resolve(null, requester.iconHost ?: redirectHost)
+    val iconUrl = requester.logoUri ?: favicon
     // Before the approval exists, so the phone never asks while the browser still waits for its page.
     val embeddedLogo = ConsentLogo.embed(deps.httpFetcher, requester.logoUri)
     val approval =
@@ -148,11 +151,10 @@ private suspend fun ApplicationCall.handleAuthorize(
             ApprovalRequest(
                 clientName = requester.displayName,
                 redirectHost = redirectHost,
-                logoUri = requester.logoUri,
+                iconUrl = iconUrl,
                 clientIp = clientIp,
                 clientGeo = clientGeo,
                 loopbackRedirect = OAuthPolicy.isLoopbackRedirectUri(redirectUri),
-                iconHost = requester.iconHost ?: redirectHost,
             ),
             deps.nowMs(),
         )
@@ -169,10 +171,11 @@ private suspend fun ApplicationCall.handleAuthorize(
             issuer = issuer,
             expiresAtMs = approval.expiresAtMs,
             metadataDocument = requester.metadataDocument,
+            iconUrl = iconUrl,
         ),
         deps.nowMs(),
     )
-    respondConsentPage(approval, requester.displayName, embeddedLogo, deps.nowMs())
+    respondConsentPage(approval, requester.displayName, embeddedLogo ?: favicon, deps.nowMs())
 }
 
 /** Logs an OAUTH authorization-request entry annotated with the client's IP and geolocation (never tokens). */
@@ -231,6 +234,7 @@ private suspend fun ApplicationCall.handleAuthorizeStatus(
                             resource = pending.resource,
                             scope = pending.scope,
                             metadataDocument = pending.metadataDocument,
+                            iconUrl = pending.iconUrl,
                         ),
                         deps.nowMs(),
                     )

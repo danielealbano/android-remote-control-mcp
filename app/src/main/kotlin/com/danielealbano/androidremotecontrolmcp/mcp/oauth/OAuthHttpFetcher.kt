@@ -71,17 +71,11 @@ class OkHttpOAuthHttpFetcher internal constructor(
         maxBytes: Int,
     ): FetchResult {
         val httpUrl = url.toHttpUrlOrNull()
-        val refusal =
-            when {
-                httpUrl == null -> "not a URL"
-                !httpUrl.isHttps -> "not https"
-                isIpLiteral(httpUrl.host) -> "an IP-literal host"
-                else -> null
-            }
-        return if (httpUrl == null || refusal != null) {
-            FetchResult.Failed(refusal ?: "not a URL")
-        } else {
-            download(httpUrl, accept, maxBytes)
+        return when {
+            httpUrl == null -> FetchResult.Failed("not a URL")
+            !httpUrl.isHttps -> FetchResult.Failed("not https")
+            isIpLiteral(httpUrl.host) -> FetchResult.Failed("an IP-literal host")
+            else -> download(httpUrl, accept, maxBytes)
         }
     }
 
@@ -133,7 +127,7 @@ class OkHttpOAuthHttpFetcher internal constructor(
     private fun isIpLiteral(host: String): Boolean = ':' in host || IPV4_LITERAL.matches(host)
 
     internal companion object {
-        /** The production client settings; tests change only the DNS and the TLS trust. */
+        /** The production client settings; tests change the DNS, the TLS trust and, in one test, the call timeout. */
         fun clientBuilder(): OkHttpClient.Builder =
             OkHttpClient
                 .Builder()

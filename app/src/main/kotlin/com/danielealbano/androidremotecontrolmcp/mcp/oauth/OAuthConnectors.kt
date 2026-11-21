@@ -32,8 +32,6 @@ class HostedCallbackPattern(
  * @property redirectPatterns Hosted callbacks accepted by pattern.
  * @property loopbackRedirects Whether its CIMD documents may use loopback redirects (DCR accepts loopback from any
  *   client).
- * @property iconHost The host whose favicon stands for the app when its callbacks are on a host without one (Gemini's
- *   Google relay); null to use the callback host.
  */
 class OAuthConnector(
     val name: String,
@@ -41,7 +39,6 @@ class OAuthConnector(
     val exactRedirectUris: Set<String> = emptySet(),
     val redirectPatterns: List<HostedCallbackPattern> = emptyList(),
     val loopbackRedirects: Boolean = false,
-    val iconHost: String? = null,
 ) {
     /** True when [redirectUri] is one of this app's hosted callbacks. */
     fun ownsHostedCallback(
@@ -105,19 +102,9 @@ object OAuthConnectors {
                 documentDomains = setOf("kimi.com"),
                 exactRedirectUris = setOf(OAuthPolicy.KIMI_REDIRECT_URI),
             ),
-            OAuthConnector(
-                name = "Gemini",
-                redirectPatterns = listOf(GEMINI_CUSTOM_CONNECTOR),
-                iconHost = "gemini.google.com",
-            ),
+            OAuthConnector(name = "Gemini", redirectPatterns = listOf(GEMINI_CUSTOM_CONNECTOR)),
             OAuthConnector(name = "Claude Code", documentDomains = setOf("claude.ai"), loopbackRedirects = true),
             OAuthConnector(name = "Codex", documentDomains = setOf("chatgpt.com"), loopbackRedirects = true),
             OAuthConnector(name = "VS Code", documentDomains = setOf("vscode.dev"), loopbackRedirects = true),
         )
-
-    /** The [OAuthConnector.iconHost] of the app whose hosted callback [redirectUri] is, or null. */
-    fun iconHostFor(redirectUri: String): String? {
-        val parsed = runCatching { URI(redirectUri) }.getOrNull()
-        return ALL.firstOrNull { it.iconHost != null && it.ownsHostedCallback(redirectUri, parsed) }?.iconHost
-    }
 }

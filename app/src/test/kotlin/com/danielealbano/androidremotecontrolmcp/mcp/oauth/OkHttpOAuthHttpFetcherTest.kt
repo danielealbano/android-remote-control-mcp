@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.net.InetAddress
 import java.net.Proxy
+import java.net.ServerSocket
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
@@ -186,6 +187,37 @@ class OkHttpOAuthHttpFetcherTest {
                     .build(),
             )
             assertEquals("timed out", failure(quick.get(url("/doc"), "application/json", MAX)))
+        }
+
+    @Test
+    @DisplayName("reports an untrusted certificate as a TLS failure")
+    fun reportsTlsFailure() =
+        runTest {
+            // The production trust: the test server's self-signed certificate is not trusted.
+            val defaultTrust =
+                OkHttpOAuthHttpFetcher {
+                    OkHttpOAuthHttpFetcher
+                        .clientBuilder()
+                        .dns { listOf(InetAddress.getLoopbackAddress()) }
+                        .build()
+                }
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(200)
+                    .body("{}")
+                    .build(),
+            )
+            assertEquals("TLS failed", failure(defaultTrust.get(url("/doc"), "application/json", MAX)))
+        }
+
+    @Test
+    @DisplayName("reports any other failure by its exception, e.g. a refused connection")
+    fun reportsOtherFailures() =
+        runTest {
+            val closedPort = ServerSocket(0, 0, InetAddress.getLoopbackAddress()).use { it.localPort }
+            val result = fetcher.get("https://$HOST:$closedPort/doc", "application/json", MAX)
+            assertEquals("ConnectException", failure(result))
         }
 
     @Test

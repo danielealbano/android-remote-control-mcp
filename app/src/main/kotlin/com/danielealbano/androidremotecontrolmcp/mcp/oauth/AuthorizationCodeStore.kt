@@ -11,6 +11,8 @@ data class AuthorizationCode(
     val expiresAtMs: Long,
     /** The CIMD client's document read at `/authorize`; null for a DCR client. */
     val metadataDocument: ClientMetadataDocument? = null,
+    /** The icon the approval showed, kept with the client once the code is redeemed. */
+    val iconUrl: String? = null,
 )
 
 /** The minted-code fields supplied when creating an authorization code. */
@@ -22,6 +24,8 @@ data class AuthorizationCodeRequest(
     val scope: String,
     /** The CIMD client's document read at `/authorize`; null for a DCR client. */
     val metadataDocument: ClientMetadataDocument? = null,
+    /** The icon the approval showed, kept with the client once the code is redeemed. */
+    val iconUrl: String? = null,
 )
 
 /**

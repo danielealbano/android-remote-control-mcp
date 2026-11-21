@@ -99,7 +99,7 @@ class OAuthClientRepositoryImplTest {
         testScope.runTest {
             val ids = (1..OAuthPolicy.MAX_OAUTH_CLIENTS).map { i -> register(i.toLong()).clientId }
             // Mark the overall-oldest (first) as approved; the oldest UNAPPROVED is the second.
-            repository.setRefreshJti(ids[0], "jti")
+            repository.recordGrant(ids[0], "jti", null, 1L)
             register((OAuthPolicy.MAX_OAUTH_CLIENTS + 1).toLong())
 
             assertNotNull(repository.getClient(ids[0]), "approved oldest must survive")
@@ -111,7 +111,7 @@ class OAuthClientRepositoryImplTest {
     fun evictsOverallOldestWhenAllApproved() =
         testScope.runTest {
             val ids = (1..OAuthPolicy.MAX_OAUTH_CLIENTS).map { i -> register(i.toLong()).clientId }
-            ids.forEach { repository.setRefreshJti(it, "jti") }
+            ids.forEachIndexed { index, id -> repository.recordGrant(id, "jti", null, index + 1L) }
             val newest = register((OAuthPolicy.MAX_OAUTH_CLIENTS + 1).toLong())
 
             assertNull(repository.getClient(ids[0]), "overall oldest must be evicted")
@@ -145,26 +145,28 @@ class OAuthClientRepositoryImplTest {
         }
 
     @Test
-    @DisplayName("touchLastUsed and setRefreshJti update")
-    fun touchAndSetJtiUpdate() =
+    @DisplayName("touchLastUsed and recordGrant update; recordGrant keeps the icon the approval showed")
+    fun touchAndRecordGrantUpdate() =
         testScope.runTest {
             val created =
                 repository.register("Claude", listOf("https://claude.ai/api/mcp/auth_callback"), "web", null, 1L)
             repository.touchLastUsed(created.clientId, 999L)
-            repository.setRefreshJti(created.clientId, "jti-1")
+            assertEquals(999L, repository.getClient(created.clientId)?.lastUsedAtMs)
+            repository.recordGrant(created.clientId, "jti-1", ICON, 1000L)
             val updated = repository.getClient(created.clientId)
-            assertEquals(999L, updated?.lastUsedAtMs)
+            assertEquals(1000L, updated?.lastUsedAtMs)
             assertEquals("jti-1", updated?.currentRefreshJti)
+            assertEquals(ICON, updated?.iconUrl)
         }
 
     @Test
     @DisplayName("addConnection creates a CIMD row on the first login, then adds connections and refreshes its details")
     fun addConnectionCreatesThenAdds() =
         testScope.runTest {
-            val first = repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 10L)
+            val first = connect("Claude Code", REDIRECTS, null, "c1", "j1", 10L)
             assertEquals(listOf("c1"), first.connections.map { it.id })
             assertEquals(10L, first.createdAtMs)
-            val second = repository.addConnection(DOC, "Claude Code 2", OTHER_REDIRECTS, LOGO, "c2", "j2", 20L)
+            val second = connect("Claude Code 2", OTHER_REDIRECTS, LOGO, "c2", "j2", 20L)
             assertEquals(listOf("c1", "c2"), second.connections.map { it.id })
             assertEquals("Claude Code 2", second.clientName)
             assertEquals(OTHER_REDIRECTS, second.redirectUris)
@@ -180,11 +182,11 @@ class OAuthClientRepositoryImplTest {
     fun dropsLeastRecentlyUsedConnection() =
         testScope.runTest {
             (1..OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT).forEach {
-                repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c$it", "j$it", it.toLong())
+                connect("Claude Code", REDIRECTS, null, "c$it", "j$it", it.toLong())
             }
             // c1 is the oldest login but was used last: c2 is now the least recently used.
             repository.touchLastUsed(DOC, 500L, "c1")
-            val after = repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c11", "j11", 600L)
+            val after = connect("Claude Code", REDIRECTS, null, "c11", "j11", 600L)
             assertEquals(OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT, after.connections.size)
             assertFalse(after.connections.any { it.id == "c2" })
             assertTrue(after.connections.any { it.id == "c1" })
@@ -196,16 +198,15 @@ class OAuthClientRepositoryImplTest {
         }
 
     @Test
-    @DisplayName("setRefreshJti and touchLastUsed with a connection change only that connection")
+    @DisplayName("touchLastUsed with a connection changes only that connection")
     fun connectionUpdates() =
         testScope.runTest {
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 1L)
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c2", "j2", 2L)
-            repository.setRefreshJti(DOC, "j1b", "c1")
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 1L)
+            connect("Claude Code", REDIRECTS, null, "c2", "j2", 2L)
             repository.touchLastUsed(DOC, 77L, "c1")
             val client = repository.getClient(DOC)
             val byId = client?.connections?.associateBy { it.id }
-            assertEquals("j1b", byId?.get("c1")?.refreshJti)
+            assertEquals("j1", byId?.get("c1")?.refreshJti)
             assertEquals(77L, byId?.get("c1")?.lastUsedAtMs)
             assertEquals("j2", byId?.get("c2")?.refreshJti)
             assertEquals(2L, byId?.get("c2")?.lastUsedAtMs)
@@ -217,8 +218,8 @@ class OAuthClientRepositoryImplTest {
     @DisplayName("revoking a CIMD client removes every connection and logs its display name")
     fun revokeCimdClient() =
         testScope.runTest {
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 1L)
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c2", "j2", 2L)
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 1L)
+            connect("Claude Code", REDIRECTS, null, "c2", "j2", 2L)
             repository.revoke(DOC)
             assertNull(repository.getClient(DOC))
             val logged = serverLog.ofType(ServerLogEntry.Type.OAUTH).last().message
@@ -229,7 +230,7 @@ class OAuthClientRepositoryImplTest {
     @DisplayName("a CIMD row counts as approved: registration spam evicts unapproved DCR clients first")
     fun cimdRowIsApproved() =
         testScope.runTest {
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 0L)
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 0L)
             (1L..OAuthPolicy.MAX_OAUTH_CLIENTS.toLong()).forEach { register(it) }
             assertNotNull(repository.getClient(DOC))
             assertEquals(OAuthPolicy.MAX_OAUTH_CLIENTS, repository.getClients().size)
@@ -239,7 +240,7 @@ class OAuthClientRepositoryImplTest {
     @DisplayName("connections persist across a new instance, and a stored list without them still loads")
     fun connectionsPersist() =
         testScope.runTest {
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 1L)
+            connect("Claude Code", REDIRECTS, null, "c1", "j1", 1L)
             val reloaded = OAuthClientRepositoryImpl(dataStore, serverLog)
             assertEquals(listOf(OAuthConnection("c1", "j1", 1L, 1L)), reloaded.getClient(DOC)?.connections)
         }
@@ -264,14 +265,14 @@ class OAuthClientRepositoryImplTest {
     fun rotateRefreshJti() =
         testScope.runTest {
             val dcr = repository.register("Claude", listOf("https://claude.ai/api/mcp/auth_callback"), "web", null, 1L)
-            repository.setRefreshJti(dcr.clientId, "j0")
+            repository.recordGrant(dcr.clientId, "j0", null, 1L)
             assertTrue(repository.rotateRefreshJti(dcr.clientId, null, "j0", "j1", 50L))
             assertFalse(repository.rotateRefreshJti(dcr.clientId, null, "j0", "j2", 60L))
             assertFalse(repository.rotateRefreshJti(dcr.clientId, "c1", "j1", "j3", 60L))
             assertEquals("j1", repository.getClient(dcr.clientId)?.currentRefreshJti)
             assertEquals(50L, repository.getClient(dcr.clientId)?.lastUsedAtMs)
 
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "k0", 1L)
+            connect("Claude Code", REDIRECTS, null, "c1", "k0", 1L)
             assertFalse(repository.rotateRefreshJti(DOC, null, "k0", "k1", 70L))
             assertFalse(repository.rotateRefreshJti(DOC, "c9", "k0", "k1", 70L))
             assertTrue(repository.rotateRefreshJti(DOC, "c1", "k0", "k1", 80L))
@@ -285,7 +286,7 @@ class OAuthClientRepositoryImplTest {
     @DisplayName("concurrent rotations of the same refresh jti: exactly one wins")
     fun concurrentRotationsOneWins() =
         testScope.runTest {
-            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "k0", 1L)
+            connect("Claude Code", REDIRECTS, null, "c1", "k0", 1L)
             val results =
                 withContext(Dispatchers.Default) {
                     (1..8)
@@ -295,12 +296,46 @@ class OAuthClientRepositoryImplTest {
             assertEquals(1, results.count { it })
         }
 
+    @Test
+    @DisplayName("addConnection keeps the icon of the latest approval on the CIMD row")
+    fun addConnectionKeepsIcon() =
+        testScope.runTest {
+            assertEquals(ICON, connect("Claude Code", REDIRECTS, null, "c1", "j1", 1L, ICON).iconUrl)
+            assertEquals(
+                "https://claude.ai/other.png",
+                connect("Claude Code", REDIRECTS, null, "c2", "j2", 2L, "https://claude.ai/other.png").iconUrl,
+            )
+            assertEquals("https://claude.ai/other.png", repository.getClient(DOC)?.iconUrl)
+        }
+
+    @Test
+    @DisplayName("a CIMD client never rotates a token without a connection, even with an own jti stored")
+    fun cimdNeverRotatesWithoutConnection() =
+        testScope.runTest {
+            connect("Claude Code", REDIRECTS, null, "c1", "k0", 1L)
+            // Only a stray write could give a CIMD row its own jti; it must still not rotate.
+            repository.recordGrant(DOC, "own", null, 2L)
+            assertFalse(repository.rotateRefreshJti(DOC, null, "own", "own2", 3L))
+        }
+
+    /** A login of the Claude Code document [DOC]. */
+    private suspend fun connect(
+        name: String,
+        redirects: List<String>,
+        logo: String?,
+        id: String,
+        jti: String,
+        nowMs: Long,
+        icon: String? = null,
+    ) = repository.addConnection(ClientMetadataDocument(DOC, name, redirects, logo), icon, id, jti, nowMs)
+
     private suspend fun register(nowMs: Long) =
         repository.register("c$nowMs", listOf("https://claude.ai/api/mcp/auth_callback"), "web", null, nowMs)
 
     private companion object {
         const val DOC = "https://claude.ai/oauth/claude-code-client-metadata"
         const val LOGO = "https://claude.ai/logo.png"
+        const val ICON = "https://icons.duckduckgo.com/ip3/claude.ai.ico"
         val REDIRECTS = listOf("http://localhost/callback")
         val OTHER_REDIRECTS = listOf("http://127.0.0.1/callback")
     }

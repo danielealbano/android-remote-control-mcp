@@ -49,14 +49,14 @@ import coil3.compose.AsyncImage
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
-import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnectors
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PublicOnlyDns
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.OAuthClientsViewModel
 import okhttp3.OkHttpClient
+import java.net.Proxy
 import java.net.URI
 import java.text.DateFormat
 import java.util.Date
@@ -177,7 +177,7 @@ private fun clientDetail(client: OAuthClient): String =
 @Composable
 private fun ClientAvatar(client: OAuthClient) {
     val context = LocalContext.current
-    // Coil loader with redirects disabled and a short timeout (SSRF hardening for the remote fetch).
+    // Coil loader with the downloads' guard: public addresses only, no proxy, no redirects, a short timeout.
     val imageLoader =
         remember {
             ImageLoader
@@ -188,6 +188,8 @@ private fun ClientAvatar(client: OAuthClient) {
                             callFactory = {
                                 OkHttpClient
                                     .Builder()
+                                    .dns(PublicOnlyDns)
+                                    .proxy(Proxy.NO_PROXY)
                                     .followRedirects(false)
                                     .followSslRedirects(false)
                                     .callTimeout(LOGO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -204,17 +206,8 @@ private fun ClientAvatar(client: OAuthClient) {
             .take(2)
             .uppercase()
 
-    // As on the approval screen: the allowed logo, else the favicon of the host that identifies the client (the
-    // document host for CIMD, whose redirect may be loopback; for DCR the app table's icon host or the redirect
-    // host), else initials.
-    val redirectUri = client.redirectUris.firstOrNull()
-    val iconHost =
-        if (OAuthPolicy.isMetadataDocumentClientId(client.clientId)) {
-            hostOf(client.clientId)
-        } else {
-            redirectUri?.let { OAuthConnectors.iconHostFor(it) } ?: hostOf(redirectUri)
-        }
-    val iconUrl = ClientIconUrl.resolve(OAuthPolicy.displayLogoUri(client.clientId, client.logoUri), iconHost)
+    // The icon the approval screen showed when the client was approved; initials when there is none.
+    val iconUrl = client.iconUrl
     var iconLoaded by remember(iconUrl) { mutableStateOf(false) }
 
     // Decorative: the client's name is read next to it
