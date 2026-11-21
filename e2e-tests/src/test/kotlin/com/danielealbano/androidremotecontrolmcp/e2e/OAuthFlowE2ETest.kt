@@ -84,7 +84,11 @@ class OAuthFlowE2ETest {
     @Test
     fun `Claude Code's real metadata document completes the OAuth flow without registration`() {
         waitForHealth()
-        authorizeAndCallTool(CLAUDE_CODE_DOCUMENT, CLAUDE_CODE_REDIRECT)
+        authorizeAndCallTool(
+            CLAUDE_CODE_DOCUMENT,
+            CLAUDE_CODE_REDIRECT,
+            authorizeHint = "the device must download $CLAUDE_CODE_DOCUMENT: does the container reach the internet?",
+        )
     }
 
     @Test
@@ -130,10 +134,14 @@ class OAuthFlowE2ETest {
         return registered["client_id"]!!.jsonPrimitive.content
     }
 
-    /** Authorizes [clientId] on [redirectUri], approves on the device, redeems the code and calls a tool. */
+    /**
+     * Authorizes [clientId] on [redirectUri], approves on the device, redeems the code and calls a tool. A refused
+     * authorize request fails with [authorizeHint] in its message.
+     */
     private fun authorizeAndCallTool(
         clientId: String,
         redirectUri: String,
+        authorizeHint: String = "",
     ) {
         val issuer = metadataIssuer()
 
@@ -145,7 +153,7 @@ class OAuthFlowE2ETest {
             "$base/authorize?response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(redirectUri)}" +
                 "&code_challenge=${enc(CHALLENGE)}&code_challenge_method=S256&state=xyz&scope=mcp"
         val (authStatus, authBody) = httpGet(authorizeUrl)
-        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed: $authBody")
+        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed ($authorizeHint): $authBody")
         val approvalId = APPROVAL_ID_REGEX.find(authBody)?.groupValues?.get(1)
         assertNotNull(approvalId, "could not parse approval id from consent page")
 
