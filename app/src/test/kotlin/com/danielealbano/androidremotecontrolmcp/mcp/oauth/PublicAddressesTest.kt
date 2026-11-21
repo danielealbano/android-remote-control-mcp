@@ -29,8 +29,6 @@ class PublicAddressesTest {
             "192.0.2.1",
             "192.88.99.1",
             "192.168.1.1",
-            "198.18.0.1",
-            "198.19.255.255",
             "198.51.100.1",
             "203.0.113.1",
             "224.0.0.1",
@@ -60,7 +58,14 @@ class PublicAddressesTest {
     }
 
     @Test
-    @DisplayName("refuses the IPv6 special-use blocks")
+    @DisplayName("allows the benchmarking range, where fake-IP VPNs answer DNS")
+    fun allowsFakeIpVpnRange() {
+        assertTrue(isPublic("198.18.0.1"))
+        assertTrue(isPublic("198.19.255.254"))
+    }
+
+    @Test
+    @DisplayName("refuses everything outside IPv6 global unicast and its special-use blocks")
     fun refusesIpv6SpecialUse() {
         listOf(
             "::",
@@ -77,13 +82,21 @@ class PublicAddressesTest {
             "febf::1",
             "fec0::1",
             "ff02::1",
+            "3fff::1",
+            "3fff:fff::1",
+            "5f00::1",
+            "100:0:0:1::1",
+            "::1.2.3.4",
+            "4000::1",
         ).forEach { assertFalse(isPublic(it), it) }
     }
 
     @Test
     @DisplayName("accepts public IPv6 addresses")
     fun acceptsPublicIpv6() {
-        listOf("2606:4700::1", "2001:200::1", "2a00:1450::1").forEach { assertTrue(isPublic(it), it) }
+        listOf("2606:4700::1", "2001:200::1", "2a00:1450::1", "3ffe::1", "3fff:1000::1").forEach {
+            assertTrue(isPublic(it), it)
+        }
     }
 
     @Test

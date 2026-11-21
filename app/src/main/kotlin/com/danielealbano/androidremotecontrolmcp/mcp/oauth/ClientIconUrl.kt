@@ -3,7 +3,8 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 /**
  * Resolves the best icon URL to render for a requesting OAuth client.
  *
- * Priority: an SSRF-safe DCR `logo_uri` ([LogoUrlPolicy.isSafeLogoUrl]) wins; otherwise, for a routable
+ * Priority: an SSRF-safe client `logo_uri` ([LogoUrlPolicy.isSafeLogoUrl]; callers pass the one
+ * [OAuthPolicy.displayLogoUri] allows, DCR or CIMD) wins; otherwise, for a routable
  * public redirect host, a third-party favicon-service URL (higher-resolution than a bare `/favicon.ico`).
  * Loopback / private / link-local hosts (local test clients) resolve to `null` so the UI falls back to an
  * initials avatar and no host is leaked to the favicon service.

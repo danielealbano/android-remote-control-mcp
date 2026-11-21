@@ -6,12 +6,11 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogReposi
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Validates an OAuth access token for `/mcp`: signature + type (via [JwtTokenService]), `aud` match
- * against the canonical resource, and the client still being in the registry (instant revocation) — for a
- * CIMD client, its connection too. On success it updates the client's (and connection's) last-used timestamp,
- * DEBOUNCED so quick successive `/mcp` calls
- * do not write to DataStore on every request. Extracted (not inlined in the server) so it is unit
- * testable and shared by production and the test helper.
+ * Validates an OAuth access token for `/mcp`: signature + type (via [JwtTokenService]), `aud` match against the
+ * canonical resource, and the client still being in the registry (instant revocation) — for a CIMD client, its
+ * connection too. On success it updates the client's (and connection's) last-used timestamp, DEBOUNCED so quick
+ * successive `/mcp` calls do not write to DataStore on every request. Extracted (not inlined in the server) so it is
+ * unit testable and shared by production and the test helper.
  */
 class OAuthAccessValidator(
     private val tokenService: JwtTokenService,

@@ -120,42 +120,28 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
 ) {
     val claims = deps.tokenService.verifyRefreshToken(form["refresh_token"].orEmpty())
     val clientIdForm = form["client_id"]
-    val client = claims?.let { deps.clientRepository.getClient(it.clientId) }
-    val rejected =
-        claims == null ||
-            (!clientIdForm.isNullOrEmpty() && clientIdForm != claims.clientId) ||
-            client == null ||
-            // Stale/rotated refresh token, or a CIMD connection that ended — reject only (do NOT revoke the client).
-            claims.jti != currentRefreshJti(client, claims.connectionId)
-    if (rejected) {
+    val newJti = UUID.randomUUID().toString()
+    // The compare and the rotation are one step, so a refresh token works once even when two requests race. A stale
+    // or rotated token, a CIMD connection that ended, or a token of the other client kind is rejected — and only
+    // rejected (do NOT revoke the client).
+    val repository = deps.clientRepository
+    val rotated =
+        claims != null &&
+            (clientIdForm.isNullOrEmpty() || clientIdForm == claims.clientId) &&
+            repository.rotateRefreshJti(claims.clientId, claims.connectionId, claims.jti, newJti, deps.nowMs())
+    if (!rotated) {
         respondOAuthError(HttpStatusCode.BadRequest, "invalid_grant")
         return
     }
     val resource = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
-    val newJti = UUID.randomUUID().toString()
-    deps.clientRepository.setRefreshJti(claims.clientId, newJti, claims.connectionId)
-    deps.clientRepository.touchLastUsed(claims.clientId, deps.nowMs(), claims.connectionId)
-    val name = OAuthPolicy.clientDisplayName(claims.clientId, client.clientName) ?: claims.clientId
+    val clientName = deps.clientRepository.getClient(claims.clientId)?.clientName
+    val name = OAuthPolicy.clientDisplayName(claims.clientId, clientName) ?: claims.clientId
     deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for $name")
     respondTokens(
         access = deps.tokenService.issueAccessToken(claims.clientId, resource, claims.connectionId),
         refresh = deps.tokenService.issueRefreshToken(claims.clientId, newJti, resource, claims.connectionId),
     )
 }
-
-/**
- * The refresh jti [client] currently accepts: a DCR client's own, or the jti of its connection [connectionId] for a
- * CIMD client (null once that connection ended). A token without a connection never refreshes a CIMD client.
- */
-private fun currentRefreshJti(
-    client: OAuthClient,
-    connectionId: String?,
-): String? =
-    when {
-        connectionId != null -> client.connections.firstOrNull { it.id == connectionId }?.refreshJti
-        OAuthPolicy.isMetadataDocumentClientId(client.clientId) -> null
-        else -> client.currentRefreshJti
-    }
 
 internal suspend fun ApplicationCall.respondTokens(
     access: String,

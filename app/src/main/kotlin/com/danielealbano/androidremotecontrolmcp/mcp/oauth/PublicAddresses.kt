@@ -5,10 +5,14 @@ import java.net.Inet6Address
 import java.net.InetAddress
 
 /**
- * Tells globally reachable addresses from the special-use ones of RFC 6890 and its IANA registries, which the OAuth
- * server's downloads must never reach (draft-ietf-oauth-client-id-metadata-document section 10.7): unspecified,
- * loopback, private, shared (CGNAT), link-local, documentation, benchmarking, protocol assignments, multicast and
- * reserved. An IPv6 address carrying an IPv4 one (mapped, NAT64 well-known prefix) is judged by that IPv4 address.
+ * Tells globally reachable addresses from the special-use ones, which the OAuth server's downloads must never reach
+ * (draft-ietf-oauth-client-id-metadata-document section 10.7, RFC 6890 and the IANA special-purpose registries). IPv4:
+ * unspecified, private, shared (CGNAT), loopback, link-local, protocol assignments, documentation, 6to4 relay,
+ * multicast and reserved are refused. The benchmarking range (`198.18.0.0/15`) is allowed: VPN apps in fake-IP mode
+ * answer DNS from it and carry the connection to the real host, and the downloads only go to fixed app domains and
+ * their vendors' logo hosts, so refusing it would only break logins on those phones. IPv6: only global unicast
+ * (`2000::/3`) is allowed, minus its special-purpose blocks; an address carrying an IPv4 one (mapped, NAT64
+ * well-known prefix) is judged by that IPv4 address.
  */
 object PublicAddresses {
     private class Block(
@@ -42,25 +46,22 @@ object PublicAddresses {
             "192.0.2.0/24",
             "192.88.99.0/24",
             "192.168.0.0/16",
-            "198.18.0.0/15",
             "198.51.100.0/24",
             "203.0.113.0/24",
             "224.0.0.0/4",
             "240.0.0.0/4",
         ).map(::block)
 
+    /** The only IPv6 space a download may reach. */
+    private val IPV6_GLOBAL_UNICAST = block("2000::/3")
+
+    /** Special-purpose blocks inside [IPV6_GLOBAL_UNICAST]. */
     private val IPV6_SPECIAL =
         listOf(
-            "::/127",
-            "64:ff9b:1::/48",
-            "100::/64",
             "2001::/23",
             "2001:db8::/32",
             "2002::/16",
-            "fc00::/7",
-            "fe80::/10",
-            "fec0::/10",
-            "ff00::/8",
+            "3fff::/20",
         ).map(::block)
 
     /**
@@ -86,7 +87,7 @@ object PublicAddresses {
                     val ipv4 = bytes.copyOfRange(bytes.size - IPV4_BYTES, bytes.size)
                     IPV4_SPECIAL.none { it.contains(ipv4) }
                 } else {
-                    IPV6_SPECIAL.none { it.contains(bytes) }
+                    IPV6_GLOBAL_UNICAST.contains(bytes) && IPV6_SPECIAL.none { it.contains(bytes) }
                 }
             }
 

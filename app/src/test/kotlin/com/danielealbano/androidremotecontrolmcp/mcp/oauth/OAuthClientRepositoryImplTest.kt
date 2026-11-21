@@ -3,13 +3,19 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -236,13 +242,57 @@ class OAuthClientRepositoryImplTest {
             repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "j1", 1L)
             val reloaded = OAuthClientRepositoryImpl(dataStore, serverLog)
             assertEquals(listOf(OAuthConnection("c1", "j1", 1L, 1L)), reloaded.getClient(DOC)?.connections)
-            val legacy =
-                kotlinx.serialization.json.Json.decodeFromString<List<OAuthClient>>(
+        }
+
+    @Test
+    @DisplayName("a list stored before CIMD (no connections field) loads through the repository")
+    fun legacyListLoads() =
+        testScope.runTest {
+            dataStore.edit {
+                it[stringPreferencesKey("oauth_clients")] =
                     """[{"clientId":"arc-1","redirectUris":["https://claude.ai/api/mcp/auth_callback"],""" +
-                        """"createdAtMs":1,"lastUsedAtMs":2,"currentRefreshJti":"j"}]""",
-                )
-            assertEquals(emptyList<OAuthConnection>(), legacy.single().connections)
-            assertTrue(legacy.single().isApproved)
+                    """"createdAtMs":1,"lastUsedAtMs":2,"currentRefreshJti":"j"}]"""
+            }
+            val legacy = OAuthClientRepositoryImpl(dataStore, serverLog).getClient("arc-1")
+            assertEquals(emptyList<OAuthConnection>(), legacy?.connections)
+            assertEquals("j", legacy?.currentRefreshJti)
+            assertEquals(true, legacy?.isApproved)
+        }
+
+    @Test
+    @DisplayName("rotateRefreshJti swaps only the expected jti of the right kind and touches last use")
+    fun rotateRefreshJti() =
+        testScope.runTest {
+            val dcr = repository.register("Claude", listOf("https://claude.ai/api/mcp/auth_callback"), "web", null, 1L)
+            repository.setRefreshJti(dcr.clientId, "j0")
+            assertTrue(repository.rotateRefreshJti(dcr.clientId, null, "j0", "j1", 50L))
+            assertFalse(repository.rotateRefreshJti(dcr.clientId, null, "j0", "j2", 60L))
+            assertFalse(repository.rotateRefreshJti(dcr.clientId, "c1", "j1", "j3", 60L))
+            assertEquals("j1", repository.getClient(dcr.clientId)?.currentRefreshJti)
+            assertEquals(50L, repository.getClient(dcr.clientId)?.lastUsedAtMs)
+
+            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "k0", 1L)
+            assertFalse(repository.rotateRefreshJti(DOC, null, "k0", "k1", 70L))
+            assertFalse(repository.rotateRefreshJti(DOC, "c9", "k0", "k1", 70L))
+            assertTrue(repository.rotateRefreshJti(DOC, "c1", "k0", "k1", 80L))
+            val connection = repository.getClient(DOC)?.connections?.single()
+            assertEquals("k1", connection?.refreshJti)
+            assertEquals(80L, connection?.lastUsedAtMs)
+            assertFalse(repository.rotateRefreshJti("https://claude.ai/oauth/gone", "c1", "k1", "k2", 90L))
+        }
+
+    @Test
+    @DisplayName("concurrent rotations of the same refresh jti: exactly one wins")
+    fun concurrentRotationsOneWins() =
+        testScope.runTest {
+            repository.addConnection(DOC, "Claude Code", REDIRECTS, null, "c1", "k0", 1L)
+            val results =
+                withContext(Dispatchers.Default) {
+                    (1..8)
+                        .map { attempt -> async { repository.rotateRefreshJti(DOC, "c1", "k0", "k$attempt", 2L) } }
+                        .awaitAll()
+                }
+            assertEquals(1, results.count { it })
         }
 
     private suspend fun register(nowMs: Long) =

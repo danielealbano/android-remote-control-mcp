@@ -15,11 +15,19 @@ class OAuthMetadataDocumentPolicyTest {
         assertEquals("claude.ai", OAuthPolicy.metadataDocumentHost(CLAUDE_CODE_DOC))
         assertEquals("chatgpt.com", OAuthPolicy.metadataDocumentHost(CHATGPT_DOC))
         assertEquals("chatgpt.com", OAuthPolicy.metadataDocumentHost(CODEX_DOC))
+        assertEquals("vscode.dev", OAuthPolicy.metadataDocumentHost(VSCODE_DOC))
+    }
+
+    @Test
+    @DisplayName("metadataDocumentHost accepts other paths and subdomains of the app domains")
+    fun acceptsOtherUrlsOnAppDomains() {
+        // OpenAI documents this shape for servers without RFC 9207; Kimi publishes no document URL.
         val callbackIdDoc = "https://chatgpt.com/oauth/$CALLBACK_ID/client.json"
         assertEquals("chatgpt.com", OAuthPolicy.metadataDocumentHost(callbackIdDoc))
-        assertEquals("vscode.dev", OAuthPolicy.metadataDocumentHost(VSCODE_DOC))
         assertEquals("www.kimi.com", OAuthPolicy.metadataDocumentHost("https://www.kimi.com/oauth/client.json"))
         assertEquals("kimi.com", OAuthPolicy.metadataDocumentHost("https://kimi.com/oauth/client.json"))
+        val insiders = "https://insiders.vscode.dev/oauth/c.json"
+        assertEquals("insiders.vscode.dev", OAuthPolicy.metadataDocumentHost(insiders))
     }
 
     @Test

@@ -27,8 +27,8 @@ object OAuthMetadata {
     /**
      * RFC 8414 Authorization Server Metadata for issuer `<baseUrl>`. It advertises RFC 9207 issuer identification:
      * every authorization response carries `iss` = this exact issuer. It also advertises Client ID Metadata Documents
-     * next to DCR: Claude, ChatGPT, Codex and VS Code then send their document URL as `client_id` (with `none`
-     * listed below, Claude's other condition), while Gemini keeps using `registration_endpoint`.
+     * next to DCR: Claude, Claude Code, ChatGPT, Codex and VS Code then send their document URL as `client_id` (with
+     * `none` listed below, Claude's other condition), while Gemini keeps using `registration_endpoint`.
      */
     fun authorizationServerMetadata(baseUrl: String): String =
         Json.encodeToString(

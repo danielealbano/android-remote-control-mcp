@@ -43,13 +43,8 @@ class OAuthClientRepositoryImpl
         private suspend fun seedLocked() {
             if (seeded) return
             val stored = dataStore.data.first()[OAUTH_CLIENTS_KEY]
-            snapshot.value = parse(stored)
+            snapshot.value = decodeClients(json, stored)
             seeded = true
-        }
-
-        private fun parse(stored: String?): List<OAuthClient> {
-            if (stored.isNullOrEmpty()) return emptyList()
-            return runCatching { json.decodeFromString<List<OAuthClient>>(stored) }.getOrDefault(emptyList())
         }
 
         /** Persists [list] to the snapshot and disk. MUST be called with [mutex] held. */
@@ -163,13 +158,7 @@ class OAuthClientRepositoryImpl
         ) {
             mutex.withLock {
                 seedLocked()
-                snapshot.value
-                    .replacing(clientId) { client ->
-                        client.copy(
-                            lastUsedAtMs = nowMs,
-                            connections = client.connections.updating(connectionId) { it.copy(lastUsedAtMs = nowMs) },
-                        )
-                    }?.let { persist(it) }
+                snapshot.value.replacing(clientId) { it.touched(nowMs, connectionId) }?.let { persist(it) }
             }
         }
 
@@ -180,17 +169,28 @@ class OAuthClientRepositoryImpl
         ) {
             mutex.withLock {
                 seedLocked()
-                snapshot.value
-                    .replacing(clientId) { client ->
-                        if (connectionId == null) {
-                            client.copy(currentRefreshJti = jti)
-                        } else {
-                            val connections = client.connections.updating(connectionId) { it.copy(refreshJti = jti) }
-                            client.copy(connections = connections)
-                        }
-                    }?.let { persist(it) }
+                snapshot.value.replacing(clientId) { it.withRefreshJti(jti, connectionId) }?.let { persist(it) }
             }
         }
+
+        override suspend fun rotateRefreshJti(
+            clientId: String,
+            connectionId: String?,
+            expectedJti: String,
+            newJti: String,
+            nowMs: Long,
+        ): Boolean =
+            mutex.withLock {
+                seedLocked()
+                val client = snapshot.value.firstOrNull { it.clientId == clientId }
+                val rotates = client != null && client.refreshJtiOf(connectionId) == expectedJti
+                if (rotates) {
+                    snapshot.value
+                        .replacing(clientId) { it.withRefreshJti(newJti, connectionId).touched(nowMs, connectionId) }
+                        ?.let { persist(it) }
+                }
+                rotates
+            }
 
         private companion object {
             private val OAUTH_CLIENTS_KEY = stringPreferencesKey("oauth_clients")

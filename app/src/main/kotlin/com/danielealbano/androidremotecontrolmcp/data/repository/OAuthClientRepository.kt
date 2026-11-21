@@ -63,4 +63,19 @@ interface OAuthClientRepository {
         jti: String,
         connectionId: String? = null,
     )
+
+    /**
+     * Refresh rotation in one step: when the current refresh jti — the client's (DCR, [connectionId] null) or the
+     * [connectionId] connection's (CIMD) — is [expectedJti], replaces it with [newJti], updates last use and returns
+     * true. Returns false and changes nothing otherwise: the token was already rotated (or is used concurrently), the
+     * client or connection is gone, or the kind does not match (a CIMD client has no own jti, a DCR one has no
+     * connections).
+     */
+    suspend fun rotateRefreshJti(
+        clientId: String,
+        connectionId: String?,
+        expectedJti: String,
+        newJti: String,
+        nowMs: Long,
+    ): Boolean
 }

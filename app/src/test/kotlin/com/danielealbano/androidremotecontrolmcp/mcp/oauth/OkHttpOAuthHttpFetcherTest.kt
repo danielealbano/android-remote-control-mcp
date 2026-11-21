@@ -13,8 +13,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
@@ -58,6 +57,13 @@ class OkHttpOAuthHttpFetcherTest {
 
     private fun url(path: String) = "https://$HOST:${server.port}$path"
 
+    private fun fetched(result: FetchResult): FetchedBody {
+        val fetched = assertInstanceOf(FetchResult.Fetched::class.java, result)
+        return fetched.body
+    }
+
+    private fun failure(result: FetchResult): String = assertInstanceOf(FetchResult.Failed::class.java, result).reason
+
     @Test
     @DisplayName("returns the body and content type of a 200, asking with the given Accept")
     fun returnsBody() =
@@ -70,10 +76,9 @@ class OkHttpOAuthHttpFetcherTest {
                     .body("{}")
                     .build(),
             )
-            val body = fetcher.get(url("/doc"), "application/json", MAX)
-            assertNotNull(body)
-            assertEquals("application/json", body?.contentType)
-            assertArrayEquals("{}".encodeToByteArray(), body?.bytes)
+            val body = fetched(fetcher.get(url("/doc"), "application/json", MAX))
+            assertEquals("application/json", body.contentType)
+            assertArrayEquals("{}".encodeToByteArray(), body.bytes)
             assertEquals("application/json", server.takeRequest(5, TimeUnit.SECONDS)?.headers?.get("Accept"))
         }
 
@@ -95,7 +100,7 @@ class OkHttpOAuthHttpFetcherTest {
                     .body("{}")
                     .build(),
             )
-            assertNull(fetcher.get(url("/doc"), "application/json", MAX))
+            assertEquals("HTTP 302", failure(fetcher.get(url("/doc"), "application/json", MAX)))
             assertEquals(1, server.requestCount)
         }
 
@@ -111,7 +116,7 @@ class OkHttpOAuthHttpFetcherTest {
                         .body("{}")
                         .build(),
                 )
-                assertNull(fetcher.get(url("/doc"), "application/json", MAX), "$code")
+                assertEquals("HTTP $code", failure(fetcher.get(url("/doc"), "application/json", MAX)))
             }
             server.enqueue(
                 MockResponse
@@ -120,7 +125,7 @@ class OkHttpOAuthHttpFetcherTest {
                     .body("")
                     .build(),
             )
-            assertNull(fetcher.get(url("/doc"), "application/json", MAX))
+            assertEquals("empty", failure(fetcher.get(url("/doc"), "application/json", MAX)))
         }
 
     @Test
@@ -134,7 +139,7 @@ class OkHttpOAuthHttpFetcherTest {
                     .body("x".repeat(MAX))
                     .build(),
             )
-            assertEquals(MAX, fetcher.get(url("/doc"), "application/json", MAX)?.bytes?.size)
+            assertEquals(MAX, fetched(fetcher.get(url("/doc"), "application/json", MAX)).bytes.size)
             server.enqueue(
                 MockResponse
                     .Builder()
@@ -142,20 +147,53 @@ class OkHttpOAuthHttpFetcherTest {
                     .body("x".repeat(MAX + 1))
                     .build(),
             )
-            assertNull(fetcher.get(url("/doc"), "application/json", MAX))
+            assertEquals("larger than $MAX bytes", failure(fetcher.get(url("/doc"), "application/json", MAX)))
         }
 
     @Test
     @DisplayName("refuses plain http, IP-literal hosts and malformed URLs without connecting")
     fun refusesBeforeConnecting() =
         runTest {
-            listOf(
-                "http://$HOST:${server.port}/doc",
-                "https://127.0.0.1:${server.port}/doc",
-                "https://[::1]:${server.port}/doc",
-                "https://8.8.8.8/doc",
-                "not a url",
-            ).forEach { assertNull(fetcher.get(it, "application/json", MAX), it) }
+            mapOf(
+                "http://$HOST:${server.port}/doc" to "not https",
+                "https://127.0.0.1:${server.port}/doc" to "an IP-literal host",
+                "https://[::1]:${server.port}/doc" to "an IP-literal host",
+                "https://8.8.8.8/doc" to "an IP-literal host",
+                "not a url" to "not a URL",
+            ).forEach { (url, reason) -> assertEquals(reason, failure(fetcher.get(url, "application/json", MAX)), url) }
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
+    @DisplayName("reports a call running past its limit as timed out")
+    fun reportsTimeout() =
+        runTest {
+            val quick =
+                OkHttpOAuthHttpFetcher {
+                    OkHttpOAuthHttpFetcher
+                        .clientBuilder()
+                        .callTimeout(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                        .sslSocketFactory(clientCerts.sslSocketFactory(), clientCerts.trustManager)
+                        .dns { listOf(InetAddress.getLoopbackAddress()) }
+                        .build()
+                }
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(200)
+                    .body("{}")
+                    .headersDelay(SHORT_TIMEOUT_MS * 10, TimeUnit.MILLISECONDS)
+                    .build(),
+            )
+            assertEquals("timed out", failure(quick.get(url("/doc"), "application/json", MAX)))
+        }
+
+    @Test
+    @DisplayName("the production fetcher never connects to a host with only special-use addresses")
+    fun productionRefusesLoopbackHost() =
+        runTest {
+            val result = OkHttpOAuthHttpFetcher().get("https://localhost:${server.port}/doc", "application/json", MAX)
+            assertEquals("localhost has no public address", failure(result))
             assertEquals(0, server.requestCount)
         }
 
@@ -179,6 +217,7 @@ class OkHttpOAuthHttpFetcherTest {
     private companion object {
         const val HOST = "docs.example.test"
         const val MAX = 64
+        const val SHORT_TIMEOUT_MS = 200L
         val held: HeldCertificate =
             HeldCertificate
                 .Builder()

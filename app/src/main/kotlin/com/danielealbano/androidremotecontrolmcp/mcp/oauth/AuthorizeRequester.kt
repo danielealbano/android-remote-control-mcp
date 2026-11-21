@@ -89,10 +89,19 @@ private suspend fun checkMetadataDocument(
     }
 }
 
-/** Client-sent text for the server log: no control characters, at most [MAX_LOGGED_CHARS]. */
-private fun loggable(value: String): String = value.filterNot { it.isISOControl() }.take(MAX_LOGGED_CHARS)
+/**
+ * Client-sent text for the server log, at most [MAX_LOGGED_CHARS]: without control characters, and without Unicode
+ * line and paragraph separators or format characters (bidi controls...), so it cannot fake a log line or reorder one.
+ */
+internal fun loggable(value: String): String =
+    value
+        .filterNot { it.isISOControl() || it.category in HIDDEN_CATEGORIES }
+        .take(MAX_LOGGED_CHARS)
 
 /** The host of [uri], or null. */
 internal fun host(uri: String): String? = runCatching { URI(uri).host }.getOrNull()
 
 private const val MAX_LOGGED_CHARS = 200
+
+private val HIDDEN_CATEGORIES =
+    setOf(CharCategory.LINE_SEPARATOR, CharCategory.PARAGRAPH_SEPARATOR, CharCategory.FORMAT)

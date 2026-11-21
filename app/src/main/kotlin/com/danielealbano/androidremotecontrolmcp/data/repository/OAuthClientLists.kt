@@ -3,6 +3,17 @@ package com.danielealbano.androidremotecontrolmcp.data.repository
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthConnection
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthPolicy
+import kotlinx.serialization.json.Json
+
+/** The persisted client list, or none when [stored] is absent or unreadable. */
+internal fun decodeClients(
+    json: Json,
+    stored: String?,
+): List<OAuthClient> =
+    stored
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { runCatching { json.decodeFromString<List<OAuthClient>>(it) }.getOrNull() }
+        .orEmpty()
 
 /**
  * This list plus [newcomer] within [OAuthPolicy.MAX_OAUTH_CLIENTS]. The victim is chosen among the EXISTING clients
@@ -41,3 +52,27 @@ internal fun List<OAuthConnection>.updating(
  */
 internal fun List<OAuthConnection>.withinConnectionCap(): List<OAuthConnection> =
     if (size < OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT) this else this - minBy { it.lastUsedAtMs }
+
+/** The refresh jti this client accepts: its own (DCR, [connectionId] null) or the connection's (CIMD). */
+internal fun OAuthClient.refreshJtiOf(connectionId: String?): String? =
+    if (connectionId == null) currentRefreshJti else connections.firstOrNull { it.id == connectionId }?.refreshJti
+
+/** This client with the refresh jti set to [jti]: its own (DCR, [connectionId] null) or the connection's (CIMD). */
+internal fun OAuthClient.withRefreshJti(
+    jti: String,
+    connectionId: String?,
+): OAuthClient =
+    if (connectionId == null) {
+        copy(currentRefreshJti = jti)
+    } else {
+        copy(connections = connections.updating(connectionId) { it.copy(refreshJti = jti) })
+    }
+
+/** This client used at [nowMs], and its [connectionId] connection too (CIMD). */
+internal fun OAuthClient.touched(
+    nowMs: Long,
+    connectionId: String?,
+): OAuthClient {
+    val touchedConnections = connections.updating(connectionId) { it.copy(lastUsedAtMs = nowMs) }
+    return copy(lastUsedAtMs = nowMs, connections = touchedConnections)
+}

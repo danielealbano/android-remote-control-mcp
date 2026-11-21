@@ -14,7 +14,8 @@ object ConsentLogo {
         fetcher: OAuthHttpFetcher,
         logoUri: String?,
     ): String? {
-        val bytes = logoUri?.let { fetcher.get(it, ACCEPT, OAuthPolicy.MAX_LOGO_BYTES)?.bytes }
+        val fetched = logoUri?.let { fetcher.get(it, ACCEPT, OAuthPolicy.MAX_LOGO_BYTES) }
+        val bytes = (fetched as? FetchResult.Fetched)?.body?.bytes
         val type = bytes?.let(::imageType)
         return if (bytes != null && type != null) "data:$type;base64,${Base64.encode(bytes)}" else null
     }

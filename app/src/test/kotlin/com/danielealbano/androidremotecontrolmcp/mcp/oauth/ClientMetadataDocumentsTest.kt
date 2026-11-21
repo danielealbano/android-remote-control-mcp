@@ -106,10 +106,10 @@ class ClientMetadataDocumentsTest {
             valid(ClientMetadataDocuments.load(fetcher("application/client-metadata+json"), CLAUDE_CODE_URL))
             listOf("text/html", null).forEach { type ->
                 val result = ClientMetadataDocuments.load(fetcher(type), CLAUDE_CODE_URL)
-                assertEquals("not served as JSON", invalidReason(result), type)
+                assertEquals("not served as JSON: $type", invalidReason(result), type)
             }
             assertEquals(
-                "could not be downloaded",
+                "could not be downloaded: ${FakeOAuthHttpFetcher.NOT_SERVED}",
                 invalidReason(ClientMetadataDocuments.load(FakeOAuthHttpFetcher(), CLAUDE_CODE_URL)),
             )
         }
@@ -121,7 +121,7 @@ class ClientMetadataDocumentsTest {
             val oversized = doc(extra = ""","padding":"${"x".repeat(OAuthPolicy.MAX_METADATA_DOCUMENT_BYTES)}"""")
             val fetcher = FakeOAuthHttpFetcher(mapOf(CLAUDE_CODE_URL to FakeOAuthHttpFetcher.json(oversized)))
             val result = ClientMetadataDocuments.load(fetcher, CLAUDE_CODE_URL)
-            assertEquals("could not be downloaded", invalidReason(result))
+            assertEquals("could not be downloaded: larger than 5120 bytes", invalidReason(result))
             assertEquals(listOf(CLAUDE_CODE_URL), fetcher.requested)
         }
 

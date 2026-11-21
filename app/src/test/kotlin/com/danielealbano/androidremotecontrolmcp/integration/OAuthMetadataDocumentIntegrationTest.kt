@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.integration
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.AuthorizeOptions
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.CANONICAL
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.OVERRIDE
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.VERIFIER
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.authorize
@@ -113,6 +114,63 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertNotEquals(HttpStatusCode.Unauthorized, mcpStatus(client, second.access))
             }
         }
+                // No cache: every login reads the document again.
+                assertEquals(2, fetcher.requested.count { it == CLAUDE_DOC_URL })
+            }
+        }
+
+    @Test
+    @DisplayName("a refresh token of the other client kind never rotates, and the stored jti stays")
+    fun refreshNeedsTheRightKind() =
+        runTest {
+            val fetcher = FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to claudeDoc()))
+            withServer(fetcher) { ctx ->
+                login(ctx, CLAUDE_DOC_URL, OAuthPolicy.CLAUDE_REDIRECT_URI)
+                val connection =
+                    ctx.clientRepository
+                        .getClient(CLAUDE_DOC_URL)!!
+                        .connections
+                        .single()
+                // Signed by the server itself, but without the connection the CIMD tokens always carry.
+                val noConnection = ctx.tokenService.issueRefreshToken(CLAUDE_DOC_URL, connection.refreshJti, CANONICAL)
+                assertEquals(HttpStatusCode.BadRequest, refreshRequest(client, CLAUDE_DOC_URL, noConnection).status)
+
+                val dcr = registerWithLogo(client, "https://claude.ai/logo.png")
+                ctx.clientRepository.setRefreshJti(dcr, "dcr-jti")
+                val withConnection = ctx.tokenService.issueRefreshToken(dcr, "dcr-jti", CANONICAL, connection.id)
+                assertEquals(HttpStatusCode.BadRequest, refreshRequest(client, dcr, withConnection).status)
+
+                assertEquals(
+                    connection,
+                    ctx.clientRepository
+                        .getClient(CLAUDE_DOC_URL)!!
+                        .connections
+                        .single(),
+                )
+                assertEquals("dcr-jti", ctx.clientRepository.getClient(dcr)?.currentRefreshJti)
+            }
+        }
+
+    @Test
+    @DisplayName("a bad parameter on a valid CIMD request redirects the error to the document's callback, with iss")
+    fun badParameterRedirectsWithIss() =
+        runTest {
+            val fetcher = FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to claudeDoc()))
+            withServer(fetcher) { ctx ->
+                val noRedirect = createClient { followRedirects = false }
+                val resp = authorize(noRedirect, CLAUDE_DOC_URL, AuthorizeOptions(challengeMethod = "plain"))
+                assertEquals(HttpStatusCode.Found, resp.status)
+                val location = Url(resp.headers["Location"]!!)
+                assertTrue(location.toString().startsWith("${OAuthPolicy.CLAUDE_REDIRECT_URI}?"), location.toString())
+                assertEquals("invalid_request", location.parameters["error"])
+                assertEquals("xyz", location.parameters["state"])
+                assertEquals(OVERRIDE, location.parameters["iss"])
+                assertTrue(
+                    ctx.approvalCoordinator
+                        .observePending()
+                        .value
+                        .isEmpty(),
+                )
 
     @Test
     @DisplayName("revoking the app ends every connection at once")
@@ -180,7 +238,11 @@ class OAuthMetadataDocumentIntegrationTest {
             val cases =
                 listOf(
                     Triple("https://evil.example/client.json", claude, "not on a supported app domain"),
-                    Triple("https://claude.ai/oauth/missing.json", claude, "could not be downloaded"),
+                    Triple(
+                        "https://claude.ai/oauth/missing.json",
+                        claude,
+                        "could not be downloaded: ${FakeOAuthHttpFetcher.NOT_SERVED}",
+                    ),
                     Triple(MISMATCH_URL, claude, "its client_id is not its URL"),
                     Triple(
                         CLAUDE_DOC_URL,

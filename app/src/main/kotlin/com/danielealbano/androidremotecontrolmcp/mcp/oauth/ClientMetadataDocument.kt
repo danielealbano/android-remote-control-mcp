@@ -39,10 +39,12 @@ object ClientMetadataDocuments {
         fetcher: OAuthHttpFetcher,
         clientId: String,
     ): ClientMetadataResult {
-        val body = fetcher.get(clientId, JSON_MEDIA_TYPE, OAuthPolicy.MAX_METADATA_DOCUMENT_BYTES)
+        val result = fetcher.get(clientId, JSON_MEDIA_TYPE, OAuthPolicy.MAX_METADATA_DOCUMENT_BYTES)
+        val body = (result as? FetchResult.Fetched)?.body
         return when {
+            result is FetchResult.Failed -> ClientMetadataResult.Invalid("could not be downloaded: ${result.reason}")
             body == null -> ClientMetadataResult.Invalid("could not be downloaded")
-            !isJsonMediaType(body.contentType) -> ClientMetadataResult.Invalid("not served as JSON")
+            !isJsonMediaType(body.contentType) -> notJson(body.contentType)
             else -> parse(clientId, body.bytes.decodeToString())
         }
     }
@@ -99,6 +101,8 @@ object ClientMetadataDocuments {
         val methods = json.strings("token_endpoint_auth_methods_supported")
         return if (methods != null) "none" in methods else json.string("token_endpoint_auth_method") == "none"
     }
+
+    private fun notJson(contentType: String?) = ClientMetadataResult.Invalid("not served as JSON: $contentType")
 
     private fun isJsonMediaType(contentType: String?): Boolean {
         val type = contentType?.substringBefore(';')?.trim()?.lowercase() ?: return false

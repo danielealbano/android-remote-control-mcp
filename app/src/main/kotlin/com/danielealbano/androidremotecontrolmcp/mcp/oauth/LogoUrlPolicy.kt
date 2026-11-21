@@ -3,7 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 import java.net.URI
 
 /**
- * SSRF guard for rendering a DCR `logo_uri`. Returns true only for an `https` URL whose host is not a
+ * SSRF guard for rendering a client `logo_uri` (DCR or CIMD). Returns true only for an `https` URL whose host is not a
  * literal private / loopback / link-local IP and not `localhost`. The loader MUST additionally not
  * follow redirects and MUST cap size/timeout; this predicate is the host-allowlist part.
  */
