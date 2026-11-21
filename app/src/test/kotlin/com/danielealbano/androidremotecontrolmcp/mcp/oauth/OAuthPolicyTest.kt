@@ -40,8 +40,8 @@ class OAuthPolicyTest {
     @Test
     @DisplayName("allows ChatGPT callback-id callbacks")
     fun allowsChatGptConnectorCallbacks() {
-        // The id ChatGPT registered on a real device, a one-character id, and one that holds the whole alphabet.
-        listOf(CHATGPT_ID, "a", "ABCXYZabcxyz0189_-").forEach {
+        // The id ChatGPT registered on a real device, a one-character id, and the whole base64url alphabet.
+        listOf(CHATGPT_ID, "a", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-").forEach {
             val uri = "https://$CHATGPT_HOST/connector/oauth/$it"
             assertTrue(OAuthPolicy.isAllowedRedirectUri(uri), uri)
         }
@@ -72,6 +72,8 @@ class OAuthPolicyTest {
             "/connector/OAuth/$CHATGPT_ID",
             "/connector/oauthx/$CHATGPT_ID",
             "/x/connector/oauth/$CHATGPT_ID",
+            "/r/$GEMINI_ID",
+            "/a/$GEMINI_ID",
             "/",
             "",
         ).forEach {
@@ -135,6 +137,7 @@ class OAuthPolicyTest {
             "/r//$GEMINI_ID",
             "/r/../a/$GEMINI_ID",
             "/r/%75ser_bound_custom-mcp-8569b7990f18a8201022f919",
+            "/connector/oauth/$CHATGPT_ID",
         ).forEach {
             val uri = "https://$GEMINI_HOST$it"
             assertFalse(OAuthPolicy.isAllowedRedirectUri(uri), uri)

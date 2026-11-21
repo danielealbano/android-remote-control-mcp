@@ -53,6 +53,24 @@ class OAuthFlowE2ETest {
     }
 
     @Test
+    fun `ChatGPT callbacks with a port or dot segments are refused at registration`() {
+        waitForHealth()
+        listOf(
+            "https://chatgpt.com:443/connector/oauth/-BSmWqXatII2",
+            "https://chatgpt.com/connector/oauth/../../evil",
+        ).forEach { uri ->
+            val (status, body) =
+                httpPost(
+                    "$base/register",
+                    """{"redirect_uris":["$uri"],"token_endpoint_auth_method":"none"}""",
+                    "application/json",
+                )
+            assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, status, "$uri: $body")
+            assertTrue(body.contains("invalid_redirect_uri"), "$uri: $body")
+        }
+    }
+
+    @Test
     fun `Gemini connector registration and callback complete the OAuth flow`() {
         runFlow(redirectUris = GEMINI_CALLBACKS, redirectUri = GEMINI_REDIRECT, clientName = "Google")
     }
