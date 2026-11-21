@@ -60,7 +60,7 @@ class OAuthMetadataDocumentIntegrationTest {
                 val page = authorize(client, CLAUDE_DOC_URL)
                 assertEquals(HttpStatusCode.OK, page.status)
                 val html = page.bodyAsText()
-                assertTrue(html.contains("Claude (claude.ai)"), html)
+                assertTrue(html.contains("Approve <strong>Claude</strong>"), html)
                 assertTrue(html.contains("data:image/png;base64,"), html)
                 // The browser never gets the logo's own URL: only the copy the phone downloaded.
                 assertFalse(html.contains(LOGO), html)
@@ -69,7 +69,9 @@ class OAuthMetadataDocumentIntegrationTest {
                         .observePending()
                         .value
                         .single()
-                assertEquals("Claude (claude.ai)", approval.clientName)
+                assertEquals("Claude", approval.clientName)
+                // Document and callback on claude.ai: no other-domain warning.
+                assertNull(approval.otherDomainHost)
                 assertEquals("claude.ai", approval.redirectHost)
                 assertEquals(LOGO, approval.iconUrl)
                 assertFalse(approval.loopbackRedirect)
@@ -94,8 +96,8 @@ class OAuthMetadataDocumentIntegrationTest {
                 assertEquals(HttpStatusCode.OK, refreshed.status)
                 assertEquals(HttpStatusCode.BadRequest, refreshRequest(client, CLAUDE_DOC_URL, tokens.refresh).status)
                 val messages = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
-                assertTrue(messages.contains("OAuth tokens issued to Claude (claude.ai)"), messages.toString())
-                assertTrue(messages.contains("OAuth token refreshed for Claude (claude.ai)"), messages.toString())
+                assertTrue(messages.contains("OAuth tokens issued to Claude"), messages.toString())
+                assertTrue(messages.contains("OAuth token refreshed for Claude"), messages.toString())
             }
         }
 
@@ -250,7 +252,9 @@ class OAuthMetadataDocumentIntegrationTest {
                         .value
                         .single()
                 assertTrue(warned.loopbackRedirect)
-                assertEquals("Claude Code (claude.ai)", warned.clientName)
+                assertEquals("Claude Code", warned.clientName)
+                // A loopback redirect gets only its own warning, never the other-domain one.
+                assertNull(warned.otherDomainHost)
                 assertEquals("localhost", warned.redirectHost)
                 // No logo in Claude Code's document: the favicon comes from its document host, not from localhost.
                 assertEquals(CLAUDE_FAVICON, warned.iconUrl)

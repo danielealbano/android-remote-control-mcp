@@ -7,6 +7,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.oauth
  *   by [ClientIconUrl] (rendered over a CSS monogram fallback) — the favicon is the only external reference, and only
  *   for public hosts.
  * @property loopbackWarning The redirect is loopback, so the page warns before the user approves on the device.
+ * @property otherDomainHost A CIMD client's document host on another domain than the redirect, so the page warns.
  */
 data class ConsentPageData(
     val approvalId: String,
@@ -16,4 +17,5 @@ data class ConsentPageData(
     val expiresInSeconds: Long,
     val iconUrl: String?,
     val loopbackWarning: Boolean = false,
+    val otherDomainHost: String? = null,
 )

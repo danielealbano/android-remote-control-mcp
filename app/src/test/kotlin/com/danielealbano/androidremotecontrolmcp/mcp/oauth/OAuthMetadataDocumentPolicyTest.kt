@@ -157,14 +157,25 @@ class OAuthMetadataDocumentPolicyTest {
     }
 
     @Test
-    @DisplayName("clientDisplayName adds the document host for CIMD and keeps the DCR name")
+    @DisplayName("clientDisplayName is the client_name, with the document host only for a nameless CIMD client")
     fun clientDisplayName() {
-        assertEquals("Claude Code (claude.ai)", OAuthPolicy.clientDisplayName(CLAUDE_CODE_DOC, "Claude Code"))
+        assertEquals("Claude Code", OAuthPolicy.clientDisplayName(CLAUDE_CODE_DOC, "Claude Code"))
         assertEquals("claude.ai", OAuthPolicy.clientDisplayName(CLAUDE_CODE_DOC, null))
         assertEquals("Claude", OAuthPolicy.clientDisplayName("arc-1", "Claude"))
         assertNull(OAuthPolicy.clientDisplayName("arc-1", null))
         assertTrue(OAuthPolicy.isMetadataDocumentClientId(CLAUDE_CODE_DOC))
         assertFalse(OAuthPolicy.isMetadataDocumentClientId("arc-1"))
+    }
+
+    @Test
+    @DisplayName("sameAppDomain compares at domain level within one app's document domains")
+    fun sameAppDomain() {
+        assertTrue(OAuthConnectors.sameAppDomain("claude.ai", "claude.ai"))
+        assertTrue(OAuthConnectors.sameAppDomain("kimi.com", "www.kimi.com"))
+        assertTrue(OAuthConnectors.sameAppDomain("www.kimi.com", "kimi.com"))
+        assertFalse(OAuthConnectors.sameAppDomain("claude.ai", "chatgpt.com"))
+        assertFalse(OAuthConnectors.sameAppDomain("claude.ai", "localhost"))
+        assertFalse(OAuthConnectors.sameAppDomain("claude.ai", "evilclaude.ai"))
     }
 
     @Test

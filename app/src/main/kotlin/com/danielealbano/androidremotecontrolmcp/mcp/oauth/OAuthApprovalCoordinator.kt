@@ -19,6 +19,9 @@ enum class ApprovalState { PENDING, APPROVED, DENIED, EXPIRED }
  *   shows it.
  * @property clientIp Source IP of the request, from what its listener trusts (`ClientIpSource`), else null.
  * @property clientGeo Offline geolocation of [clientIp] (country/city), else null.
+ * @property otherDomainHost For a CIMD client whose document is on another domain than its redirect (domain level),
+ *   the document host, so the approval warns; null otherwise, and always null for a loopback redirect, which has its
+ *   own warning.
  * @property loopbackRedirect The code goes to a loopback redirect: an app on the computer where the login page is
  *   open, which any program there could claim, so the approval warns (MCP authorization spec, localhost redirect
  *   risks).
@@ -33,6 +36,7 @@ data class PendingApproval(
     val clientIp: String? = null,
     val clientGeo: GeoLocation? = null,
     val loopbackRedirect: Boolean = false,
+    val otherDomainHost: String? = null,
 )
 
 /** The requesting-client identity captured at `/authorize` and surfaced on the approval. */
@@ -43,6 +47,7 @@ data class ApprovalRequest(
     val clientIp: String?,
     val clientGeo: GeoLocation?,
     val loopbackRedirect: Boolean = false,
+    val otherDomainHost: String? = null,
 )
 
 /**

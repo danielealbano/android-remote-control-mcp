@@ -173,11 +173,19 @@ private fun ApprovalCard(
                 Spacer(Modifier.height(8.dp))
                 ClientOriginRow(ip = approval.clientIp, geo = approval.clientGeo)
             }
-            if (approval.loopbackRedirect) {
-                // The code goes to an app on the computer of the login page, which any program there could claim.
+            // Loopback: the code goes to an app on the computer of the login page, which any program there could claim.
+            // Otherwise a CIMD client whose document is on another domain than its redirect.
+            val otherDomain = approval.otherDomainHost
+            val warning =
+                when {
+                    approval.loopbackRedirect -> stringResource(R.string.approval_loopback_warning)
+                    otherDomain != null -> stringResource(R.string.approval_other_domain_warning, otherDomain)
+                    else -> null
+                }
+            if (warning != null) {
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = stringResource(R.string.approval_loopback_warning),
+                    text = warning,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,

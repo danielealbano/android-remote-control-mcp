@@ -159,16 +159,16 @@ object OAuthPolicy {
     }
 
     /**
-     * The name a client is shown with. A CIMD client's own name is self-asserted, so the host its document came from
-     * follows it: `Claude (claude.ai)`. A DCR client shows its `client_name`; null when it sent none.
+     * The name a client is shown with: its `client_name`. A CIMD client without one shows the host of its document; a
+     * DCR client without one gets null.
      */
     fun clientDisplayName(
         clientId: String,
         clientName: String?,
     ): String? {
-        if (!isMetadataDocumentClientId(clientId)) return clientName
-        val host = runCatching { URI(clientId).rawAuthority }.getOrNull()
-        return if (clientName != null && host != null) "$clientName ($host)" else clientName ?: host
+        val documentHost =
+            clientId.takeIf { isMetadataDocumentClientId(it) }?.let { runCatching { URI(it).rawAuthority }.getOrNull() }
+        return clientName ?: documentHost
     }
 
     /** True when [uri] is an `http` loopback redirect (`localhost`, `127.0.0.1`, `[::1]`): an app on the computer. */

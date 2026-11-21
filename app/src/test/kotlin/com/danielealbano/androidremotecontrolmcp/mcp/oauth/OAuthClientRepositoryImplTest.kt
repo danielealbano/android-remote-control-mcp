@@ -192,7 +192,7 @@ class OAuthClientRepositoryImplTest {
             assertTrue(after.connections.any { it.id == "c1" })
             assertTrue(after.connections.any { it.id == "c11" })
             assertEquals(
-                "OAuth connection ended for Claude Code (claude.ai): more than 10 connections",
+                "OAuth connection ended for Claude Code: more than 10 connections",
                 serverLog.ofType(ServerLogEntry.Type.OAUTH).single().message,
             )
         }
@@ -223,7 +223,7 @@ class OAuthClientRepositoryImplTest {
             repository.revoke(DOC)
             assertNull(repository.getClient(DOC))
             val logged = serverLog.ofType(ServerLogEntry.Type.OAUTH).last().message
-            assertEquals("OAuth client revoked: Claude Code (claude.ai)", logged)
+            assertEquals("OAuth client revoked: Claude Code", logged)
         }
 
     @Test

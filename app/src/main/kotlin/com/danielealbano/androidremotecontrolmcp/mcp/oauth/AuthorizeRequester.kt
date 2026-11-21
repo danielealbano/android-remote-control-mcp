@@ -13,7 +13,17 @@ internal class AuthorizeRequester(
     val logoUri: String?,
     val metadataDocument: ClientMetadataDocument?,
     val iconHost: String? = null,
-)
+) {
+    /**
+     * For a CIMD client whose document is on another domain than [redirectUri] (domain level), the document host; null
+     * otherwise, and for a loopback redirect, which has its own warning instead.
+     */
+    fun otherDomainHost(redirectUri: String): String? {
+        val redirectHost = host(redirectUri).orEmpty()
+        val differs = metadataDocument != null && !OAuthPolicy.isLoopbackRedirectUri(redirectUri)
+        return iconHost?.takeIf { differs && !OAuthConnectors.sameAppDomain(it, redirectHost) }
+    }
+}
 
 /** A DCR client: registered, with [redirectUri] among its registered URIs and still inside the allowlist. */
 internal suspend fun registeredRequester(

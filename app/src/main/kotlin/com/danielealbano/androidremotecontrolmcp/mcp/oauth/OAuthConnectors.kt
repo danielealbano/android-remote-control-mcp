@@ -107,4 +107,21 @@ object OAuthConnectors {
             OAuthConnector(name = "Codex", documentDomains = setOf("chatgpt.com"), loopbackRedirects = true),
             OAuthConnector(name = "VS Code", documentDomains = setOf("vscode.dev"), loopbackRedirects = true),
         )
+
+    /**
+     * True when [documentHost] and [redirectHost] are under the same document domain of one app (domain level, so
+     * `kimi.com` and `www.kimi.com` match).
+     */
+    fun sameAppDomain(
+        documentHost: String,
+        redirectHost: String,
+    ): Boolean =
+        ALL.any { connector ->
+            connector.documentDomains.any { domain -> isUnder(documentHost, domain) && isUnder(redirectHost, domain) }
+        }
+
+    private fun isUnder(
+        host: String,
+        domain: String,
+    ): Boolean = host == domain || host.endsWith(".$domain")
 }

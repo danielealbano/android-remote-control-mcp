@@ -11,6 +11,10 @@ private const val LOOPBACK_WARNING =
     "The access goes to an app on the computer where this page is open. " +
         "Approve only if you started this login here yourself."
 
+/** The consent page's wording of the in-app other-domain warning; [safeHost] is already HTML-escaped. */
+private fun otherDomainWarning(safeHost: String) =
+    "This app identifies itself from $safeHost, a different domain. Approve only if you expected this."
+
 /**
  * Renders and responds with the [consentPageHtml] for [approval], with [iconUrl] (the logo the phone embedded with
  * [ConsentLogo], else the favicon link) and the countdown seeded from the window remaining at [nowMs].
@@ -30,6 +34,7 @@ suspend fun ApplicationCall.respondConsentPage(
             expiresInSeconds = (approval.expiresAtMs - nowMs) / MILLIS_PER_SECOND,
             iconUrl = iconUrl,
             loopbackWarning = approval.loopbackRedirect,
+            otherDomainHost = approval.otherDomainHost,
         )
     respondText(consentPageHtml(data), ContentType.Text.Html)
 }
@@ -55,7 +60,13 @@ fun consentPageHtml(data: ConsentPageData): String {
         )
     val iconTag =
         data.iconUrl?.let { """<img class="icon" src="${escapeHtml(it)}" alt="" onerror="this.remove()">""" } ?: ""
-    val warningTag = if (data.loopbackWarning) "<div class=\"warning\">$LOOPBACK_WARNING</div>" else ""
+    val warningText =
+        when {
+            data.loopbackWarning -> LOOPBACK_WARNING
+            data.otherDomainHost != null -> otherDomainWarning(escapeHtml(data.otherDomainHost))
+            else -> null
+        }
+    val warningTag = warningText?.let { "<div class=\"warning\">$it</div>" }.orEmpty()
     val seconds = data.expiresInSeconds.coerceAtLeast(0)
     return """
         <!DOCTYPE html>

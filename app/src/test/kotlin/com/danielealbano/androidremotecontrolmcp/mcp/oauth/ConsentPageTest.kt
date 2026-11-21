@@ -15,6 +15,20 @@ class ConsentPageTest {
     ) = ConsentPageData("approval-id", "42", clientName, host, expiresInSeconds, iconUrl)
 
     @Test
+    @DisplayName("warns about another domain, escaped, and shows only the loopback warning for a loopback redirect")
+    fun otherDomainWarning() {
+        val base = ConsentPageData("approval-id", "42", "App", "app.example", 300L, null)
+        val other = consentPageHtml(base.copy(otherDomainHost = "<b>docs.example</b>"))
+        val escaped = "This app identifies itself from &lt;b&gt;docs.example&lt;/b&gt;, a different domain."
+        assertTrue(other.contains(escaped), other)
+        assertFalse(other.contains("<b>docs.example</b>"), other)
+        val loopback = consentPageHtml(base.copy(loopbackWarning = true, otherDomainHost = "docs.example"))
+        assertTrue(loopback.contains("The access goes to an app on the computer where this page is open."), loopback)
+        assertFalse(loopback.contains("a different domain"), loopback)
+        assertFalse(consentPageHtml(base).contains("class=\"warning\""))
+    }
+
+    @Test
     @DisplayName("escapes a malicious client name")
     fun escapesClientName() {
         val html = consentPageHtml(data(clientName = "<script>alert(1)</script>"))
