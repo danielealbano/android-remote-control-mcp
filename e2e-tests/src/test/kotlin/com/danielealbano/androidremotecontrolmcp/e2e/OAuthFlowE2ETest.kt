@@ -153,7 +153,8 @@ class OAuthFlowE2ETest {
             "$base/authorize?response_type=code&client_id=${enc(clientId)}&redirect_uri=${enc(redirectUri)}" +
                 "&code_challenge=${enc(CHALLENGE)}&code_challenge_method=S256&state=xyz&scope=mcp"
         val (authStatus, authBody) = httpGet(authorizeUrl)
-        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed ($authorizeHint): $authBody")
+        val hint = authorizeHint.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+        assertEquals(HttpURLConnection.HTTP_OK, authStatus, "authorize failed$hint: $authBody")
         val approvalId = APPROVAL_ID_REGEX.find(authBody)?.groupValues?.get(1)
         assertNotNull(approvalId, "could not parse approval id from consent page")
 
