@@ -275,7 +275,7 @@ If **Add custom MCP server** is missing in step 2, your plan or workspace does n
 4. On the phone, check the 2-digit code and approve the request from **ChatGPT (chatgpt.com)** (notification, or the card on the Server screen).
 5. In a chat, type `@` and pick the plugin. It also works in the ChatGPT Android app.
 
-To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**.
+To remove it, open **Settings** → **Plugins** in ChatGPT, pick the plugin, choose **Uninstall**, then revoke the client in this app under **Settings → Access → Connected clients**. ChatGPT is one row there for all its plugins and accounts connected to this phone, so revoking it ends every ChatGPT connection.
 
 > ⚠️ **Security:** the same cautions as for Claude apply.
 
