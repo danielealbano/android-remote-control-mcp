@@ -9,6 +9,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -171,7 +172,7 @@ class OAuthFlowE2ETest {
         val (status, body) = httpGet("$base/.well-known/oauth-authorization-server")
         assertEquals(HttpURLConnection.HTTP_OK, status, body)
         val metadata = Json.parseToJsonElement(body).jsonObject
-        assertEquals("true", metadata["authorization_response_iss_parameter_supported"]?.jsonPrimitive?.content)
+        assertEquals(JsonPrimitive(true), metadata["authorization_response_iss_parameter_supported"])
         return metadata["issuer"]!!.jsonPrimitive.content
     }
 

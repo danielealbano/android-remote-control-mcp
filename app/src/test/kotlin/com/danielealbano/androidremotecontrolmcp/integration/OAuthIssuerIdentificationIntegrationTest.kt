@@ -13,7 +13,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
@@ -101,7 +101,7 @@ class OAuthIssuerIdentificationIntegrationTest {
     private suspend fun metadataIssuer(client: HttpClient): String {
         val metadata =
             Json.parseToJsonElement(client.get("/.well-known/oauth-authorization-server").bodyAsText()).jsonObject
-        assertTrue(metadata["authorization_response_iss_parameter_supported"]!!.jsonPrimitive.boolean)
+        assertEquals(JsonPrimitive(true), metadata["authorization_response_iss_parameter_supported"])
         return metadata["issuer"]!!.jsonPrimitive.content
     }
 
