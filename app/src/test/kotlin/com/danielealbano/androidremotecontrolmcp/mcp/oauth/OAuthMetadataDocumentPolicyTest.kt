@@ -157,12 +157,8 @@ class OAuthMetadataDocumentPolicyTest {
     }
 
     @Test
-    @DisplayName("clientDisplayName is the client_name, with the document host only for a nameless CIMD client")
-    fun clientDisplayName() {
-        assertEquals("Claude Code", OAuthPolicy.clientDisplayName(CLAUDE_CODE_DOC, "Claude Code"))
-        assertEquals("claude.ai", OAuthPolicy.clientDisplayName(CLAUDE_CODE_DOC, null))
-        assertEquals("Claude", OAuthPolicy.clientDisplayName("arc-1", "Claude"))
-        assertNull(OAuthPolicy.clientDisplayName("arc-1", null))
+    @DisplayName("isMetadataDocumentClientId tells a document URL from a DCR client id")
+    fun metadataDocumentClientId() {
         assertTrue(OAuthPolicy.isMetadataDocumentClientId(CLAUDE_CODE_DOC))
         assertFalse(OAuthPolicy.isMetadataDocumentClientId("arc-1"))
     }

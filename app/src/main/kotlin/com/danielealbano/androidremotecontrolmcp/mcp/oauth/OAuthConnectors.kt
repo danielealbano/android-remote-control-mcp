@@ -47,7 +47,7 @@ class OAuthConnector(
     ): Boolean = redirectUri in exactRedirectUris || redirectPatterns.any { it.matches(parsed) }
 
     /** True when [host] is one of [documentDomains] or a subdomain of one. */
-    fun ownsDocumentHost(host: String): Boolean = documentDomains.any { host == it || host.endsWith(".$it") }
+    fun ownsDocumentHost(host: String): Boolean = documentDomains.any { isUnderDomain(host, it) }
 }
 
 /** The apps this server accepts OAuth clients from. */
@@ -117,11 +117,12 @@ object OAuthConnectors {
         redirectHost: String,
     ): Boolean =
         ALL.any { connector ->
-            connector.documentDomains.any { domain -> isUnder(documentHost, domain) && isUnder(redirectHost, domain) }
+            connector.documentDomains.any { isUnderDomain(documentHost, it) && isUnderDomain(redirectHost, it) }
         }
-
-    private fun isUnder(
-        host: String,
-        domain: String,
-    ): Boolean = host == domain || host.endsWith(".$domain")
 }
+
+/** True when [host] is [domain] or a subdomain of it: the one domain rule for documents and the domain warning. */
+private fun isUnderDomain(
+    host: String,
+    domain: String,
+): Boolean = host == domain || host.endsWith(".$domain")

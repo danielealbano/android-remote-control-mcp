@@ -141,7 +141,7 @@ private suspend fun ApplicationCall.handleAuthorize(
     val clientIp = clientIp()
     // Geolocation may inflate/mmap the bundled DB on first use — keep that disk I/O off the request thread.
     val clientGeo = withContext(Dispatchers.IO) { deps.geoIpResolver.resolve(clientIp) }
-    // The one icon the approval shows and the client keeps once approved: the allowed logo, else the favicon.
+    // The one icon the approval shows and the client keeps when the code is redeemed: the allowed logo, else favicon.
     val favicon = ClientIconUrl.favicon(requester.iconHost ?: redirectHost)
     val iconUrl = requester.logoUri ?: favicon
     // Before the approval exists, so the phone never asks while the browser still waits for its page.

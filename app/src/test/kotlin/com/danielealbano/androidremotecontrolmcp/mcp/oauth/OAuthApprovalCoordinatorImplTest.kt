@@ -31,7 +31,7 @@ class OAuthApprovalCoordinatorImplTest {
         }
 
     @Test
-    @DisplayName("createPending carries the icon URL and the loopback flag onto the pending approval")
+    @DisplayName("createPending carries the icon URL, the loopback flag and the other-domain host onto the approval")
     fun createPendingCarriesIconUrl() =
         runTest {
             val coordinator = newCoordinator(RecordingServerLogRepository())
@@ -40,6 +40,8 @@ class OAuthApprovalCoordinatorImplTest {
             val request = ApprovalRequest("C", "localhost", null, null, null, loopbackRedirect = true)
             val loopback = coordinator.createPending(request, 0L)
             assertEquals(true, loopback.loopbackRedirect)
+            val other = ApprovalRequest("C", "claude.ai", null, null, null, otherDomainHost = "chatgpt.com")
+            assertEquals("chatgpt.com", coordinator.createPending(other, 0L).otherDomainHost)
         }
 
     @Test

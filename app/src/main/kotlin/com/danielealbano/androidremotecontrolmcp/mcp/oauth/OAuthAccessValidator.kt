@@ -45,7 +45,7 @@ class OAuthAccessValidator(
             if (wonDebounce) {
                 val idleMs = now - client.lastUsedAtMs
                 if (idleMs >= OAuthPolicy.IDLE_SESSION_LOG_THRESHOLD_MS) {
-                    val name = OAuthPolicy.clientDisplayName(client.clientId, client.clientName) ?: client.clientId
+                    val name = client.clientName ?: client.clientId
                     serverLog.log(
                         ServerLogEntry.Type.OAUTH,
                         "OAuth client '$name' active again after " +

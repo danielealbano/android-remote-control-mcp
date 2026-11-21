@@ -158,10 +158,10 @@ private fun ClientRow(
     }
 }
 
-/** The client's name, with its document host for a CIMD client. */
+/** The client's name, else its first redirect host, else Unknown. */
 @Composable
 private fun clientLabel(client: OAuthClient): String =
-    OAuthPolicy.clientDisplayName(client.clientId, client.clientName)
+    client.clientName
         ?: hostOf(client.redirectUris.firstOrNull())
         ?: stringResource(R.string.oauth_clients_unknown_client)
 

@@ -38,14 +38,15 @@ private suspend fun ApplicationCall.handleAuthorizationCodeGrant(
     if (refusal != null || code == null) {
         deps.serverLog.log(
             ServerLogEntry.Type.OAUTH,
-            "OAuth code refused (${loggable(clientId ?: "no client_id")}): ${refusal?.reason ?: UNKNOWN_CODE}",
+            "OAuth code refused (${loggable(clientId?.takeIf { it.isNotEmpty() } ?: "no client_id")}): " +
+                (refusal?.reason ?: UNKNOWN_CODE),
         )
         respondOAuthError(HttpStatusCode.BadRequest, refusal?.error ?: "invalid_grant")
         return
     }
     val jti = UUID.randomUUID().toString()
     val grant = recordGrant(deps, code, jti)
-    val displayName = OAuthPolicy.clientDisplayName(code.clientId, grant.clientName) ?: code.clientId
+    val displayName = grant.clientName ?: code.clientId
     deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth tokens issued to $displayName")
     respondTokens(
         access = deps.tokenService.issueAccessToken(code.clientId, code.resource, grant.connectionId),
@@ -68,6 +69,10 @@ private fun codeGrantRefusal(
     val clientId = form["client_id"]
     val resourceForm = form["resource"]
     return when {
+        form["code"].isNullOrEmpty() -> {
+            CodeRefusal("invalid_request", "no code")
+        }
+
         code == null -> {
             CodeRefusal("invalid_grant", UNKNOWN_CODE)
         }
@@ -155,7 +160,7 @@ private suspend fun ApplicationCall.handleRefreshTokenGrant(
     }
     val resource = canonicalResource(effectiveBaseUrl(this, deps.publicUrlOverride))
     val clientName = deps.clientRepository.getClient(claims.clientId)?.clientName
-    val name = OAuthPolicy.clientDisplayName(claims.clientId, clientName) ?: claims.clientId
+    val name = clientName ?: claims.clientId
     deps.serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth token refreshed for $name")
     respondTokens(
         access = deps.tokenService.issueAccessToken(claims.clientId, resource, claims.connectionId),

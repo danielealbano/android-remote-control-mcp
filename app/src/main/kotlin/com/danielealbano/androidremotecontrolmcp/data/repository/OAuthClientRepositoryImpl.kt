@@ -115,7 +115,7 @@ class OAuthClientRepositoryImpl
                         if (kept.size < it.connections.size) {
                             serverLog.log(
                                 ServerLogEntry.Type.OAUTH,
-                                "OAuth connection ended for ${OAuthPolicy.clientDisplayName(clientId, clientName)}: " +
+                                "OAuth connection ended for $clientName: " +
                                     "more than ${OAuthPolicy.MAX_CONNECTIONS_PER_CLIENT} connections",
                             )
                         }
@@ -148,7 +148,7 @@ class OAuthClientRepositoryImpl
                 val updated = snapshot.value.filterNot { it.clientId == clientId }
                 if (updated.size != snapshot.value.size) {
                     persist(updated)
-                    val name = OAuthPolicy.clientDisplayName(clientId, removed?.clientName) ?: clientId
+                    val name = removed?.clientName ?: clientId
                     serverLog.log(ServerLogEntry.Type.OAUTH, "OAuth client revoked: $name")
                 }
             }

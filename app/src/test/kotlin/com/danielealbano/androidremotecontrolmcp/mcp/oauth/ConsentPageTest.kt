@@ -1,5 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -27,6 +32,24 @@ class ConsentPageTest {
         assertFalse(loopback.contains("a different domain"), loopback)
         assertFalse(consentPageHtml(base).contains("class=\"warning\""))
     }
+
+    @Test
+    @DisplayName("respondConsentPage passes the approval's other-domain host to the page")
+    fun respondConsentPagePassesOtherDomain() =
+        testApplication {
+            val approval =
+                PendingApproval(
+                    id = "id",
+                    clientName = "App",
+                    redirectHost = "claude.ai",
+                    matchCode = "42",
+                    expiresAtMs = Long.MAX_VALUE,
+                    otherDomainHost = "chatgpt.com",
+                )
+            routing { get("/") { call.respondConsentPage(approval, "App", null, 0L) } }
+            val html = client.get("/").bodyAsText()
+            assertTrue(html.contains("This app identifies itself from chatgpt.com, a different domain."), html)
+        }
 
     @Test
     @DisplayName("escapes a malicious client name")

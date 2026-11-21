@@ -158,19 +158,6 @@ object OAuthPolicy {
         return logoUri.takeIf { allowed }
     }
 
-    /**
-     * The name a client is shown with: its `client_name`. A CIMD client without one shows the host of its document; a
-     * DCR client without one gets null.
-     */
-    fun clientDisplayName(
-        clientId: String,
-        clientName: String?,
-    ): String? {
-        val documentHost =
-            clientId.takeIf { isMetadataDocumentClientId(it) }?.let { runCatching { URI(it).rawAuthority }.getOrNull() }
-        return clientName ?: documentHost
-    }
-
     /** True when [uri] is an `http` loopback redirect (`localhost`, `127.0.0.1`, `[::1]`): an app on the computer. */
     fun isLoopbackRedirectUri(uri: String): Boolean = runCatching { URI(uri) }.getOrNull().isLoopbackRedirect()
 

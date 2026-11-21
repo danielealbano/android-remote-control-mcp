@@ -51,7 +51,7 @@ class OAuthMetadataDocumentIntegrationTest {
     )
 
     @Test
-    @DisplayName("Claude's hosted flow: document, approval named with its host, embedded logo, tokens, /mcp, refresh")
+    @DisplayName("Claude's hosted flow: document, approval by client_name, embedded logo, tokens, /mcp, refresh")
     fun hostedFlow() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
@@ -406,6 +406,83 @@ class OAuthMetadataDocumentIntegrationTest {
                         .message,
                 )
             }
+        }
+
+    @Test
+    @DisplayName("every refused code is logged with its reason, never with the code or the verifier")
+    fun tokenRefusalReasons() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            withServer(FakeOAuthHttpFetcher(mapOf(CLAUDE_DOC_URL to claudeDoc())), deps) { ctx ->
+                val codes = mutableListOf<String>()
+
+                suspend fun freshCode(): String {
+                    val code = loginCode(ctx, CLAUDE_DOC_URL, OAuthPolicy.CLAUDE_REDIRECT_URI)
+                    codes += code
+                    return code
+                }
+                val claude = OAuthPolicy.CLAUDE_REDIRECT_URI
+                val doc = "($CLAUDE_DOC_URL):"
+                val noId = "(no client_id): no client_id (Authorization header"
+                val sneakyResource = "https://x/\u2028fake"
+                val cases =
+                    listOf(
+                        Triple(form(null, CLAUDE_DOC_URL, claude), null, "$doc no code"),
+                        Triple(form("bogus", CLAUDE_DOC_URL, claude), null, "$doc unknown, used or expired code"),
+                        Triple(
+                            form(freshCode(), CLAUDE_DOC_URL, "http://localhost/x"),
+                            null,
+                            "$doc redirect_uri differs",
+                        ),
+                        Triple(form(freshCode(), null, claude), null, "$noId absent)"),
+                        Triple(form(freshCode(), null, claude), "Basic eA==", "$noId sent)"),
+                        Triple(form(freshCode(), "", claude), null, "$noId absent)"),
+                        Triple(
+                            form(freshCode(), CLAUDE_DOC_URL, claude, resource = sneakyResource),
+                            null,
+                            "$doc resource https://x/fake differs",
+                        ),
+                        Triple(
+                            form(freshCode(), CLAUDE_DOC_URL, claude, verifier = "wrong"),
+                            null,
+                            "$doc PKCE verifier does not match",
+                        ),
+                    )
+                cases.forEach { (params, authorization, expected) ->
+                    val resp =
+                        client.post("/token") {
+                            authorization?.let { header("Authorization", it) }
+                            setBody(FormDataContent(params))
+                        }
+                    assertEquals(HttpStatusCode.BadRequest, resp.status, expected)
+                    assertEquals(
+                        "OAuth code refused $expected",
+                        deps.serverLog
+                            .ofType(ServerLogEntry.Type.OAUTH)
+                            .last()
+                            .message,
+                    )
+                }
+                val logged = deps.serverLog.ofType(ServerLogEntry.Type.OAUTH).map { it.message }
+                (codes + VERIFIER).forEach { secret -> assertTrue(logged.none { it.contains(secret) }, secret) }
+            }
+        }
+
+    /** A code grant form; a null value leaves the parameter out. */
+    private fun form(
+        code: String?,
+        clientId: String?,
+        redirectUri: String,
+        resource: String? = null,
+        verifier: String = VERIFIER,
+    ): Parameters =
+        Parameters.build {
+            append("grant_type", "authorization_code")
+            code?.let { append("code", it) }
+            clientId?.let { append("client_id", it) }
+            append("redirect_uri", redirectUri)
+            append("code_verifier", verifier)
+            resource?.let { append("resource", it) }
         }
 
     @Test

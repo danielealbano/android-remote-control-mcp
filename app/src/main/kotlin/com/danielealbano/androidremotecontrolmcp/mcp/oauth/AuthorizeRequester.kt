@@ -19,9 +19,11 @@ internal class AuthorizeRequester(
      * otherwise, and for a loopback redirect, which has its own warning instead.
      */
     fun otherDomainHost(redirectUri: String): String? {
+        val documentHost = metadataDocument?.clientId?.let { host(it) }
         val redirectHost = host(redirectUri).orEmpty()
-        val differs = metadataDocument != null && !OAuthPolicy.isLoopbackRedirectUri(redirectUri)
-        return iconHost?.takeIf { differs && !OAuthConnectors.sameAppDomain(it, redirectHost) }
+        return documentHost?.takeIf {
+            !OAuthPolicy.isLoopbackRedirectUri(redirectUri) && !OAuthConnectors.sameAppDomain(it, redirectHost)
+        }
     }
 }
 
@@ -64,7 +66,7 @@ internal suspend fun metadataDocumentRequester(
         is ClientMetadataResult.Valid -> {
             val document = result.document
             AuthorizeRequester(
-                displayName = OAuthPolicy.clientDisplayName(clientId, document.clientName) ?: document.clientName,
+                displayName = document.clientName,
                 logoUri = OAuthPolicy.displayLogoUri(clientId, document.logoUri),
                 metadataDocument = document,
                 iconHost = host(clientId),
