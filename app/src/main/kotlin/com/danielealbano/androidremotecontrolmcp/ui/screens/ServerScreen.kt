@@ -59,6 +59,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizati
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
+import com.danielealbano.androidremotecontrolmcp.ui.components.RegisterWithSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
@@ -102,6 +103,7 @@ fun ServerScreen(
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsStateWithLifecycle()
     val pendingApprovalCount by viewModel.pendingApprovalCount.collectAsStateWithLifecycle()
+    val registerCardDismissed by viewModel.registerCardDismissed.collectAsStateWithLifecycle()
 
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
@@ -185,6 +187,13 @@ fun ServerScreen(
                 )
                 Spacer(Modifier.height(16.dp))
             }
+
+            RegisterWithSection(
+                serverConfig = serverConfig,
+                tunnelStatus = tunnelStatus,
+                dismissed = registerCardDismissed,
+                onDismiss = viewModel::dismissRegisterCard,
+            )
 
             ServerStatusCard(
                 serverStatus = serverStatus,

@@ -473,6 +473,17 @@
     </plurals>
     <string name="oauth_clients_revoke_dialog_title">Revoke client?</string>
     <string name="oauth_clients_revoke_dialog_body">Revoking immediately invalidates this client\'s tokens. It must re-authorize to reconnect.</string>
+    <string name="register_card_title">Register with</string>
+    <string name="register_card_dismiss">Dismiss</string>
+    <string name="register_target_claude">Claude</string>
+    <string name="register_target_chatgpt">ChatGPT.com</string>
+    <string name="register_target_gemini">Gemini</string>
+    <string name="register_card_no_tunnel">Enable a tunnel first. Claude, ChatGPT and Gemini reach this phone through its public URL.</string>
+    <string name="register_card_no_url">Start the server to get the tunnel URL.</string>
+    <string name="register_card_oauth_off">Turn on OAuth in Settings → Access first.</string>
+    <string name="register_chatgpt_steps">URL copied. Tap +, then Add custom MCP server, and paste it.</string>
+    <string name="register_gemini_steps">URL copied. Tap +, then paste it as the server URL.</string>
+    <string name="register_no_app">No app can open the link.</string>
     <string name="oauth_clients_revoke_dialog_body_app">Revoking immediately ends every connection of this app. Each one must re-authorize to reconnect.</string>
     <string name="oauth_clients_revoke_confirm">Revoke</string>
     <string name="oauth_clients_revoke_cancel">Cancel</string>
