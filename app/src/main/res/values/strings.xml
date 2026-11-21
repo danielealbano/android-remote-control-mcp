@@ -473,6 +473,7 @@
     </plurals>
     <string name="oauth_clients_revoke_dialog_title">Revoke client?</string>
     <string name="oauth_clients_revoke_dialog_body">Revoking immediately invalidates this client\'s tokens. It must re-authorize to reconnect.</string>
+    <string name="oauth_clients_revoke_dialog_body_app">Revoking immediately ends every connection of this app. Each one must re-authorize to reconnect.</string>
     <string name="oauth_clients_revoke_confirm">Revoke</string>
     <string name="oauth_clients_revoke_cancel">Cancel</string>
 

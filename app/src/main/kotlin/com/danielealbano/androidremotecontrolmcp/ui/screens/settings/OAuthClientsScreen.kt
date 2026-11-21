@@ -106,7 +106,7 @@ private fun ClientRow(
         AlertDialog(
             onDismissRequest = { showConfirm = false },
             title = { Text(stringResource(R.string.oauth_clients_revoke_dialog_title)) },
-            text = { Text(stringResource(R.string.oauth_clients_revoke_dialog_body)) },
+            text = { Text(stringResource(revokeDialogBodyRes(client.clientId))) },
             confirmButton = {
                 TextButton(onClick = {
                     showConfirm = false
@@ -164,6 +164,14 @@ private fun clientLabel(client: OAuthClient): String =
     client.clientName
         ?: hostOf(client.redirectUris.firstOrNull())
         ?: stringResource(R.string.oauth_clients_unknown_client)
+
+/** The revoke dialog text: revoking a CIMD row ends every connection of its app. */
+internal fun revokeDialogBodyRes(clientId: String): Int =
+    if (OAuthPolicy.isMetadataDocumentClientId(clientId)) {
+        R.string.oauth_clients_revoke_dialog_body_app
+    } else {
+        R.string.oauth_clients_revoke_dialog_body
+    }
 
 /** A CIMD client is one row for every login of its app: how many connections it holds; else the DCR type. */
 @Composable
