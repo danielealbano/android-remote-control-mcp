@@ -13,7 +13,12 @@ import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.Proxy
 import java.net.UnknownHostException
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import javax.net.ssl.SSLException
 
@@ -43,7 +48,8 @@ interface OAuthHttpFetcher {
     /**
      * GETs [url] with `Accept: [accept]`. Fails, with the reason, when it is not `https`, has an IP-literal host or a
      * host with no public address, answers a status other than 200 (redirects are never followed), sends more than
-     * [maxBytes] or an empty body, or the call runs past [OAuthPolicy.OUTBOUND_FETCH_TIMEOUT_MS].
+     * [maxBytes] or an empty body, or the call, its address lookup included, runs past
+     * [OAuthPolicy.OUTBOUND_FETCH_TIMEOUT_MS].
      */
     suspend fun get(
         url: String,
@@ -140,11 +146,53 @@ class OkHttpOAuthHttpFetcher internal constructor(
     }
 }
 
-/** [Dns.SYSTEM] without the special-use addresses ([PublicAddresses]); a host left with none does not resolve. */
-internal object PublicOnlyDns : Dns {
+/** [PublicDns] over [Dns.SYSTEM], given up after [OAuthPolicy.OUTBOUND_FETCH_TIMEOUT_MS]. */
+internal object PublicOnlyDns : Dns by PublicDns(Dns.SYSTEM, OAuthPolicy.OUTBOUND_FETCH_TIMEOUT_MS)
+
+/**
+ * [resolver] without the special-use addresses ([PublicAddresses]); a host left with none does not resolve. The lookup
+ * runs on a thread of its own and is given up after [timeoutMs], because OkHttp's call timeout cannot interrupt a
+ * lookup: a stalled resolver would otherwise hold the request past it.
+ */
+internal class PublicDns(
+    private val resolver: Dns,
+    private val timeoutMs: Long,
+) : Dns {
     override fun lookup(hostname: String): List<InetAddress> =
-        Dns.SYSTEM
-            .lookup(hostname)
+        resolve(hostname)
             .filter(PublicAddresses::isPublic)
             .ifEmpty { throw UnknownHostException("$hostname has no public address") }
+
+    private fun resolve(hostname: String): List<InetAddress> {
+        val lookup = LOOKUPS.submit(Callable { resolver.lookup(hostname) })
+        val failure: Throwable =
+            try {
+                return lookup.get(timeoutMs, TimeUnit.MILLISECONDS)
+            } catch (e: ExecutionException) {
+                // What the resolver threw, as if it had run on this thread.
+                e.cause ?: e
+            } catch (e: TimeoutException) {
+                UnknownHostException("$hostname did not resolve in $timeoutMs ms").apply { initCause(e) }
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                InterruptedIOException("lookup of $hostname interrupted").apply { initCause(e) }
+            }
+        lookup.cancel(true)
+        throw failure
+    }
+
+    private companion object {
+        const val LOOKUP_THREADS = 4
+        const val IDLE_THREAD_SECONDS = 30L
+
+        /** Shared by every lookup; idle threads end, so nothing stays running between logins. */
+        val LOOKUPS =
+            ThreadPoolExecutor(
+                LOOKUP_THREADS,
+                LOOKUP_THREADS,
+                IDLE_THREAD_SECONDS,
+                TimeUnit.SECONDS,
+                LinkedBlockingQueue(),
+            ) { Thread(it, "MCP-OAuthDns").apply { isDaemon = true } }.apply { allowCoreThreadTimeOut(true) }
+    }
 }

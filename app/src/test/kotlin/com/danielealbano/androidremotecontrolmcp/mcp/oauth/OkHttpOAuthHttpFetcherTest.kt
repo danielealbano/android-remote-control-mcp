@@ -23,6 +23,7 @@ import java.net.InetAddress
 import java.net.Proxy
 import java.net.ServerSocket
 import java.net.UnknownHostException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @DisplayName("OkHttpOAuthHttpFetcher")
@@ -254,6 +255,33 @@ class OkHttpOAuthHttpFetcherTest {
     }
 
     @Test
+    @DisplayName("reports a stalled address lookup, given up at its limit")
+    fun reportsStalledLookup() =
+        runTest {
+            val stalled = CountDownLatch(1)
+            val dns = PublicDns({ stalled.await().let { listOf(InetAddress.getLoopbackAddress()) } }, SHORT_TIMEOUT_MS)
+            val slow = OkHttpOAuthHttpFetcher { OkHttpOAuthHttpFetcher.clientBuilder().dns(dns).build() }
+            try {
+                val result = slow.get(url("/doc"), "application/json", MAX)
+                assertEquals("$HOST did not resolve in $SHORT_TIMEOUT_MS ms", failure(result))
+            } finally {
+                stalled.countDown()
+            }
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
+    @DisplayName("PublicDns keeps the public addresses and passes on what the resolver throws")
+    fun publicDnsFiltersAndPassesFailures() {
+        val mixed = listOf(InetAddress.getByName("10.0.0.1"), InetAddress.getByName("1.1.1.1"))
+        assertEquals(listOf(InetAddress.getByName("1.1.1.1")), PublicDns({ mixed }, MAX_LOOKUP_MS).lookup(HOST))
+        val refused = PublicDns({ throw UnknownHostException("nope") }, MAX_LOOKUP_MS)
+        assertEquals("nope", assertThrows(UnknownHostException::class.java) { refused.lookup(HOST) }.message)
+        val broken = PublicDns({ error("bug") }, MAX_LOOKUP_MS)
+        assertThrows(IllegalStateException::class.java) { broken.lookup(HOST) }
+    }
+
+    @Test
     @DisplayName("PublicOnlyDns gives no address for a host with only special-use ones")
     fun publicOnlyDnsRefusesLoopback() {
         assertThrows(UnknownHostException::class.java) { PublicOnlyDns.lookup("localhost") }
@@ -263,6 +291,7 @@ class OkHttpOAuthHttpFetcherTest {
         const val HOST = "docs.example.test"
         const val MAX = 64
         const val SHORT_TIMEOUT_MS = 200L
+        const val MAX_LOOKUP_MS = 5_000L
         val held: HeldCertificate =
             HeldCertificate
                 .Builder()
