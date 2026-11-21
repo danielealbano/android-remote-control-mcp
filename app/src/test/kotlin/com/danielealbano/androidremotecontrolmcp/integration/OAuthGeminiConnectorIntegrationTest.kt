@@ -1,25 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
-import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.AuthorizeOptions
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.OVERRIDE
-import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.VERIFIER
-import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.authorize
-import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.connectMcp
+import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.assertConnectorFlow
 import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.registerResponse
-import com.danielealbano.androidremotecontrolmcp.integration.OAuthTestClient.tokenRequest
-import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.Url
 import io.mockk.coEvery
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -40,51 +29,13 @@ class OAuthGeminiConnectorIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             coEvery { deps.actionExecutor.tap(any(), any()) } returns Result.success(Unit)
             McpIntegrationTestHelper.withOAuthTestApplication(deps = deps, publicUrlOverride = OVERRIDE) { ctx ->
-                val registerResp = registerResponse(client, GEMINI_CALLBACKS, clientName = "Google")
-                assertEquals(HttpStatusCode.Created, registerResp.status)
-                val registered = Json.parseToJsonElement(registerResp.bodyAsText()).jsonObject
-                assertEquals(GEMINI_CALLBACKS, registered["redirect_uris"]!!.jsonArray.map { it.jsonPrimitive.content })
-                val clientId = registered["client_id"]!!.jsonPrimitive.content
-
-                authorize(client, clientId, AuthorizeOptions(redirectUri = GEMINI_REDIRECT))
-                val approval =
-                    ctx.approvalCoordinator
-                        .observePending()
-                        .value
-                        .single()
-                assertEquals("Google", approval.clientName)
-                assertEquals("oauth-redirect.googleusercontent.com", approval.redirectHost)
-                ctx.approvalCoordinator.approve(approval.id, System.currentTimeMillis())
-                val redirect =
-                    Json
-                        .parseToJsonElement(client.get("/authorize/status?id=${approval.id}").bodyAsText())
-                        .jsonObject["redirect"]!!
-                        .jsonPrimitive.content
-                assertTrue(redirect.startsWith("$GEMINI_REDIRECT?"), redirect)
-                assertEquals("xyz", Url(redirect).parameters["state"])
-
-                val tokenResp =
-                    tokenRequest(
-                        client,
-                        clientId,
-                        Url(redirect).parameters["code"]!!,
-                        verifier = VERIFIER,
-                        includeResource = true,
-                        redirectUri = GEMINI_REDIRECT,
-                    )
-                assertEquals(HttpStatusCode.OK, tokenResp.status)
-                val access =
-                    Json
-                        .parseToJsonElement(tokenResp.bodyAsText())
-                        .jsonObject["access_token"]!!
-                        .jsonPrimitive.content
-                val mcpClient = connectMcp(this, access)
-                try {
-                    val result = mcpClient.callTool(name = "android_tap", arguments = mapOf("x" to 1, "y" to 1))
-                    assertNotEquals(true, result.isError)
-                } finally {
-                    mcpClient.close()
-                }
+                assertConnectorFlow(
+                    ctx,
+                    redirectUris = GEMINI_CALLBACKS,
+                    redirectUri = GEMINI_REDIRECT,
+                    clientName = "Google",
+                    redirectHost = "oauth-redirect.googleusercontent.com",
+                )
             }
         }
 
