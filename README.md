@@ -286,7 +286,7 @@ Gemini connects as a **custom app** over OAuth 2.1. It needs a public HTTPS URL,
 Google requires a personal Google Account, age 18 or over, Gemini in English, and Gemini [History](https://myactivity.google.com/product/gemini) turned on. It is not available in every country. The free plan works.
 
 1. Start the tunnel and the server, then copy the `https://…/mcp` URL from the Server tab.
-2. On [gemini.google.com](https://gemini.google.com), on a computer or in a phone's browser, open the menu, then **Customize** → **Connectors** → **+**. The Gemini mobile app cannot add one. On the phone, the **Gemini** button of the **Register with** card on the Server screen copies the URL and opens this page in the browser.
+2. On [gemini.google.com](https://gemini.google.com), on a computer or in a phone's browser, open the menu, then **Customize** → **Connectors** → **+**. The Gemini mobile app cannot add one. On the phone, the **Gemini** button of the **Register with** card on the Server screen copies the URL and opens the Connectors page in the browser.
 3. Paste the URL as the **MCP Server URL** and leave **Client ID** and **Client secret** empty. Choose **Next**, accept the risks, choose **Connect**, and continue through Google's account link dialog.
 4. On the phone, check the 2-digit code and approve the request from **Google** (notification, or the card on the Server screen).
 5. In a chat, type `@` and pick the app. It also works in the Gemini mobile app.

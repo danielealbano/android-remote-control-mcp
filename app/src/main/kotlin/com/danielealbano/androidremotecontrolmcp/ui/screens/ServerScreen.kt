@@ -114,6 +114,7 @@ fun ServerScreen(
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
+    val serverDetailsClipLabel = stringResource(R.string.server_details_clip_label)
     var showChannelNotConfiguredDialog by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -234,7 +235,7 @@ fun ServerScreen(
                 specificAddressRefused = listenerCheck.specificAddressError != null,
                 onCopyAll = { text ->
                     scope.launch {
-                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(serverDetailsClipLabel, text)))
                         Toast.makeText(context, copiedToClipboardMessage, Toast.LENGTH_SHORT).show()
                     }
                 },

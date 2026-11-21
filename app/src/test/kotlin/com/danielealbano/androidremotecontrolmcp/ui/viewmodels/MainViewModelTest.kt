@@ -57,7 +57,6 @@ import org.junit.jupiter.api.Test
 @Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
-    private val registerCardDismissedFlow = MutableStateFlow(false)
     private val testDispatcher: TestDispatcher = StandardTestDispatcher()
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var tunnelManager: TunnelManager
@@ -68,6 +67,7 @@ class MainViewModelTest {
     private lateinit var configFlow: MutableStateFlow<ServerConfig>
     private lateinit var tunnelStatusFlow: MutableStateFlow<TunnelStatus>
     private lateinit var pendingApprovalsFlow: MutableStateFlow<List<PendingApproval>>
+    private lateinit var registerCardDismissedFlow: MutableStateFlow<Boolean>
     private lateinit var viewModel: MainViewModel
 
     @BeforeEach
@@ -99,6 +99,8 @@ class MainViewModelTest {
 
         settingsRepository = mockk(relaxed = true)
         every { settingsRepository.serverConfig } returns configFlow
+        registerCardDismissedFlow = MutableStateFlow(false)
+        every { settingsRepository.registerCardDismissed } returns registerCardDismissedFlow
 
         tunnelManager = mockk(relaxed = true)
         every { tunnelManager.tunnelStatus } returns tunnelStatusFlow
@@ -110,7 +112,6 @@ class MainViewModelTest {
         pendingApprovalsFlow = MutableStateFlow(emptyList())
         approvalCoordinator = mockk(relaxed = true)
         every { approvalCoordinator.observePending() } returns pendingApprovalsFlow
-        every { settingsRepository.registerCardDismissed } returns registerCardDismissedFlow
 
         listenerRules = mockk()
         every { listenerRules.check(any()) } returns ListenerSettingsCheck()

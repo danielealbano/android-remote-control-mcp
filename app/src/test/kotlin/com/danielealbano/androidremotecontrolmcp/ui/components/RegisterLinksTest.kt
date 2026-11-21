@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
@@ -28,6 +29,54 @@ class RegisterLinksTest {
                 "&connectorUrl=https%3A%2F%2Fabc.d.arc-tunnel.io%2Fmcp",
             RegisterLinks.claudeUrl("realme Note 70T - Android Remote Control", "https://abc.d.arc-tunnel.io/mcp"),
         )
+    }
+
+    @Test
+    @DisplayName("a phone name with reserved or non-ASCII characters stays one value in Claude's link")
+    fun claudeUrlEncodesReservedCharacters() {
+        val url = RegisterLinks.claudeUrl("A+B & C #1 ü", "https://abc.d.arc-tunnel.io/mcp")
+        assertTrue(url.contains("&connectorName=A%2BB%20%26%20C%20%231%20%C3%BC&connectorUrl="), url)
+    }
+
+    @Test
+    @DisplayName("each button opens its own page: Claude's filled-in dialog, ChatGPT's plugins, Gemini's connectors")
+    fun linkPerTarget() {
+        val mcpUrl = "https://abc.d.arc-tunnel.io/mcp"
+        val name = "work - Android Remote Control"
+        assertEquals(RegisterLinks.claudeUrl(name, mcpUrl), RegisterLinks.link(RegisterTarget.CLAUDE, name, mcpUrl))
+        assertEquals("https://chatgpt.com/plugins", RegisterLinks.link(RegisterTarget.CHATGPT, name, mcpUrl))
+        assertEquals(
+            "https://gemini.google.com/customize/connectors",
+            RegisterLinks.link(RegisterTarget.GEMINI, name, mcpUrl),
+        )
+    }
+
+    @Test
+    @DisplayName("only ChatGPT and Gemini copy the URL and say where to paste it; no app shows its own message")
+    fun copyAndMessages() {
+        assertFalse(RegisterTarget.CLAUDE.copiesUrl)
+        assertTrue(RegisterTarget.CHATGPT.copiesUrl)
+        assertTrue(RegisterTarget.GEMINI.copiesUrl)
+        assertEquals(null, RegisterLinks.messageAfterOpen(RegisterTarget.CLAUDE, opened = true))
+        assertEquals(R.string.register_chatgpt_steps, RegisterLinks.messageAfterOpen(RegisterTarget.CHATGPT, true))
+        assertEquals(R.string.register_gemini_steps, RegisterLinks.messageAfterOpen(RegisterTarget.GEMINI, true))
+        RegisterTarget.entries.forEach {
+            assertEquals(R.string.register_no_app, RegisterLinks.messageAfterOpen(it, opened = false), it.name)
+        }
+    }
+
+    @Test
+    @DisplayName("the hints say why the buttons are disabled, one per reason, and none when they work")
+    fun hints() {
+        assertEquals(listOf(R.string.register_card_no_tunnel), RegisterCardState.NoTunnel.hintsRes)
+        assertEquals(
+            listOf(R.string.register_card_no_url, R.string.register_card_oauth_off),
+            RegisterCardState.TunnelEnabled(mcpUrl = null, oauthEnabled = false).hintsRes,
+        )
+        assertEquals(listOf(R.string.register_card_no_url), RegisterCardState.TunnelEnabled(null, true).hintsRes)
+        val oauthOff = RegisterCardState.TunnelEnabled("https://a/mcp", oauthEnabled = false)
+        assertEquals(listOf(R.string.register_card_oauth_off), oauthOff.hintsRes)
+        assertEquals(emptyList<Int>(), RegisterCardState.TunnelEnabled("https://a/mcp", true).hintsRes)
     }
 
     @Test

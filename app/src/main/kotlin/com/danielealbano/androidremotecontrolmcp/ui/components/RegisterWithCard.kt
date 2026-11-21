@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
@@ -31,11 +30,14 @@ import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The home-screen "Register with" card for [serverConfig] and [tunnelStatus], followed by its spacing, or nothing once
- * [dismissed]. The buttons name the connector after the device slug or the phone ([RegisterLinks.connectorName]).
+ * [dismissed]. The Claude button names the connector after the device slug or the phone
+ * ([RegisterLinks.connectorName]).
  */
 @Composable
 fun RegisterWithSection(
@@ -48,18 +50,12 @@ fun RegisterWithSection(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    val phoneName =
-        remember(context) {
-            val deviceName = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
-            RegisterLinks.phoneName(deviceName, Build.MANUFACTURER, Build.MODEL)
-        }
     val state = RegisterLinks.cardState(serverConfig, tunnelStatus)
     RegisterWithCard(
         state = state,
         onRegister = { target ->
             (state as? RegisterCardState.TunnelEnabled)?.mcpUrl?.let { mcpUrl ->
-                val name = RegisterLinks.connectorName(serverConfig.deviceSlug, phoneName)
-                scope.launch { registerWith(context, clipboard, target, mcpUrl, name) }
+                scope.launch { registerWith(context, clipboard, target, mcpUrl, serverConfig.deviceSlug) }
             }
         },
         onDismiss = onDismiss,
@@ -97,58 +93,54 @@ fun RegisterWithCard(
     }
 }
 
-/** The card's hints, one per line, or none when every button works. */
+/** The card's message or hints ([RegisterCardState.hintsRes]), one per line, or none when every button works. */
 @Composable
-private fun registerCardBody(state: RegisterCardState): String? {
-    val noTunnel = stringResource(R.string.register_card_no_tunnel)
-    val noUrl = stringResource(R.string.register_card_no_url)
-    val oauthOff = stringResource(R.string.register_card_oauth_off)
-    return when (state) {
-        RegisterCardState.NoTunnel -> {
-            noTunnel
-        }
-
-        is RegisterCardState.TunnelEnabled -> {
-            listOfNotNull(noUrl.takeIf { state.mcpUrl == null }, oauthOff.takeIf { !state.oauthEnabled })
-                .joinToString("\n")
-                .ifEmpty { null }
-        }
-    }
-}
+private fun registerCardBody(state: RegisterCardState): String? =
+    state.hintsRes
+        .map { stringResource(it) }
+        .joinToString("\n")
+        .ifEmpty { null }
 
 /**
- * Sends the user to [target]'s add-connector form for [mcpUrl]. Claude's opens with [connectorName] and [mcpUrl]
- * filled in; ChatGPT's and Gemini's cannot be filled in, so [mcpUrl] is copied first and a message says where to paste
- * it. The link opens in the default browser, because the services' own apps cannot add a connector; with no default
- * browser set, Android picks the app.
+ * Sends the user to [target]'s add-connector form for [mcpUrl] ([RegisterLinks.link]); Claude's opens filled in, with
+ * the connector named after [deviceSlug] or the phone. ChatGPT's and Gemini's cannot be filled in, so [mcpUrl] is
+ * copied first and a message says where to paste it. The link opens in the default browser, because the services' own
+ * apps cannot add a connector; with no default browser set, Android picks the app. The system lookups run off the main
+ * thread.
  */
-suspend fun registerWith(
+private suspend fun registerWith(
     context: Context,
     clipboard: Clipboard,
     target: RegisterTarget,
     mcpUrl: String,
-    connectorName: String,
+    deviceSlug: String,
 ) {
-    val link =
-        when (target) {
-            RegisterTarget.CLAUDE -> RegisterLinks.claudeUrl(connectorName, mcpUrl)
-            RegisterTarget.CHATGPT -> RegisterLinks.CHATGPT_URL
-            RegisterTarget.GEMINI -> RegisterLinks.GEMINI_URL
+    val (link, browser) =
+        withContext(Dispatchers.IO) {
+            val name = RegisterLinks.connectorName(deviceSlug, phoneName(context))
+            RegisterLinks.link(target, name, mcpUrl) to defaultBrowser(context)
         }
-    if (target.stepsRes != null) {
-        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(MCP_URL_CLIP_LABEL, mcpUrl)))
+    if (target.copiesUrl) {
+        val label = context.getString(R.string.register_clip_label)
+        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, mcpUrl)))
     }
-    val message =
+    val opened =
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addCategory(Intent.CATEGORY_BROWSABLE)
-            defaultBrowser(context)?.let { intent.setPackage(it) }
+            browser?.let { intent.setPackage(it) }
             context.startActivity(intent)
-            target.stepsRes
+            true
         } catch (e: ActivityNotFoundException) {
             Log.w(TAG, "No app opens the ${target.name} link: ${e.javaClass.simpleName}")
-            R.string.register_no_app
+            false
         }
-    message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    RegisterLinks.messageAfterOpen(target, opened)?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+}
+
+/** The phone's name ([RegisterLinks.phoneName]), read when a button is tapped so a rename is never stale. */
+private fun phoneName(context: Context): String {
+    val deviceName = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+    return RegisterLinks.phoneName(deviceName, Build.MANUFACTURER, Build.MODEL)
 }
 
 /**
@@ -171,4 +163,3 @@ private fun defaultBrowser(context: Context): String? {
 }
 
 private const val TAG = "MCP:RegisterWith"
-private const val MCP_URL_CLIP_LABEL = "MCP server URL"
