@@ -73,7 +73,8 @@ fun RegisterWithSection(
 
 /**
  * The home-screen "Register with" card: without a tunnel only a message that one is needed, else a button per
- * [RegisterTarget], disabled (with a hint) until the public URL is known and while OAuth is off.
+ * [RegisterTarget], disabled (with a hint) until the public URL is known, while OAuth is off, and until the server
+ * restarts with the saved settings.
  */
 @Composable
 fun RegisterWithCard(

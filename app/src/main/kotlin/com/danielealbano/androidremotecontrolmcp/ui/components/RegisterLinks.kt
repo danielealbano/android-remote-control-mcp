@@ -7,6 +7,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.mcp.canonicalResource
 import com.danielealbano.androidremotecontrolmcp.mcp.normalizeBaseUrl
+import com.danielealbano.androidremotecontrolmcp.mcp.overrideBaseUrl
 import java.net.URLEncoder
 
 /**
@@ -153,7 +154,7 @@ object RegisterLinks {
             running != null &&
                 (
                     running.oauthEnabled != config.oauthEnabled ||
-                        overrideBase(running.publicUrlOverride) != overrideBase(config.publicUrlOverride)
+                        overrideBaseUrl(running.publicUrlOverride) != overrideBaseUrl(config.publicUrlOverride)
                 )
         val url = tunnelUrl(config, tunnelStatus, serverStatus)
         return RegisterCardState.TunnelEnabled(url, config.oauthEnabled, restartNeeded)
@@ -166,15 +167,19 @@ object RegisterLinks {
     ): TunnelUrl {
         val connected = tunnelStatus as? TunnelStatus.Connected
         val endpoint = connected?.endpoints?.firstOrNull { it.valid }?.url
-        val started = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Running
+        // The server's state decides first: a URL counts only while it runs, never from a tunnel status left behind.
         return when {
-            endpoint != null -> {
-                val baseUrl = overrideBase(config.publicUrlOverride) ?: normalizeBaseUrl(endpoint)
-                TunnelUrl.Known(canonicalResource(baseUrl))
+            serverStatus is ServerStatus.Starting -> {
+                TunnelUrl.Missing.WAITING
             }
 
-            !started -> {
+            serverStatus !is ServerStatus.Running -> {
                 TunnelUrl.Missing.SERVER_STOPPED
+            }
+
+            endpoint != null -> {
+                val baseUrl = overrideBaseUrl(config.publicUrlOverride) ?: normalizeBaseUrl(endpoint)
+                TunnelUrl.Known(canonicalResource(baseUrl))
             }
 
             tunnelStatus is TunnelStatus.Error || connected != null -> {
@@ -186,9 +191,6 @@ object RegisterLinks {
             }
         }
     }
-
-    /** The normalized base URL of a public URL [override], or null when none is set. */
-    private fun overrideBase(override: String): String? = override.trim().ifEmpty { null }?.let(::normalizeBaseUrl)
 
     /**
      * The browser to open the links in: [defaultPackage] (what Android resolves a web link to) when it is one of

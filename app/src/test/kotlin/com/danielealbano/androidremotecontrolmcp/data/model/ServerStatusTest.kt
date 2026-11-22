@@ -44,28 +44,77 @@ class ServerStatusTest {
     inner class RunningTest {
         @Test
         fun `Running carries port and binding address`() {
-            val status = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+            val status =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
             assertEquals(8080, status.port)
             assertEquals("127.0.0.1", status.bindingAddress)
         }
 
         @Test
+        fun `Running carries the OAuth toggle and the public URL override the server started with`() {
+            val status =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = false,
+                    publicUrlOverride = "https://phone.example.org",
+                )
+            assertFalse(status.oauthEnabled)
+            assertEquals("https://phone.example.org", status.publicUrlOverride)
+        }
+
+        @Test
         fun `Running defaults httpsEnabled to false`() {
-            val status = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+            val status =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
             assertFalse(status.httpsEnabled)
         }
 
         @Test
         fun `Running equality is based on fields`() {
-            val a = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
-            val b = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+            val a =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
+            val b =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
             assertEquals(a, b)
         }
 
         @Test
         fun `Running with different port are not equal`() {
-            val a = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
-            val b = ServerStatus.Running(port = 9090, bindingAddress = "127.0.0.1")
+            val a =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
+            val b =
+                ServerStatus.Running(
+                    port = 9090,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                )
             assertNotEquals(a, b)
         }
     }

@@ -26,8 +26,8 @@ sealed class ServerStatus {
         val port: Int,
         val bindingAddress: String,
         val httpsEnabled: Boolean = false,
-        val oauthEnabled: Boolean = true,
-        val publicUrlOverride: String = "",
+        val oauthEnabled: Boolean,
+        val publicUrlOverride: String,
     ) : ServerStatus()
 
     /** The MCP server is in the process of shutting down. */

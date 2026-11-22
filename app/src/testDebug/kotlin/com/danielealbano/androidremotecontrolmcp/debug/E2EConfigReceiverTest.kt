@@ -481,7 +481,14 @@ class E2EConfigReceiverTest {
 
     @Test
     fun `enroll is ignored while the server runs`() {
-        withServerStatus(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"))
+        withServerStatus(
+            ServerStatus.Running(
+                port = 8080,
+                bindingAddress = "127.0.0.1",
+                oauthEnabled = true,
+                publicUrlOverride = "",
+            ),
+        )
 
         receiver.onReceive(mockContext, actionIntent(E2EConfigReceiver.ACTION_E2E_ARC_TUNNEL_ENROLL))
 

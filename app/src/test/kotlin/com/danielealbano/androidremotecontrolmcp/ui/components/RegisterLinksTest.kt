@@ -15,7 +15,13 @@ import org.junit.jupiter.api.Test
 @DisplayName("RegisterLinks")
 class RegisterLinksTest {
     private val tunnelOn = ServerConfig(tunnelEnabled = true)
-    private val running = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+    private val running =
+        ServerStatus.Running(
+            port = 8080,
+            bindingAddress = "127.0.0.1",
+            oauthEnabled = true,
+            publicUrlOverride = "",
+        )
 
     private fun connected(vararg endpoints: TunnelEndpoint): TunnelStatus {
         val provider = TunnelProviderType.ARC_TUNNEL
@@ -138,9 +144,13 @@ class RegisterLinksTest {
     @Test
     @DisplayName("without a URL the card says to start the server, to wait for the tunnel, or that the tunnel failed")
     fun missingUrl() {
+        // A tunnel still shown connected after a stop never counts: the server's state decides first.
+        val leftBehind = connected(TunnelEndpoint("https://abc.d.arc-tunnel.io", valid = true))
         listOf(ServerStatus.Stopped, ServerStatus.Stopping, ServerStatus.Error("x")).forEach {
             assertEquals(TunnelUrl.Missing.SERVER_STOPPED, urlOf(TunnelStatus.Disconnected, it), it.toString())
+            assertEquals(TunnelUrl.Missing.SERVER_STOPPED, urlOf(leftBehind, it), it.toString())
         }
+        assertEquals(TunnelUrl.Missing.WAITING, urlOf(leftBehind, ServerStatus.Starting))
         listOf(TunnelStatus.Disconnected, TunnelStatus.Connecting).forEach {
             assertEquals(TunnelUrl.Missing.WAITING, urlOf(it, ServerStatus.Starting), it.toString())
             assertEquals(TunnelUrl.Missing.WAITING, urlOf(it, running), it.toString())

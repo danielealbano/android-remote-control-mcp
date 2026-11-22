@@ -8,7 +8,13 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ServerStatusCard button enablement")
 class ServerStatusCardTest {
-    private val running = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+    private val running =
+        ServerStatus.Running(
+            port = 8080,
+            bindingAddress = "127.0.0.1",
+            oauthEnabled = true,
+            publicUrlOverride = "",
+        )
 
     @Test
     fun `mcp start enabled only when stopped and startEnabled`() {

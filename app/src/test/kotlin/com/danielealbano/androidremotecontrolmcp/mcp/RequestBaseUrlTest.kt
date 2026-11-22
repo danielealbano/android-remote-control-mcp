@@ -231,6 +231,14 @@ class RequestBaseUrlTest {
     }
 
     @Test
+    @DisplayName("overrideBaseUrl normalizes a set override and gives null for a blank one")
+    fun overrideBaseUrlRule() {
+        assertEquals("https://pinned.host", overrideBaseUrl(" HTTPS://Pinned.Host/ "))
+        assertEquals(null, overrideBaseUrl("   "))
+        assertEquals(null, overrideBaseUrl(""))
+    }
+
+    @Test
     @DisplayName("currentRequestBaseUrl returns element value, else fallback")
     fun currentRequestBaseUrlReadsElement() =
         runTest {

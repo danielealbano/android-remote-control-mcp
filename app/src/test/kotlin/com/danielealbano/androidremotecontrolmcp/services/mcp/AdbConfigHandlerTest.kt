@@ -1309,7 +1309,14 @@ class AdbConfigHandlerTest {
                 mockkObject(McpServerService.Companion)
                 try {
                     every { McpServerService.serverStatus } returns
-                        MutableStateFlow(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"))
+                        MutableStateFlow(
+                            ServerStatus.Running(
+                                port = 8080,
+                                bindingAddress = "127.0.0.1",
+                                oauthEnabled = true,
+                                publicUrlOverride = "",
+                            ),
+                        )
                     val intent =
                         createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
                             boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_ENROLL, true)

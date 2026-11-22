@@ -426,7 +426,13 @@ private fun ConnectionInfoCardPreview() {
             httpsEnabled = false,
             bearerToken = "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             tunnelEnabled = true,
-            serverStatus = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"),
+            serverStatus =
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                ),
             tunnelStatus =
                 TunnelStatus.Connected(
                     endpoints = listOf(TunnelEndpoint("https://random-words.trycloudflare.com", valid = true)),

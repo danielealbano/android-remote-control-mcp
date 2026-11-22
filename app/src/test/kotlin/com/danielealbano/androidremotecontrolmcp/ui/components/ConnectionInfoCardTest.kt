@@ -25,7 +25,13 @@ class ConnectionInfoCardTest {
         port: Int,
     ): String = "$scheme://$displayAddress:$port/mcp"
 
-    private val running = ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")
+    private val running =
+        ServerStatus.Running(
+            port = 8080,
+            bindingAddress = "127.0.0.1",
+            oauthEnabled = true,
+            publicUrlOverride = "",
+        )
 
     private fun ep(
         url: String,

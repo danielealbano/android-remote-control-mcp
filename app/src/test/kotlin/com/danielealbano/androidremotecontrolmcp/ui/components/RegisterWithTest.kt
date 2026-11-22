@@ -25,6 +25,7 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -109,6 +110,28 @@ class RegisterWithTest {
             verify { anyConstructed<Intent>().setPackage("com.android.chrome") }
             verify { context.startActivity(any()) }
             verify(exactly = 0) { Toast.makeText(any<Context>(), any<Int>(), any()) }
+        }
+
+    @Test
+    @DisplayName("the connector name and the browser lookup run off the calling thread")
+    fun lookupsOffTheCallingThread() =
+        runTest {
+            val caller = Thread.currentThread()
+            val lookupThreads = mutableListOf<Thread>()
+            every {
+                packageManager.queryIntentActivities(any<Intent>(), any<PackageManager.ResolveInfoFlags>())
+            } answers {
+                lookupThreads += Thread.currentThread()
+                listOf(resolveInfo("com.android.chrome"))
+            }
+
+            registerWith(context, clipboard, RegisterTarget.CLAUDE, MCP_URL) {
+                lookupThreads += Thread.currentThread()
+                "work - Android Remote Control"
+            }
+
+            assertEquals(2, lookupThreads.size)
+            lookupThreads.forEach { assertNotSame(caller, it) }
         }
 
     @Test
