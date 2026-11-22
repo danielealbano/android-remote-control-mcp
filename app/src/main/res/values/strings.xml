@@ -568,8 +568,8 @@
     <string name="register_card_tunnel_failed">The tunnel has no working public URL. Check the tunnel status below.</string>
     <string name="register_card_restart">Restart the server to apply the new settings.</string>
     <string name="register_card_oauth_off">Turn on OAuth in Settings → Access first.</string>
-    <string name="register_chatgpt_steps">URL copied. Tap +, then Add custom MCP server, and paste it.</string>
-    <string name="register_gemini_steps">URL copied. Tap +, then paste it as the MCP Server URL.</string>
+    <string name="register_chatgpt_steps">URL copied. Tap +, Add custom MCP server.</string>
+    <string name="register_gemini_steps">URL copied. Tap + and paste it.</string>
     <string name="register_no_app">No app can open the link.</string>
     <string name="register_clip_label">MCP server URL</string>
     <string name="register_button_description">Register with %1$s</string>
