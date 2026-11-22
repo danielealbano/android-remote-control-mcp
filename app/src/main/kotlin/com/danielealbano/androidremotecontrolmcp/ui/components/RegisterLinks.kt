@@ -36,27 +36,48 @@ sealed interface RegisterCardState {
     }
 
     /**
-     * A tunnel is enabled. [mcpUrl] is the public MCP URL, null until the tunnel is connected, which needs the server
-     * started ([serverRunning]). The services log in with OAuth, so the buttons work only with [mcpUrl] and while
-     * [oauthEnabled].
+     * A tunnel is enabled. The services reach the phone through [url] and log in with OAuth, so the buttons work only
+     * with a known URL, while [oauthEnabled], and once the running server uses the saved settings ([restartNeeded]
+     * false).
      */
     data class TunnelEnabled(
-        val mcpUrl: String?,
+        val url: TunnelUrl,
         val oauthEnabled: Boolean,
-        val serverRunning: Boolean = false,
+        val restartNeeded: Boolean,
     ) : RegisterCardState {
-        val canRegister: Boolean get() = mcpUrl != null && oauthEnabled
+        val mcpUrl: String? get() = (url as? TunnelUrl.Known)?.mcpUrl
 
-        /** Why the buttons are disabled: no public URL yet (start the server, or wait for the tunnel), OAuth is off. */
+        val canRegister: Boolean get() = url is TunnelUrl.Known && oauthEnabled && !restartNeeded
+
+        /** Why the buttons are disabled: no URL yet (and why), OAuth is off, the server must restart. */
         override val hintsRes: List<Int>
             get() =
                 listOfNotNull(
-                    noUrlHint.takeIf { mcpUrl == null },
+                    (url as? TunnelUrl.Missing)?.hintRes,
                     R.string.register_card_oauth_off.takeIf { !oauthEnabled },
+                    R.string.register_card_restart.takeIf { restartNeeded && oauthEnabled },
                 )
+    }
+}
 
-        private val noUrlHint: Int
-            get() = if (serverRunning) R.string.register_card_waiting_url else R.string.register_card_no_url
+/** The public MCP URL the card registers, or why there is none yet. */
+sealed interface TunnelUrl {
+    data class Known(
+        val mcpUrl: String,
+    ) : TunnelUrl
+
+    /** No public URL; [hintRes] says why. */
+    enum class Missing(
+        @StringRes val hintRes: Int,
+    ) : TunnelUrl {
+        /** The server (and so the tunnel) is not started. */
+        SERVER_STOPPED(R.string.register_card_no_url),
+
+        /** The server runs and the tunnel is coming up. */
+        WAITING(R.string.register_card_waiting_url),
+
+        /** The tunnel failed, or is connected with no usable endpoint (a Cloudflare tunnel without a route). */
+        TUNNEL_FAILED(R.string.register_card_tunnel_failed),
     }
 }
 
@@ -73,14 +94,17 @@ object RegisterLinks {
 
     private const val APP_NAME = "Android Remote Control"
 
-    /** The page [target]'s button opens: Claude's dialog filled in with [connectorName] and [mcpUrl], else its page. */
+    /**
+     * The page [target]'s button opens: Claude's dialog filled in with [mcpUrl] and the [connectorName] (asked for only
+     * then), else the service's page.
+     */
     fun link(
         target: RegisterTarget,
-        connectorName: String,
         mcpUrl: String,
+        connectorName: () -> String,
     ): String =
         when (target) {
-            RegisterTarget.CLAUDE -> claudeUrl(connectorName, mcpUrl)
+            RegisterTarget.CLAUDE -> claudeUrl(connectorName(), mcpUrl)
             RegisterTarget.CHATGPT -> CHATGPT_URL
             RegisterTarget.GEMINI -> GEMINI_URL
         }
@@ -113,9 +137,10 @@ object RegisterLinks {
             ?: if (model.startsWith(manufacturer, ignoreCase = true)) model else "$manufacturer $model"
 
     /**
-     * The card for [config], [tunnelStatus] and [serverStatus] (starting or running counts as started). The MCP URL is
-     * the first valid endpoint of a connected tunnel, or the public URL override when one is set: the OAuth metadata
-     * names the override, so a service given another URL could not log in.
+     * The card for the saved [config], [tunnelStatus] and [serverStatus]. The MCP URL is the first valid endpoint of a
+     * connected tunnel, or the public URL override when one is set: the OAuth metadata names the override, so a
+     * service given another URL could not log in. A running server keeps the OAuth toggle and the override it started
+     * with, so a change of either needs a restart first.
      */
     fun cardState(
         config: ServerConfig,
@@ -123,14 +148,47 @@ object RegisterLinks {
         serverStatus: ServerStatus,
     ): RegisterCardState {
         if (!config.tunnelEnabled) return RegisterCardState.NoTunnel
-        val endpoint = (tunnelStatus as? TunnelStatus.Connected)?.endpoints?.firstOrNull { it.valid }?.url
-        val baseUrl = endpoint?.let { config.publicUrlOverride.trim().ifEmpty { it } }
-        return RegisterCardState.TunnelEnabled(
-            mcpUrl = baseUrl?.let { canonicalResource(normalizeBaseUrl(it)) },
-            oauthEnabled = config.oauthEnabled,
-            serverRunning = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Running,
-        )
+        val running = serverStatus as? ServerStatus.Running
+        val restartNeeded =
+            running != null &&
+                (
+                    running.oauthEnabled != config.oauthEnabled ||
+                        overrideBase(running.publicUrlOverride) != overrideBase(config.publicUrlOverride)
+                )
+        val url = tunnelUrl(config, tunnelStatus, serverStatus)
+        return RegisterCardState.TunnelEnabled(url, config.oauthEnabled, restartNeeded)
     }
+
+    private fun tunnelUrl(
+        config: ServerConfig,
+        tunnelStatus: TunnelStatus,
+        serverStatus: ServerStatus,
+    ): TunnelUrl {
+        val connected = tunnelStatus as? TunnelStatus.Connected
+        val endpoint = connected?.endpoints?.firstOrNull { it.valid }?.url
+        val started = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Running
+        return when {
+            endpoint != null -> {
+                val baseUrl = overrideBase(config.publicUrlOverride) ?: normalizeBaseUrl(endpoint)
+                TunnelUrl.Known(canonicalResource(baseUrl))
+            }
+
+            !started -> {
+                TunnelUrl.Missing.SERVER_STOPPED
+            }
+
+            tunnelStatus is TunnelStatus.Error || connected != null -> {
+                TunnelUrl.Missing.TUNNEL_FAILED
+            }
+
+            else -> {
+                TunnelUrl.Missing.WAITING
+            }
+        }
+    }
+
+    /** The normalized base URL of a public URL [override], or null when none is set. */
+    private fun overrideBase(override: String): String? = override.trim().ifEmpty { null }?.let(::normalizeBaseUrl)
 
     /**
      * The browser to open the links in: [defaultPackage] (what Android resolves a web link to) when it is one of

@@ -291,6 +291,8 @@ class McpServerService : Service() {
                 ServerStatus.Running(
                     port = config.port,
                     bindingAddress = config.bindHost,
+                    oauthEnabled = config.oauthEnabled,
+                    publicUrlOverride = config.publicUrlOverride,
                 ),
             )
 

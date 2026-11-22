@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
@@ -57,7 +59,11 @@ fun RegisterWithSection(
         state = state,
         onRegister = { target ->
             (state as? RegisterCardState.TunnelEnabled)?.mcpUrl?.let { mcpUrl ->
-                scope.launch { registerWith(context, clipboard, target, mcpUrl, serverConfig.deviceSlug) }
+                scope.launch {
+                    registerWith(context, clipboard, target, mcpUrl) {
+                        RegisterLinks.connectorName(serverConfig.deviceSlug, phoneName(context))
+                    }
+                }
             }
         },
         onDismiss = onDismiss,
@@ -84,8 +90,15 @@ fun RegisterWithCard(
     ) {
         if (state is RegisterCardState.TunnelEnabled) {
             RegisterTarget.entries.forEach { target ->
-                TextButton(onClick = { onRegister(target) }, enabled = state.canRegister) {
-                    Text(text = stringResource(target.labelRes))
+                val label = stringResource(target.labelRes)
+                // Spoken with its context ("Register with Claude"), not only the service name.
+                val description = stringResource(R.string.register_button_description, label)
+                TextButton(
+                    onClick = { onRegister(target) },
+                    enabled = state.canRegister,
+                    modifier = Modifier.semantics { contentDescription = description },
+                ) {
+                    Text(text = label)
                 }
             }
         }
@@ -104,24 +117,20 @@ private fun registerCardBody(state: RegisterCardState): String? =
         .ifEmpty { null }
 
 /**
- * Sends the user to [target]'s add-connector form for [mcpUrl] ([RegisterLinks.link]); Claude's opens filled in, with
- * the connector named after [deviceSlug] or the phone. ChatGPT's and Gemini's cannot be filled in, so [mcpUrl] is
- * copied first and a message says where to paste it. The link opens in the default browser, because the services' own
- * apps cannot add a connector; with no default browser set, Android picks the app. The system lookups run off the main
- * thread.
+ * Sends the user to [target]'s add-connector form for [mcpUrl] ([RegisterLinks.link]); Claude's opens filled in, named
+ * [connectorName]. ChatGPT's and Gemini's cannot be filled in, so [mcpUrl] is copied first and a message says where to
+ * paste it. The link opens in the default browser, because the services' own apps cannot add a connector; with no
+ * default browser set, Android picks the app. The system lookups, [connectorName] included, run off the main thread.
  */
-private suspend fun registerWith(
+internal suspend fun registerWith(
     context: Context,
     clipboard: Clipboard,
     target: RegisterTarget,
     mcpUrl: String,
-    deviceSlug: String,
+    connectorName: () -> String,
 ) {
     val (link, browser) =
-        withContext(Dispatchers.IO) {
-            val name = RegisterLinks.connectorName(deviceSlug, phoneName(context))
-            RegisterLinks.link(target, name, mcpUrl) to defaultBrowser(context)
-        }
+        withContext(Dispatchers.IO) { RegisterLinks.link(target, mcpUrl, connectorName) to defaultBrowser(context) }
     if (target.copiesUrl) {
         val label = context.getString(R.string.register_clip_label)
         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, mcpUrl)))
@@ -139,10 +148,14 @@ private suspend fun registerWith(
     RegisterLinks.messageAfterOpen(target, opened)?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
 }
 
-/** The phone's name ([RegisterLinks.phoneName]), read when a button is tapped so a rename is never stale. */
-private fun phoneName(context: Context): String {
+/** The phone's name ([RegisterLinks.phoneName]), read when Claude's button is tapped so a rename is never stale. */
+internal fun phoneName(
+    context: Context,
+    manufacturer: String = Build.MANUFACTURER,
+    model: String = Build.MODEL,
+): String {
     val deviceName = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
-    return RegisterLinks.phoneName(deviceName, Build.MANUFACTURER, Build.MODEL)
+    return RegisterLinks.phoneName(deviceName, manufacturer, model)
 }
 
 /**

@@ -45,12 +45,27 @@ class RegisterLinksTest {
     fun linkPerTarget() {
         val mcpUrl = "https://abc.d.arc-tunnel.io/mcp"
         val name = "work - Android Remote Control"
-        assertEquals(RegisterLinks.claudeUrl(name, mcpUrl), RegisterLinks.link(RegisterTarget.CLAUDE, name, mcpUrl))
-        assertEquals("https://chatgpt.com/plugins", RegisterLinks.link(RegisterTarget.CHATGPT, name, mcpUrl))
+        assertEquals(RegisterLinks.claudeUrl(name, mcpUrl), RegisterLinks.link(RegisterTarget.CLAUDE, mcpUrl) { name })
+        assertEquals("https://chatgpt.com/plugins", RegisterLinks.link(RegisterTarget.CHATGPT, mcpUrl) { name })
         assertEquals(
             "https://gemini.google.com/customize/connectors",
-            RegisterLinks.link(RegisterTarget.GEMINI, name, mcpUrl),
+            RegisterLinks.link(RegisterTarget.GEMINI, mcpUrl) { name },
         )
+    }
+
+    @Test
+    @DisplayName("the connector name is asked for only by Claude's link")
+    fun connectorNameOnlyForClaude() {
+        var asked = 0
+        val name = {
+            asked++
+            "work - Android Remote Control"
+        }
+        RegisterLinks.link(RegisterTarget.CHATGPT, "https://a/mcp", name)
+        RegisterLinks.link(RegisterTarget.GEMINI, "https://a/mcp", name)
+        assertEquals(0, asked)
+        RegisterLinks.link(RegisterTarget.CLAUDE, "https://a/mcp", name)
+        assertEquals(1, asked)
     }
 
     @Test
@@ -70,15 +85,20 @@ class RegisterLinksTest {
     @Test
     @DisplayName("the hints say why the buttons are disabled, one per reason, and none when they work")
     fun hints() {
+        val url = TunnelUrl.Known("https://a/mcp")
         assertEquals(listOf(R.string.register_card_no_tunnel), RegisterCardState.NoTunnel.hintsRes)
         assertEquals(
             listOf(R.string.register_card_no_url, R.string.register_card_oauth_off),
-            RegisterCardState.TunnelEnabled(mcpUrl = null, oauthEnabled = false).hintsRes,
+            RegisterCardState.TunnelEnabled(TunnelUrl.Missing.SERVER_STOPPED, false, false).hintsRes,
         )
-        assertEquals(listOf(R.string.register_card_no_url), RegisterCardState.TunnelEnabled(null, true).hintsRes)
-        val oauthOff = RegisterCardState.TunnelEnabled("https://a/mcp", oauthEnabled = false)
+        val restart = RegisterCardState.TunnelEnabled(url, oauthEnabled = true, restartNeeded = true)
+        assertEquals(listOf(R.string.register_card_restart), restart.hintsRes)
+        // With OAuth off, turning it back on is the whole fix: no restart hint on top.
+        val oauthOff = RegisterCardState.TunnelEnabled(url, oauthEnabled = false, restartNeeded = true)
         assertEquals(listOf(R.string.register_card_oauth_off), oauthOff.hintsRes)
-        assertEquals(emptyList<Int>(), RegisterCardState.TunnelEnabled("https://a/mcp", true).hintsRes)
+        val ready = RegisterCardState.TunnelEnabled(url, oauthEnabled = true, restartNeeded = false)
+        assertEquals(emptyList<Int>(), ready.hintsRes)
+        assertTrue(ready.canRegister)
     }
 
     @Test
@@ -116,26 +136,22 @@ class RegisterLinksTest {
     }
 
     @Test
-    @DisplayName("with a tunnel the buttons wait for its public URL")
-    fun noUrlYet() {
-        listOf(TunnelStatus.Disconnected, TunnelStatus.Connecting, TunnelStatus.Error("x"), connected()).forEach {
-            val state = RegisterLinks.cardState(tunnelOn, it, running)
-            assertEquals(RegisterCardState.TunnelEnabled(null, true, serverRunning = true), state, it.toString())
-            assertFalse((state as RegisterCardState.TunnelEnabled).canRegister)
-        }
-    }
-
-    @Test
-    @DisplayName("without a URL the hint says to start the server, or to wait while it is starting or running")
-    fun noUrlHintFollowsTheServer() {
-        val starting = RegisterLinks.cardState(tunnelOn, TunnelStatus.Connecting, ServerStatus.Starting)
-        assertEquals(listOf(R.string.register_card_waiting_url), starting.hintsRes)
-        val runningHints = RegisterLinks.cardState(tunnelOn, TunnelStatus.Connecting, running).hintsRes
-        assertEquals(listOf(R.string.register_card_waiting_url), runningHints)
+    @DisplayName("without a URL the card says to start the server, to wait for the tunnel, or that the tunnel failed")
+    fun missingUrl() {
         listOf(ServerStatus.Stopped, ServerStatus.Stopping, ServerStatus.Error("x")).forEach {
-            val hints = RegisterLinks.cardState(tunnelOn, TunnelStatus.Disconnected, it).hintsRes
-            assertEquals(listOf(R.string.register_card_no_url), hints, it.toString())
+            assertEquals(TunnelUrl.Missing.SERVER_STOPPED, urlOf(TunnelStatus.Disconnected, it), it.toString())
         }
+        listOf(TunnelStatus.Disconnected, TunnelStatus.Connecting).forEach {
+            assertEquals(TunnelUrl.Missing.WAITING, urlOf(it, ServerStatus.Starting), it.toString())
+            assertEquals(TunnelUrl.Missing.WAITING, urlOf(it, running), it.toString())
+        }
+        val noRoute = connected(TunnelEndpoint("https://wrong.example.com", valid = false))
+        listOf(TunnelStatus.Error("cloudflared binary not found"), connected(), noRoute).forEach {
+            assertEquals(TunnelUrl.Missing.TUNNEL_FAILED, urlOf(it, running), it.toString())
+        }
+        val state = RegisterLinks.cardState(tunnelOn, TunnelStatus.Connecting, running)
+        assertFalse((state as RegisterCardState.TunnelEnabled).canRegister)
+        assertEquals(null, state.mcpUrl)
     }
 
     @Test
@@ -148,31 +164,58 @@ class RegisterLinksTest {
                 TunnelEndpoint("https://other.example.com", valid = true),
             )
         val state = RegisterLinks.cardState(tunnelOn, status, running) as RegisterCardState.TunnelEnabled
+        assertEquals(TunnelUrl.Known("https://mcp.example.com/mcp"), state.url)
         assertEquals("https://mcp.example.com/mcp", state.mcpUrl)
         assertTrue(state.canRegister)
-        val noneValid = connected(TunnelEndpoint("https://wrong.example.com", valid = false))
-        val noValid = RegisterLinks.cardState(tunnelOn, noneValid, running)
-        assertEquals(RegisterCardState.TunnelEnabled(null, true, serverRunning = true), noValid)
     }
 
     @Test
     @DisplayName("a public URL override replaces the tunnel URL once the tunnel is connected")
     fun overrideWins() {
         val config = tunnelOn.copy(publicUrlOverride = " https://phone.example.org/ ")
+        val started = running.copy(publicUrlOverride = "https://phone.example.org")
         val endpoint = TunnelEndpoint("https://abc.d.arc-tunnel.io", valid = true)
-        val live = RegisterLinks.cardState(config, connected(endpoint), running) as RegisterCardState.TunnelEnabled
+        val live = RegisterLinks.cardState(config, connected(endpoint), started) as RegisterCardState.TunnelEnabled
         assertEquals("https://phone.example.org/mcp", live.mcpUrl)
-        val connecting = RegisterLinks.cardState(config, TunnelStatus.Connecting, running)
-        assertEquals(RegisterCardState.TunnelEnabled(null, true, serverRunning = true), connecting)
+        assertFalse(live.restartNeeded)
+        assertEquals(TunnelUrl.Missing.WAITING, urlOf(TunnelStatus.Connecting, started, config))
+    }
+
+    @Test
+    @DisplayName("a running server started with another OAuth toggle or override needs a restart first")
+    fun restartNeeded() {
+        val endpoint = connected(TunnelEndpoint("https://abc.d.arc-tunnel.io", valid = true))
+
+        fun stateOf(
+            config: ServerConfig,
+            server: ServerStatus,
+        ) = RegisterLinks.cardState(config, endpoint, server) as RegisterCardState.TunnelEnabled
+        val oauthTurnedOn = stateOf(tunnelOn, running.copy(oauthEnabled = false))
+        assertTrue(oauthTurnedOn.restartNeeded)
+        assertFalse(oauthTurnedOn.canRegister)
+        assertTrue(stateOf(tunnelOn.copy(publicUrlOverride = "https://new.example.org"), running).restartNeeded)
+        assertTrue(stateOf(tunnelOn, running.copy(publicUrlOverride = "https://old.example.org")).restartNeeded)
+        // The same override written differently is no change; and only a running server can need a restart.
+        val same = tunnelOn.copy(publicUrlOverride = "HTTPS://Phone.example.org/")
+        assertFalse(stateOf(same, running.copy(publicUrlOverride = "https://phone.example.org")).restartNeeded)
+        assertFalse(stateOf(tunnelOn, ServerStatus.Starting).restartNeeded)
+        assertTrue(stateOf(tunnelOn, running).canRegister)
     }
 
     @Test
     @DisplayName("with OAuth off the buttons stay disabled even with a URL")
     fun oauthOff() {
         val endpoint = TunnelEndpoint("https://abc.d.arc-tunnel.io", valid = true)
-        val state = RegisterLinks.cardState(tunnelOn.copy(oauthEnabled = false), connected(endpoint), running)
-        val expected = RegisterCardState.TunnelEnabled("https://abc.d.arc-tunnel.io/mcp", false, serverRunning = true)
+        val config = tunnelOn.copy(oauthEnabled = false)
+        val state = RegisterLinks.cardState(config, connected(endpoint), running.copy(oauthEnabled = false))
+        val expected = RegisterCardState.TunnelEnabled(TunnelUrl.Known("https://abc.d.arc-tunnel.io/mcp"), false, false)
         assertEquals(expected, state)
         assertFalse((state as RegisterCardState.TunnelEnabled).canRegister)
     }
+
+    private fun urlOf(
+        tunnelStatus: TunnelStatus,
+        serverStatus: ServerStatus,
+        config: ServerConfig = tunnelOn,
+    ): TunnelUrl = (RegisterLinks.cardState(config, tunnelStatus, serverStatus) as RegisterCardState.TunnelEnabled).url
 }
