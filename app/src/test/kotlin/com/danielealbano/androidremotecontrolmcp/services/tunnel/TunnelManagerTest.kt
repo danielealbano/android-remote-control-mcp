@@ -16,9 +16,12 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -242,6 +245,34 @@ class TunnelManagerTest {
             }
 
         @Test
+        fun `a stop cut short by a timeout still shows the tunnel as gone`() =
+            runTest {
+                val providerStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
+                val config = ServerConfig(tunnelEnabled = true, tunnelProvider = TunnelProviderType.CLOUDFLARE)
+                every { mockCloudflareProvider.status } returns providerStatus
+                coEvery { mockCloudflareProvider.start(8080, config) } just Runs
+                coEvery { mockCloudflareProvider.stop() } coAnswers { awaitCancellation() }
+                val manager = createManager()
+                manager.start(config, listenerHost)
+                Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
+                val connected =
+                    TunnelStatus.Connected(
+                        endpoints = listOf(TunnelEndpoint("https://test.trycloudflare.com", valid = true)),
+                        providerType = TunnelProviderType.CLOUDFLARE,
+                    )
+                providerStatus.value = connected
+                Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
+                assertEquals(connected, manager.tunnelStatus.value)
+
+                assertNull(withTimeoutOrNull(STOP_TIMEOUT_MS) { manager.stop() })
+
+                assertEquals(TunnelStatus.Disconnected, manager.tunnelStatus.value)
+                // The provider was let go: a later stop does not wait on it again.
+                manager.stop()
+                coVerify(exactly = 1) { mockCloudflareProvider.stop() }
+            }
+
+        @Test
         fun `stop when no active tunnel is no-op`() =
             runTest {
                 val manager = createManager()
@@ -304,5 +335,6 @@ class TunnelManagerTest {
     companion object {
         /** Time to wait for the relay coroutine on Dispatchers.IO to propagate state. */
         private const val RELAY_PROPAGATION_DELAY_MS = 100L
+        private const val STOP_TIMEOUT_MS = 3_000L
     }
 }
