@@ -74,7 +74,7 @@ sealed interface TunnelUrl {
         /** The server (and so the tunnel) is not started. */
         SERVER_STOPPED(R.string.register_card_no_url),
 
-        /** The server runs and the tunnel is coming up. */
+        /** The server is starting or running, and the tunnel is coming up. */
         WAITING(R.string.register_card_waiting_url),
 
         /** The tunnel failed, or is connected with no usable endpoint (a Cloudflare tunnel without a route). */
@@ -139,8 +139,8 @@ object RegisterLinks {
 
     /**
      * The card for the saved [config], [tunnelStatus] and [serverStatus]. The MCP URL is the first valid endpoint of a
-     * connected tunnel, or the public URL override when one is set: the OAuth metadata names the override, so a
-     * service given another URL could not log in. A running server keeps the OAuth toggle and the override it started
+     * connected tunnel, replaced by the public URL override when one is set: the OAuth metadata names the override, so
+     * a service given another URL could not log in. A running server keeps the OAuth toggle and the override it started
      * with, so a change of either needs a restart first.
      */
     fun cardState(

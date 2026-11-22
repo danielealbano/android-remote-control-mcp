@@ -565,7 +565,7 @@
     <string name="register_card_no_tunnel">Enable a tunnel first. Claude, ChatGPT and Gemini reach this phone through its public URL.</string>
     <string name="register_card_no_url">Start the server to get the tunnel URL.</string>
     <string name="register_card_waiting_url">Waiting for the tunnel URL.</string>
-    <string name="register_card_tunnel_failed">The tunnel did not start. Check the tunnel status below.</string>
+    <string name="register_card_tunnel_failed">The tunnel has no working public URL. Check the tunnel status below.</string>
     <string name="register_card_restart">Restart the server to apply the new settings.</string>
     <string name="register_card_oauth_off">Turn on OAuth in Settings → Access first.</string>
     <string name="register_chatgpt_steps">URL copied. Tap +, then Add custom MCP server, and paste it.</string>

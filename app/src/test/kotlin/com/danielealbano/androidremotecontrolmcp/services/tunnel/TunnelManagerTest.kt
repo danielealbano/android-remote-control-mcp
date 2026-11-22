@@ -18,6 +18,7 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -254,15 +255,14 @@ class TunnelManagerTest {
                 coEvery { mockCloudflareProvider.stop() } coAnswers { awaitCancellation() }
                 val manager = createManager()
                 manager.start(config, listenerHost)
-                Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
                 val connected =
                     TunnelStatus.Connected(
                         endpoints = listOf(TunnelEndpoint("https://test.trycloudflare.com", valid = true)),
                         providerType = TunnelProviderType.CLOUDFLARE,
                     )
                 providerStatus.value = connected
-                Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
-                assertEquals(connected, manager.tunnelStatus.value)
+                // The relay runs on Dispatchers.IO: wait for it rather than for a fixed time.
+                manager.tunnelStatus.first { it == connected }
 
                 assertNull(withTimeoutOrNull(STOP_TIMEOUT_MS) { manager.stop() })
 
