@@ -130,6 +130,11 @@ tasks.withType<Test> {
     dependsOn(compileTestSu)
     systemProperty("e2e.testSu", testSuBinary.get().asFile.absolutePath)
 
+    // The results depend on the APKs under test, the redroid container, the phone and the network, none of them task
+    // inputs: a cached or up-to-date result would report a run that never happened, so the suite always runs.
+    outputs.doNotCacheIf("E2E results depend on the APKs under test and live devices") { true }
+    outputs.upToDateWhen { false }
+
     useJUnitPlatform()
 
     // Show test stdout/stderr in the console for debugging.
