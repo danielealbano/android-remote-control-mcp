@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.components
 import androidx.annotation.StringRes
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.mcp.canonicalResource
 import com.danielealbano.androidremotecontrolmcp.mcp.normalizeBaseUrl
@@ -35,22 +36,27 @@ sealed interface RegisterCardState {
     }
 
     /**
-     * A tunnel is enabled. [mcpUrl] is the public MCP URL, null until the tunnel is connected. The services log in
-     * with OAuth, so the buttons work only with [mcpUrl] and while [oauthEnabled].
+     * A tunnel is enabled. [mcpUrl] is the public MCP URL, null until the tunnel is connected, which needs the server
+     * started ([serverRunning]). The services log in with OAuth, so the buttons work only with [mcpUrl] and while
+     * [oauthEnabled].
      */
     data class TunnelEnabled(
         val mcpUrl: String?,
         val oauthEnabled: Boolean,
+        val serverRunning: Boolean = false,
     ) : RegisterCardState {
         val canRegister: Boolean get() = mcpUrl != null && oauthEnabled
 
-        /** Why the buttons are disabled: the public URL is not known yet, OAuth is off. */
+        /** Why the buttons are disabled: no public URL yet (start the server, or wait for the tunnel), OAuth is off. */
         override val hintsRes: List<Int>
             get() =
                 listOfNotNull(
-                    R.string.register_card_no_url.takeIf { mcpUrl == null },
+                    noUrlHint.takeIf { mcpUrl == null },
                     R.string.register_card_oauth_off.takeIf { !oauthEnabled },
                 )
+
+        private val noUrlHint: Int
+            get() = if (serverRunning) R.string.register_card_waiting_url else R.string.register_card_no_url
     }
 }
 
@@ -107,13 +113,14 @@ object RegisterLinks {
             ?: if (model.startsWith(manufacturer, ignoreCase = true)) model else "$manufacturer $model"
 
     /**
-     * The card for [config] and [tunnelStatus]. The MCP URL is the first valid endpoint of a connected tunnel, or the
-     * public URL override when one is set: the OAuth metadata names the override, so a service given another URL
-     * could not log in.
+     * The card for [config], [tunnelStatus] and [serverStatus] (starting or running counts as started). The MCP URL is
+     * the first valid endpoint of a connected tunnel, or the public URL override when one is set: the OAuth metadata
+     * names the override, so a service given another URL could not log in.
      */
     fun cardState(
         config: ServerConfig,
         tunnelStatus: TunnelStatus,
+        serverStatus: ServerStatus,
     ): RegisterCardState {
         if (!config.tunnelEnabled) return RegisterCardState.NoTunnel
         val endpoint = (tunnelStatus as? TunnelStatus.Connected)?.endpoints?.firstOrNull { it.valid }?.url
@@ -121,6 +128,7 @@ object RegisterLinks {
         return RegisterCardState.TunnelEnabled(
             mcpUrl = baseUrl?.let { canonicalResource(normalizeBaseUrl(it)) },
             oauthEnabled = config.oauthEnabled,
+            serverRunning = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Running,
         )
     }
 

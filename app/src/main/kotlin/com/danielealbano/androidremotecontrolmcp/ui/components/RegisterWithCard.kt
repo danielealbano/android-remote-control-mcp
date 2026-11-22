@@ -29,20 +29,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The home-screen "Register with" card for [serverConfig] and [tunnelStatus], followed by its spacing, or nothing once
- * [dismissed]. The Claude button names the connector after the device slug or the phone
+ * The home-screen "Register with" card for [serverConfig], [tunnelStatus] and [serverStatus], followed by its spacing,
+ * or nothing once [dismissed]. The Claude button names the connector after the device slug or the phone
  * ([RegisterLinks.connectorName]).
  */
 @Composable
 fun RegisterWithSection(
     serverConfig: ServerConfig,
     tunnelStatus: TunnelStatus,
+    serverStatus: ServerStatus,
     dismissed: Boolean,
     onDismiss: () -> Unit,
 ) {
@@ -50,7 +52,7 @@ fun RegisterWithSection(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    val state = RegisterLinks.cardState(serverConfig, tunnelStatus)
+    val state = RegisterLinks.cardState(serverConfig, tunnelStatus, serverStatus)
     RegisterWithCard(
         state = state,
         onRegister = { target ->

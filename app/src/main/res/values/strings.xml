@@ -563,6 +563,7 @@
     <string name="register_target_gemini">Gemini</string>
     <string name="register_card_no_tunnel">Enable a tunnel first. Claude, ChatGPT and Gemini reach this phone through its public URL.</string>
     <string name="register_card_no_url">Start the server to get the tunnel URL.</string>
+    <string name="register_card_waiting_url">Waiting for the tunnel URL.</string>
     <string name="register_card_oauth_off">Turn on OAuth in Settings → Access first.</string>
     <string name="register_chatgpt_steps">URL copied. Tap +, then Add custom MCP server, and paste it.</string>
     <string name="register_gemini_steps">URL copied. Tap +, then paste it as the MCP Server URL.</string>

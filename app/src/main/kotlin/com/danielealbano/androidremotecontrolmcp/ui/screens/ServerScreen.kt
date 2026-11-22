@@ -192,6 +192,7 @@ fun ServerScreen(
             RegisterWithSection(
                 serverConfig = serverConfig,
                 tunnelStatus = tunnelStatus,
+                serverStatus = serverStatus,
                 dismissed = registerCardDismissed,
                 onDismiss = viewModel::dismissRegisterCard,
             )
