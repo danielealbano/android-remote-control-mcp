@@ -160,6 +160,7 @@
 
     <!-- Clipboard -->
     <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="server_details_clip_label">Server details</string>
 
     <!-- Server Status -->
     <string name="server_status_title">Server Status</string>
@@ -554,6 +555,25 @@
     <string name="privacy_card_title">Worried about personal data?</string>
     <string name="privacy_card_action">Set up Privacy Mode</string>
     <string name="privacy_card_dismiss">Dismiss</string>
+
+    <!-- Register with card -->
+    <string name="register_card_title">Register with</string>
+    <string name="register_card_dismiss">Dismiss</string>
+    <string name="register_target_claude">Claude</string>
+    <string name="register_target_chatgpt">ChatGPT.com</string>
+    <string name="register_target_gemini">Gemini</string>
+    <string name="register_card_no_tunnel">Enable a tunnel first. Claude, ChatGPT and Gemini reach this phone through its public URL.</string>
+    <string name="register_card_no_url">Start the server to get the tunnel URL.</string>
+    <string name="register_card_waiting_url">Waiting for the tunnel URL.</string>
+    <string name="register_card_tunnel_failed">The tunnel has no working public URL. Check the tunnel status below.</string>
+    <string name="register_card_restart">Restart the server to apply the new settings.</string>
+    <string name="register_card_oauth_off">Turn on OAuth in Settings → Access first.</string>
+    <string name="register_chatgpt_steps">URL copied. Tap +, Add custom MCP server.</string>
+    <string name="register_gemini_steps">URL copied. Tap + and paste it.</string>
+    <string name="register_no_app">No app can open the link.</string>
+    <string name="register_clip_label">MCP server URL</string>
+    <string name="register_button_description">Register with %1$s</string>
+
     <string name="notification_channel_elevation_approval_name">Elevated command approvals</string>
     <string name="notification_channel_elevation_approval_description">Asks you to approve elevated shell commands requested by an MCP client</string>
     <string name="elevation_notification_title">Approve an elevated command?</string>

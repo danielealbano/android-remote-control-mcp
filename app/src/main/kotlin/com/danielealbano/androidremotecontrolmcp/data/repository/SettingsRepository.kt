@@ -174,7 +174,10 @@ interface SettingsRepository :
      */
     fun validateCertificateHostname(hostname: String): Result<String>
 
-    /** Updates the tunnel enabled toggle. */
+    /**
+     * Updates the tunnel enabled toggle. Turning a tunnel on (it was off) clears [registerCardDismissed], so the
+     * home-screen "Register with" card comes back.
+     */
     suspend fun updateTunnelEnabled(enabled: Boolean)
 
     /** Updates the tunnel provider type. */
@@ -286,6 +289,12 @@ interface SettingsRepository :
 
     /** Emits whether the home-screen Privacy Mode callout card was dismissed (default false). */
     val privacyModeCardDismissed: Flow<Boolean>
+
+    /** Persists whether the home-screen "Register with" card was dismissed. */
+    suspend fun updateRegisterCardDismissed(dismissed: Boolean)
+
+    /** Emits whether the home-screen "Register with" card was dismissed (default false). */
+    val registerCardDismissed: Flow<Boolean>
 
     /** Emits whether automatic GitHub update checks are enabled (default true). */
     val autoUpdateCheckEnabled: Flow<Boolean>

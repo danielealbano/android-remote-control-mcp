@@ -90,7 +90,14 @@ class AdbServiceTrampolineActivityTest {
 
         @Test
         fun `handle enroll-tunnel is ignored while the server runs`() {
-            prepare(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"))
+            prepare(
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                ),
+            )
 
             activity.handle(AdbServiceTrampolineActivity.ACTION_VALUE_ENROLL_TUNNEL)
 

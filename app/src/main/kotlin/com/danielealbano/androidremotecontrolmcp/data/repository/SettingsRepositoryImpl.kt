@@ -74,6 +74,7 @@ private val EVENT_CHANNEL_CONFIG_KEY = stringPreferencesKey("event_channel_confi
 private val PRIVACY_MODE_CONFIG_KEY = stringPreferencesKey("privacy_mode_config")
 private val PRIVACY_BENCHMARK_SECONDS_KEY = stringPreferencesKey("privacy_benchmark_estimate_seconds")
 private val PRIVACY_CARD_DISMISSED_KEY = booleanPreferencesKey("privacy_mode_card_home_dismissed")
+private val REGISTER_CARD_DISMISSED_KEY = booleanPreferencesKey("register_card_home_dismissed")
 private val AUTO_UPDATE_CHECK_ENABLED_KEY = booleanPreferencesKey("auto_update_check_enabled")
 private val AVAILABLE_UPDATE_VERSION_KEY = stringPreferencesKey("available_update_version")
 private val AVAILABLE_UPDATE_URL_KEY = stringPreferencesKey("available_update_url")
@@ -532,6 +533,7 @@ class SettingsRepositoryImpl
             dataStore.edit { prefs ->
                 val old = prefs[TUNNEL_ENABLED_KEY] ?: false
                 prefs[TUNNEL_ENABLED_KEY] = enabled
+                if (enabled && !old) prefs.remove(REGISTER_CARD_DISMISSED_KEY)
                 logToggle("tunnel_enabled", old, enabled, "Remote access tunnel")
             }
         }
@@ -703,6 +705,13 @@ class SettingsRepositoryImpl
 
         override val privacyModeCardDismissed: Flow<Boolean> =
             dataStore.data.map { prefs -> prefs[PRIVACY_CARD_DISMISSED_KEY] ?: false }
+
+        override suspend fun updateRegisterCardDismissed(dismissed: Boolean) {
+            dataStore.edit { prefs -> prefs[REGISTER_CARD_DISMISSED_KEY] = dismissed }
+        }
+
+        override val registerCardDismissed: Flow<Boolean> =
+            dataStore.data.map { prefs -> prefs[REGISTER_CARD_DISMISSED_KEY] ?: false }
 
         override val autoUpdateCheckEnabled: Flow<Boolean> =
             dataStore.data.map { prefs -> prefs[AUTO_UPDATE_CHECK_ENABLED_KEY] ?: true }

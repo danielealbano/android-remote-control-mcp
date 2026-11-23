@@ -16,7 +16,14 @@ class ServerStatusLogMessageTest {
         assertEquals("Server starting", serverStatusLogMessage(ServerStatus.Starting))
         assertEquals(
             "Server started on 127.0.0.1:8080",
-            serverStatusLogMessage(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")),
+            serverStatusLogMessage(
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                ),
+            ),
         )
         assertEquals("Server stopping", serverStatusLogMessage(ServerStatus.Stopping))
         assertEquals("Server stopped", serverStatusLogMessage(ServerStatus.Stopped))
@@ -27,7 +34,14 @@ class ServerStatusLogMessageTest {
     fun `an IPv6 address is bracketed`() {
         assertEquals(
             "Server started on [2001:db8::20]:8080",
-            serverStatusLogMessage(ServerStatus.Running(port = 8080, bindingAddress = "2001:db8::20")),
+            serverStatusLogMessage(
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "2001:db8::20",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                ),
+            ),
         )
     }
 

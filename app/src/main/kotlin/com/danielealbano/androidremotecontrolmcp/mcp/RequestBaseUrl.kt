@@ -105,7 +105,10 @@ fun normalizeBaseUrl(raw: String): String {
 fun effectiveBaseUrl(
     call: ApplicationCall,
     override: String,
-): String = override.trim().ifEmpty { null }?.let { normalizeBaseUrl(it) } ?: deriveBaseUrl(call)
+): String = overrideBaseUrl(override) ?: deriveBaseUrl(call)
+
+/** The base URL a public URL [override] sets ([normalizeBaseUrl]), or null when none is set. */
+fun overrideBaseUrl(override: String): String? = override.trim().ifEmpty { null }?.let(::normalizeBaseUrl)
 
 /** Coroutine-context element carrying the per-request base URL into MCP tool handlers. */
 class RequestBaseUrlElement(

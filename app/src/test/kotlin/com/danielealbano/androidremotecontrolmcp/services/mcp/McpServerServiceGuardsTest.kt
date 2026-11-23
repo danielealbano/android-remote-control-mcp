@@ -11,7 +11,16 @@ class McpServerServiceGuardsTest {
     @Test
     fun `isServerActive is true for Starting and Running only`() {
         assertTrue(isServerActive(ServerStatus.Starting))
-        assertTrue(isServerActive(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1")))
+        assertTrue(
+            isServerActive(
+                ServerStatus.Running(
+                    port = 8080,
+                    bindingAddress = "127.0.0.1",
+                    oauthEnabled = true,
+                    publicUrlOverride = "",
+                ),
+            ),
+        )
         assertFalse(isServerActive(ServerStatus.Stopped))
         assertFalse(isServerActive(ServerStatus.Stopping))
         assertFalse(isServerActive(ServerStatus.Error("boom")))

@@ -287,12 +287,7 @@ class McpServerService : Service() {
                 }
             }
 
-            updateStatus(
-                ServerStatus.Running(
-                    port = config.port,
-                    bindingAddress = config.bindHost,
-                ),
-            )
+            updateStatus(runningStatus(config))
 
             // Start tunnel if remote access is enabled. Cloudflare/ngrok forward to http://localhost:<tunnel local
             // port>, served by the main listener or by the server's own plain HTTP loopback listener; the free E2E
@@ -529,6 +524,19 @@ internal fun fallbackBaseUrl(
     val port = config?.port ?: ServerConfig.DEFAULT_PORT
     return "$scheme://${NetworkUtils.urlHost(host)}:$port"
 }
+
+/**
+ * The status of a server started with [config]: where it listens, and the settings that apply only on a restart (HTTPS,
+ * OAuth, the public URL override), so the UI can tell when the saved ones differ.
+ */
+internal fun runningStatus(config: ServerConfig): ServerStatus.Running =
+    ServerStatus.Running(
+        port = config.port,
+        bindingAddress = config.bindHost,
+        httpsEnabled = config.httpsEnabled,
+        oauthEnabled = config.oauthEnabled,
+        publicUrlOverride = config.publicUrlOverride,
+    )
 
 /** Human-readable server-log message for a [ServerStatus] transition. */
 internal fun serverStatusLogMessage(status: ServerStatus): String =

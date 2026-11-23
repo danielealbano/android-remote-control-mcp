@@ -19,11 +19,15 @@ sealed class ServerStatus {
      * @property port The port the server is listening on.
      * @property bindingAddress The IP address the server is bound to.
      * @property httpsEnabled Whether HTTPS is enabled (optional, disabled by default).
+     * @property oauthEnabled Whether the server started with OAuth; a change in the settings applies on restart.
+     * @property publicUrlOverride The public URL override the server started with; a change applies on restart.
      */
     data class Running(
         val port: Int,
         val bindingAddress: String,
         val httpsEnabled: Boolean = false,
+        val oauthEnabled: Boolean,
+        val publicUrlOverride: String,
     ) : ServerStatus()
 
     /** The MCP server is in the process of shutting down. */

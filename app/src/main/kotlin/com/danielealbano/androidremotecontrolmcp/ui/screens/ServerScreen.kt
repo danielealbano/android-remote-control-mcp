@@ -59,6 +59,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizati
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
+import com.danielealbano.androidremotecontrolmcp.ui.components.RegisterWithSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
@@ -102,6 +103,7 @@ fun ServerScreen(
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsStateWithLifecycle()
     val pendingApprovalCount by viewModel.pendingApprovalCount.collectAsStateWithLifecycle()
+    val registerCardDismissed by viewModel.registerCardDismissed.collectAsStateWithLifecycle()
 
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
@@ -112,6 +114,7 @@ fun ServerScreen(
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
+    val serverDetailsClipLabel = stringResource(R.string.server_details_clip_label)
     var showChannelNotConfiguredDialog by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -186,6 +189,14 @@ fun ServerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            RegisterWithSection(
+                serverConfig = serverConfig,
+                tunnelStatus = tunnelStatus,
+                serverStatus = serverStatus,
+                dismissed = registerCardDismissed,
+                onDismiss = viewModel::dismissRegisterCard,
+            )
+
             ServerStatusCard(
                 serverStatus = serverStatus,
                 channelStatus = channelStatus,
@@ -225,7 +236,7 @@ fun ServerScreen(
                 specificAddressRefused = listenerCheck.specificAddressError != null,
                 onCopyAll = { text ->
                     scope.launch {
-                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(serverDetailsClipLabel, text)))
                         Toast.makeText(context, copiedToClipboardMessage, Toast.LENGTH_SHORT).show()
                     }
                 },

@@ -89,10 +89,13 @@ class TunnelManager
                 statusRelayJob?.cancel()
                 statusRelayJob = null
 
-                activeProvider?.stop()
-                activeProvider = null
-
-                _tunnelStatus.value = TunnelStatus.Disconnected
+                // In a finally: a stop cancelled by the caller's timeout must still leave the tunnel shown as gone.
+                try {
+                    activeProvider?.stop()
+                } finally {
+                    activeProvider = null
+                    _tunnelStatus.value = TunnelStatus.Disconnected
+                }
             }
         }
     }
