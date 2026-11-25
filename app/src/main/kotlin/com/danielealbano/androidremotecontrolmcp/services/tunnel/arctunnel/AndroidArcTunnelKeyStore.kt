@@ -19,6 +19,23 @@ class AndroidArcTunnelKeyStore
             alias: String,
             challenge: ByteArray?,
         ) {
+            if (challenge == null) {
+                generate(alias, null, deviceProps = false)
+            } else {
+                // The identity key (enrollment and every renewal): its attestation also carries the device
+                // properties when the keystore can attest them.
+                ArcTunnelDeviceProps.withFallback(
+                    withProps = { generate(alias, challenge, deviceProps = true) },
+                    withoutProps = { generate(alias, challenge, deviceProps = false) },
+                )
+            }
+        }
+
+        private fun generate(
+            alias: String,
+            challenge: ByteArray?,
+            deviceProps: Boolean,
+        ) {
             keyStore().deleteEntry(alias)
             val builder =
                 KeyGenParameterSpec
@@ -30,7 +47,9 @@ class AndroidArcTunnelKeyStore
                         KeyProperties.DIGEST_SHA384,
                         KeyProperties.DIGEST_SHA512,
                     )
-            if (challenge != null) builder.setAttestationChallenge(challenge)
+            if (challenge != null) {
+                builder.setAttestationChallenge(challenge).setDevicePropertiesAttestationIncluded(deviceProps)
+            }
             KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, PROVIDER).apply {
                 initialize(builder.build())
                 generateKeyPair()
