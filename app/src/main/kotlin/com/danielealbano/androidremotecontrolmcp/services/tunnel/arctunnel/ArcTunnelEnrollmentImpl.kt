@@ -26,6 +26,7 @@ class ArcTunnelEnrollmentImpl
         @ApplicationContext private val context: Context,
         private val keys: ArcTunnelKeyStore,
         private val serverLog: ServerLogRepository,
+        reportedDevice: ArcTunnelReportedDevice,
     ) : ArcTunnelEnrollment {
         private val _state = MutableStateFlow<ArcTunnelEnrollmentState>(ArcTunnelEnrollmentState.Idle)
         override val state: StateFlow<ArcTunnelEnrollmentState> = _state.asStateFlow()
@@ -33,7 +34,7 @@ class ArcTunnelEnrollmentImpl
         private val requestInFlight = AtomicBoolean(false)
         private val stores = ConcurrentHashMap<String, ArcTunnelIdentityStore>()
         private val nets = ConcurrentHashMap<ArcTunnelEnv, ArcTunnelNet>()
-        private val enroller = ArcTunnelEnroller(keys, serverLog)
+        private val enroller = ArcTunnelEnroller(keys, serverLog, reportedDevice)
         private val flow = ArcTunnelEnrollmentFlow(keys, enroller)
 
         /** One store instance per environment, so its `@Synchronized` methods really serialize all writers. */

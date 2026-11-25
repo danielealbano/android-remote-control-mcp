@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference
 class ArcTunnelEnrollerTest {
     private val keys = FakeArcTunnelKeyStore()
     private val serverLog = RecordingServerLogRepository()
-    private val enroller = ArcTunnelEnroller(keys, serverLog)
+    private val enroller = ArcTunnelEnroller(keys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE)
     private val hosts = ArcTunnelTestServer.hosts
     private val prefix = ArcTunnelEnroller.aliasPrefix(hosts)
     private val service = Service()
@@ -238,6 +238,26 @@ class ArcTunnelEnrollerTest {
         }
 
     @Test
+    fun `the enrollment, the first issue and a renewal all carry the reported device`() =
+        runBlocking {
+            val (identity, issueNonce) = enroller.enroll(net, hosts)
+            enroller.issue(identity, issueNonce)
+            enroller.issue(identity, "0c01")
+
+            val expected = ArcTunnelTestIdentity.REPORTED_DEVICE
+            val enrolled =
+                service.bodies(ENROLL_PATH).map {
+                    ArcTunnelJson.decodeFromString(ArcTunnelEnrollRequest.serializer(), it).reportedDevice
+                }
+            val issued =
+                service.bodies(ISSUE_PATH).map {
+                    ArcTunnelJson.decodeFromString(ArcTunnelIssueRequest.serializer(), it).reportedDevice
+                }
+            assertEquals(listOf(expected), enrolled)
+            assertEquals(listOf(expected, expected), issued)
+        }
+
+    @Test
     fun `issue installs chains and deletes the identity key two generations back`() =
         runBlocking {
             val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
@@ -403,7 +423,7 @@ class ArcTunnelEnrollerTest {
         runBlocking {
             val spiedKeys = spyk(FakeArcTunnelKeyStore())
             every { spiedKeys.deleteKey("${prefix}identity-0") } throws KeyStoreException("busy")
-            val spiedEnroller = ArcTunnelEnroller(spiedKeys, serverLog)
+            val spiedEnroller = ArcTunnelEnroller(spiedKeys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE)
             val identity = ArcTunnelTestIdentity.create(spiedKeys, net, withPublicChain = false)
             val saves = AtomicInteger()
 

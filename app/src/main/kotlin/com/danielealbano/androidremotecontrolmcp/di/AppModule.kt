@@ -83,6 +83,7 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalsImpl
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelReportedDevice
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlerts
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceAlertsImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelServiceStatus
@@ -163,6 +164,13 @@ object AppModule {
     fun providePrivacyModelStore(
         @ApplicationContext context: Context,
     ): PrivacyModelStore = PrivacyModelStore(context.filesDir)
+
+    /**
+     * Provides what the phone reports about itself to the free E2E tunnel service, read from `Build` once.
+     */
+    @Provides
+    @Singleton
+    fun provideArcTunnelReportedDevice(): ArcTunnelReportedDevice = ArcTunnelReportedDevice.fromBuild()
 }
 
 @Module

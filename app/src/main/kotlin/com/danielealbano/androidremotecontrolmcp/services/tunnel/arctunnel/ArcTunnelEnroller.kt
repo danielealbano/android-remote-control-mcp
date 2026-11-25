@@ -9,10 +9,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.cert.X509Certificate
 
-/** Phase 1 enrollment, Phase 2 issuance and every renewal (PROTOCOL.md §2–§3) with one TLS key per name. */
+/**
+ * Phase 1 enrollment, Phase 2 issuance and every renewal (PROTOCOL.md §2–§3) with one TLS key per name. The
+ * enrollment and every `/issue` (the first certificate and every renewal) carry [reportedDevice].
+ */
 class ArcTunnelEnroller(
     private val keys: ArcTunnelKeyStore,
     private val serverLog: ServerLogRepository,
+    private val reportedDevice: ArcTunnelReportedDevice,
 ) {
     /**
      * Phase 1: attested identity key + bootstrap identity cert; returns the identity (no public cert yet) +
@@ -78,6 +82,7 @@ class ArcTunnelEnroller(
                 nonce = nonce,
                 attestationChain = keys.attestationChainPem(identityAlias),
                 identityCsr = ArcTunnelCsr.identityCsr(keys.privateKey(identityAlias), keys.publicKey(identityAlias)),
+                reportedDevice = reportedDevice,
             )
         val response =
             ArcTunnelHttp.post(
@@ -145,6 +150,7 @@ class ArcTunnelEnroller(
                 attestationChain = keys.attestationChainPem(nextIdentityAlias),
                 identityCsr = ArcTunnelCsr.identityCsr(identityKey, keys.publicKey(nextIdentityAlias)),
                 tlsCsr = ArcTunnelCsr.tlsCsr(tlsKey, keys.publicKey(base.tlsAlias), identity.fqdn()),
+                reportedDevice = reportedDevice,
             )
         val response =
             ArcTunnelHttp.post(
