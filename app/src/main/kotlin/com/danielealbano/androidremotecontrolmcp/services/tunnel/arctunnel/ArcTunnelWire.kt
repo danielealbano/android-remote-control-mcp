@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import android.os.Build
 import io.netty.util.NetUtil
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -23,11 +24,41 @@ data class ArcTunnelNonceResponse(
     val nonce: String,
 )
 
+/**
+ * What the phone reports about itself (PROTOCOL.md §2, "Reported device"), sent with the enrollment and every
+ * `/issue`. The TEE checked none of it, so the server keeps it apart from the attested device properties; it drops any
+ * value it does not accept and never refuses a request over one, so the values go out exactly as Android gives them.
+ */
+@Serializable
+data class ArcTunnelReportedDevice(
+    val brand: String,
+    val device: String,
+    val product: String,
+    val manufacturer: String,
+    val model: String,
+    val fingerprint: String,
+) {
+    companion object {
+        /** The only place the reported device is read from [Build]; JVM tests pass fixed values instead. */
+        fun fromBuild(): ArcTunnelReportedDevice =
+            ArcTunnelReportedDevice(
+                brand = Build.BRAND,
+                device = Build.DEVICE,
+                product = Build.PRODUCT,
+                manufacturer = Build.MANUFACTURER,
+                model = Build.MODEL,
+                fingerprint = Build.FINGERPRINT,
+            )
+    }
+}
+
 @Serializable
 data class ArcTunnelEnrollRequest(
     val nonce: String,
     @SerialName("attestation_chain") val attestationChain: String,
     @SerialName("identity_csr") val identityCsr: String,
+    // Non-null: with explicitNulls = false a null would drop the key without a word.
+    @SerialName("reported_device") val reportedDevice: ArcTunnelReportedDevice,
 )
 
 @Serializable
@@ -43,6 +74,8 @@ data class ArcTunnelIssueRequest(
     @SerialName("attestation_chain") val attestationChain: String,
     @SerialName("identity_csr") val identityCsr: String,
     @SerialName("tls_csr") val tlsCsr: String,
+    // Non-null for the same reason as on ArcTunnelEnrollRequest.
+    @SerialName("reported_device") val reportedDevice: ArcTunnelReportedDevice,
 )
 
 @Serializable

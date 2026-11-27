@@ -105,14 +105,44 @@ class ArcTunnelWireTest {
         assertEquals("p", response.publicCert)
     }
 
+    private val device =
+        ArcTunnelReportedDevice(
+            brand = "b",
+            device = "d",
+            product = "p",
+            manufacturer = "ma",
+            model = "mo",
+            fingerprint = "f",
+        )
+    private val deviceJson =
+        """"reported_device":{"brand":"b","device":"d","product":"p",""" +
+            """"manufacturer":"ma","model":"mo","fingerprint":"f"}"""
+
     @Test
     fun `EnrollRequest serializes snake_case names`() {
         val json =
             ArcTunnelJson.encodeToString(
                 ArcTunnelEnrollRequest.serializer(),
-                ArcTunnelEnrollRequest(nonce = "n", attestationChain = "a", identityCsr = "c"),
+                ArcTunnelEnrollRequest(nonce = "n", attestationChain = "a", identityCsr = "c", reportedDevice = device),
             )
 
-        assertEquals("""{"nonce":"n","attestation_chain":"a","identity_csr":"c"}""", json)
+        assertEquals("""{"nonce":"n","attestation_chain":"a","identity_csr":"c",$deviceJson}""", json)
+    }
+
+    @Test
+    fun `IssueRequest serializes snake_case names`() {
+        val json =
+            ArcTunnelJson.encodeToString(
+                ArcTunnelIssueRequest.serializer(),
+                ArcTunnelIssueRequest(
+                    nonce = "n",
+                    attestationChain = "a",
+                    identityCsr = "c",
+                    tlsCsr = "t",
+                    reportedDevice = device,
+                ),
+            )
+
+        assertEquals("""{"nonce":"n","attestation_chain":"a","identity_csr":"c","tls_csr":"t",$deviceJson}""", json)
     }
 }

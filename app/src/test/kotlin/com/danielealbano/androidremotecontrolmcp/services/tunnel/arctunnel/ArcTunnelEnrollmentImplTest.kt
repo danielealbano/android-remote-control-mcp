@@ -109,7 +109,7 @@ class ArcTunnelEnrollmentImplTest {
         server = ArcTunnelTestServer.start()
         server.dispatcher = service
         env = ArcTunnelEnv(ArcTunnelTestServer.BASE, "127.0.0.1:${server.port}", ArcTunnelTestServer.certPem)
-        impl = ArcTunnelEnrollmentImpl(context, keys, serverLog)
+        impl = ArcTunnelEnrollmentImpl(context, keys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE)
     }
 
     @AfterEach

@@ -6,6 +6,17 @@ import java.security.cert.X509Certificate
 object ArcTunnelTestIdentity {
     const val NAME = "abcdefghij"
 
+    /** Fixed reported device for JVM tests, a distinct value per field so a swap shows. */
+    val REPORTED_DEVICE =
+        ArcTunnelReportedDevice(
+            brand = "TestBrand",
+            device = "test_device",
+            product = "test_product",
+            manufacturer = "TestMaker",
+            model = "Test Model 1",
+            fingerprint = "TestBrand/test_product/test_device:16/BP2A.250605.031/1:user/release-keys",
+        )
+
     fun chainFor(
         keys: FakeArcTunnelKeyStore,
         alias: String,

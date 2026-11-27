@@ -88,7 +88,7 @@ class ArcTunnelReceivedCertificateTest {
         server.dispatcher = service
         enrollAnswer = { ArcTunnelTestServer.json(enrollBody()) }
         env = ArcTunnelEnv(ArcTunnelTestServer.BASE, "127.0.0.1:${server.port}", ArcTunnelTestServer.certPem)
-        impl = ArcTunnelEnrollmentImpl(context, keys, serverLog)
+        impl = ArcTunnelEnrollmentImpl(context, keys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE)
     }
 
     @AfterEach
@@ -311,7 +311,8 @@ class ArcTunnelReceivedCertificateTest {
     @Test
     fun `a first enrollment cancelled once the certificate is received is saved all the same`() =
         runBlocking {
-            val flow = ArcTunnelEnrollmentFlow(keys, ArcTunnelEnroller(keys, serverLog))
+            val flow =
+                ArcTunnelEnrollmentFlow(keys, ArcTunnelEnroller(keys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE))
             val caller = AtomicReference<Job>()
             val net = netCancellingAfterInstall(caller)
             val job =
@@ -331,7 +332,8 @@ class ArcTunnelReceivedCertificateTest {
     fun `a resumed issuance cancelled once the certificate is received is saved all the same`() =
         runBlocking {
             saveIdentity()
-            val flow = ArcTunnelEnrollmentFlow(keys, ArcTunnelEnroller(keys, serverLog))
+            val flow =
+                ArcTunnelEnrollmentFlow(keys, ArcTunnelEnroller(keys, serverLog, ArcTunnelTestIdentity.REPORTED_DEVICE))
             val caller = AtomicReference<Job>()
             val net = netCancellingAfterInstall(caller)
             val job =
